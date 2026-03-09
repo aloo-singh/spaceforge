@@ -1,15 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
 import { Application, Graphics } from "pixi.js";
 import { screenToWorld } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, ZOOM_STEP } from "@/lib/editor/constants";
+import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import type { CameraState, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const appRef = useRef<Application | null>(null);
+  const gridRef = useRef<Graphics | null>(null);
   const instructionsId = "editor-canvas-controls";
+  const { resolvedTheme } = useTheme();
+  const editorTheme = useMemo(
+    () => getEditorCanvasTheme(resolveEditorThemeMode(resolvedTheme)),
+    [resolvedTheme]
+  );
+  const editorThemeRef = useRef(editorTheme);
+
+  useEffect(() => {
+    editorThemeRef.current = editorTheme;
+  }, [editorTheme]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -21,16 +35,18 @@ export default function EditorCanvas() {
     async function init() {
       await app.init({
         resizeTo: containerRef.current!,
-        background: "#111111",
+        background: editorThemeRef.current.canvasBackground,
         antialias: true,
       });
 
       if (destroyed || !containerRef.current) return;
 
+      appRef.current = app;
       containerRef.current.appendChild(app.canvas);
       app.canvas.style.touchAction = "none";
 
       const grid = new Graphics();
+      gridRef.current = grid;
       app.stage.addChild(grid);
 
       const syncViewport = () => {
@@ -38,7 +54,12 @@ export default function EditorCanvas() {
       };
 
       syncViewport();
-      drawGrid(grid, useEditorStore.getState().camera, useEditorStore.getState().viewport);
+      drawGrid(
+        grid,
+        useEditorStore.getState().camera,
+        useEditorStore.getState().viewport,
+        editorThemeRef.current
+      );
 
       const handleResize = () => {
         syncViewport();
@@ -47,7 +68,7 @@ export default function EditorCanvas() {
       app.renderer.on("resize", handleResize);
 
       const unsubscribe = useEditorStore.subscribe((state) => {
-        drawGrid(grid, state.camera, state.viewport);
+        drawGrid(grid, state.camera, state.viewport, editorThemeRef.current);
       });
 
       // Space-to-pan is a core editor affordance; add this to onboarding/tutorial later.
@@ -165,6 +186,8 @@ export default function EditorCanvas() {
         window.removeEventListener("blur", onWindowBlur);
         unsubscribe();
         app.renderer.off("resize", handleResize);
+        appRef.current = null;
+        gridRef.current = null;
       };
     }
 
@@ -179,6 +202,16 @@ export default function EditorCanvas() {
       app.destroy(true, { children: true });
     };
   }, []);
+
+  useEffect(() => {
+    const app = appRef.current;
+    const grid = gridRef.current;
+    if (!app || !grid) return;
+
+    app.renderer.background.color = editorTheme.canvasBackground;
+    const state = useEditorStore.getState();
+    drawGrid(grid, state.camera, state.viewport, editorTheme);
+  }, [editorTheme]);
 
   return (
     <section
@@ -203,7 +236,8 @@ export default function EditorCanvas() {
 function drawGrid(
   graphics: Graphics,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
 ) {
   const { width, height } = viewport;
   graphics.clear();
@@ -221,20 +255,20 @@ function drawGrid(
   if (GRID_MINOR_SIZE_MM * camera.pixelsPerMm >= 8) {
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
       width: 1,
-      color: 0x242424,
+      color: theme.gridMinor,
       alpha: 1,
     });
   }
 
   drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
     width: 1,
-    color: 0x343434,
+    color: theme.gridMajor,
     alpha: 1,
   });
 
   const originX = (0 - camera.xMm) * camera.pixelsPerMm + width / 2;
   const originY = (0 - camera.yMm) * camera.pixelsPerMm + height / 2;
-  graphics.setStrokeStyle({ width: 1.5, color: 0x4f4f4f, alpha: 1 });
+  graphics.setStrokeStyle({ width: 1.5, color: theme.originAxis, alpha: 1 });
   graphics.moveTo(originX, 0);
   graphics.lineTo(originX, height);
   graphics.moveTo(0, originY);
