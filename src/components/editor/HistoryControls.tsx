@@ -2,6 +2,7 @@
 
 import { Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Keycap } from "@/components/ui/keycap";
 import { useEditorStore } from "@/stores/editorStore";
 
 export function HistoryControls() {
@@ -19,10 +20,14 @@ export function HistoryControls() {
           size="sm"
           onClick={undo}
           disabled={!canUndo}
-          aria-label="Undo last edit"
+          aria-label="Undo last edit, shortcut Command or Control plus Z"
+          className="gap-2"
         >
           <Undo2 />
           Undo
+          <Keycap aria-hidden="true" className="h-5 min-w-0 rounded-sm px-1.5 text-[10px]">
+            ⌘Z
+          </Keycap>
         </Button>
         <Button
           type="button"
@@ -30,15 +35,16 @@ export function HistoryControls() {
           size="sm"
           onClick={redo}
           disabled={!canRedo}
-          aria-label="Redo last undone edit"
+          aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
+          className="gap-2"
         >
           <Redo2 />
           Redo
+          <Keycap aria-hidden="true" className="h-5 min-w-0 rounded-sm px-1.5 text-[10px]">
+            ⇧⌘Z
+          </Keycap>
         </Button>
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Undo: Cmd/Ctrl+Z. Redo: Shift+Cmd+Z or Ctrl+Y.
-      </p>
     </aside>
   );
 }

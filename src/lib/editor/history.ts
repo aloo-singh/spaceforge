@@ -4,76 +4,44 @@ export type EditorDocumentState = {
   rooms: Room[];
 };
 
-export type EditorCommandContext = {
-  document: EditorDocumentState;
-  selectedRoomId: string | null;
-};
-
 export type EditorCommand =
   | {
       type: "complete-room";
       room: Room;
-      previousSelectedRoomId: string | null;
     }
   | {
       type: "rename-room";
       roomId: string;
       previousName: string;
       nextName: string;
-    }
-  | {
-      type: "set-selection";
-      previousSelectedRoomId: string | null;
-      nextSelectedRoomId: string | null;
     };
 
 export function applyEditorCommand(
-  state: EditorCommandContext,
+  document: EditorDocumentState,
   command: EditorCommand,
   direction: "undo" | "redo"
-): EditorCommandContext {
+): EditorDocumentState {
   if (command.type === "complete-room") {
     if (direction === "undo") {
       return {
-        document: {
-          rooms: state.document.rooms.filter((room) => room.id !== command.room.id),
-        },
-        selectedRoomId: command.previousSelectedRoomId,
+        rooms: document.rooms.filter((room) => room.id !== command.room.id),
       };
     }
 
     return {
-      document: {
-        rooms: [...state.document.rooms.filter((room) => room.id !== command.room.id), command.room],
-      },
-      selectedRoomId: null,
+      rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
     };
   }
 
-  if (command.type === "rename-room") {
-    const nextName = direction === "undo" ? command.previousName : command.nextName;
-    return {
-      ...state,
-      document: {
-        rooms: state.document.rooms.map((room) =>
-          room.id === command.roomId
-            ? {
-                ...room,
-                name: nextName,
-              }
-            : room
-        ),
-      },
-    };
-  }
-
+  const nextName = direction === "undo" ? command.previousName : command.nextName;
   return {
-    ...state,
-    selectedRoomId:
-      direction === "undo" ? command.previousSelectedRoomId : command.nextSelectedRoomId,
+    rooms: document.rooms.map((room) =>
+      room.id === command.roomId
+        ? {
+            ...room,
+            name: nextName,
+          }
+        : room
+    ),
   };
-}
-
-export function isMergeableRenameCommand(command: EditorCommand, roomId: string): boolean {
-  return command.type === "rename-room" && command.roomId === roomId;
 }
