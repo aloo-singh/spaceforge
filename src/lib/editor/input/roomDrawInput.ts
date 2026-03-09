@@ -1,12 +1,18 @@
 import { screenToWorld } from "@/lib/editor/camera";
-import type { Point } from "@/lib/editor/types";
+import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
+import { isPointInPolygon } from "@/lib/editor/roomGeometry";
+import type { Point, Room } from "@/lib/editor/types";
 
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
   viewport: { width: number; height: number };
+  document: { rooms: Room[] };
   roomDraft: { points: Point[] };
+  selectedRoomId: string | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
+  selectRoomById: (roomId: string | null) => void;
+  clearRoomSelection: () => void;
 };
 
 type RoomDrawStore = {
@@ -15,14 +21,17 @@ type RoomDrawStore = {
 
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
+  onHoveredRoomLabelChange: (roomId: string | null) => void;
   requestRender: () => void;
 };
 
 /**
  * Handles room drawing interactions:
- * - left click places points
+ * - left click places points while drafting
+ * - room labels are the selection affordance when not drafting
+ * - first click outside an active selection clears it without starting draw
  * - right click cancels active draft
- * - escape cancels active draft
+ * - escape cancels active draft or clears room selection
  * Rendering stays in EditorCanvas.
  */
 export function attachRoomDrawInput(
@@ -32,21 +41,40 @@ export function attachRoomDrawInput(
 ) {
   let isSpaceHeld = false;
   let shouldSuppressNextContextMenu = false;
+  let hoveredRoomLabelId: string | null = null;
 
   const toCanvasPoint = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
 
+  const setHoveredRoomLabelId = (roomId: string | null) => {
+    if (hoveredRoomLabelId === roomId) return;
+    hoveredRoomLabelId = roomId;
+    callbacks.onHoveredRoomLabelChange(roomId);
+  };
+
   const onPointerMove = (event: PointerEvent) => {
     const screenPoint = toCanvasPoint(event);
     const state = store.getState();
     callbacks.onCursorWorldChange(screenToWorld(screenPoint, state.camera, state.viewport));
+    if (!isSpaceHeld && state.roomDraft.points.length === 0) {
+      const hoveredRoom = findRoomLabelAtScreenPoint(
+        state.document.rooms,
+        screenPoint,
+        state.camera,
+        state.viewport
+      );
+      setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    } else {
+      setHoveredRoomLabelId(null);
+    }
     callbacks.requestRender();
   };
 
   const onPointerLeave = () => {
     callbacks.onCursorWorldChange(null);
+    setHoveredRoomLabelId(null);
     callbacks.requestRender();
   };
 
@@ -66,6 +94,38 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+    const labelHitRoom = findRoomLabelAtScreenPoint(
+      state.document.rooms,
+      screenPoint,
+      state.camera,
+      state.viewport
+    );
+
+    if (state.roomDraft.points.length > 0) {
+      state.placeDraftPointFromCursor(cursorWorld);
+      return;
+    }
+
+    if (labelHitRoom) {
+      state.selectRoomById(labelHitRoom.id);
+      return;
+    }
+
+    if (state.selectedRoomId) {
+      const selectedRoom =
+        state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
+      const clickedInsideSelectedRoom =
+        selectedRoom !== null && isPointInPolygon(cursorWorld, selectedRoom.points);
+
+      if (!clickedInsideSelectedRoom) {
+        state.clearRoomSelection();
+        return;
+      }
+
+      // Keep selection when clicking inside the selected room body.
+      return;
+    }
+
     state.placeDraftPointFromCursor(cursorWorld);
   };
 
@@ -90,7 +150,12 @@ export function attachRoomDrawInput(
     }
 
     if (event.code === "Escape") {
-      store.getState().resetDraft();
+      const state = store.getState();
+      if (state.roomDraft.points.length > 0) {
+        state.resetDraft();
+      } else {
+        state.clearRoomSelection();
+      }
     }
   };
 
@@ -104,6 +169,7 @@ export function attachRoomDrawInput(
 
   const onWindowBlur = () => {
     isSpaceHeld = false;
+    setHoveredRoomLabelId(null);
   };
 
   canvas.addEventListener("pointermove", onPointerMove);

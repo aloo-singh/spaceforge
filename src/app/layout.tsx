@@ -46,7 +46,7 @@ export default function RootLayout({
               </Link>
               <Link href="/changelog" className="leading-none">
                 <Badge variant="outline" className="text-[11px] font-medium">
-                  v0.2.0
+                  v0.3.0
                 </Badge>
               </Link>
             </nav>

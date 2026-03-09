@@ -9,6 +9,15 @@ export type EditorCanvasTheme = {
   draftWall: number;
   roomOutline: number;
   roomFill: number;
+  roomSelectionOutline: number;
+  roomLabelFill: number;
+  roomLabelStroke: number;
+  roomLabelPillFill: number;
+  roomLabelPillStroke: number;
+  roomLabelPillHoverFill: number;
+  roomLabelPillHoverStroke: number;
+  roomLabelPillSelectedFill: number;
+  roomLabelPillSelectedStroke: number;
 };
 
 const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
@@ -21,6 +30,15 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     draftWall: 0x2d7ff9,
     roomOutline: 0x245fc2,
     roomFill: 0x2d7ff9,
+    roomSelectionOutline: 0x2d7ff9,
+    roomLabelFill: 0x1b2430,
+    roomLabelStroke: 0xf6f7f9,
+    roomLabelPillFill: 0xf6f9fd,
+    roomLabelPillStroke: 0xbccce0,
+    roomLabelPillHoverFill: 0xe9f1ff,
+    roomLabelPillHoverStroke: 0x8eb2e7,
+    roomLabelPillSelectedFill: 0xddeaff,
+    roomLabelPillSelectedStroke: 0x2d7ff9,
   },
   dark: {
     canvasBackground: 0x13161a,
@@ -31,6 +49,15 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     draftWall: 0x60a5fa,
     roomOutline: 0x93c5fd,
     roomFill: 0x60a5fa,
+    roomSelectionOutline: 0x60a5fa,
+    roomLabelFill: 0xe9edf3,
+    roomLabelStroke: 0x13161a,
+    roomLabelPillFill: 0x1a212a,
+    roomLabelPillStroke: 0x3d4b5d,
+    roomLabelPillHoverFill: 0x232f3f,
+    roomLabelPillHoverStroke: 0x5d86be,
+    roomLabelPillSelectedFill: 0x1f3658,
+    roomLabelPillSelectedStroke: 0x60a5fa,
   },
 };
 
