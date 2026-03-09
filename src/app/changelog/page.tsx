@@ -5,10 +5,26 @@ export default function ChangelogPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Changelog</h1>
 
         <p className="mt-4 text-sm leading-relaxed text-foreground/80">
-          Internal development notes for SpaceForge. Pre-1.0 entries may be cleaned up later.
+          What changed in each SpaceForge milestone.
         </p>
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.2.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-09</span>
+          </div>
+
+          <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/90">
+            <li>Added the first room drawing flow</li>
+            <li>You can now place snapped corners to create a rectangular room</li>
+            <li>Added a live drawing preview while placing walls</li>
+            <li>Added blue interactive editor visuals for drawing</li>
+            <li>Added a manual light and dark theme switch</li>
+            <li>Kept smooth pan and zoom controls while drawing</li>
+          </ul>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.1.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-09</span>
