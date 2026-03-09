@@ -1,16 +1,28 @@
 import { create } from "zustand";
-import { INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
+import { GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
 } from "@/lib/editor/camera";
-import type { CameraState, Point, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import {
+  getOrthogonalSnappedPoint,
+  getRectangleClosingPoint,
+  isZeroLengthSegment,
+  pointsEqual,
+  snapPointToGrid,
+} from "@/lib/editor/geometry";
+import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 type RoomDraftState = {
   points: Point[];
 };
 
+type DocumentState = {
+  rooms: Room[];
+};
+
 type EditorState = {
+  document: DocumentState;
   camera: CameraState;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
@@ -18,11 +30,22 @@ type EditorState = {
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
-  addDraftPoint: (point: Point) => void;
+  placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
 };
 
+function createRoomId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `room-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
+  document: {
+    rooms: [],
+  },
   camera: {
     xMm: 0,
     yMm: 0,
@@ -57,12 +80,60 @@ export const useEditorStore = create<EditorState>((set) => ({
         yMm,
       },
     })),
-  addDraftPoint: (point) =>
-    set((state) => ({
-      roomDraft: {
-        points: [...state.roomDraft.points, point],
-      },
-    })),
+  placeDraftPointFromCursor: (cursorWorld) =>
+    set((state) => {
+      const draftPoints = state.roomDraft.points;
+
+      if (draftPoints.length === 0) {
+        return {
+          roomDraft: {
+            points: [snapPointToGrid(cursorWorld, GRID_SIZE_MM)],
+          },
+        };
+      }
+
+      const lastPoint = draftPoints[draftPoints.length - 1];
+      const nextPoint = getOrthogonalSnappedPoint(lastPoint, cursorWorld, GRID_SIZE_MM);
+
+      if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
+
+      if (draftPoints.length === 3) {
+        const closingPoint = getRectangleClosingPoint(draftPoints);
+        if (!closingPoint || !pointsEqual(nextPoint, closingPoint)) {
+          return state;
+        }
+
+        const roomPoints = [...draftPoints, closingPoint];
+        return {
+          document: {
+            rooms: [
+              ...state.document.rooms,
+              {
+                id: createRoomId(),
+                name: `Room ${state.document.rooms.length + 1}`,
+                points: roomPoints,
+              },
+            ],
+          },
+          roomDraft: {
+            points: [],
+          },
+        };
+      }
+
+      if (draftPoints.length === 2) {
+        const firstPoint = draftPoints[0];
+        if (firstPoint.x === nextPoint.x || firstPoint.y === nextPoint.y) {
+          return state;
+        }
+      }
+
+      return {
+        roomDraft: {
+          points: [...draftPoints, nextPoint],
+        },
+      };
+    }),
   resetDraft: () =>
     set({
       roomDraft: {
