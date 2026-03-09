@@ -17,7 +17,13 @@ import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
-import { getAxisAlignedRoomBounds, getWallHandleLayouts, type RectWall } from "@/lib/editor/rectRoomResize";
+import {
+  getAxisAlignedRoomBounds,
+  getCornerHandleLayouts,
+  getWallHandleLayouts,
+  type RectCorner,
+  type RectWall,
+} from "@/lib/editor/rectRoomResize";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
@@ -34,13 +40,17 @@ export default function EditorCanvas() {
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }>({
     hoveredWall: null,
+    hoveredCorner: null,
     hoveredRoomId: null,
     activeWall: null,
+    activeCorner: null,
     activeRoomId: null,
   });
   const instructionsId = "editor-canvas-controls";
@@ -66,10 +76,15 @@ export default function EditorCanvas() {
     const app = new Application();
 
     async function init() {
+      const targetResolution =
+        typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
       await app.init({
         resizeTo: resizeTarget,
         background: editorThemeRef.current.canvasBackground,
         antialias: true,
+        autoDensity: true,
+        resolution: targetResolution,
+        roundPixels: true,
       });
       initialized = true;
 
@@ -263,8 +278,10 @@ function drawScene(
   hoveredRoomLabelId: string | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
   theme: EditorCanvasTheme
@@ -341,8 +358,10 @@ function drawRooms(
   selectedRoomId: string | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -384,6 +403,7 @@ function drawRooms(
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
     const handles = getWallHandleLayouts(bounds, camera, viewport);
+    const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
     for (const handle of handles) {
       const isHovered =
@@ -422,6 +442,42 @@ function drawRooms(
       graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
       graphics.stroke();
     }
+
+    for (const handle of cornerHandles) {
+      const isHovered =
+        roomResizeUi.hoveredRoomId === room.id && roomResizeUi.hoveredCorner === handle.corner;
+      const isActive =
+        roomResizeUi.activeRoomId === room.id && roomResizeUi.activeCorner === handle.corner;
+      const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
+      const half = size / 2;
+      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
+      const fillAlpha = isActive ? 0.54 : isHovered ? 0.42 : 0.3;
+      const strokeAlpha = isActive ? 1 : isHovered ? 0.98 : 0.9;
+      const strokeWidth = isActive ? 2.1 : isHovered ? 1.8 : 1.5;
+
+      if (haloPadding > 0) {
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
+        graphics.rect(
+          handle.center.x - half - haloPadding,
+          handle.center.y - half - haloPadding,
+          size + haloPadding * 2,
+          size + haloPadding * 2
+        );
+        graphics.fill();
+      }
+
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
+      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: strokeWidth,
+        color: theme.roomOutline,
+        alpha: strokeAlpha,
+      });
+      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
+      graphics.stroke();
+    }
   }
 }
 
@@ -440,6 +496,13 @@ function drawRoomLabels(
   for (const room of rooms) {
     const layout = getRoomLabelLayout(room, camera, viewport);
     if (!layout) continue;
+    const textResolution = getTextResolution();
+    const left = snapToPixel(layout.left, textResolution);
+    const top = snapToPixel(layout.top, textResolution);
+    const width = snapToPixel(layout.width, textResolution);
+    const height = snapToPixel(layout.height, textResolution);
+    const centerX = snapToPixel(layout.center.x, textResolution);
+    const centerY = snapToPixel(layout.center.y, textResolution);
 
     const isSelected = selectedRoomId === room.id;
     const isHovered = hoveredRoomLabelId === room.id;
@@ -457,15 +520,16 @@ function drawRoomLabels(
 
     const pill = new Graphics();
     pill.setFillStyle({ color: fillColor, alpha: 0.92 });
-    pill.roundRect(layout.left, layout.top, layout.width, layout.height, layout.borderRadius);
+    pill.roundRect(left, top, width, height, layout.borderRadius);
     pill.fill();
     pill.setStrokeStyle({ width: strokeWidth, color: strokeColor, alpha: 0.95 });
-    pill.roundRect(layout.left, layout.top, layout.width, layout.height, layout.borderRadius);
+    pill.roundRect(left, top, width, height, layout.borderRadius);
     pill.stroke();
     labelContainer.addChild(pill);
 
     const text = new Text({
       text: layout.text,
+      resolution: textResolution,
       style: {
         fontFamily: ROOM_LABEL_FONT_FAMILY,
         fontSize: ROOM_LABEL_FONT_SIZE_PX,
@@ -473,13 +537,14 @@ function drawRoomLabels(
         fill: theme.roomLabelFill,
         stroke: {
           color: theme.roomLabelStroke,
-          width: 3,
+          width: 2,
           join: "round",
         },
       },
     });
+    text.roundPixels = true;
     text.anchor.set(0.5);
-    text.position.set(layout.center.x, layout.center.y);
+    text.position.set(centerX, centerY);
     text.alpha = layout.isPlaceholder ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
     labelContainer.addChild(text);
   }
@@ -594,4 +659,13 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function getTextResolution(): number {
+  if (typeof window === "undefined") return 1;
+  return Math.min(window.devicePixelRatio || 1, 2);
+}
+
+function snapToPixel(value: number, resolution: number): number {
+  return Math.round(value * resolution) / resolution;
 }

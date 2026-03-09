@@ -10,6 +10,22 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.5.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-09</span>
+          </div>
+
+          <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/90">
+            <li>Added wall resize handles for selected rooms</li>
+            <li>Added corner resize handles for faster room reshaping</li>
+            <li>Resizing now snaps cleanly to the grid</li>
+            <li>Room resizing can be undone and redone</li>
+            <li>Improved handle hover states and resize cursors</li>
+            <li>Sharpened room label rendering on the canvas</li>
+          </ul>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.4.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-09</span>
           </div>
