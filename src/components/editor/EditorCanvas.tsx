@@ -390,10 +390,25 @@ function drawRooms(
         roomResizeUi.hoveredRoomId === room.id && roomResizeUi.hoveredWall === handle.wall;
       const isActive =
         roomResizeUi.activeRoomId === room.id && roomResizeUi.activeWall === handle.wall;
-      const fillAlpha = isActive ? 0.34 : isHovered ? 0.24 : 0.16;
-      const strokeAlpha = isActive ? 0.98 : isHovered ? 0.9 : 0.72;
-      const strokeWidth = isActive ? 1.9 : 1.4;
+      const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
+      const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
+      const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
       const radius = Math.min(handle.width, handle.height) / 2;
+      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
+      const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
+      const handleStrokeColor = theme.roomOutline;
+
+      if (haloPadding > 0) {
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
+        graphics.roundRect(
+          handle.left - haloPadding,
+          handle.top - haloPadding,
+          handle.width + haloPadding * 2,
+          handle.height + haloPadding * 2,
+          radius + haloPadding
+        );
+        graphics.fill();
+      }
 
       graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
       graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
@@ -401,7 +416,7 @@ function drawRooms(
 
       graphics.setStrokeStyle({
         width: strokeWidth,
-        color: theme.interactiveAccent,
+        color: handleStrokeColor,
         alpha: strokeAlpha,
       });
       graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);

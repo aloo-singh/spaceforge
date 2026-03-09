@@ -44,6 +44,10 @@ type ResizeSession = {
   startPoints: Point[];
 };
 
+function getCursorForWall(wall: RectWall): string {
+  return wall === "top" || wall === "bottom" ? "row-resize" : "col-resize";
+}
+
 export function attachRoomResizeInput(
   canvas: HTMLCanvasElement,
   store: RoomResizeStore,
@@ -52,6 +56,7 @@ export function attachRoomResizeInput(
   let isSpaceHeld = false;
   let hoveredWall: RectWall | null = null;
   let activeSession: ResizeSession | null = null;
+  let currentCursor: string = "";
 
   const toCanvasPoint = (event: PointerEvent): Point => {
     const rect = canvas.getBoundingClientRect();
@@ -81,9 +86,32 @@ export function attachRoomResizeInput(
     });
   };
 
+  const setCursor = (nextCursor: string) => {
+    if (currentCursor === nextCursor) return;
+    currentCursor = nextCursor;
+    canvas.style.cursor = nextCursor;
+    document.body.style.cursor = nextCursor;
+  };
+
+  const updateCursor = () => {
+    if (activeSession) {
+      setCursor(getCursorForWall(activeSession.wall));
+      return;
+    }
+
+    if (hoveredWall && !isSpaceHeld) {
+      setCursor(getCursorForWall(hoveredWall));
+      return;
+    }
+
+    // Revert to pan/draw module cursor ownership when not over resize affordances.
+    setCursor("");
+  };
+
   const setHoveredWall = (next: RectWall | null) => {
     if (hoveredWall === next) return;
     hoveredWall = next;
+    updateCursor();
     publishHandleState();
     callbacks.requestRender();
   };
@@ -96,6 +124,7 @@ export function attachRoomResizeInput(
     }
     activeSession = null;
     hoveredWall = null;
+    updateCursor();
     publishHandleState();
     callbacks.requestRender();
   };
@@ -119,6 +148,11 @@ export function attachRoomResizeInput(
       const nextPoints = getRoomPointsFromBounds(nextBounds);
       store.getState().previewRoomResize(activeSession.roomId, nextPoints);
       callbacks.requestRender();
+      return;
+    }
+
+    if (event.buttons !== 0) {
+      setHoveredWall(null);
       return;
     }
 
@@ -155,6 +189,7 @@ export function attachRoomResizeInput(
       startPoints: selected.room.points.map((point) => ({ ...point })),
     };
     hoveredWall = hitWall;
+    updateCursor();
     publishHandleState();
     callbacks.requestRender();
   };
@@ -189,6 +224,7 @@ export function attachRoomResizeInput(
       if (!activeSession) {
         setHoveredWall(null);
       }
+      updateCursor();
     }
   };
 
@@ -196,6 +232,7 @@ export function attachRoomResizeInput(
     if (isTypingTarget(event.target)) return;
     if (event.code === "Space") {
       isSpaceHeld = false;
+      updateCursor();
     }
   };
 
@@ -207,6 +244,7 @@ export function attachRoomResizeInput(
       return;
     }
     setHoveredWall(null);
+    updateCursor();
   };
 
   canvas.addEventListener("pointermove", onPointerMove);
@@ -227,6 +265,8 @@ export function attachRoomResizeInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    canvas.style.cursor = "";
+    document.body.style.cursor = "";
   };
 }
 
