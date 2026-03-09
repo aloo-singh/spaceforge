@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Application, Graphics } from "pixi.js";
 import { screenToWorld } from "@/lib/editor/camera";
-import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, ZOOM_STEP } from "@/lib/editor/constants";
+import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
+import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
-import type { CameraState, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import type { CameraState, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 export default function EditorCanvas() {
@@ -70,120 +71,10 @@ export default function EditorCanvas() {
       const unsubscribe = useEditorStore.subscribe((state) => {
         drawGrid(grid, state.camera, state.viewport, editorThemeRef.current);
       });
-
-      // Space-to-pan is a core editor affordance; add this to onboarding/tutorial later.
-      let isSpaceHeld = false;
-      let isPanning = false;
-      let activePointerId: number | null = null;
-      let lastPointer: ScreenPoint = { x: 0, y: 0 };
-
-      const updateCursor = () => {
-        if (isPanning) {
-          app.canvas.style.cursor = "grabbing";
-          return;
-        }
-
-        app.canvas.style.cursor = isSpaceHeld ? "grab" : "default";
-      };
-
-      const canStartPan = (button: number) => {
-        const isMiddleButton = button === 1;
-        const isSpaceLeftButton = button === 0 && isSpaceHeld;
-        return isMiddleButton || isSpaceLeftButton;
-      };
-
-      const onPointerDown = (event: PointerEvent) => {
-        if (!canStartPan(event.button)) return;
-        event.preventDefault();
-        isPanning = true;
-        activePointerId = event.pointerId;
-        lastPointer = { x: event.clientX, y: event.clientY };
-        app.canvas.setPointerCapture(event.pointerId);
-        updateCursor();
-      };
-
-      const onPointerMove = (event: PointerEvent) => {
-        if (!isPanning || activePointerId !== event.pointerId) return;
-        const nextPointer = { x: event.clientX, y: event.clientY };
-
-        useEditorStore.getState().panCameraByPx({
-          x: nextPointer.x - lastPointer.x,
-          y: nextPointer.y - lastPointer.y,
-        });
-
-        lastPointer = nextPointer;
-      };
-
-      const onPointerUp = (event: PointerEvent) => {
-        if (activePointerId !== event.pointerId) return;
-        isPanning = false;
-        activePointerId = null;
-        if (app.canvas.hasPointerCapture(event.pointerId)) {
-          app.canvas.releasePointerCapture(event.pointerId);
-        }
-        updateCursor();
-      };
-
-      const onWheel = (event: WheelEvent) => {
-        event.preventDefault();
-        const rect = app.canvas.getBoundingClientRect();
-        const cursorInCanvas = {
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-        };
-        const scaleFactor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-        useEditorStore.getState().zoomAtScreenPoint(cursorInCanvas, scaleFactor);
-      };
-
-      const isTypingTarget = (target: EventTarget | null) => {
-        if (!(target instanceof HTMLElement)) return false;
-        const tag = target.tagName;
-        return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
-      };
-
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.code !== "Space" || isTypingTarget(event.target)) return;
-        event.preventDefault();
-        if (!isSpaceHeld) {
-          isSpaceHeld = true;
-          updateCursor();
-        }
-      };
-
-      const onKeyUp = (event: KeyboardEvent) => {
-        if (event.code !== "Space" || isTypingTarget(event.target)) return;
-        event.preventDefault();
-        isSpaceHeld = false;
-        updateCursor();
-      };
-
-      const onWindowBlur = () => {
-        isSpaceHeld = false;
-        isPanning = false;
-        activePointerId = null;
-        updateCursor();
-      };
-
-      app.canvas.addEventListener("pointerdown", onPointerDown);
-      app.canvas.addEventListener("pointermove", onPointerMove);
-      app.canvas.addEventListener("pointerup", onPointerUp);
-      app.canvas.addEventListener("pointercancel", onPointerUp);
-      app.canvas.addEventListener("wheel", onWheel, { passive: false });
-      // Future keyboard shortcuts (draw/select/etc.) should hook into this same lifecycle.
-      window.addEventListener("keydown", onKeyDown);
-      window.addEventListener("keyup", onKeyUp);
-      window.addEventListener("blur", onWindowBlur);
-      updateCursor();
+      const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
 
       return () => {
-        app.canvas.removeEventListener("pointerdown", onPointerDown);
-        app.canvas.removeEventListener("pointermove", onPointerMove);
-        app.canvas.removeEventListener("pointerup", onPointerUp);
-        app.canvas.removeEventListener("pointercancel", onPointerUp);
-        app.canvas.removeEventListener("wheel", onWheel);
-        window.removeEventListener("keydown", onKeyDown);
-        window.removeEventListener("keyup", onKeyUp);
-        window.removeEventListener("blur", onWindowBlur);
+        detachPanZoomInput();
         unsubscribe();
         app.renderer.off("resize", handleResize);
         appRef.current = null;
