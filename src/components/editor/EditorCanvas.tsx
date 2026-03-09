@@ -9,6 +9,7 @@ import { useEditorStore } from "@/stores/editorStore";
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const instructionsId = "editor-canvas-controls";
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -147,6 +148,7 @@ export default function EditorCanvas() {
       app.canvas.addEventListener("pointerup", onPointerUp);
       app.canvas.addEventListener("pointercancel", onPointerUp);
       app.canvas.addEventListener("wheel", onWheel, { passive: false });
+      // Future keyboard shortcuts (draw/select/etc.) should hook into this same lifecycle.
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup", onKeyUp);
       window.addEventListener("blur", onWindowBlur);
@@ -178,7 +180,24 @@ export default function EditorCanvas() {
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <section
+      aria-label="SpaceForge floor plan editor canvas"
+      aria-describedby={instructionsId}
+      role="region"
+      className="h-full w-full"
+    >
+      <p id={instructionsId} className="sr-only">
+        Editor controls: hold Space and drag to pan, middle mouse drag also pans, and mouse wheel
+        zooms.
+      </p>
+      <div
+        ref={containerRef}
+        tabIndex={-1}
+        className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      />
+    </section>
+  );
 }
 
 function drawGrid(
