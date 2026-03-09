@@ -10,6 +10,21 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.3.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-09</span>
+          </div>
+
+          <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/90">
+            <li>Added room selection to the editor</li>
+            <li>Added room names directly on the plan</li>
+            <li>Added a simple panel to rename the selected room</li>
+            <li>Improved the flow between selecting rooms and drawing new ones</li>
+            <li>Made room selection feel more intentional and easier to control</li>
+          </ul>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.2.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-09</span>
           </div>
