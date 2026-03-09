@@ -9,6 +9,9 @@ export type EditorCanvasTheme = {
   draftWall: number;
   roomOutline: number;
   roomFill: number;
+  roomSelectionOutline: number;
+  roomLabelFill: number;
+  roomLabelStroke: number;
 };
 
 const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
@@ -21,6 +24,9 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     draftWall: 0x2d7ff9,
     roomOutline: 0x245fc2,
     roomFill: 0x2d7ff9,
+    roomSelectionOutline: 0x2d7ff9,
+    roomLabelFill: 0x1b2430,
+    roomLabelStroke: 0xf6f7f9,
   },
   dark: {
     canvasBackground: 0x13161a,
@@ -31,6 +37,9 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     draftWall: 0x60a5fa,
     roomOutline: 0x93c5fd,
     roomFill: 0x60a5fa,
+    roomSelectionOutline: 0x60a5fa,
+    roomLabelFill: 0xe9edf3,
+    roomLabelStroke: 0x13161a,
   },
 };
 

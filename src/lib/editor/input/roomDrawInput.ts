@@ -1,12 +1,16 @@
 import { screenToWorld } from "@/lib/editor/camera";
-import type { Point } from "@/lib/editor/types";
+import { findRoomAtPoint } from "@/lib/editor/roomGeometry";
+import type { Point, Room } from "@/lib/editor/types";
 
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
   viewport: { width: number; height: number };
+  document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
+  selectRoomById: (roomId: string | null) => void;
+  clearRoomSelection: () => void;
 };
 
 type RoomDrawStore = {
@@ -20,9 +24,9 @@ type RoomDrawInputCallbacks = {
 
 /**
  * Handles room drawing interactions:
- * - left click places points
+ * - left click places points while drafting, otherwise selects rooms
  * - right click cancels active draft
- * - escape cancels active draft
+ * - escape cancels active draft or clears room selection
  * Rendering stays in EditorCanvas.
  */
 export function attachRoomDrawInput(
@@ -66,6 +70,21 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+
+    if (state.roomDraft.points.length === 0) {
+      const hitRoom = findRoomAtPoint(state.document.rooms, cursorWorld);
+      if (hitRoom) {
+        state.selectRoomById(hitRoom.id);
+        return;
+      }
+
+      // Preserve existing draw flow: clicking empty space starts a new draft.
+      // Also clear any previous selection before beginning the new room.
+      state.clearRoomSelection();
+      state.placeDraftPointFromCursor(cursorWorld);
+      return;
+    }
+
     state.placeDraftPointFromCursor(cursorWorld);
   };
 
@@ -90,7 +109,12 @@ export function attachRoomDrawInput(
     }
 
     if (event.code === "Escape") {
-      store.getState().resetDraft();
+      const state = store.getState();
+      if (state.roomDraft.points.length > 0) {
+        state.resetDraft();
+      } else {
+        state.clearRoomSelection();
+      }
     }
   };
 

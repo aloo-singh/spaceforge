@@ -2,21 +2,24 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
-import { Application, Graphics } from "pixi.js";
+import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
 import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometry";
+import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
+import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
   const roomRef = useRef<Graphics | null>(null);
+  const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const instructionsId = "editor-canvas-controls";
@@ -60,12 +63,15 @@ export default function EditorCanvas() {
 
       const grid = new Graphics();
       const rooms = new Graphics();
+      const roomLabels = new Container();
       const draft = new Graphics();
       gridRef.current = grid;
       roomRef.current = rooms;
+      roomLabelRef.current = roomLabels;
       draftRef.current = draft;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
+      app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
 
       const syncViewport = () => {
@@ -76,6 +82,7 @@ export default function EditorCanvas() {
       drawScene(
         grid,
         rooms,
+        roomLabels,
         draft,
         useEditorStore.getState(),
         cursorWorldRef.current,
@@ -89,7 +96,15 @@ export default function EditorCanvas() {
       app.renderer.on("resize", handleResize);
 
       const unsubscribe = useEditorStore.subscribe((state) => {
-        drawScene(grid, rooms, draft, state, cursorWorldRef.current, editorThemeRef.current);
+        drawScene(
+          grid,
+          rooms,
+          roomLabels,
+          draft,
+          state,
+          cursorWorldRef.current,
+          editorThemeRef.current
+        );
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
       const detachRoomDrawInput = attachRoomDrawInput(app.canvas, useEditorStore, {
@@ -100,6 +115,7 @@ export default function EditorCanvas() {
           drawScene(
             grid,
             rooms,
+            roomLabels,
             draft,
             useEditorStore.getState(),
             cursorWorldRef.current,
@@ -116,6 +132,7 @@ export default function EditorCanvas() {
         appRef.current = null;
         gridRef.current = null;
         roomRef.current = null;
+        roomLabelRef.current = null;
         draftRef.current = null;
       };
     }
@@ -138,12 +155,13 @@ export default function EditorCanvas() {
     const app = appRef.current;
     const grid = gridRef.current;
     const rooms = roomRef.current;
+    const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
-    if (!app || !grid || !rooms || !draft) return;
+    if (!app || !grid || !rooms || !roomLabels || !draft) return;
 
     app.renderer.background.color = editorTheme.canvasBackground;
     const state = useEditorStore.getState();
-    drawScene(grid, rooms, draft, state, cursorWorldRef.current, editorTheme);
+    drawScene(grid, rooms, roomLabels, draft, state, cursorWorldRef.current, editorTheme);
   }, [editorTheme]);
 
   return (
@@ -151,18 +169,20 @@ export default function EditorCanvas() {
       aria-label="SpaceForge floor plan editor canvas"
       aria-describedby={instructionsId}
       role="region"
-      className="h-full w-full"
+      className="relative h-full w-full"
     >
       <p id={instructionsId} className="sr-only">
-        Editor controls: left click places room corners snapped to the 500 millimetre grid. Hold
-        Space and drag to pan, middle mouse drag also pans, mouse wheel zooms, and Escape cancels
-        the current room draft. Right click also cancels the current room draft.
+        Editor controls: left click places room corners while drafting, otherwise it selects a room
+        or clears selection. Hold Space and drag to pan, middle mouse drag also pans, mouse wheel
+        zooms, and Escape cancels the current room draft or clears selection. Right click also
+        cancels the current room draft.
       </p>
       <div
         ref={containerRef}
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
+      <SelectedRoomNamePanel />
     </section>
   );
 }
@@ -172,13 +192,22 @@ type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 function drawScene(
   gridGraphics: Graphics,
   roomGraphics: Graphics,
+  roomLabelContainer: Container,
   draftGraphics: Graphics,
   state: EditorSnapshot,
   cursorWorld: Point | null,
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
-  drawRooms(roomGraphics, state.document.rooms, state.camera, state.viewport, theme);
+  drawRooms(
+    roomGraphics,
+    state.document.rooms,
+    state.selectedRoomId,
+    state.camera,
+    state.viewport,
+    theme
+  );
+  drawRoomLabels(roomLabelContainer, state.document.rooms, state.camera, state.viewport, theme);
   drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
 }
 
@@ -228,6 +257,7 @@ function drawGrid(
 function drawRooms(
   graphics: Graphics,
   rooms: Room[],
+  selectedRoomId: string | null,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -236,9 +266,13 @@ function drawRooms(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
+    const isSelected = room.id === selectedRoomId;
     const screenPoints = room.points.map((point) => worldToScreen(point, camera, viewport));
 
-    graphics.setFillStyle({ color: theme.roomFill, alpha: 0.12 });
+    graphics.setFillStyle({
+      color: theme.roomFill,
+      alpha: isSelected ? 0.2 : 0.12,
+    });
     graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
     for (let i = 1; i < screenPoints.length; i += 1) {
       graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
@@ -246,13 +280,56 @@ function drawRooms(
     graphics.closePath();
     graphics.fill();
 
-    graphics.setStrokeStyle({ width: 2, color: theme.roomOutline, alpha: 0.9 });
+    graphics.setStrokeStyle({
+      width: isSelected ? 2.5 : 2,
+      color: isSelected ? theme.roomSelectionOutline : theme.roomOutline,
+      alpha: isSelected ? 1 : 0.9,
+    });
     graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
     for (let i = 1; i < screenPoints.length; i += 1) {
       graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
     }
     graphics.closePath();
     graphics.stroke();
+  }
+}
+
+function drawRoomLabels(
+  labelContainer: Container,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const staleLabels = labelContainer.removeChildren();
+  staleLabels.forEach((label) => label.destroy());
+
+  for (const room of rooms) {
+    const label = room.name.trim();
+    if (label.length === 0 || room.points.length < 3) continue;
+
+    const labelAnchorWorld = getPolygonLabelAnchor(room.points);
+    if (!labelAnchorWorld) continue;
+    const labelAnchorScreen = worldToScreen(labelAnchorWorld, camera, viewport);
+
+    const text = new Text({
+      text: label,
+      style: {
+        fontFamily: "Inter, sans-serif",
+        fontSize: 14,
+        fontWeight: "500",
+        fill: theme.roomLabelFill,
+        stroke: {
+          color: theme.roomLabelStroke,
+          width: 3,
+          join: "round",
+        },
+      },
+    });
+    text.anchor.set(0.5);
+    text.position.set(labelAnchorScreen.x, labelAnchorScreen.y);
+    text.alpha = 0.92;
+    labelContainer.addChild(text);
   }
 }
 

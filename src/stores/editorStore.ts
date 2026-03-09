@@ -26,12 +26,16 @@ type EditorState = {
   camera: CameraState;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
+  selectedRoomId: string | null;
   setViewport: (width: number, height: number) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
+  selectRoomById: (roomId: string | null) => void;
+  clearRoomSelection: () => void;
+  updateRoomName: (roomId: string, name: string) => void;
 };
 
 function createRoomId(): string {
@@ -58,6 +62,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   roomDraft: {
     points: [],
   },
+  selectedRoomId: null,
   setViewport: (width, height) => set({ viewport: { width, height } }),
   panCameraByPx: (delta) =>
     set((state) => ({
@@ -105,6 +110,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
         const roomPoints = [...draftPoints, closingPoint];
         return {
+          selectedRoomId: null,
           document: {
             rooms: [
               ...state.document.rooms,
@@ -140,4 +146,19 @@ export const useEditorStore = create<EditorState>((set) => ({
         points: [],
       },
     }),
+  selectRoomById: (roomId) => set({ selectedRoomId: roomId }),
+  clearRoomSelection: () => set({ selectedRoomId: null }),
+  updateRoomName: (roomId, name) =>
+    set((state) => ({
+      document: {
+        rooms: state.document.rooms.map((room) =>
+          room.id === roomId
+            ? {
+                ...room,
+                name,
+              }
+            : room
+        ),
+      },
+    })),
 }));
