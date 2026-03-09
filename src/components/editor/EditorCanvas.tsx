@@ -27,20 +27,26 @@ export default function EditorCanvas() {
   }, [editorTheme]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const host = containerRef.current;
+    if (!host) return;
 
     let destroyed = false;
+    let initialized = false;
 
     const app = new Application();
 
     async function init() {
       await app.init({
-        resizeTo: containerRef.current!,
+        resizeTo: host,
         background: editorThemeRef.current.canvasBackground,
         antialias: true,
       });
+      initialized = true;
 
-      if (destroyed || !containerRef.current) return;
+      if (destroyed || !containerRef.current) {
+        app.destroy(true, { children: true });
+        return;
+      }
 
       appRef.current = app;
       containerRef.current.appendChild(app.canvas);
@@ -90,7 +96,9 @@ export default function EditorCanvas() {
     return () => {
       destroyed = true;
       teardown?.();
-      app.destroy(true, { children: true });
+      if (initialized) {
+        app.destroy(true, { children: true });
+      }
     };
   }, []);
 

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
@@ -55,6 +56,7 @@ export default function RootLayout({
             </nav>
           </header>
           {children}
+          <ThemeToggle className="fixed right-4 bottom-4 z-30" />
         </ThemeProvider>
       </body>
     </html>
