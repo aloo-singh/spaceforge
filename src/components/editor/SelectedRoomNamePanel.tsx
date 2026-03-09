@@ -13,7 +13,7 @@ export function SelectedRoomNamePanel() {
   if (!selectedRoom) return null;
 
   return (
-    <aside className="pointer-events-auto absolute right-4 bottom-4 z-20 w-72 rounded-lg border border-border/70 bg-card/95 p-3 text-card-foreground shadow-lg backdrop-blur-sm">
+    <aside className="pointer-events-auto absolute right-4 bottom-4 left-4 z-20 rounded-lg border border-border/70 bg-card/95 p-3 text-card-foreground shadow-lg backdrop-blur-sm sm:right-auto sm:w-72">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Selected room</p>
       <label htmlFor="room-name-input" className="mt-2 mb-1 block text-sm font-medium">
         Name
