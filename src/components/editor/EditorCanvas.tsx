@@ -29,6 +29,7 @@ export default function EditorCanvas() {
   useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
+    const resizeTarget: HTMLElement = host;
 
     let destroyed = false;
     let initialized = false;
@@ -37,7 +38,7 @@ export default function EditorCanvas() {
 
     async function init() {
       await app.init({
-        resizeTo: host,
+        resizeTo: resizeTarget,
         background: editorThemeRef.current.canvasBackground,
         antialias: true,
       });
