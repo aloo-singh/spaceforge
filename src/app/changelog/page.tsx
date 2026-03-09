@@ -10,6 +10,21 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.4.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-09</span>
+          </div>
+
+          <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/90">
+            <li>Added undo and redo support with a simple command history</li>
+            <li>Undo and redo now cover completed rooms and room renaming</li>
+            <li>Selection and deselection changes can now be undone and redone</li>
+            <li>Added editor toolbar buttons for undo and redo with disabled states</li>
+            <li>Added keyboard shortcuts: Cmd/Ctrl+Z, Shift+Cmd+Z, Ctrl+Shift+Z, and Ctrl+Y</li>
+          </ul>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.3.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-09</span>
           </div>

@@ -6,8 +6,10 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
+import packageJson from "../../package.json";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const APP_VERSION_LABEL = `v${packageJson.version}`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,7 +48,7 @@ export default function RootLayout({
               </Link>
               <Link href="/changelog" className="leading-none">
                 <Badge variant="outline" className="text-[11px] font-medium">
-                  v0.3.0
+                  {APP_VERSION_LABEL}
                 </Badge>
               </Link>
             </nav>

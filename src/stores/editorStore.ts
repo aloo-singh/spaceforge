@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
+import { applyEditorCommand, type EditorCommand } from "@/lib/editor/history";
 import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
@@ -21,12 +22,24 @@ type DocumentState = {
   rooms: Room[];
 };
 
+type RenameSessionState = {
+  roomId: string;
+  initialName: string;
+} | null;
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
+  renameSession: RenameSessionState;
+  history: {
+    past: EditorCommand[];
+    future: EditorCommand[];
+  };
+  canUndo: boolean;
+  canRedo: boolean;
   setViewport: (width: number, height: number) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
@@ -35,8 +48,22 @@ type EditorState = {
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   clearRoomSelection: () => void;
+  startRoomRenameSession: (roomId: string) => void;
+  updateRoomRenameDraft: (roomId: string, name: string) => void;
+  commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
+  cancelRoomRenameSession: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  undo: () => void;
+  redo: () => void;
 };
+
+const HISTORY_LIMIT = 100;
+
+function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
+  const nextPast = [...past, command];
+  if (nextPast.length <= HISTORY_LIMIT) return nextPast;
+  return nextPast.slice(nextPast.length - HISTORY_LIMIT);
+}
 
 function createRoomId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -44,6 +71,24 @@ function createRoomId(): string {
   }
 
   return `room-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function updateRoomNameInDocument(document: DocumentState, roomId: string, name: string): DocumentState {
+  return {
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            name,
+          }
+        : room
+    ),
+  };
+}
+
+function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
+  if (!roomId) return null;
+  return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -63,6 +108,13 @@ export const useEditorStore = create<EditorState>((set) => ({
     points: [],
   },
   selectedRoomId: null,
+  renameSession: null,
+  history: {
+    past: [],
+    future: [],
+  },
+  canUndo: false,
+  canRedo: false,
   setViewport: (width, height) => set({ viewport: { width, height } }),
   panCameraByPx: (delta) =>
     set((state) => ({
@@ -109,21 +161,28 @@ export const useEditorStore = create<EditorState>((set) => ({
         }
 
         const roomPoints = [...draftPoints, closingPoint];
+        const room: Room = {
+          id: createRoomId(),
+          name: `Room ${state.document.rooms.length + 1}`,
+          points: roomPoints,
+        };
+        const command: EditorCommand = {
+          type: "complete-room",
+          room,
+        };
+        const nextDocument = applyEditorCommand(state.document, command, "redo");
         return {
-          selectedRoomId: null,
-          document: {
-            rooms: [
-              ...state.document.rooms,
-              {
-                id: createRoomId(),
-                name: `Room ${state.document.rooms.length + 1}`,
-                points: roomPoints,
-              },
-            ],
-          },
+          document: nextDocument,
           roomDraft: {
             points: [],
           },
+          renameSession: null,
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
         };
       }
 
@@ -146,19 +205,184 @@ export const useEditorStore = create<EditorState>((set) => ({
         points: [],
       },
     }),
-  selectRoomById: (roomId) => set({ selectedRoomId: roomId }),
-  clearRoomSelection: () => set({ selectedRoomId: null }),
+  selectRoomById: (roomId) =>
+    set((state) => {
+      if (state.selectedRoomId === roomId) return state;
+
+      return {
+        selectedRoomId: roomId,
+        renameSession: null,
+      };
+    }),
+  clearRoomSelection: () =>
+    set({
+      selectedRoomId: null,
+      renameSession: null,
+    }),
+  startRoomRenameSession: (roomId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (state.renameSession?.roomId === roomId) return state;
+
+      return {
+        renameSession: {
+          roomId,
+          initialName: room.name,
+        },
+      };
+    }),
+  updateRoomRenameDraft: (roomId, name) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+
+      const renameSession =
+        state.renameSession?.roomId === roomId
+          ? state.renameSession
+          : {
+              roomId,
+              initialName: room.name,
+            };
+
+      if (room.name === name && state.renameSession?.roomId === roomId) return state;
+
+      return {
+        document: updateRoomNameInDocument(state.document, roomId, name),
+        renameSession,
+      };
+    }),
+  commitRoomRenameSession: (options) =>
+    set((state) => {
+      const deselectIfUnchanged = options?.deselectIfUnchanged ?? true;
+      const renameSession = state.renameSession;
+      if (!renameSession) {
+        if (!state.selectedRoomId) return state;
+        if (!deselectIfUnchanged) return state;
+        return { selectedRoomId: null };
+      }
+
+      const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
+      if (!room) {
+        return {
+          selectedRoomId: null,
+          renameSession: null,
+        };
+      }
+
+      const didNameChange = room.name !== renameSession.initialName;
+      if (!didNameChange) {
+        if (!deselectIfUnchanged) {
+          return {
+            renameSession: null,
+          };
+        }
+        return {
+          selectedRoomId: null,
+          renameSession: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "rename-room",
+        roomId: renameSession.roomId,
+        previousName: renameSession.initialName,
+        nextName: room.name,
+      };
+
+      return {
+        selectedRoomId: null,
+        renameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  cancelRoomRenameSession: () =>
+    set((state) => {
+      const renameSession = state.renameSession;
+      if (!renameSession) {
+        if (!state.selectedRoomId) return state;
+        return {
+          selectedRoomId: null,
+        };
+      }
+
+      const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
+      const nextDocument =
+        room && room.name !== renameSession.initialName
+          ? updateRoomNameInDocument(state.document, renameSession.roomId, renameSession.initialName)
+          : state.document;
+
+      return {
+        document: nextDocument,
+        selectedRoomId: null,
+        renameSession: null,
+      };
+    }),
   updateRoomName: (roomId, name) =>
-    set((state) => ({
-      document: {
-        rooms: state.document.rooms.map((room) =>
-          room.id === roomId
-            ? {
-                ...room,
-                name,
-              }
-            : room
-        ),
-      },
-    })),
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room || room.name === name) return state;
+
+      const command: EditorCommand = {
+        type: "rename-room",
+        roomId,
+        previousName: room.name,
+        nextName: name,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  undo: () =>
+    set((state) => {
+      const command = state.history.past[state.history.past.length - 1];
+      if (!command) return state;
+      const nextDocument = applyEditorCommand(state.document, command, "undo");
+      const nextPast = state.history.past.slice(0, -1);
+      const nextFuture = [command, ...state.history.future];
+
+      return {
+        document: nextDocument,
+        selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        renameSession: null,
+        history: {
+          past: nextPast,
+          future: nextFuture,
+        },
+        canUndo: nextPast.length > 0,
+        canRedo: true,
+      };
+    }),
+  redo: () =>
+    set((state) => {
+      const [command, ...remainingFuture] = state.history.future;
+      if (!command) return state;
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+      const nextPast = pushToPast(state.history.past, command);
+
+      return {
+        document: nextDocument,
+        selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        renameSession: null,
+        history: {
+          past: nextPast,
+          future: remainingFuture,
+        },
+        canUndo: true,
+        canRedo: remainingFuture.length > 0,
+      };
+    }),
 }));
