@@ -76,10 +76,15 @@ export default function EditorCanvas() {
     const app = new Application();
 
     async function init() {
+      const targetResolution =
+        typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
       await app.init({
         resizeTo: resizeTarget,
         background: editorThemeRef.current.canvasBackground,
         antialias: true,
+        autoDensity: true,
+        resolution: targetResolution,
+        roundPixels: true,
       });
       initialized = true;
 
@@ -491,6 +496,13 @@ function drawRoomLabels(
   for (const room of rooms) {
     const layout = getRoomLabelLayout(room, camera, viewport);
     if (!layout) continue;
+    const textResolution = getTextResolution();
+    const left = snapToPixel(layout.left, textResolution);
+    const top = snapToPixel(layout.top, textResolution);
+    const width = snapToPixel(layout.width, textResolution);
+    const height = snapToPixel(layout.height, textResolution);
+    const centerX = snapToPixel(layout.center.x, textResolution);
+    const centerY = snapToPixel(layout.center.y, textResolution);
 
     const isSelected = selectedRoomId === room.id;
     const isHovered = hoveredRoomLabelId === room.id;
@@ -508,15 +520,16 @@ function drawRoomLabels(
 
     const pill = new Graphics();
     pill.setFillStyle({ color: fillColor, alpha: 0.92 });
-    pill.roundRect(layout.left, layout.top, layout.width, layout.height, layout.borderRadius);
+    pill.roundRect(left, top, width, height, layout.borderRadius);
     pill.fill();
     pill.setStrokeStyle({ width: strokeWidth, color: strokeColor, alpha: 0.95 });
-    pill.roundRect(layout.left, layout.top, layout.width, layout.height, layout.borderRadius);
+    pill.roundRect(left, top, width, height, layout.borderRadius);
     pill.stroke();
     labelContainer.addChild(pill);
 
     const text = new Text({
       text: layout.text,
+      resolution: textResolution,
       style: {
         fontFamily: ROOM_LABEL_FONT_FAMILY,
         fontSize: ROOM_LABEL_FONT_SIZE_PX,
@@ -524,13 +537,14 @@ function drawRoomLabels(
         fill: theme.roomLabelFill,
         stroke: {
           color: theme.roomLabelStroke,
-          width: 3,
+          width: 2,
           join: "round",
         },
       },
     });
+    text.roundPixels = true;
     text.anchor.set(0.5);
-    text.position.set(layout.center.x, layout.center.y);
+    text.position.set(centerX, centerY);
     text.alpha = layout.isPlaceholder ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
     labelContainer.addChild(text);
   }
@@ -645,4 +659,13 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function getTextResolution(): number {
+  if (typeof window === "undefined") return 1;
+  return Math.min(window.devicePixelRatio || 1, 2);
+}
+
+function snapToPixel(value: number, resolution: number): number {
+  return Math.round(value * resolution) / resolution;
 }
