@@ -4,6 +4,7 @@ import { worldToScreen } from "@/lib/editor/camera";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 
 export type RectWall = "left" | "right" | "top" | "bottom";
+export type RectCorner = "top-left" | "top-right" | "bottom-right" | "bottom-left";
 
 export type RoomRectBounds = {
   minX: number;
@@ -20,11 +21,19 @@ export type WallHandleLayout = {
   height: number;
 };
 
+export type CornerHandleLayout = {
+  corner: RectCorner;
+  center: Point;
+  size: number;
+};
+
 const HANDLE_LENGTH_PX = 40;
 const HANDLE_THICKNESS_PX = 8;
 const MIN_HANDLE_LENGTH_PX = 14;
 const HANDLE_EDGE_PADDING_PX = 8;
 const HANDLE_HIT_PADDING_PX = 8;
+const CORNER_HANDLE_SIZE_PX = 10;
+const CORNER_HIT_PADDING_PX = 6;
 export const MIN_ROOM_SIZE_MM = GRID_SIZE_MM;
 
 export function getAxisAlignedRoomBounds(room: Room): RoomRectBounds | null {
@@ -128,6 +137,43 @@ export function hitTestWallHandle(
   return null;
 }
 
+export function getCornerHandleLayouts(
+  bounds: RoomRectBounds,
+  camera: CameraState,
+  viewport: ViewportSize
+): CornerHandleLayout[] {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+
+  return [
+    { corner: "top-left", center: topLeft, size: CORNER_HANDLE_SIZE_PX },
+    { corner: "top-right", center: topRight, size: CORNER_HANDLE_SIZE_PX },
+    { corner: "bottom-right", center: bottomRight, size: CORNER_HANDLE_SIZE_PX },
+    { corner: "bottom-left", center: bottomLeft, size: CORNER_HANDLE_SIZE_PX },
+  ];
+}
+
+export function hitTestCornerHandle(
+  handles: CornerHandleLayout[],
+  point: Point
+): RectCorner | null {
+  for (const handle of handles) {
+    const half = handle.size / 2;
+    if (
+      point.x >= handle.center.x - half - CORNER_HIT_PADDING_PX &&
+      point.x <= handle.center.x + half + CORNER_HIT_PADDING_PX &&
+      point.y >= handle.center.y - half - CORNER_HIT_PADDING_PX &&
+      point.y <= handle.center.y + half + CORNER_HIT_PADDING_PX
+    ) {
+      return handle.corner;
+    }
+  }
+
+  return null;
+}
+
 export function resizeBoundsForWallDrag(
   bounds: RoomRectBounds,
   wall: RectWall,
@@ -166,6 +212,51 @@ export function resizeBoundsForWallDrag(
 
   return {
     ...bounds,
+    maxY: Math.max(snappedY, bounds.minY + minRoomSizeMm),
+  };
+}
+
+export function resizeBoundsForCornerDrag(
+  bounds: RoomRectBounds,
+  corner: RectCorner,
+  cursorWorld: Point,
+  options?: {
+    gridSizeMm?: number;
+    minRoomSizeMm?: number;
+  }
+): RoomRectBounds {
+  const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
+  const minRoomSizeMm = options?.minRoomSizeMm ?? MIN_ROOM_SIZE_MM;
+  const snappedX = snapToGrid(cursorWorld.x, gridSizeMm);
+  const snappedY = snapToGrid(cursorWorld.y, gridSizeMm);
+
+  if (corner === "top-left") {
+    return {
+      ...bounds,
+      minX: Math.min(snappedX, bounds.maxX - minRoomSizeMm),
+      minY: Math.min(snappedY, bounds.maxY - minRoomSizeMm),
+    };
+  }
+
+  if (corner === "top-right") {
+    return {
+      ...bounds,
+      maxX: Math.max(snappedX, bounds.minX + minRoomSizeMm),
+      minY: Math.min(snappedY, bounds.maxY - minRoomSizeMm),
+    };
+  }
+
+  if (corner === "bottom-right") {
+    return {
+      ...bounds,
+      maxX: Math.max(snappedX, bounds.minX + minRoomSizeMm),
+      maxY: Math.max(snappedY, bounds.minY + minRoomSizeMm),
+    };
+  }
+
+  return {
+    ...bounds,
+    minX: Math.min(snappedX, bounds.maxX - minRoomSizeMm),
     maxY: Math.max(snappedY, bounds.minY + minRoomSizeMm),
   };
 }

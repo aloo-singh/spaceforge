@@ -17,7 +17,13 @@ import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
-import { getAxisAlignedRoomBounds, getWallHandleLayouts, type RectWall } from "@/lib/editor/rectRoomResize";
+import {
+  getAxisAlignedRoomBounds,
+  getCornerHandleLayouts,
+  getWallHandleLayouts,
+  type RectCorner,
+  type RectWall,
+} from "@/lib/editor/rectRoomResize";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
@@ -34,13 +40,17 @@ export default function EditorCanvas() {
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }>({
     hoveredWall: null,
+    hoveredCorner: null,
     hoveredRoomId: null,
     activeWall: null,
+    activeCorner: null,
     activeRoomId: null,
   });
   const instructionsId = "editor-canvas-controls";
@@ -263,8 +273,10 @@ function drawScene(
   hoveredRoomLabelId: string | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
   theme: EditorCanvasTheme
@@ -341,8 +353,10 @@ function drawRooms(
   selectedRoomId: string | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -384,6 +398,7 @@ function drawRooms(
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
     const handles = getWallHandleLayouts(bounds, camera, viewport);
+    const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
     for (const handle of handles) {
       const isHovered =
@@ -420,6 +435,42 @@ function drawRooms(
         alpha: strokeAlpha,
       });
       graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.stroke();
+    }
+
+    for (const handle of cornerHandles) {
+      const isHovered =
+        roomResizeUi.hoveredRoomId === room.id && roomResizeUi.hoveredCorner === handle.corner;
+      const isActive =
+        roomResizeUi.activeRoomId === room.id && roomResizeUi.activeCorner === handle.corner;
+      const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
+      const half = size / 2;
+      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
+      const fillAlpha = isActive ? 0.54 : isHovered ? 0.42 : 0.3;
+      const strokeAlpha = isActive ? 1 : isHovered ? 0.98 : 0.9;
+      const strokeWidth = isActive ? 2.1 : isHovered ? 1.8 : 1.5;
+
+      if (haloPadding > 0) {
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
+        graphics.rect(
+          handle.center.x - half - haloPadding,
+          handle.center.y - half - haloPadding,
+          size + haloPadding * 2,
+          size + haloPadding * 2
+        );
+        graphics.fill();
+      }
+
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
+      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: strokeWidth,
+        color: theme.roomOutline,
+        alpha: strokeAlpha,
+      });
+      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
       graphics.stroke();
     }
   }
