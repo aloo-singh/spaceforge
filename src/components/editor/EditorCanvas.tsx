@@ -7,6 +7,7 @@ import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
 import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometry";
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
+import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
@@ -18,7 +19,6 @@ export default function EditorCanvas() {
   const roomRef = useRef<Graphics | null>(null);
   const draftRef = useRef<Graphics | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
-  const isSpaceHeldRef = useRef(false);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorTheme = useMemo(
@@ -92,79 +92,27 @@ export default function EditorCanvas() {
         drawScene(grid, rooms, draft, state, cursorWorldRef.current, editorThemeRef.current);
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
-
-      const toLocalCanvasPoint = (event: PointerEvent) => {
-        const rect = app.canvas.getBoundingClientRect();
-        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-      };
-
-      const onPointerMove = (event: PointerEvent) => {
-        const screenPoint = toLocalCanvasPoint(event);
-        const state = useEditorStore.getState();
-        cursorWorldRef.current = screenToWorld(screenPoint, state.camera, state.viewport);
-        drawScene(
-          grid,
-          rooms,
-          draft,
-          state,
-          cursorWorldRef.current,
-          editorThemeRef.current
-        );
-      };
-
-      const onPointerLeave = () => {
-        cursorWorldRef.current = null;
-        drawScene(
-          grid,
-          rooms,
-          draft,
-          useEditorStore.getState(),
-          cursorWorldRef.current,
-          editorThemeRef.current
-        );
-      };
-
-      const onPointerDown = (event: PointerEvent) => {
-        if (event.button !== 0 || isSpaceHeldRef.current) return;
-        const screenPoint = toLocalCanvasPoint(event);
-        const state = useEditorStore.getState();
-        const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
-        state.placeDraftPointFromCursor(cursorWorld);
-      };
-
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.code === "Space") {
-          isSpaceHeldRef.current = true;
-        }
-      };
-
-      const onKeyUp = (event: KeyboardEvent) => {
-        if (event.code === "Space") {
-          isSpaceHeldRef.current = false;
-        }
-      };
-
-      const onWindowBlur = () => {
-        isSpaceHeldRef.current = false;
-      };
-
-      app.canvas.addEventListener("pointermove", onPointerMove);
-      app.canvas.addEventListener("pointerleave", onPointerLeave);
-      app.canvas.addEventListener("pointerdown", onPointerDown);
-      window.addEventListener("keydown", onKeyDown);
-      window.addEventListener("keyup", onKeyUp);
-      window.addEventListener("blur", onWindowBlur);
+      const detachRoomDrawInput = attachRoomDrawInput(app.canvas, useEditorStore, {
+        onCursorWorldChange: (cursorWorld) => {
+          cursorWorldRef.current = cursorWorld;
+        },
+        requestRender: () => {
+          drawScene(
+            grid,
+            rooms,
+            draft,
+            useEditorStore.getState(),
+            cursorWorldRef.current,
+            editorThemeRef.current
+          );
+        },
+      });
 
       return () => {
         detachPanZoomInput();
+        detachRoomDrawInput();
         unsubscribe();
         app.renderer.off("resize", handleResize);
-        app.canvas.removeEventListener("pointermove", onPointerMove);
-        app.canvas.removeEventListener("pointerleave", onPointerLeave);
-        app.canvas.removeEventListener("pointerdown", onPointerDown);
-        window.removeEventListener("keydown", onKeyDown);
-        window.removeEventListener("keyup", onKeyUp);
-        window.removeEventListener("blur", onWindowBlur);
         appRef.current = null;
         gridRef.current = null;
         roomRef.current = null;
@@ -207,7 +155,8 @@ export default function EditorCanvas() {
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners snapped to the 500 millimetre grid. Hold
-        Space and drag to pan, middle mouse drag also pans, and mouse wheel zooms.
+        Space and drag to pan, middle mouse drag also pans, mouse wheel zooms, and Escape cancels
+        the current room draft. Right click also cancels the current room draft.
       </p>
       <div
         ref={containerRef}
@@ -316,40 +265,74 @@ function drawDraft(
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
-  if (draftPoints.length === 0) return;
+  if (draftPoints.length > 0) {
+    const screenDraftPoints = draftPoints.map((point) => worldToScreen(point, camera, viewport));
 
-  const screenDraftPoints = draftPoints.map((point) => worldToScreen(point, camera, viewport));
+    graphics.setStrokeStyle({ width: 2, color: theme.draftWall, alpha: 1 });
+    graphics.moveTo(screenDraftPoints[0].x, screenDraftPoints[0].y);
+    for (let i = 1; i < screenDraftPoints.length; i += 1) {
+      graphics.lineTo(screenDraftPoints[i].x, screenDraftPoints[i].y);
+    }
+    graphics.stroke();
 
-  graphics.setStrokeStyle({ width: 2, color: theme.draftWall, alpha: 1 });
-  graphics.moveTo(screenDraftPoints[0].x, screenDraftPoints[0].y);
-  for (let i = 1; i < screenDraftPoints.length; i += 1) {
-    graphics.lineTo(screenDraftPoints[i].x, screenDraftPoints[i].y);
-  }
-  graphics.stroke();
+    graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 1 });
+    for (const point of screenDraftPoints) {
+      graphics.rect(point.x - 3, point.y - 3, 6, 6);
+      graphics.fill();
+    }
 
-  graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 1 });
-  for (const point of screenDraftPoints) {
-    graphics.rect(point.x - 3, point.y - 3, 6, 6);
-    graphics.fill();
+    if (!cursorWorld) return;
+
+    const previewWorld = getOrthogonalSnappedPoint(
+      draftPoints[draftPoints.length - 1],
+      cursorWorld,
+      GRID_SIZE_MM
+    );
+    const previewScreen = worldToScreen(previewWorld, camera, viewport);
+    const lastScreenPoint = screenDraftPoints[screenDraftPoints.length - 1];
+    const isZeroPreview =
+      previewScreen.x === lastScreenPoint.x && previewScreen.y === lastScreenPoint.y;
+
+    if (!isZeroPreview) {
+      graphics.setStrokeStyle({ width: 2, color: theme.interactiveAccent, alpha: 0.55 });
+      graphics.moveTo(lastScreenPoint.x, lastScreenPoint.y);
+      graphics.lineTo(previewScreen.x, previewScreen.y);
+      graphics.stroke();
+    }
+
+    drawSnapMarker(graphics, previewScreen, theme, "active");
+    return;
   }
 
   if (!cursorWorld) return;
 
-  const previewWorld =
-    draftPoints.length === 0
-      ? snapPointToGrid(cursorWorld, GRID_SIZE_MM)
-      : getOrthogonalSnappedPoint(draftPoints[draftPoints.length - 1], cursorWorld, GRID_SIZE_MM);
-  const previewScreen = worldToScreen(previewWorld, camera, viewport);
-  const lastScreenPoint = screenDraftPoints[screenDraftPoints.length - 1];
+  const firstPointPreviewWorld = snapPointToGrid(cursorWorld, GRID_SIZE_MM);
+  const firstPointPreviewScreen = worldToScreen(firstPointPreviewWorld, camera, viewport);
+  drawSnapMarker(graphics, firstPointPreviewScreen, theme, "idle");
+}
 
-  if (previewScreen.x === lastScreenPoint.x && previewScreen.y === lastScreenPoint.y) {
-    return;
-  }
+function drawSnapMarker(
+  graphics: Graphics,
+  point: Point,
+  theme: EditorCanvasTheme,
+  mode: "idle" | "active"
+) {
+  const radius = mode === "active" ? 6 : 5;
+  const dotRadius = mode === "active" ? 2 : 1.75;
+  const fillAlpha = mode === "active" ? 0.18 : 0.12;
+  const strokeAlpha = mode === "active" ? 0.95 : 0.75;
 
-  graphics.setStrokeStyle({ width: 2, color: theme.interactiveAccent, alpha: 0.55 });
-  graphics.moveTo(lastScreenPoint.x, lastScreenPoint.y);
-  graphics.lineTo(previewScreen.x, previewScreen.y);
+  graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
+  graphics.circle(point.x, point.y, radius);
+  graphics.fill();
+
+  graphics.setStrokeStyle({ width: 1.5, color: theme.interactiveAccent, alpha: strokeAlpha });
+  graphics.circle(point.x, point.y, radius);
   graphics.stroke();
+
+  graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.9 });
+  graphics.circle(point.x, point.y, dotRadius);
+  graphics.fill();
 }
 
 function drawGridLines(
