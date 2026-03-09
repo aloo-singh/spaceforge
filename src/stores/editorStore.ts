@@ -53,6 +53,8 @@ type EditorState = {
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
+  commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   undo: () => void;
   redo: () => void;
 };
@@ -84,6 +86,31 @@ function updateRoomNameInDocument(document: DocumentState, roomId: string, name:
         : room
     ),
   };
+}
+
+function updateRoomPointsInDocument(
+  document: DocumentState,
+  roomId: string,
+  nextPoints: Point[]
+): DocumentState {
+  return {
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            points: nextPoints.map((point) => ({ ...point })),
+          }
+        : room
+    ),
+  };
+}
+
+function arePointListsEqual(a: Point[], b: Point[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
+  }
+  return true;
 }
 
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
@@ -338,6 +365,39 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  previewRoomResize: (roomId, nextPoints) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (arePointListsEqual(room.points, nextPoints)) return state;
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+      };
+    }),
+  commitRoomResize: (roomId, previousPoints, nextPoints) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (arePointListsEqual(previousPoints, nextPoints)) return state;
+
+      const command: EditorCommand = {
+        type: "resize-room",
+        roomId,
+        previousPoints: previousPoints.map((point) => ({ ...point })),
+        nextPoints: nextPoints.map((point) => ({ ...point })),
+      };
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
