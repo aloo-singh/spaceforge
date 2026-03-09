@@ -14,10 +14,12 @@ import {
 } from "@/lib/editor/roomLabel";
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
+import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
+import { HistoryControls } from "@/components/editor/HistoryControls";
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -135,10 +137,12 @@ export default function EditorCanvas() {
           );
         },
       });
+      const detachHistoryHotkeys = attachHistoryHotkeys(useEditorStore);
 
       return () => {
         detachPanZoomInput();
         detachRoomDrawInput();
+        detachHistoryHotkeys();
         unsubscribe();
         app.renderer.off("resize", handleResize);
         appRef.current = null;
@@ -197,13 +201,15 @@ export default function EditorCanvas() {
         select that room. When a room is selected, clicking outside clears selection first, then a
         following click can start drawing. Hold Space and drag to pan, middle mouse drag also pans,
         mouse wheel zooms, and Escape cancels the current room draft or clears selection. Right
-        click also cancels the current room draft.
+        click also cancels the current room draft. Undo is Cmd or Ctrl plus Z, and redo is
+        Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div
         ref={containerRef}
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
+      <HistoryControls />
       <SelectedRoomNamePanel />
     </section>
   );
