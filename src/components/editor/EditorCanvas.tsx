@@ -13,9 +13,11 @@ import {
   ROOM_LABEL_FONT_WEIGHT,
 } from "@/lib/editor/roomLabel";
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
+import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
+import { getAxisAlignedRoomBounds, getWallHandleLayouts, type RectWall } from "@/lib/editor/rectRoomResize";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
@@ -30,6 +32,17 @@ export default function EditorCanvas() {
   const draftRef = useRef<Graphics | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
+  const roomResizeUiRef = useRef<{
+    hoveredWall: RectWall | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeRoomId: string | null;
+  }>({
+    hoveredWall: null,
+    hoveredRoomId: null,
+    activeWall: null,
+    activeRoomId: null,
+  });
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorTheme = useMemo(
@@ -95,6 +108,7 @@ export default function EditorCanvas() {
         useEditorStore.getState(),
         cursorWorldRef.current,
         hoveredRoomLabelIdRef.current,
+        roomResizeUiRef.current,
         editorThemeRef.current
       );
 
@@ -113,10 +127,29 @@ export default function EditorCanvas() {
           state,
           cursorWorldRef.current,
           hoveredRoomLabelIdRef.current,
+          roomResizeUiRef.current,
           editorThemeRef.current
         );
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
+      const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
+        onHandleStateChange: (handleState) => {
+          roomResizeUiRef.current = handleState;
+        },
+        requestRender: () => {
+          drawScene(
+            grid,
+            rooms,
+            roomLabels,
+            draft,
+            useEditorStore.getState(),
+            cursorWorldRef.current,
+            hoveredRoomLabelIdRef.current,
+            roomResizeUiRef.current,
+            editorThemeRef.current
+          );
+        },
+      });
       const detachRoomDrawInput = attachRoomDrawInput(app.canvas, useEditorStore, {
         onCursorWorldChange: (cursorWorld) => {
           cursorWorldRef.current = cursorWorld;
@@ -133,6 +166,7 @@ export default function EditorCanvas() {
             useEditorStore.getState(),
             cursorWorldRef.current,
             hoveredRoomLabelIdRef.current,
+            roomResizeUiRef.current,
             editorThemeRef.current
           );
         },
@@ -141,6 +175,7 @@ export default function EditorCanvas() {
 
       return () => {
         detachPanZoomInput();
+        detachRoomResizeInput();
         detachRoomDrawInput();
         detachHistoryHotkeys();
         unsubscribe();
@@ -185,6 +220,7 @@ export default function EditorCanvas() {
       state,
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
+      roomResizeUiRef.current,
       editorTheme
     );
   }, [editorTheme]);
@@ -225,6 +261,12 @@ function drawScene(
   state: EditorSnapshot,
   cursorWorld: Point | null,
   hoveredRoomLabelId: string | null,
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeRoomId: string | null;
+  },
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
@@ -232,6 +274,8 @@ function drawScene(
     roomGraphics,
     state.document.rooms,
     state.selectedRoomId,
+    roomResizeUi,
+    state.roomDraft.points.length > 0,
     state.camera,
     state.viewport,
     theme
@@ -295,6 +339,13 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeRoomId: string | null;
+  },
+  isDraftingRoom: boolean,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -328,6 +379,49 @@ function drawRooms(
     }
     graphics.closePath();
     graphics.stroke();
+
+    if (!isSelected || isDraftingRoom) continue;
+    const bounds = getAxisAlignedRoomBounds(room);
+    if (!bounds) continue;
+    const handles = getWallHandleLayouts(bounds, camera, viewport);
+
+    for (const handle of handles) {
+      const isHovered =
+        roomResizeUi.hoveredRoomId === room.id && roomResizeUi.hoveredWall === handle.wall;
+      const isActive =
+        roomResizeUi.activeRoomId === room.id && roomResizeUi.activeWall === handle.wall;
+      const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
+      const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
+      const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
+      const radius = Math.min(handle.width, handle.height) / 2;
+      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
+      const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
+      const handleStrokeColor = theme.roomOutline;
+
+      if (haloPadding > 0) {
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
+        graphics.roundRect(
+          handle.left - haloPadding,
+          handle.top - haloPadding,
+          handle.width + haloPadding * 2,
+          handle.height + haloPadding * 2,
+          radius + haloPadding
+        );
+        graphics.fill();
+      }
+
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: strokeWidth,
+        color: handleStrokeColor,
+        alpha: strokeAlpha,
+      });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.stroke();
+    }
   }
 }
 

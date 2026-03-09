@@ -14,6 +14,12 @@ export type EditorCommand =
       roomId: string;
       previousName: string;
       nextName: string;
+    }
+  | {
+      type: "resize-room";
+      roomId: string;
+      previousPoints: Room["points"];
+      nextPoints: Room["points"];
     };
 
 export function applyEditorCommand(
@@ -30,6 +36,20 @@ export function applyEditorCommand(
 
     return {
       rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
+    };
+  }
+
+  if (command.type === "resize-room") {
+    const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
+    return {
+      rooms: document.rooms.map((room) =>
+        room.id === command.roomId
+          ? {
+              ...room,
+              points: nextPoints.map((point) => ({ ...point })),
+            }
+          : room
+      ),
     };
   }
 
