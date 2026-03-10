@@ -12,6 +12,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import { loadEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 type RoomDraftState = {
@@ -118,10 +119,19 @@ function getSelectionIfRoomExists(roomId: string | null, document: DocumentState
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
 
+function createInitialDocumentState(): DocumentState {
+  const snapshot = loadEditorSnapshot();
+  if (!snapshot) {
+    return {
+      rooms: [],
+    };
+  }
+
+  return snapshot.document;
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
-  document: {
-    rooms: [],
-  },
+  document: createInitialDocumentState(),
   camera: {
     xMm: 0,
     yMm: 0,
