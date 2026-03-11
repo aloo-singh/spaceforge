@@ -10,6 +10,42 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.7.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-11</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export layouts as PNG images</li>
+                <li>Theme-aware exports for light and dark mode</li>
+                <li>Clean export composition with intentional padding</li>
+                <li>Optional &quot;Designed by [name]&quot; signature for exported images</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improvements</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export grid is simplified for clarity and shareability</li>
+                <li>Export images now feel cleaner than raw canvas screenshots</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Internal</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Introduced a dedicated export composition pipeline</li>
+                <li>Isolated PNG export utility for reuse</li>
+                <li>Export rendering decoupled from live canvas rendering</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.6.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-11</span>
           </div>
