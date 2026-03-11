@@ -130,6 +130,10 @@ function arePointListsEqual(a: Point[], b: Point[]): boolean {
   return true;
 }
 
+function areCamerasEqual(a: CameraState, b: CameraState): boolean {
+  return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
+}
+
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
@@ -491,20 +495,26 @@ if (typeof window !== "undefined") {
   window.__spaceforgeEditorAutosaveCleanup__?.();
 
   let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
-  let lastSavedDocumentSignature = JSON.stringify(useEditorStore.getState().document);
+  let lastSavedPersistedSignature = JSON.stringify({
+    document: useEditorStore.getState().document,
+    camera: useEditorStore.getState().camera,
+  });
 
   const flushAutosave = () => {
     autosaveTimeout = null;
     const state = useEditorStore.getState();
-    const nextDocumentSignature = JSON.stringify(state.document);
-    if (nextDocumentSignature === lastSavedDocumentSignature) return;
+    const nextPersistedSignature = JSON.stringify({
+      document: state.document,
+      camera: state.camera,
+    });
+    if (nextPersistedSignature === lastSavedPersistedSignature) return;
 
     const didSave = saveEditorSnapshot({
       document: state.document,
       camera: state.camera,
     });
     if (didSave) {
-      lastSavedDocumentSignature = nextDocumentSignature;
+      lastSavedPersistedSignature = nextPersistedSignature;
     }
   };
 
@@ -528,9 +538,11 @@ if (typeof window !== "undefined") {
     flushPendingAutosave();
   };
 
-  // Autosave only when the persisted document shape changes.
+  // Autosave only when persisted fields change.
   const unsubscribe = useEditorStore.subscribe((state, previousState) => {
-    if (state.document === previousState.document) return;
+    const didDocumentChange = state.document !== previousState.document;
+    const didCameraChange = !areCamerasEqual(state.camera, previousState.camera);
+    if (!didDocumentChange && !didCameraChange) return;
 
     if (autosaveTimeout) {
       clearTimeout(autosaveTimeout);
