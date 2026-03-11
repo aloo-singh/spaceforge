@@ -39,6 +39,15 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 
+const EMPTY_ROOM_RESIZE_UI = {
+  hoveredWall: null,
+  hoveredCorner: null,
+  hoveredRoomId: null,
+  activeWall: null,
+  activeCorner: null,
+  activeRoomId: null,
+} as const;
+
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
@@ -55,14 +64,7 @@ export default function EditorCanvas() {
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
-  }>({
-    hoveredWall: null,
-    hoveredCorner: null,
-    hoveredRoomId: null,
-    activeWall: null,
-    activeCorner: null,
-    activeRoomId: null,
-  });
+  }>({ ...EMPTY_ROOM_RESIZE_UI });
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -121,17 +123,46 @@ export default function EditorCanvas() {
       (0 - state.camera.yMm) * state.camera.pixelsPerMm + state.viewport.height / 2;
 
     setIsExportingPng(true);
-    const gridLayer = gridRef.current;
-    const previousGridVisibility = gridLayer?.visible;
+    const exportStage = new Container();
+    const exportRoomGraphics = new Graphics();
+    const exportRoomLabels = new Container();
+    const exportDraftGraphics = new Graphics();
+    exportStage.addChild(exportRoomGraphics);
+    exportStage.addChild(exportRoomLabels);
+    exportStage.addChild(exportDraftGraphics);
 
-    if (gridLayer) {
-      gridLayer.visible = false;
-    }
+    drawRooms(
+      exportRoomGraphics,
+      state.document.rooms,
+      null,
+      EMPTY_ROOM_RESIZE_UI,
+      state.roomDraft.points.length > 0,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
+    drawRoomLabels(
+      exportRoomLabels,
+      state.document.rooms,
+      null,
+      null,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
+    drawDraft(
+      exportDraftGraphics,
+      state.roomDraft.points,
+      cursorWorldRef.current,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
 
     try {
       const blob = await exportPixiCanvasToPngBlob({
         renderer: app.renderer,
-        stage: app.stage,
+        stage: exportStage,
       }, {
         backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
         paddingPx: 48,
@@ -163,9 +194,7 @@ export default function EditorCanvas() {
     } catch (error) {
       console.error("PNG export failed.", error);
     } finally {
-      if (gridLayer && typeof previousGridVisibility === "boolean") {
-        gridLayer.visible = previousGridVisibility;
-      }
+      exportStage.destroy({ children: true });
       setIsExportingPng(false);
     }
   }, [completeHint, editorThemeMode, isExportingPng]);
