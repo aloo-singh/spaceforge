@@ -3,13 +3,14 @@
 import { useState, useSyncExternalStore } from "react";
 import { Download, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
 type HistoryControlsProps = {
-  onExportPng?: () => void | Promise<void>;
+  onExportPng?: (signatureText?: string) => void | Promise<void>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
 };
@@ -20,6 +21,7 @@ export function HistoryControls({
   exportDisabled = false,
 }: HistoryControlsProps) {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [exportSignatureText, setExportSignatureText] = useState("");
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -34,6 +36,7 @@ export function HistoryControls({
   const redo = useEditorStore((state) => state.redo);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
+  const normalizedSignature = normalizeExportSignature(exportSignatureText);
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -61,7 +64,7 @@ export function HistoryControls({
             type="button"
             variant="outline"
             size="sm"
-            onClick={onExportPng}
+            onClick={() => onExportPng?.(normalizedSignature || undefined)}
             disabled={!onExportPng || exportDisabled || isExportingPng}
             aria-label="Export current canvas as PNG"
             className="gap-2"
@@ -69,6 +72,16 @@ export function HistoryControls({
             <Download />
             {isExportingPng ? "Exporting..." : "Export PNG"}
           </Button>
+          <Input
+            type="text"
+            value={exportSignatureText}
+            onChange={(event) => setExportSignatureText(event.target.value)}
+            maxLength={40}
+            placeholder="Designed by..."
+            aria-label="Optional export signature text"
+            className="h-8 w-40 text-xs"
+            disabled={isExportingPng}
+          />
           <div className="h-5 w-px bg-border/70" aria-hidden="true" />
           <Button
             type="button"
@@ -121,4 +134,8 @@ export function HistoryControls({
       />
     </>
   );
+}
+
+function normalizeExportSignature(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }

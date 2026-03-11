@@ -10,6 +10,11 @@ export type PixiPngExportSource =
 export type PixiPngExportOptions = {
   backgroundColor?: string;
   paddingPx?: number;
+  signature?: {
+    text: string;
+    color: string;
+    alpha?: number;
+  };
   grid?: {
     spacingPx: number;
     originXPx: number;
@@ -80,6 +85,7 @@ function composeExportCanvas(
     sourceWidth,
     sourceHeight
   );
+  drawExportSignature(context, exportWidth, exportHeight, options.signature, paddingPx);
 
   return composedCanvas;
 }
@@ -126,6 +132,33 @@ function drawExportGrid(
 function normalizeFirstGridLine(start: number, spacing: number, minValue: number): number {
   const normalized = ((start - minValue) % spacing + spacing) % spacing;
   return minValue + normalized;
+}
+
+function drawExportSignature(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  signature: PixiPngExportOptions["signature"],
+  paddingPx: number
+) {
+  if (!signature) return;
+  const trimmedText = signature.text.trim();
+  if (!trimmedText) return;
+
+  const label = `Designed by ${trimmedText}`;
+  const alpha = typeof signature.alpha === "number" ? Math.max(0, Math.min(1, signature.alpha)) : 0.7;
+  const horizontalInset = Math.max(12, Math.floor(paddingPx * 0.33));
+  const baselineInset = Math.max(10, Math.floor(paddingPx * 0.28));
+  const fontSizePx = Math.max(11, Math.min(14, Math.floor(paddingPx * 0.28)));
+
+  context.save();
+  context.textAlign = "right";
+  context.textBaseline = "alphabetic";
+  context.font = `500 ${fontSizePx}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+  context.fillStyle = signature.color;
+  context.globalAlpha = alpha;
+  context.fillText(label, width - horizontalInset, height - baselineInset);
+  context.restore();
 }
 
 function extractSourceCanvas(source: PixiPngExportSource): ICanvas {

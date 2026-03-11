@@ -65,7 +65,7 @@ export default function EditorCanvas() {
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const editorThemeRef = useRef(editorTheme);
 
-  const exportCurrentCanvasAsPng = useCallback(async () => {
+  const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
     if (!app || isExportingPng) return;
     const state = useEditorStore.getState();
@@ -99,6 +99,13 @@ export default function EditorCanvas() {
           color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
           alpha: editorThemeMode === "light" ? 0.08 : 0.1,
         },
+        signature: signatureText
+          ? {
+              text: signatureText,
+              color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
+              alpha: editorThemeMode === "light" ? 0.72 : 0.7,
+            }
+          : undefined,
       });
       const downloadUrl = URL.createObjectURL(blob);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
