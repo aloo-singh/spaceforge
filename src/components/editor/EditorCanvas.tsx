@@ -19,6 +19,12 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
+  getActiveEditorOnboardingHint,
+  loadDismissedEditorHintIds,
+  saveDismissedEditorHintIds,
+  type EditorOnboardingHintId,
+} from "@/lib/editor/onboardingHints";
+import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
   getWallHandleLayouts,
@@ -29,6 +35,7 @@ import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types"
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
+import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,9 +68,20 @@ export default function EditorCanvas() {
     () => getEditorCanvasTheme(editorThemeMode),
     [editorThemeMode]
   );
+  const roomCount = useEditorStore((state) => state.document.rooms.length);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
+  const [hasHydratedHints, setHasHydratedHints] = useState(false);
+  const [dismissedHintIds, setDismissedHintIds] = useState<EditorOnboardingHintId[]>([]);
   const editorThemeRef = useRef(editorTheme);
+  const activeHint = useMemo(() => {
+    if (!hasHydratedHints) return null;
+
+    return getActiveEditorOnboardingHint({
+      roomCount,
+      dismissedHintIds: new Set(dismissedHintIds),
+    });
+  }, [dismissedHintIds, hasHydratedHints, roomCount]);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -127,6 +145,20 @@ export default function EditorCanvas() {
   useEffect(() => {
     editorThemeRef.current = editorTheme;
   }, [editorTheme]);
+
+  useEffect(() => {
+    setDismissedHintIds(loadDismissedEditorHintIds());
+    setHasHydratedHints(true);
+  }, []);
+
+  const dismissHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setDismissedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveDismissedEditorHintIds(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const host = containerRef.current;
@@ -325,6 +357,14 @@ export default function EditorCanvas() {
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
+      {activeHint ? (
+        <aside className="pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3">
+          <OnboardingHintCard
+            message={activeHint.message}
+            onDismiss={() => dismissHint(activeHint.id)}
+          />
+        </aside>
+      ) : null}
       <HistoryControls
         onExportPng={exportCurrentCanvasAsPng}
         isExportingPng={isExportingPng}
