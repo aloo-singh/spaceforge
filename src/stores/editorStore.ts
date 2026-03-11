@@ -12,7 +12,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
-import { loadEditorSnapshot, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
+import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 type RoomDraftState = {
@@ -62,6 +62,14 @@ type EditorState = {
 
 const HISTORY_LIMIT = 100;
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
+const DEFAULT_DOCUMENT_STATE: DocumentState = {
+  rooms: [],
+};
+const DEFAULT_CAMERA_STATE: CameraState = {
+  xMm: 0,
+  yMm: 0,
+  pixelsPerMm: INITIAL_PIXELS_PER_MM,
+};
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
   const nextPast = [...past, command];
@@ -120,24 +128,19 @@ function getSelectionIfRoomExists(roomId: string | null, document: DocumentState
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
 
-function createInitialDocumentState(): DocumentState {
-  const snapshot = loadEditorSnapshot();
-  if (!snapshot) {
-    return {
-      rooms: [],
-    };
-  }
+const hydrationSnapshot = loadEditorSnapshotForHydration();
 
-  return snapshot.document;
+function createInitialDocumentState(): DocumentState {
+  return hydrationSnapshot?.document ?? DEFAULT_DOCUMENT_STATE;
+}
+
+function createInitialCameraState(): CameraState {
+  return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
   document: createInitialDocumentState(),
-  camera: {
-    xMm: 0,
-    yMm: 0,
-    pixelsPerMm: INITIAL_PIXELS_PER_MM,
-  },
+  camera: createInitialCameraState(),
   viewport: {
     width: 1,
     height: 1,

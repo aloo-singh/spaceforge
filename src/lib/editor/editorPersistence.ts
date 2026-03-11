@@ -21,6 +21,11 @@ export type PersistedEditorSnapshot = {
   camera: CameraState;
 };
 
+export type PersistedEditorHydrationSnapshot = {
+  document: EditorDocumentState;
+  camera: CameraState | null;
+};
+
 export type PersistedEditorPayloadV1 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
@@ -61,14 +66,10 @@ function isCameraState(value: unknown): value is CameraState {
   );
 }
 
-function isPersistedEditorPayloadV1(value: unknown): value is PersistedEditorPayloadV1 {
+function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
-  if (value.version !== EDITOR_PERSISTENCE_VERSION) return false;
-  if (!isObject(value.document)) return false;
-  if (!Array.isArray(value.document.rooms)) return false;
-  if (!value.document.rooms.every((room) => isRoom(room))) return false;
-
-  return isCameraState(value.camera);
+  if (!Array.isArray(value.rooms)) return false;
+  return value.rooms.every((room) => isRoom(room));
 }
 
 function clonePoint(point: Point): Point {
@@ -116,13 +117,27 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
 }
 
 export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot | null {
+  const hydrationSnapshot = deserializeEditorSnapshotForHydration(raw);
+  if (!hydrationSnapshot || !hydrationSnapshot.camera) return null;
+
+  return {
+    document: hydrationSnapshot.document,
+    camera: hydrationSnapshot.camera,
+  };
+}
+
+export function deserializeEditorSnapshotForHydration(
+  raw: string
+): PersistedEditorHydrationSnapshot | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isPersistedEditorPayloadV1(parsed)) return null;
+    if (!isObject(parsed)) return null;
+    if (parsed.version !== EDITOR_PERSISTENCE_VERSION) return null;
+    if (!isPersistedDocument(parsed.document)) return null;
 
     return {
       document: cloneDocument(parsed.document),
-      camera: cloneCamera(parsed.camera),
+      camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
     };
   } catch {
     return null;
@@ -152,6 +167,20 @@ export function loadEditorSnapshot(
     const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     if (!raw) return null;
     return deserializeEditorSnapshot(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function loadEditorSnapshotForHydration(
+  storage: Storage | null = getBrowserStorage()
+): PersistedEditorHydrationSnapshot | null {
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
+    if (!raw) return null;
+    return deserializeEditorSnapshotForHydration(raw);
   } catch {
     return null;
   }
