@@ -1,20 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { Download, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
-export function HistoryControls() {
+type HistoryControlsProps = {
+  onExportPng?: (signatureText?: string) => void | Promise<void>;
+  isExportingPng?: boolean;
+  exportDisabled?: boolean;
+};
+
+export function HistoryControls({
+  onExportPng,
+  isExportingPng = false,
+  exportDisabled = false,
+}: HistoryControlsProps) {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [exportSignatureText, setExportSignatureText] = useState("");
+  const hasHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
+  const isCanvasEmpty = useEditorStore(
+    (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
+  );
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
+  const isResetDisabled = !hasHydrated || isCanvasEmpty;
+  const normalizedSignature = normalizeExportSignature(exportSignatureText);
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -31,11 +53,35 @@ export function HistoryControls() {
             variant="outline"
             size="icon-sm"
             onClick={() => setIsResetDialogOpen(true)}
+            disabled={isResetDisabled}
             aria-label="Reset canvas"
             title="Reset canvas"
           >
             <RotateCcw />
           </Button>
+          <div className="h-5 w-px bg-border/70" aria-hidden="true" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onExportPng?.(normalizedSignature || undefined)}
+            disabled={!onExportPng || exportDisabled || isExportingPng}
+            aria-label="Export current canvas as PNG"
+            className="gap-2"
+          >
+            <Download />
+            {isExportingPng ? "Exporting..." : "Export PNG"}
+          </Button>
+          <Input
+            type="text"
+            value={exportSignatureText}
+            onChange={(event) => setExportSignatureText(event.target.value)}
+            maxLength={40}
+            placeholder="Designed by..."
+            aria-label="Optional export signature text"
+            className="h-8 w-40 text-xs"
+            disabled={isExportingPng}
+          />
           <div className="h-5 w-px bg-border/70" aria-hidden="true" />
           <Button
             type="button"
@@ -88,4 +134,8 @@ export function HistoryControls() {
       />
     </>
   );
+}
+
+function normalizeExportSignature(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
