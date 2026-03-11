@@ -90,6 +90,24 @@ export default function EditorCanvas() {
     });
   }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
 
+  const dismissHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setDismissedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveDismissedEditorHintIds(next);
+      return next;
+    });
+  }, []);
+
+  const completeHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setCompletedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveCompletedEditorHintIds(next);
+      return next;
+    });
+  }, []);
+
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
     if (!app || isExportingPng) return;
@@ -138,6 +156,9 @@ export default function EditorCanvas() {
       link.href = downloadUrl;
       link.download = `spaceforge-editor-${timestamp}.png`;
       link.click();
+      if (activeHintIdRef.current === "export-as-png") {
+        completeHint("export-as-png");
+      }
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
     } catch (error) {
       console.error("PNG export failed.", error);
@@ -147,7 +168,7 @@ export default function EditorCanvas() {
       }
       setIsExportingPng(false);
     }
-  }, [editorThemeMode, isExportingPng]);
+  }, [completeHint, editorThemeMode, isExportingPng]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;
@@ -164,23 +185,17 @@ export default function EditorCanvas() {
     setHasHydratedHints(true);
   }, []);
 
-  const dismissHint = useCallback((hintId: EditorOnboardingHintId) => {
-    setDismissedHintIds((previous) => {
-      if (previous.includes(hintId)) return previous;
-      const next = [...previous, hintId];
-      saveDismissedEditorHintIds(next);
-      return next;
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (activeHintIdRef.current !== "empty-canvas-draw") return;
+      const didCreateFirstRoom =
+        previousState.document.rooms.length === 0 && state.document.rooms.length > 0;
+      if (!didCreateFirstRoom) return;
+      completeHint("empty-canvas-draw");
     });
-  }, []);
 
-  const completeHint = useCallback((hintId: EditorOnboardingHintId) => {
-    setCompletedHintIds((previous) => {
-      if (previous.includes(hintId)) return previous;
-      const next = [...previous, hintId];
-      saveCompletedEditorHintIds(next);
-      return next;
-    });
-  }, []);
+    return unsubscribe;
+  }, [completeHint]);
 
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe((state, previousState) => {

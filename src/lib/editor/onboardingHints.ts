@@ -1,11 +1,12 @@
-export const EDITOR_HINT_DISMISSALS_STORAGE_KEY = "spaceforge.editor.onboarding.dismissed-hints";
-export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v4";
+export const EDITOR_HINT_DISMISSALS_STORAGE_KEY = "spaceforge.editor.onboarding.dismissed-hints.v2";
+export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v6";
 
 export type EditorOnboardingHintId =
   | "empty-canvas-draw"
   | "select-room-by-name"
   | "resize-room-by-dragging-edges"
-  | "undo-last-action";
+  | "undo-last-action"
+  | "export-as-png";
 
 type EditorOnboardingHint = {
   id: EditorOnboardingHintId;
@@ -48,6 +49,12 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
       isMacPlatform ? "Press ⌘Z to undo" : "Press Ctrl+Z to undo",
     shouldShow: ({ roomCount, completedHintIds }) =>
       roomCount > 0 && completedHintIds.has("resize-room-by-dragging-edges"),
+  },
+  {
+    id: "export-as-png",
+    message: "Export as PNG when you're ready",
+    shouldShow: ({ roomCount, completedHintIds }) =>
+      roomCount > 0 && completedHintIds.has("undo-last-action"),
   },
 ];
 
@@ -117,6 +124,7 @@ function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
     value === "empty-canvas-draw" ||
     value === "select-room-by-name" ||
     value === "resize-room-by-dragging-edges" ||
-    value === "undo-last-action"
+    value === "undo-last-action" ||
+    value === "export-as-png"
   );
 }
