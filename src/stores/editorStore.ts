@@ -12,7 +12,14 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+
+declare global {
+  interface Window {
+    __spaceforgeEditorAutosaveCleanup__?: () => void;
+  }
+}
 
 type RoomDraftState = {
   points: Point[];
@@ -55,11 +62,21 @@ type EditorState = {
   updateRoomName: (roomId: string, name: string) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
 };
 
 const HISTORY_LIMIT = 100;
+const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
+const DEFAULT_DOCUMENT_STATE: DocumentState = {
+  rooms: [],
+};
+const DEFAULT_CAMERA_STATE: CameraState = {
+  xMm: 0,
+  yMm: 0,
+  pixelsPerMm: INITIAL_PIXELS_PER_MM,
+};
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
   const nextPast = [...past, command];
@@ -113,20 +130,28 @@ function arePointListsEqual(a: Point[], b: Point[]): boolean {
   return true;
 }
 
+function areCamerasEqual(a: CameraState, b: CameraState): boolean {
+  return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
+}
+
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
 
+const hydrationSnapshot = loadEditorSnapshotForHydration();
+
+function createInitialDocumentState(): DocumentState {
+  return hydrationSnapshot?.document ?? DEFAULT_DOCUMENT_STATE;
+}
+
+function createInitialCameraState(): CameraState {
+  return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
-  document: {
-    rooms: [],
-  },
-  camera: {
-    xMm: 0,
-    yMm: 0,
-    pixelsPerMm: INITIAL_PIXELS_PER_MM,
-  },
+  document: createInitialDocumentState(),
+  camera: createInitialCameraState(),
   viewport: {
     width: 1,
     height: 1,
@@ -406,6 +431,25 @@ export const useEditorStore = create<EditorState>((set) => ({
         canRedo: false,
       };
     }),
+  resetCanvas: () =>
+    set((state) => ({
+      document: {
+        rooms: [],
+      },
+      camera: { ...DEFAULT_CAMERA_STATE },
+      roomDraft: {
+        points: [],
+      },
+      selectedRoomId: null,
+      renameSession: null,
+      history: {
+        past: [],
+        future: [],
+      },
+      canUndo: false,
+      canRedo: false,
+      viewport: state.viewport,
+    })),
   undo: () =>
     set((state) => {
       const command = state.history.past[state.history.past.length - 1];
@@ -446,3 +490,79 @@ export const useEditorStore = create<EditorState>((set) => ({
       };
     }),
 }));
+
+if (typeof window !== "undefined") {
+  window.__spaceforgeEditorAutosaveCleanup__?.();
+
+  let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let lastSavedPersistedSignature = JSON.stringify({
+    document: useEditorStore.getState().document,
+    camera: useEditorStore.getState().camera,
+  });
+
+  const flushAutosave = () => {
+    autosaveTimeout = null;
+    const state = useEditorStore.getState();
+    const nextPersistedSignature = JSON.stringify({
+      document: state.document,
+      camera: state.camera,
+    });
+    if (nextPersistedSignature === lastSavedPersistedSignature) return;
+
+    const didSave = saveEditorSnapshot({
+      document: state.document,
+      camera: state.camera,
+    });
+    if (didSave) {
+      lastSavedPersistedSignature = nextPersistedSignature;
+    }
+  };
+
+  const flushPendingAutosave = () => {
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+      autosaveTimeout = null;
+    }
+    flushAutosave();
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      flushPendingAutosave();
+    }
+  };
+  const onPageHide = () => {
+    flushPendingAutosave();
+  };
+  const onBeforeUnload = () => {
+    flushPendingAutosave();
+  };
+
+  // Autosave only when persisted fields change.
+  const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+    const didDocumentChange = state.document !== previousState.document;
+    const didCameraChange = !areCamerasEqual(state.camera, previousState.camera);
+    if (!didDocumentChange && !didCameraChange) return;
+
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+    }
+
+    autosaveTimeout = setTimeout(flushAutosave, DOCUMENT_AUTOSAVE_DEBOUNCE_MS);
+  });
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pagehide", onPageHide);
+  window.addEventListener("beforeunload", onBeforeUnload);
+
+  window.__spaceforgeEditorAutosaveCleanup__ = () => {
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+      autosaveTimeout = null;
+    }
+    unsubscribe();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pagehide", onPageHide);
+    window.removeEventListener("beforeunload", onBeforeUnload);
+  };
+}
