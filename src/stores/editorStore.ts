@@ -15,6 +15,12 @@ import {
 import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
+declare global {
+  interface Window {
+    __spaceforgeEditorAutosaveCleanup__?: () => void;
+  }
+}
+
 type RoomDraftState = {
   points: Point[];
 };
@@ -462,6 +468,8 @@ export const useEditorStore = create<EditorState>((set) => ({
 }));
 
 if (typeof window !== "undefined") {
+  window.__spaceforgeEditorAutosaveCleanup__?.();
+
   let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   let lastSavedDocumentSignature = JSON.stringify(useEditorStore.getState().document);
 
@@ -480,8 +488,28 @@ if (typeof window !== "undefined") {
     }
   };
 
+  const flushPendingAutosave = () => {
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+      autosaveTimeout = null;
+    }
+    flushAutosave();
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      flushPendingAutosave();
+    }
+  };
+  const onPageHide = () => {
+    flushPendingAutosave();
+  };
+  const onBeforeUnload = () => {
+    flushPendingAutosave();
+  };
+
   // Autosave only when the persisted document shape changes.
-  useEditorStore.subscribe((state, previousState) => {
+  const unsubscribe = useEditorStore.subscribe((state, previousState) => {
     if (state.document === previousState.document) return;
 
     if (autosaveTimeout) {
@@ -490,4 +518,19 @@ if (typeof window !== "undefined") {
 
     autosaveTimeout = setTimeout(flushAutosave, DOCUMENT_AUTOSAVE_DEBOUNCE_MS);
   });
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pagehide", onPageHide);
+  window.addEventListener("beforeunload", onBeforeUnload);
+
+  window.__spaceforgeEditorAutosaveCleanup__ = () => {
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+      autosaveTimeout = null;
+    }
+    unsubscribe();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pagehide", onPageHide);
+    window.removeEventListener("beforeunload", onBeforeUnload);
+  };
 }
