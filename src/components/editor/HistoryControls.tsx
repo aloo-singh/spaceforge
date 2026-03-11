@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Redo2, Undo2 } from "lucide-react";
+import { Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -28,12 +29,12 @@ export function HistoryControls() {
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon-sm"
             onClick={() => setIsResetDialogOpen(true)}
             aria-label="Reset canvas"
-            className="text-destructive hover:text-destructive"
+            title="Reset canvas"
           >
-            Reset canvas
+            <RotateCcw />
           </Button>
           <div className="h-5 w-px bg-border/70" aria-hidden="true" />
           <Button
@@ -69,32 +70,22 @@ export function HistoryControls() {
         </div>
       </aside>
 
-      {isResetDialogOpen ? (
-        <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-black/55 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reset-canvas-title"
-            aria-describedby="reset-canvas-description"
-            className="w-full max-w-md rounded-xl border border-border/70 bg-card p-5 text-card-foreground shadow-xl"
-          >
-            <h2 id="reset-canvas-title" className="text-base font-semibold">
-              Reset canvas?
-            </h2>
-            <p id="reset-canvas-description" className="mt-2 text-sm text-muted-foreground">
-              This will remove your current layout from the canvas and clear saved local editor data for this device.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="button" variant="destructive" onClick={confirmResetCanvas}>
-                Reset canvas
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ResponsiveDialog
+        open={isResetDialogOpen}
+        onOpenChange={setIsResetDialogOpen}
+        title="Reset canvas?"
+        description="This will remove your current layout from the canvas and clear saved local editor data for this device."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmResetCanvas}>
+              Reset canvas
+            </Button>
+          </>
+        }
+      />
     </>
   );
 }
