@@ -56,9 +56,10 @@ export default function EditorCanvas() {
   });
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
+  const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
   const editorTheme = useMemo(
-    () => getEditorCanvasTheme(resolveEditorThemeMode(resolvedTheme)),
-    [resolvedTheme]
+    () => getEditorCanvasTheme(editorThemeMode),
+    [editorThemeMode]
   );
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -74,6 +75,9 @@ export default function EditorCanvas() {
       const blob = await exportPixiCanvasToPngBlob({
         renderer: app.renderer,
         stage: app.stage,
+      }, {
+        backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
+        paddingPx: 48,
       });
       const downloadUrl = URL.createObjectURL(blob);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -87,7 +91,7 @@ export default function EditorCanvas() {
     } finally {
       setIsExportingPng(false);
     }
-  }, [isExportingPng]);
+  }, [editorThemeMode, isExportingPng]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;

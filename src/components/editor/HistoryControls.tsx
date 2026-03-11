@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Download, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
@@ -20,6 +20,11 @@ export function HistoryControls({
   exportDisabled = false,
 }: HistoryControlsProps) {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const hasHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
   const isCanvasEmpty = useEditorStore(
@@ -28,6 +33,7 @@ export function HistoryControls({
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
+  const isResetDisabled = !hasHydrated || isCanvasEmpty;
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -44,7 +50,7 @@ export function HistoryControls({
             variant="outline"
             size="icon-sm"
             onClick={() => setIsResetDialogOpen(true)}
-            disabled={isCanvasEmpty}
+            disabled={isResetDisabled}
             aria-label="Reset canvas"
             title="Reset canvas"
           >
