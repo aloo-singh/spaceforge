@@ -39,6 +39,7 @@ type RoomResizeInputCallbacks = {
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }) => void;
+  onRoomResizeCommitted?: (roomId: string) => void;
   requestRender: () => void;
 };
 
@@ -255,6 +256,9 @@ export function attachRoomResizeInput(
       .document.rooms.find((candidate) => candidate.id === session.roomId);
     const nextPoints = room ? room.points : session.startPoints;
     store.getState().commitRoomResize(session.roomId, session.startPoints, nextPoints);
+    if (!arePointListsEqual(session.startPoints, nextPoints)) {
+      callbacks.onRoomResizeCommitted?.(session.roomId);
+    }
     stopSession();
   };
 
@@ -326,4 +330,12 @@ function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+}
+
+function arePointListsEqual(a: Point[], b: Point[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index].x !== b[index].x || a[index].y !== b[index].y) return false;
+  }
+  return true;
 }

@@ -1,7 +1,10 @@
 export const EDITOR_HINT_DISMISSALS_STORAGE_KEY = "spaceforge.editor.onboarding.dismissed-hints";
-export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v2";
+export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v3";
 
-export type EditorOnboardingHintId = "empty-canvas-draw" | "select-room-by-name";
+export type EditorOnboardingHintId =
+  | "empty-canvas-draw"
+  | "select-room-by-name"
+  | "resize-room-by-dragging-edges";
 
 type EditorOnboardingHint = {
   id: EditorOnboardingHintId;
@@ -25,6 +28,12 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
     id: "select-room-by-name",
     message: "Click the room name to select it",
     shouldShow: ({ roomCount }) => roomCount > 0,
+  },
+  {
+    id: "resize-room-by-dragging-edges",
+    message: "Drag edges to resize",
+    shouldShow: ({ roomCount, completedHintIds }) =>
+      roomCount > 0 && completedHintIds.has("select-room-by-name"),
   },
 ];
 
@@ -83,5 +92,9 @@ function saveEditorHintIdsToStorage(storageKey: string, hintIds: EditorOnboardin
 }
 
 function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
-  return value === "empty-canvas-draw" || value === "select-room-by-name";
+  return (
+    value === "empty-canvas-draw" ||
+    value === "select-room-by-name" ||
+    value === "resize-room-by-dragging-edges"
+  );
 }

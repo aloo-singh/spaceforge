@@ -266,6 +266,10 @@ export default function EditorCanvas() {
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;
         },
+        onRoomResizeCommitted: () => {
+          if (activeHintIdRef.current !== "resize-room-by-dragging-edges") return;
+          completeHint("resize-room-by-dragging-edges");
+        },
         requestRender: () => {
           drawScene(
             grid,
