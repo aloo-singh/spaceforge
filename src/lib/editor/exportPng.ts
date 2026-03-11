@@ -10,10 +10,18 @@ export type PixiPngExportSource =
 export type PixiPngExportOptions = {
   backgroundColor?: string;
   paddingPx?: number;
+  grid?: {
+    spacingPx: number;
+    originXPx: number;
+    originYPx: number;
+    color: string;
+    alpha?: number;
+  };
 };
 
 const DEFAULT_EXPORT_BACKGROUND = "#ffffff";
 const DEFAULT_EXPORT_PADDING_PX = 48;
+const DEFAULT_EDGE_CROP_PX = 1;
 
 function resolveRenderer(source: PixiPngExportSource): Renderer {
   if ("extract" in source) return source;
@@ -38,8 +46,16 @@ function composeExportCanvas(
   options: PixiPngExportOptions = {}
 ): HTMLCanvasElement {
   const paddingPx = getNormalizedPadding(options.paddingPx);
-  const exportWidth = Math.max(1, sourceCanvas.width + paddingPx * 2);
-  const exportHeight = Math.max(1, sourceCanvas.height + paddingPx * 2);
+  const edgeCropPx =
+    sourceCanvas.width > DEFAULT_EDGE_CROP_PX * 2 && sourceCanvas.height > DEFAULT_EDGE_CROP_PX * 2
+      ? DEFAULT_EDGE_CROP_PX
+      : 0;
+  const sourceX = edgeCropPx;
+  const sourceY = edgeCropPx;
+  const sourceWidth = sourceCanvas.width - edgeCropPx * 2;
+  const sourceHeight = sourceCanvas.height - edgeCropPx * 2;
+  const exportWidth = Math.max(1, sourceWidth + paddingPx * 2);
+  const exportHeight = Math.max(1, sourceHeight + paddingPx * 2);
   const composedCanvas = document.createElement("canvas");
   composedCanvas.width = exportWidth;
   composedCanvas.height = exportHeight;
@@ -52,9 +68,64 @@ function composeExportCanvas(
   context.imageSmoothingEnabled = false;
   context.fillStyle = options.backgroundColor ?? DEFAULT_EXPORT_BACKGROUND;
   context.fillRect(0, 0, exportWidth, exportHeight);
-  context.drawImage(sourceCanvas as unknown as CanvasImageSource, paddingPx, paddingPx);
+  drawExportGrid(context, exportWidth, exportHeight, options.grid, paddingPx - edgeCropPx);
+  context.drawImage(
+    sourceCanvas as unknown as CanvasImageSource,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    paddingPx,
+    paddingPx,
+    sourceWidth,
+    sourceHeight
+  );
 
   return composedCanvas;
+}
+
+function drawExportGrid(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  grid: PixiPngExportOptions["grid"],
+  sourceOffsetPx: number
+) {
+  if (!grid) return;
+  if (!Number.isFinite(grid.spacingPx) || grid.spacingPx < 4) return;
+
+  const spacingPx = grid.spacingPx;
+  const alpha = typeof grid.alpha === "number" ? Math.max(0, Math.min(1, grid.alpha)) : 0.1;
+  const startX = sourceOffsetPx + grid.originXPx;
+  const startY = sourceOffsetPx + grid.originYPx;
+  const firstVertical = normalizeFirstGridLine(startX, spacingPx, 0);
+  const firstHorizontal = normalizeFirstGridLine(startY, spacingPx, 0);
+
+  context.save();
+  context.strokeStyle = grid.color;
+  context.globalAlpha = alpha;
+  context.lineWidth = 1;
+  context.beginPath();
+
+  for (let x = firstVertical; x <= width; x += spacingPx) {
+    const alignedX = Math.round(x) + 0.5;
+    context.moveTo(alignedX, 0);
+    context.lineTo(alignedX, height);
+  }
+
+  for (let y = firstHorizontal; y <= height; y += spacingPx) {
+    const alignedY = Math.round(y) + 0.5;
+    context.moveTo(0, alignedY);
+    context.lineTo(width, alignedY);
+  }
+
+  context.stroke();
+  context.restore();
+}
+
+function normalizeFirstGridLine(start: number, spacing: number, minValue: number): number {
+  const normalized = ((start - minValue) % spacing + spacing) % spacing;
+  return minValue + normalized;
 }
 
 function extractSourceCanvas(source: PixiPngExportSource): ICanvas {

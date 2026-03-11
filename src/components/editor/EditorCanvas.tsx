@@ -68,8 +68,22 @@ export default function EditorCanvas() {
   const exportCurrentCanvasAsPng = useCallback(async () => {
     const app = appRef.current;
     if (!app || isExportingPng) return;
+    const state = useEditorStore.getState();
+    const minorGridSpacingPx = GRID_MINOR_SIZE_MM * state.camera.pixelsPerMm;
+    const majorGridSpacingPx = GRID_SIZE_MM * state.camera.pixelsPerMm;
+    const exportGridSpacingPx = minorGridSpacingPx >= 8 ? minorGridSpacingPx : majorGridSpacingPx;
+    const exportGridOriginXPx =
+      (0 - state.camera.xMm) * state.camera.pixelsPerMm + state.viewport.width / 2;
+    const exportGridOriginYPx =
+      (0 - state.camera.yMm) * state.camera.pixelsPerMm + state.viewport.height / 2;
 
     setIsExportingPng(true);
+    const gridLayer = gridRef.current;
+    const previousGridVisibility = gridLayer?.visible;
+
+    if (gridLayer) {
+      gridLayer.visible = false;
+    }
 
     try {
       const blob = await exportPixiCanvasToPngBlob({
@@ -78,6 +92,13 @@ export default function EditorCanvas() {
       }, {
         backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
         paddingPx: 48,
+        grid: {
+          spacingPx: exportGridSpacingPx,
+          originXPx: exportGridOriginXPx,
+          originYPx: exportGridOriginYPx,
+          color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
+          alpha: editorThemeMode === "light" ? 0.08 : 0.1,
+        },
       });
       const downloadUrl = URL.createObjectURL(blob);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -89,6 +110,9 @@ export default function EditorCanvas() {
     } catch (error) {
       console.error("PNG export failed.", error);
     } finally {
+      if (gridLayer && typeof previousGridVisibility === "boolean") {
+        gridLayer.visible = previousGridVisibility;
+      }
       setIsExportingPng(false);
     }
   }, [editorThemeMode, isExportingPng]);
