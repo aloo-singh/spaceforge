@@ -10,6 +10,43 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.6.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-11</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Major improvements</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Layouts now persist automatically in the browser</li>
+                <li>Refreshing the page restores your layout</li>
+                <li>Camera position and zoom are restored with the layout</li>
+                <li>Autosave runs automatically during editing</li>
+                <li>Autosave now flushes when the page is refreshed or closed</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Reset canvas action with confirmation dialog</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Internal</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Versioned editor persistence layer</li>
+                <li>Debounced autosave system</li>
+                <li>Camera state synchronised with editor viewport</li>
+                <li>Safe localStorage hydration with corruption protection</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.5.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-09</span>
           </div>
