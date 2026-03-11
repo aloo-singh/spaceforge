@@ -62,6 +62,7 @@ type EditorState = {
   updateRoomName: (roomId: string, name: string) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
 };
@@ -426,6 +427,25 @@ export const useEditorStore = create<EditorState>((set) => ({
         canRedo: false,
       };
     }),
+  resetCanvas: () =>
+    set((state) => ({
+      document: {
+        rooms: [],
+      },
+      camera: { ...DEFAULT_CAMERA_STATE },
+      roomDraft: {
+        points: [],
+      },
+      selectedRoomId: null,
+      renameSession: null,
+      history: {
+        past: [],
+        future: [],
+      },
+      canUndo: false,
+      canRedo: false,
+      viewport: state.viewport,
+    })),
   undo: () =>
     set((state) => {
       const command = state.history.past[state.history.past.length - 1];
