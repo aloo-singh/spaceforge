@@ -22,6 +22,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
+  onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
 
@@ -107,7 +108,11 @@ export function attachRoomDrawInput(
     }
 
     if (labelHitRoom) {
+      const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
       state.selectRoomById(labelHitRoom.id);
+      if (didChangeSelection) {
+        callbacks.onRoomLabelSelected?.(labelHitRoom.id);
+      }
       return;
     }
 

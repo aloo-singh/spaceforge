@@ -20,7 +20,9 @@ import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
   getActiveEditorOnboardingHint,
+  loadCompletedEditorHintIds,
   loadDismissedEditorHintIds,
+  saveCompletedEditorHintIds,
   saveDismissedEditorHintIds,
   type EditorOnboardingHintId,
 } from "@/lib/editor/onboardingHints";
@@ -73,15 +75,18 @@ export default function EditorCanvas() {
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [hasHydratedHints, setHasHydratedHints] = useState(false);
   const [dismissedHintIds, setDismissedHintIds] = useState<EditorOnboardingHintId[]>([]);
+  const [completedHintIds, setCompletedHintIds] = useState<EditorOnboardingHintId[]>([]);
   const editorThemeRef = useRef(editorTheme);
+  const activeHintIdRef = useRef<EditorOnboardingHintId | null>(null);
   const activeHint = useMemo(() => {
     if (!hasHydratedHints) return null;
 
     return getActiveEditorOnboardingHint({
       roomCount,
       dismissedHintIds: new Set(dismissedHintIds),
+      completedHintIds: new Set(completedHintIds),
     });
-  }, [dismissedHintIds, hasHydratedHints, roomCount]);
+  }, [completedHintIds, dismissedHintIds, hasHydratedHints, roomCount]);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -147,7 +152,12 @@ export default function EditorCanvas() {
   }, [editorTheme]);
 
   useEffect(() => {
+    activeHintIdRef.current = activeHint?.id ?? null;
+  }, [activeHint]);
+
+  useEffect(() => {
     setDismissedHintIds(loadDismissedEditorHintIds());
+    setCompletedHintIds(loadCompletedEditorHintIds());
     setHasHydratedHints(true);
   }, []);
 
@@ -156,6 +166,15 @@ export default function EditorCanvas() {
       if (previous.includes(hintId)) return previous;
       const next = [...previous, hintId];
       saveDismissedEditorHintIds(next);
+      return next;
+    });
+  }, []);
+
+  const completeHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setCompletedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveCompletedEditorHintIds(next);
       return next;
     });
   }, []);
@@ -268,6 +287,10 @@ export default function EditorCanvas() {
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
         },
+        onRoomLabelSelected: () => {
+          if (activeHintIdRef.current !== "select-room-by-name") return;
+          completeHint("select-room-by-name");
+        },
         requestRender: () => {
           drawScene(
             grid,
@@ -312,7 +335,7 @@ export default function EditorCanvas() {
         app.destroy(true, { children: true });
       }
     };
-  }, []);
+  }, [completeHint]);
 
   useEffect(() => {
     const app = appRef.current;
