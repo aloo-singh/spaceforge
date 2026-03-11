@@ -12,7 +12,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
-import { loadEditorSnapshot } from "@/lib/editor/editorPersistence";
+import { loadEditorSnapshot, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 type RoomDraftState = {
@@ -61,6 +61,7 @@ type EditorState = {
 };
 
 const HISTORY_LIMIT = 100;
+const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
   const nextPast = [...past, command];
@@ -456,3 +457,34 @@ export const useEditorStore = create<EditorState>((set) => ({
       };
     }),
 }));
+
+if (typeof window !== "undefined") {
+  let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let lastSavedDocumentSignature = JSON.stringify(useEditorStore.getState().document);
+
+  const flushAutosave = () => {
+    autosaveTimeout = null;
+    const state = useEditorStore.getState();
+    const nextDocumentSignature = JSON.stringify(state.document);
+    if (nextDocumentSignature === lastSavedDocumentSignature) return;
+
+    const didSave = saveEditorSnapshot({
+      document: state.document,
+      camera: state.camera,
+    });
+    if (didSave) {
+      lastSavedDocumentSignature = nextDocumentSignature;
+    }
+  };
+
+  // Autosave only when the persisted document shape changes.
+  useEditorStore.subscribe((state, previousState) => {
+    if (state.document === previousState.document) return;
+
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+    }
+
+    autosaveTimeout = setTimeout(flushAutosave, DOCUMENT_AUTOSAVE_DEBOUNCE_MS);
+  });
+}

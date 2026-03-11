@@ -33,7 +33,7 @@ const MIN_HANDLE_LENGTH_PX = 14;
 const HANDLE_EDGE_PADDING_PX = 8;
 const HANDLE_HIT_PADDING_PX = 8;
 const CORNER_HANDLE_SIZE_PX = 10;
-const CORNER_HIT_PADDING_PX = 6;
+const CORNER_HIT_PADDING_PX = 8;
 export const MIN_ROOM_SIZE_MM = GRID_SIZE_MM;
 
 export function getAxisAlignedRoomBounds(room: Room): RoomRectBounds | null {
