@@ -1,21 +1,28 @@
 export const EDITOR_HINT_DISMISSALS_STORAGE_KEY = "spaceforge.editor.onboarding.dismissed-hints";
-export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v3";
+export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v4";
 
 export type EditorOnboardingHintId =
   | "empty-canvas-draw"
   | "select-room-by-name"
-  | "resize-room-by-dragging-edges";
+  | "resize-room-by-dragging-edges"
+  | "undo-last-action";
 
 type EditorOnboardingHint = {
   id: EditorOnboardingHintId;
-  message: string;
+  message: string | ((context: EditorOnboardingHintContext) => string);
   shouldShow: (context: EditorOnboardingHintContext) => boolean;
 };
 
 type EditorOnboardingHintContext = {
   roomCount: number;
+  isMacPlatform: boolean;
   dismissedHintIds: ReadonlySet<EditorOnboardingHintId>;
   completedHintIds: ReadonlySet<EditorOnboardingHintId>;
+};
+
+export type ActiveEditorOnboardingHint = {
+  id: EditorOnboardingHintId;
+  message: string;
 };
 
 const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
@@ -35,13 +42,27 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
     shouldShow: ({ roomCount, completedHintIds }) =>
       roomCount > 0 && completedHintIds.has("select-room-by-name"),
   },
+  {
+    id: "undo-last-action",
+    message: ({ isMacPlatform }) =>
+      isMacPlatform ? "Press ⌘Z to undo" : "Press Ctrl+Z to undo",
+    shouldShow: ({ roomCount, completedHintIds }) =>
+      roomCount > 0 && completedHintIds.has("resize-room-by-dragging-edges"),
+  },
 ];
 
-export function getActiveEditorOnboardingHint(context: EditorOnboardingHintContext) {
+export function getActiveEditorOnboardingHint(
+  context: EditorOnboardingHintContext
+): ActiveEditorOnboardingHint | null {
   for (const hint of EDITOR_ONBOARDING_HINTS) {
     if (context.dismissedHintIds.has(hint.id)) continue;
     if (context.completedHintIds.has(hint.id)) continue;
-    if (hint.shouldShow(context)) return hint;
+    if (!hint.shouldShow(context)) continue;
+
+    return {
+      id: hint.id,
+      message: typeof hint.message === "function" ? hint.message(context) : hint.message,
+    };
   }
 
   return null;
@@ -95,6 +116,7 @@ function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
   return (
     value === "empty-canvas-draw" ||
     value === "select-room-by-name" ||
-    value === "resize-room-by-dragging-edges"
+    value === "resize-room-by-dragging-edges" ||
+    value === "undo-last-action"
   );
 }

@@ -73,6 +73,7 @@ export default function EditorCanvas() {
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
+  const [isMacPlatform, setIsMacPlatform] = useState(false);
   const [hasHydratedHints, setHasHydratedHints] = useState(false);
   const [dismissedHintIds, setDismissedHintIds] = useState<EditorOnboardingHintId[]>([]);
   const [completedHintIds, setCompletedHintIds] = useState<EditorOnboardingHintId[]>([]);
@@ -83,10 +84,11 @@ export default function EditorCanvas() {
 
     return getActiveEditorOnboardingHint({
       roomCount,
+      isMacPlatform,
       dismissedHintIds: new Set(dismissedHintIds),
       completedHintIds: new Set(completedHintIds),
     });
-  }, [completedHintIds, dismissedHintIds, hasHydratedHints, roomCount]);
+  }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -156,6 +158,7 @@ export default function EditorCanvas() {
   }, [activeHint]);
 
   useEffect(() => {
+    setIsMacPlatform(detectMacPlatform());
     setDismissedHintIds(loadDismissedEditorHintIds());
     setCompletedHintIds(loadCompletedEditorHintIds());
     setHasHydratedHints(true);
@@ -178,6 +181,17 @@ export default function EditorCanvas() {
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (activeHintIdRef.current !== "undo-last-action") return;
+      const didPerformUndo = state.history.future.length > previousState.history.future.length;
+      if (!didPerformUndo) return;
+      completeHint("undo-last-action");
+    });
+
+    return unsubscribe;
+  }, [completeHint]);
 
   useEffect(() => {
     const host = containerRef.current;
@@ -795,6 +809,18 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function detectMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgentDataPlatform =
+    typeof navigator.userAgentData?.platform === "string"
+      ? navigator.userAgentData.platform
+      : "";
+  if (/mac/i.test(userAgentDataPlatform)) return true;
+
+  return /mac/i.test(navigator.platform);
 }
 
 function getTextResolution(): number {
