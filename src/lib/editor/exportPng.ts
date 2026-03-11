@@ -24,9 +24,11 @@ async function canvasToPngBlob(canvas: ICanvas): Promise<Blob> {
     });
   }
 
-  if (canvas.toBlob) {
+  const toBlob = canvas.toBlob;
+
+  if (toBlob) {
     return new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
+      toBlob.call(canvas, (blob) => {
         if (!blob) {
           reject(new Error("Pixi PNG export failed: canvas produced an empty blob."));
           return;
@@ -57,9 +59,13 @@ export async function exportPixiCanvasToPngDataUrl(source: PixiPngExportSource):
     });
   }
 
-  return renderer.extract.base64({
-    format: "png",
-  });
+  const toDataUrl = renderer.canvas.toDataURL;
+
+  if (!toDataUrl) {
+    throw new Error("Pixi PNG export failed: renderer canvas does not support data URL export.");
+  }
+
+  return toDataUrl.call(renderer.canvas, "image/png");
 }
 
 export async function exportPixiCanvasToPngBlob(source: PixiPngExportSource): Promise<Blob> {
@@ -69,7 +75,7 @@ export async function exportPixiCanvasToPngBlob(source: PixiPngExportSource): Pr
     ? renderer.extract.canvas({
         target,
       })
-    : renderer.extract.canvas({});
+    : renderer.canvas;
 
   return canvasToPngBlob(canvas);
 }
