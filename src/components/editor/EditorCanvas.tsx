@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
@@ -16,6 +16,7 @@ import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
+import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
   getAxisAlignedRoomBounds,
@@ -59,7 +60,34 @@ export default function EditorCanvas() {
     () => getEditorCanvasTheme(resolveEditorThemeMode(resolvedTheme)),
     [resolvedTheme]
   );
+  const [isExportingPng, setIsExportingPng] = useState(false);
+  const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const editorThemeRef = useRef(editorTheme);
+
+  const exportCurrentCanvasAsPng = useCallback(async () => {
+    const app = appRef.current;
+    if (!app || isExportingPng) return;
+
+    setIsExportingPng(true);
+
+    try {
+      const blob = await exportPixiCanvasToPngBlob({
+        renderer: app.renderer,
+        stage: app.stage,
+      });
+      const downloadUrl = URL.createObjectURL(blob);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `spaceforge-editor-${timestamp}.png`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+    } catch (error) {
+      console.error("PNG export failed.", error);
+    } finally {
+      setIsExportingPng(false);
+    }
+  }, [isExportingPng]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;
@@ -94,6 +122,7 @@ export default function EditorCanvas() {
       }
 
       appRef.current = app;
+      setIsCanvasReadyForExport(true);
       containerRef.current.appendChild(app.canvas);
       app.canvas.style.touchAction = "none";
 
@@ -196,6 +225,7 @@ export default function EditorCanvas() {
         unsubscribe();
         app.renderer.off("resize", handleResize);
         appRef.current = null;
+        setIsCanvasReadyForExport(false);
         gridRef.current = null;
         roomRef.current = null;
         roomLabelRef.current = null;
@@ -260,7 +290,11 @@ export default function EditorCanvas() {
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
-      <HistoryControls />
+      <HistoryControls
+        onExportPng={exportCurrentCanvasAsPng}
+        isExportingPng={isExportingPng}
+        exportDisabled={!isCanvasReadyForExport}
+      />
       <SelectedRoomNamePanel />
     </section>
   );

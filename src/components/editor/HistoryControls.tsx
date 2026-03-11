@@ -1,17 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { Download, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
-export function HistoryControls() {
+type HistoryControlsProps = {
+  onExportPng?: () => void | Promise<void>;
+  isExportingPng?: boolean;
+  exportDisabled?: boolean;
+};
+
+export function HistoryControls({
+  onExportPng,
+  isExportingPng = false,
+  exportDisabled = false,
+}: HistoryControlsProps) {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
+  const isCanvasEmpty = useEditorStore(
+    (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
+  );
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
@@ -31,10 +44,24 @@ export function HistoryControls() {
             variant="outline"
             size="icon-sm"
             onClick={() => setIsResetDialogOpen(true)}
+            disabled={isCanvasEmpty}
             aria-label="Reset canvas"
             title="Reset canvas"
           >
             <RotateCcw />
+          </Button>
+          <div className="h-5 w-px bg-border/70" aria-hidden="true" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onExportPng}
+            disabled={!onExportPng || exportDisabled || isExportingPng}
+            aria-label="Export current canvas as PNG"
+            className="gap-2"
+          >
+            <Download />
+            {isExportingPng ? "Exporting..." : "Export PNG"}
           </Button>
           <div className="h-5 w-px bg-border/70" aria-hidden="true" />
           <Button
