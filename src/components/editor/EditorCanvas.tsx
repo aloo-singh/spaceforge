@@ -19,6 +19,15 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
+  type ActiveEditorOnboardingHint,
+  getActiveEditorOnboardingHint,
+  loadCompletedEditorHintIds,
+  loadDismissedEditorHintIds,
+  saveCompletedEditorHintIds,
+  saveDismissedEditorHintIds,
+  type EditorOnboardingHintId,
+} from "@/lib/editor/onboardingHints";
+import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
   getWallHandleLayouts,
@@ -29,6 +38,18 @@ import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types"
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
+import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
+
+const EMPTY_ROOM_RESIZE_UI = {
+  hoveredWall: null,
+  hoveredCorner: null,
+  hoveredRoomId: null,
+  activeWall: null,
+  activeCorner: null,
+  activeRoomId: null,
+} as const;
+const HINT_TRANSITION_MS = 200;
+const HINT_HANDOFF_DELAY_MS = 150;
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -46,14 +67,7 @@ export default function EditorCanvas() {
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
-  }>({
-    hoveredWall: null,
-    hoveredCorner: null,
-    hoveredRoomId: null,
-    activeWall: null,
-    activeCorner: null,
-    activeRoomId: null,
-  });
+  }>({ ...EMPTY_ROOM_RESIZE_UI });
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -61,9 +75,121 @@ export default function EditorCanvas() {
     () => getEditorCanvasTheme(editorThemeMode),
     [editorThemeMode]
   );
+  const roomCount = useEditorStore((state) => state.document.rooms.length);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
+  const [isMacPlatform, setIsMacPlatform] = useState(false);
+  const [hasHydratedHints, setHasHydratedHints] = useState(false);
+  const [displayedHint, setDisplayedHint] = useState<ActiveEditorOnboardingHint | null>(null);
+  const [hintMotionState, setHintMotionState] = useState<"entering" | "visible" | "exiting">("visible");
+  const [dismissedHintIds, setDismissedHintIds] = useState<EditorOnboardingHintId[]>([]);
+  const [completedHintIds, setCompletedHintIds] = useState<EditorOnboardingHintId[]>([]);
+  const hintTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintTransitionCycleRef = useRef(0);
+  const latestEligibleHintRef = useRef<ActiveEditorOnboardingHint | null>(null);
   const editorThemeRef = useRef(editorTheme);
+  const activeHintIdRef = useRef<EditorOnboardingHintId | null>(null);
+  const activeHint = useMemo(() => {
+    if (!hasHydratedHints) return null;
+
+    return getActiveEditorOnboardingHint({
+      roomCount,
+      isMacPlatform,
+      dismissedHintIds: new Set(dismissedHintIds),
+      completedHintIds: new Set(completedHintIds),
+    });
+  }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
+
+  useEffect(() => {
+    latestEligibleHintRef.current = activeHint;
+  }, [activeHint]);
+
+  useEffect(() => {
+    return () => {
+      if (hintTransitionTimeoutRef.current) {
+        clearTimeout(hintTransitionTimeoutRef.current);
+      }
+      if (hintHandoffTimeoutRef.current) {
+        clearTimeout(hintHandoffTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const clearTimers = () => {
+      if (hintTransitionTimeoutRef.current) {
+        clearTimeout(hintTransitionTimeoutRef.current);
+        hintTransitionTimeoutRef.current = null;
+      }
+      if (hintHandoffTimeoutRef.current) {
+        clearTimeout(hintHandoffTimeoutRef.current);
+        hintHandoffTimeoutRef.current = null;
+      }
+    };
+
+    const startEnter = (hint: ActiveEditorOnboardingHint) => {
+      setDisplayedHint(hint);
+      setHintMotionState("entering");
+      requestAnimationFrame(() => {
+        setHintMotionState("visible");
+      });
+    };
+
+    if (!displayedHint) {
+      if (hintHandoffTimeoutRef.current) return;
+      if (activeHint) {
+        clearTimers();
+        startEnter(activeHint);
+      }
+      return;
+    }
+
+    if (activeHint && activeHint.id === displayedHint.id) {
+      if (activeHint.message !== displayedHint.message) {
+        setDisplayedHint(activeHint);
+      }
+      return;
+    }
+
+    clearTimers();
+    const transitionCycle = hintTransitionCycleRef.current + 1;
+    hintTransitionCycleRef.current = transitionCycle;
+    setHintMotionState("exiting");
+
+    hintTransitionTimeoutRef.current = setTimeout(() => {
+      if (hintTransitionCycleRef.current !== transitionCycle) return;
+
+      setDisplayedHint(null);
+      hintTransitionTimeoutRef.current = null;
+      hintHandoffTimeoutRef.current = setTimeout(() => {
+        if (hintTransitionCycleRef.current !== transitionCycle) return;
+        hintHandoffTimeoutRef.current = null;
+        const nextHint = latestEligibleHintRef.current;
+        if (nextHint) {
+          startEnter(nextHint);
+        }
+      }, HINT_HANDOFF_DELAY_MS);
+    }, HINT_TRANSITION_MS);
+  }, [activeHint, displayedHint]);
+
+  const dismissHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setDismissedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveDismissedEditorHintIds(next);
+      return next;
+    });
+  }, []);
+
+  const completeHint = useCallback((hintId: EditorOnboardingHintId) => {
+    setCompletedHintIds((previous) => {
+      if (previous.includes(hintId)) return previous;
+      const next = [...previous, hintId];
+      saveCompletedEditorHintIds(next);
+      return next;
+    });
+  }, []);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -78,17 +204,46 @@ export default function EditorCanvas() {
       (0 - state.camera.yMm) * state.camera.pixelsPerMm + state.viewport.height / 2;
 
     setIsExportingPng(true);
-    const gridLayer = gridRef.current;
-    const previousGridVisibility = gridLayer?.visible;
+    const exportStage = new Container();
+    const exportRoomGraphics = new Graphics();
+    const exportRoomLabels = new Container();
+    const exportDraftGraphics = new Graphics();
+    exportStage.addChild(exportRoomGraphics);
+    exportStage.addChild(exportRoomLabels);
+    exportStage.addChild(exportDraftGraphics);
 
-    if (gridLayer) {
-      gridLayer.visible = false;
-    }
+    drawRooms(
+      exportRoomGraphics,
+      state.document.rooms,
+      null,
+      EMPTY_ROOM_RESIZE_UI,
+      state.roomDraft.points.length > 0,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
+    drawRoomLabels(
+      exportRoomLabels,
+      state.document.rooms,
+      null,
+      null,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
+    drawDraft(
+      exportDraftGraphics,
+      state.roomDraft.points,
+      cursorWorldRef.current,
+      state.camera,
+      state.viewport,
+      editorThemeRef.current
+    );
 
     try {
       const blob = await exportPixiCanvasToPngBlob({
         renderer: app.renderer,
-        stage: app.stage,
+        stage: exportStage,
       }, {
         backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
         paddingPx: 48,
@@ -113,20 +268,55 @@ export default function EditorCanvas() {
       link.href = downloadUrl;
       link.download = `spaceforge-editor-${timestamp}.png`;
       link.click();
+      if (activeHintIdRef.current === "export-as-png") {
+        completeHint("export-as-png");
+      }
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
     } catch (error) {
       console.error("PNG export failed.", error);
     } finally {
-      if (gridLayer && typeof previousGridVisibility === "boolean") {
-        gridLayer.visible = previousGridVisibility;
-      }
+      exportStage.destroy({ children: true });
       setIsExportingPng(false);
     }
-  }, [editorThemeMode, isExportingPng]);
+  }, [completeHint, editorThemeMode, isExportingPng]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;
   }, [editorTheme]);
+
+  useEffect(() => {
+    activeHintIdRef.current = displayedHint?.id ?? null;
+  }, [displayedHint]);
+
+  useEffect(() => {
+    setIsMacPlatform(detectMacPlatform());
+    setDismissedHintIds(loadDismissedEditorHintIds());
+    setCompletedHintIds(loadCompletedEditorHintIds());
+    setHasHydratedHints(true);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (activeHintIdRef.current !== "empty-canvas-draw") return;
+      const didCreateFirstRoom =
+        previousState.document.rooms.length === 0 && state.document.rooms.length > 0;
+      if (!didCreateFirstRoom) return;
+      completeHint("empty-canvas-draw");
+    });
+
+    return unsubscribe;
+  }, [completeHint]);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (activeHintIdRef.current !== "undo-last-action") return;
+      const didPerformUndo = state.history.future.length > previousState.history.future.length;
+      if (!didPerformUndo) return;
+      completeHint("undo-last-action");
+    });
+
+    return unsubscribe;
+  }, [completeHint]);
 
   useEffect(() => {
     const host = containerRef.current;
@@ -210,10 +400,19 @@ export default function EditorCanvas() {
           editorThemeRef.current
         );
       });
-      const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
+      const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore, {
+        onPan: () => {
+          if (activeHintIdRef.current !== "pan-canvas") return;
+          completeHint("pan-canvas");
+        },
+      });
       const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;
+        },
+        onRoomResizeCommitted: () => {
+          if (activeHintIdRef.current !== "resize-room-by-dragging-edges") return;
+          completeHint("resize-room-by-dragging-edges");
         },
         requestRender: () => {
           drawScene(
@@ -235,6 +434,10 @@ export default function EditorCanvas() {
         },
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
+        },
+        onRoomLabelSelected: () => {
+          if (activeHintIdRef.current !== "select-room-by-name") return;
+          completeHint("select-room-by-name");
         },
         requestRender: () => {
           drawScene(
@@ -280,7 +483,7 @@ export default function EditorCanvas() {
         app.destroy(true, { children: true });
       }
     };
-  }, []);
+  }, [completeHint]);
 
   useEffect(() => {
     const app = appRef.current;
@@ -325,6 +528,24 @@ export default function EditorCanvas() {
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
+      {displayedHint ? (
+        <aside
+          className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
+            hintMotionState === "visible"
+              ? "translate-y-0 opacity-100"
+              : hintMotionState === "entering"
+                ? "translate-y-2 opacity-0"
+                : "-translate-y-1.5 opacity-0"
+          }`}
+          style={{ transitionDuration: `${HINT_TRANSITION_MS}ms` }}
+        >
+          <OnboardingHintCard
+            message={displayedHint.message}
+            invertedTheme={editorThemeMode === "light" ? "dark" : "light"}
+            onDismiss={() => dismissHint(displayedHint.id)}
+          />
+        </aside>
+      ) : null}
       <HistoryControls
         onExportPng={exportCurrentCanvasAsPng}
         isExportingPng={isExportingPng}
@@ -471,6 +692,11 @@ function drawRooms(
     if (!isSelected || isDraftingRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
+    const hoveredWall =
+      roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
+    if (hoveredWall) {
+      drawHoveredWallHighlight(graphics, bounds, hoveredWall, camera, viewport, theme);
+    }
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
@@ -548,6 +774,42 @@ function drawRooms(
       graphics.stroke();
     }
   }
+}
+
+function drawHoveredWallHighlight(
+  graphics: Graphics,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+
+  let from = topLeft;
+  let to = topRight;
+  if (wall === "right") {
+    from = topRight;
+    to = bottomRight;
+  } else if (wall === "bottom") {
+    from = bottomLeft;
+    to = bottomRight;
+  } else if (wall === "left") {
+    from = topLeft;
+    to = bottomLeft;
+  }
+
+  graphics.setStrokeStyle({
+    width: 3,
+    color: theme.interactiveAccent,
+    alpha: 0.58,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
 }
 
 function drawRoomLabels(
@@ -728,6 +990,21 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function detectMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+
+  const navigatorWithUserAgentData = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
+  const userAgentDataPlatform =
+    typeof navigatorWithUserAgentData.userAgentData?.platform === "string"
+      ? navigatorWithUserAgentData.userAgentData.platform
+      : "";
+  if (/mac/i.test(userAgentDataPlatform)) return true;
+
+  return /mac/i.test(navigator.platform);
 }
 
 function getTextResolution(): number {

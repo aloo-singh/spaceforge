@@ -1,18 +1,90 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/stores/editorStore";
 
 export function SelectedRoomNamePanel() {
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const shouldFocusSelectedRoomNameInput = useEditorStore(
+    (state) => state.shouldFocusSelectedRoomNameInput
+  );
   const rooms = useEditorStore((state) => state.document.rooms);
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
+  const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
+    (state) => state.consumeSelectedRoomNameInputFocusRequest
+  );
+  const focusFrameRef = useRef<number | null>(null);
+  const focusTimeoutRef = useRef<number | null>(null);
 
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+
+  useEffect(() => {
+    if (!shouldFocusSelectedRoomNameInput || !selectedRoom) return;
+
+    let attempts = 0;
+    let isCancelled = false;
+
+    const tryFocusInput = () => {
+      if (isCancelled) return;
+      const inputElement = document.getElementById("room-name-input");
+      if (inputElement instanceof HTMLInputElement) {
+        inputElement.focus({ preventScroll: true });
+        inputElement.select();
+        consumeSelectedRoomNameInputFocusRequest();
+        if (focusTimeoutRef.current !== null) {
+          window.clearTimeout(focusTimeoutRef.current);
+          focusTimeoutRef.current = null;
+        }
+        focusFrameRef.current = null;
+        return;
+      }
+
+      if (attempts >= 3) {
+        consumeSelectedRoomNameInputFocusRequest();
+        if (focusTimeoutRef.current !== null) {
+          window.clearTimeout(focusTimeoutRef.current);
+          focusTimeoutRef.current = null;
+        }
+        focusFrameRef.current = null;
+        return;
+      }
+
+      attempts += 1;
+      focusFrameRef.current = requestAnimationFrame(tryFocusInput);
+    };
+
+    const runFocusAfterPointerCycle = () => {
+      focusFrameRef.current = requestAnimationFrame(() => {
+        focusFrameRef.current = requestAnimationFrame(tryFocusInput);
+      });
+    };
+
+    const onPointerUp = () => {
+      runFocusAfterPointerCycle();
+    };
+
+    window.addEventListener("pointerup", onPointerUp, { capture: true, once: true });
+    focusTimeoutRef.current = window.setTimeout(runFocusAfterPointerCycle, 0);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener("pointerup", onPointerUp, { capture: true });
+      if (focusTimeoutRef.current !== null) {
+        window.clearTimeout(focusTimeoutRef.current);
+        focusTimeoutRef.current = null;
+      }
+      if (focusFrameRef.current !== null) {
+        cancelAnimationFrame(focusFrameRef.current);
+        focusFrameRef.current = null;
+      }
+    };
+  }, [consumeSelectedRoomNameInputFocusRequest, selectedRoom, shouldFocusSelectedRoomNameInput]);
+
   if (!selectedRoom) return null;
 
   return (

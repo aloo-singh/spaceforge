@@ -40,6 +40,7 @@ type EditorState = {
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
+  shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
     past: EditorCommand[];
@@ -55,6 +56,7 @@ type EditorState = {
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   clearRoomSelection: () => void;
+  consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
   updateRoomRenameDraft: (roomId: string, name: string) => void;
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
@@ -160,6 +162,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     points: [],
   },
   selectedRoomId: null,
+  shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
     past: [],
@@ -228,6 +231,8 @@ export const useEditorStore = create<EditorState>((set) => ({
           roomDraft: {
             points: [],
           },
+          selectedRoomId: room.id,
+          shouldFocusSelectedRoomNameInput: true,
           renameSession: null,
           history: {
             past: pushToPast(state.history.past, command),
@@ -263,13 +268,22 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         selectedRoomId: roomId,
+        shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
     }),
   clearRoomSelection: () =>
     set({
       selectedRoomId: null,
+      shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
+    }),
+  consumeSelectedRoomNameInputFocusRequest: () =>
+    set((state) => {
+      if (!state.shouldFocusSelectedRoomNameInput) return state;
+      return {
+        shouldFocusSelectedRoomNameInput: false,
+      };
     }),
   startRoomRenameSession: (roomId) =>
     set((state) => {
@@ -318,6 +332,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (!room) {
         return {
           selectedRoomId: null,
+          shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
       }
@@ -331,6 +346,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         }
         return {
           selectedRoomId: null,
+          shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
       }
@@ -344,6 +360,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         selectedRoomId: null,
+        shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
           past: pushToPast(state.history.past, command),
@@ -360,6 +377,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         if (!state.selectedRoomId) return state;
         return {
           selectedRoomId: null,
+          shouldFocusSelectedRoomNameInput: false,
         };
       }
 
@@ -372,6 +390,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         document: nextDocument,
         selectedRoomId: null,
+        shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
     }),
@@ -441,6 +460,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         points: [],
       },
       selectedRoomId: null,
+      shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       history: {
         past: [],
@@ -461,6 +481,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
           past: nextPast,
@@ -480,6 +501,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
           past: nextPast,

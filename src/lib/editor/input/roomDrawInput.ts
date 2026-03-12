@@ -22,6 +22,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
+  onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
 
@@ -42,6 +43,7 @@ export function attachRoomDrawInput(
   let isSpaceHeld = false;
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
+  let currentCursor = "";
 
   const toCanvasPoint = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
@@ -52,6 +54,28 @@ export function attachRoomDrawInput(
     if (hoveredRoomLabelId === roomId) return;
     hoveredRoomLabelId = roomId;
     callbacks.onHoveredRoomLabelChange(roomId);
+  };
+
+  const setCursor = (nextCursor: string) => {
+    if (currentCursor === nextCursor) return;
+    currentCursor = nextCursor;
+    canvas.style.cursor = nextCursor;
+  };
+
+  const updateCursor = () => {
+    const isDrawingModeActive = store.getState().roomDraft.points.length > 0;
+    if (!isSpaceHeld && isDrawingModeActive) {
+      setCursor("crosshair");
+      return;
+    }
+
+    if (!isSpaceHeld && hoveredRoomLabelId) {
+      setCursor("pointer");
+      return;
+    }
+
+    // Yield cursor ownership to pan/resize modules when not hovering a label.
+    setCursor("");
   };
 
   const onPointerMove = (event: PointerEvent) => {
@@ -69,12 +93,14 @@ export function attachRoomDrawInput(
     } else {
       setHoveredRoomLabelId(null);
     }
+    updateCursor();
     callbacks.requestRender();
   };
 
   const onPointerLeave = () => {
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    updateCursor();
     callbacks.requestRender();
   };
 
@@ -86,6 +112,7 @@ export function attachRoomDrawInput(
         event.preventDefault();
         shouldSuppressNextContextMenu = true;
         state.resetDraft();
+        updateCursor();
       }
       return;
     }
@@ -103,11 +130,16 @@ export function attachRoomDrawInput(
 
     if (state.roomDraft.points.length > 0) {
       state.placeDraftPointFromCursor(cursorWorld);
+      updateCursor();
       return;
     }
 
     if (labelHitRoom) {
+      const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
       state.selectRoomById(labelHitRoom.id);
+      if (didChangeSelection) {
+        callbacks.onRoomLabelSelected?.(labelHitRoom.id);
+      }
       return;
     }
 
@@ -127,6 +159,7 @@ export function attachRoomDrawInput(
     }
 
     state.placeDraftPointFromCursor(cursorWorld);
+    updateCursor();
   };
 
   const onContextMenu = (event: MouseEvent) => {
@@ -146,6 +179,7 @@ export function attachRoomDrawInput(
 
     if (event.code === "Space") {
       isSpaceHeld = true;
+      updateCursor();
       return;
     }
 
@@ -153,6 +187,7 @@ export function attachRoomDrawInput(
       const state = store.getState();
       if (state.roomDraft.points.length > 0) {
         state.resetDraft();
+        updateCursor();
       } else {
         state.clearRoomSelection();
       }
@@ -164,12 +199,14 @@ export function attachRoomDrawInput(
 
     if (event.code === "Space") {
       isSpaceHeld = false;
+      updateCursor();
     }
   };
 
   const onWindowBlur = () => {
     isSpaceHeld = false;
     setHoveredRoomLabelId(null);
+    updateCursor();
   };
 
   canvas.addEventListener("pointermove", onPointerMove);
@@ -188,6 +225,7 @@ export function attachRoomDrawInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    canvas.style.cursor = "";
   };
 }
 
