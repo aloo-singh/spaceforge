@@ -13,12 +13,14 @@ type HistoryControlsProps = {
   onExportPng?: (signatureText?: string) => void | Promise<void>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
+  exportDisabledReason?: string;
 };
 
 export function HistoryControls({
   onExportPng,
   isExportingPng = false,
   exportDisabled = false,
+  exportDisabledReason,
 }: HistoryControlsProps) {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [exportSignatureText, setExportSignatureText] = useState("");
@@ -37,6 +39,8 @@ export function HistoryControls({
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const normalizedSignature = normalizeExportSignature(exportSignatureText);
+  const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
+  const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -65,8 +69,9 @@ export function HistoryControls({
             variant="outline"
             size="sm"
             onClick={() => onExportPng?.(normalizedSignature || undefined)}
-            disabled={!onExportPng || exportDisabled || isExportingPng}
+            disabled={isExportButtonDisabled}
             aria-label="Export current canvas as PNG"
+            title={exportButtonTitle}
             className="gap-2"
           >
             <Download />

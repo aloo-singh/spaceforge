@@ -78,6 +78,7 @@ export default function EditorCanvas() {
     [editorThemeMode]
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const hasRooms = roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -561,7 +562,8 @@ export default function EditorCanvas() {
       <HistoryControls
         onExportPng={exportCurrentCanvasAsPng}
         isExportingPng={isExportingPng}
-        exportDisabled={!isCanvasReadyForExport}
+        exportDisabled={!isCanvasReadyForExport || !hasRooms}
+        exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
       />
       <SelectedRoomNamePanel />
     </section>
