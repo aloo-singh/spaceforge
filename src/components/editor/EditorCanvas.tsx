@@ -687,6 +687,11 @@ function drawRooms(
     if (!isSelected || isDraftingRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
+    const hoveredWall =
+      roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
+    if (hoveredWall) {
+      drawHoveredWallHighlight(graphics, bounds, hoveredWall, camera, viewport, theme);
+    }
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
@@ -764,6 +769,42 @@ function drawRooms(
       graphics.stroke();
     }
   }
+}
+
+function drawHoveredWallHighlight(
+  graphics: Graphics,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+
+  let from = topLeft;
+  let to = topRight;
+  if (wall === "right") {
+    from = topRight;
+    to = bottomRight;
+  } else if (wall === "bottom") {
+    from = bottomLeft;
+    to = bottomRight;
+  } else if (wall === "left") {
+    from = topLeft;
+    to = bottomLeft;
+  }
+
+  graphics.setStrokeStyle({
+    width: 3,
+    color: theme.interactiveAccent,
+    alpha: 0.58,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
 }
 
 function drawRoomLabels(
@@ -949,9 +990,12 @@ function drawGridLines(
 function detectMacPlatform(): boolean {
   if (typeof navigator === "undefined") return false;
 
+  const navigatorWithUserAgentData = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
   const userAgentDataPlatform =
-    typeof navigator.userAgentData?.platform === "string"
-      ? navigator.userAgentData.platform
+    typeof navigatorWithUserAgentData.userAgentData?.platform === "string"
+      ? navigatorWithUserAgentData.userAgentData.platform
       : "";
   if (/mac/i.test(userAgentDataPlatform)) return true;
 
