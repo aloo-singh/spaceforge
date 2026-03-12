@@ -63,6 +63,12 @@ export function attachRoomDrawInput(
   };
 
   const updateCursor = () => {
+    const isDrawingModeActive = store.getState().roomDraft.points.length > 0;
+    if (!isSpaceHeld && isDrawingModeActive) {
+      setCursor("crosshair");
+      return;
+    }
+
     if (!isSpaceHeld && hoveredRoomLabelId) {
       setCursor("pointer");
       return;
@@ -106,6 +112,7 @@ export function attachRoomDrawInput(
         event.preventDefault();
         shouldSuppressNextContextMenu = true;
         state.resetDraft();
+        updateCursor();
       }
       return;
     }
@@ -123,6 +130,7 @@ export function attachRoomDrawInput(
 
     if (state.roomDraft.points.length > 0) {
       state.placeDraftPointFromCursor(cursorWorld);
+      updateCursor();
       return;
     }
 
@@ -151,6 +159,7 @@ export function attachRoomDrawInput(
     }
 
     state.placeDraftPointFromCursor(cursorWorld);
+    updateCursor();
   };
 
   const onContextMenu = (event: MouseEvent) => {
@@ -178,6 +187,7 @@ export function attachRoomDrawInput(
       const state = store.getState();
       if (state.roomDraft.points.length > 0) {
         state.resetDraft();
+        updateCursor();
       } else {
         state.clearRoomSelection();
       }
