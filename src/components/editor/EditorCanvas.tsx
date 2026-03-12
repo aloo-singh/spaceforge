@@ -197,11 +197,13 @@ export default function EditorCanvas() {
     const app = appRef.current;
     if (!app || isExportingPng) return;
     const state = useEditorStore.getState();
+    const hasSignature = Boolean(signatureText?.trim());
     const layoutBounds = getLayoutBoundsFromDocument(state.document);
     const exportFraming = getAutoFitExportFraming({
       layoutBounds,
       viewport: state.viewport,
       fallbackCamera: state.camera,
+      innerPaddingPx: hasSignature ? 88 : 72,
     });
     const exportCamera = exportFraming.camera;
     const exportViewport = exportFraming.viewport;
