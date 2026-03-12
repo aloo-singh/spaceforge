@@ -10,6 +10,43 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.8.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-12</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added contextual onboarding hints for drawing, selection, resize, undo, export, and panning</li>
+                <li>Hints now persist dismissed and completed state locally</li>
+                <li>Added a final panning hint with workspace navigation guidance</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improvements</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hint cards now use stronger contrast and subtle enter/exit transitions</li>
+                <li>Newly created rooms are selected immediately and ready for instant renaming</li>
+                <li>Drawing mode now shows a crosshair cursor for clearer affordance</li>
+                <li>Wall edge hover highlight and refined resize cursors improve resize discoverability</li>
+                <li>Wall and corner snap previews now interpolate briefly for smoother drag feel</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Export</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>PNG exports now omit selection-specific UI for cleaner output</li>
+                <li>Live editor selection state remains unchanged during export</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.7.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-11</span>
           </div>
