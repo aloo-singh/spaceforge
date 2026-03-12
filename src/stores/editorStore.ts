@@ -228,6 +228,7 @@ export const useEditorStore = create<EditorState>((set) => ({
           roomDraft: {
             points: [],
           },
+          selectedRoomId: room.id,
           renameSession: null,
           history: {
             past: pushToPast(state.history.past, command),

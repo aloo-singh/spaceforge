@@ -43,6 +43,7 @@ export function attachRoomDrawInput(
   let isSpaceHeld = false;
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
+  let currentCursor = "";
 
   const toCanvasPoint = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
@@ -53,6 +54,22 @@ export function attachRoomDrawInput(
     if (hoveredRoomLabelId === roomId) return;
     hoveredRoomLabelId = roomId;
     callbacks.onHoveredRoomLabelChange(roomId);
+  };
+
+  const setCursor = (nextCursor: string) => {
+    if (currentCursor === nextCursor) return;
+    currentCursor = nextCursor;
+    canvas.style.cursor = nextCursor;
+  };
+
+  const updateCursor = () => {
+    if (!isSpaceHeld && hoveredRoomLabelId) {
+      setCursor("pointer");
+      return;
+    }
+
+    // Yield cursor ownership to pan/resize modules when not hovering a label.
+    setCursor("");
   };
 
   const onPointerMove = (event: PointerEvent) => {
@@ -70,12 +87,14 @@ export function attachRoomDrawInput(
     } else {
       setHoveredRoomLabelId(null);
     }
+    updateCursor();
     callbacks.requestRender();
   };
 
   const onPointerLeave = () => {
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    updateCursor();
     callbacks.requestRender();
   };
 
@@ -151,6 +170,7 @@ export function attachRoomDrawInput(
 
     if (event.code === "Space") {
       isSpaceHeld = true;
+      updateCursor();
       return;
     }
 
@@ -169,12 +189,14 @@ export function attachRoomDrawInput(
 
     if (event.code === "Space") {
       isSpaceHeld = false;
+      updateCursor();
     }
   };
 
   const onWindowBlur = () => {
     isSpaceHeld = false;
     setHoveredRoomLabelId(null);
+    updateCursor();
   };
 
   canvas.addEventListener("pointermove", onPointerMove);
@@ -193,6 +215,7 @@ export function attachRoomDrawInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    canvas.style.cursor = "";
   };
 }
 
