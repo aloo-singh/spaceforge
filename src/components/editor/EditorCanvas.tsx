@@ -19,6 +19,7 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
+  type ActiveEditorOnboardingHint,
   getActiveEditorOnboardingHint,
   loadCompletedEditorHintIds,
   loadDismissedEditorHintIds,
@@ -47,6 +48,8 @@ const EMPTY_ROOM_RESIZE_UI = {
   activeCorner: null,
   activeRoomId: null,
 } as const;
+const HINT_TRANSITION_MS = 200;
+const HINT_HANDOFF_DELAY_MS = 150;
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -77,8 +80,14 @@ export default function EditorCanvas() {
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
   const [hasHydratedHints, setHasHydratedHints] = useState(false);
+  const [displayedHint, setDisplayedHint] = useState<ActiveEditorOnboardingHint | null>(null);
+  const [hintMotionState, setHintMotionState] = useState<"entering" | "visible" | "exiting">("visible");
   const [dismissedHintIds, setDismissedHintIds] = useState<EditorOnboardingHintId[]>([]);
   const [completedHintIds, setCompletedHintIds] = useState<EditorOnboardingHintId[]>([]);
+  const hintTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintTransitionCycleRef = useRef(0);
+  const latestEligibleHintRef = useRef<ActiveEditorOnboardingHint | null>(null);
   const editorThemeRef = useRef(editorTheme);
   const activeHintIdRef = useRef<EditorOnboardingHintId | null>(null);
   const activeHint = useMemo(() => {
@@ -91,6 +100,78 @@ export default function EditorCanvas() {
       completedHintIds: new Set(completedHintIds),
     });
   }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
+
+  useEffect(() => {
+    latestEligibleHintRef.current = activeHint;
+  }, [activeHint]);
+
+  useEffect(() => {
+    return () => {
+      if (hintTransitionTimeoutRef.current) {
+        clearTimeout(hintTransitionTimeoutRef.current);
+      }
+      if (hintHandoffTimeoutRef.current) {
+        clearTimeout(hintHandoffTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const clearTimers = () => {
+      if (hintTransitionTimeoutRef.current) {
+        clearTimeout(hintTransitionTimeoutRef.current);
+        hintTransitionTimeoutRef.current = null;
+      }
+      if (hintHandoffTimeoutRef.current) {
+        clearTimeout(hintHandoffTimeoutRef.current);
+        hintHandoffTimeoutRef.current = null;
+      }
+    };
+
+    const startEnter = (hint: ActiveEditorOnboardingHint) => {
+      setDisplayedHint(hint);
+      setHintMotionState("entering");
+      requestAnimationFrame(() => {
+        setHintMotionState("visible");
+      });
+    };
+
+    if (!displayedHint) {
+      if (hintHandoffTimeoutRef.current) return;
+      if (activeHint) {
+        clearTimers();
+        startEnter(activeHint);
+      }
+      return;
+    }
+
+    if (activeHint && activeHint.id === displayedHint.id) {
+      if (activeHint.message !== displayedHint.message) {
+        setDisplayedHint(activeHint);
+      }
+      return;
+    }
+
+    clearTimers();
+    const transitionCycle = hintTransitionCycleRef.current + 1;
+    hintTransitionCycleRef.current = transitionCycle;
+    setHintMotionState("exiting");
+
+    hintTransitionTimeoutRef.current = setTimeout(() => {
+      if (hintTransitionCycleRef.current !== transitionCycle) return;
+
+      setDisplayedHint(null);
+      hintTransitionTimeoutRef.current = null;
+      hintHandoffTimeoutRef.current = setTimeout(() => {
+        if (hintTransitionCycleRef.current !== transitionCycle) return;
+        hintHandoffTimeoutRef.current = null;
+        const nextHint = latestEligibleHintRef.current;
+        if (nextHint) {
+          startEnter(nextHint);
+        }
+      }, HINT_HANDOFF_DELAY_MS);
+    }, HINT_TRANSITION_MS);
+  }, [activeHint, displayedHint]);
 
   const dismissHint = useCallback((hintId: EditorOnboardingHintId) => {
     setDismissedHintIds((previous) => {
@@ -204,8 +285,8 @@ export default function EditorCanvas() {
   }, [editorTheme]);
 
   useEffect(() => {
-    activeHintIdRef.current = activeHint?.id ?? null;
-  }, [activeHint]);
+    activeHintIdRef.current = displayedHint?.id ?? null;
+  }, [displayedHint]);
 
   useEffect(() => {
     setIsMacPlatform(detectMacPlatform());
@@ -442,11 +523,21 @@ export default function EditorCanvas() {
         tabIndex={-1}
         className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
-      {activeHint ? (
-        <aside className="pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3">
+      {displayedHint ? (
+        <aside
+          className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
+            hintMotionState === "visible"
+              ? "translate-y-0 opacity-100"
+              : hintMotionState === "entering"
+                ? "translate-y-2 opacity-0"
+                : "-translate-y-1.5 opacity-0"
+          }`}
+          style={{ transitionDuration: `${HINT_TRANSITION_MS}ms` }}
+        >
           <OnboardingHintCard
-            message={activeHint.message}
-            onDismiss={() => dismissHint(activeHint.id)}
+            message={displayedHint.message}
+            invertedTheme={editorThemeMode === "light" ? "dark" : "light"}
+            onDismiss={() => dismissHint(displayedHint.id)}
           />
         </aside>
       ) : null}

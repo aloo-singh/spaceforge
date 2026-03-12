@@ -8,26 +8,40 @@ import { cn } from "@/lib/utils";
 type OnboardingHintCardProps = {
   message: string;
   onDismiss: () => void;
+  invertedTheme: "light" | "dark";
   className?: string;
 };
 
-export function OnboardingHintCard({ message, onDismiss, className }: OnboardingHintCardProps) {
+export function OnboardingHintCard({
+  message,
+  onDismiss,
+  invertedTheme,
+  className,
+}: OnboardingHintCardProps) {
+  const isDarkCard = invertedTheme === "dark";
+
   return (
     <Card
       className={cn(
-        "pointer-events-auto border-border/70 bg-card/90 text-card-foreground shadow-md backdrop-blur-sm",
+        "pointer-events-auto border shadow-lg backdrop-blur-sm",
+        isDarkCard
+          ? "border-slate-700/90 bg-slate-900/94 text-slate-100 shadow-black/40"
+          : "border-slate-300/90 bg-white/96 text-slate-900 shadow-slate-900/20",
         className
       )}
     >
       <CardContent className="flex items-center gap-2 p-2.5 pl-3">
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className={cn("text-sm", isDarkCard ? "text-slate-200/90" : "text-slate-700")}>{message}</p>
         <Button
           type="button"
-          variant="ghost"
+          variant={isDarkCard ? "secondary" : "ghost"}
           size="icon-xs"
           onClick={onDismiss}
           aria-label="Dismiss hint"
-          className="ml-auto"
+          className={cn(
+            "ml-auto",
+            isDarkCard ? "bg-slate-800 text-slate-100 hover:bg-slate-700" : undefined
+          )}
         >
           <X />
         </Button>
