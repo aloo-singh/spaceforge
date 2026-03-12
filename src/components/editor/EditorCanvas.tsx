@@ -16,6 +16,8 @@ import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
+import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
+import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
@@ -195,13 +197,21 @@ export default function EditorCanvas() {
     const app = appRef.current;
     if (!app || isExportingPng) return;
     const state = useEditorStore.getState();
-    const minorGridSpacingPx = GRID_MINOR_SIZE_MM * state.camera.pixelsPerMm;
-    const majorGridSpacingPx = GRID_SIZE_MM * state.camera.pixelsPerMm;
+    const layoutBounds = getLayoutBoundsFromDocument(state.document);
+    const exportFraming = getAutoFitExportFraming({
+      layoutBounds,
+      viewport: state.viewport,
+      fallbackCamera: state.camera,
+    });
+    const exportCamera = exportFraming.camera;
+    const exportViewport = exportFraming.viewport;
+    const minorGridSpacingPx = GRID_MINOR_SIZE_MM * exportCamera.pixelsPerMm;
+    const majorGridSpacingPx = GRID_SIZE_MM * exportCamera.pixelsPerMm;
     const exportGridSpacingPx = minorGridSpacingPx >= 8 ? minorGridSpacingPx : majorGridSpacingPx;
     const exportGridOriginXPx =
-      (0 - state.camera.xMm) * state.camera.pixelsPerMm + state.viewport.width / 2;
+      (0 - exportCamera.xMm) * exportCamera.pixelsPerMm + exportViewport.width / 2;
     const exportGridOriginYPx =
-      (0 - state.camera.yMm) * state.camera.pixelsPerMm + state.viewport.height / 2;
+      (0 - exportCamera.yMm) * exportCamera.pixelsPerMm + exportViewport.height / 2;
 
     setIsExportingPng(true);
     const exportStage = new Container();
@@ -218,8 +228,8 @@ export default function EditorCanvas() {
       null,
       EMPTY_ROOM_RESIZE_UI,
       state.roomDraft.points.length > 0,
-      state.camera,
-      state.viewport,
+      exportCamera,
+      exportViewport,
       editorThemeRef.current
     );
     drawRoomLabels(
@@ -227,16 +237,16 @@ export default function EditorCanvas() {
       state.document.rooms,
       null,
       null,
-      state.camera,
-      state.viewport,
+      exportCamera,
+      exportViewport,
       editorThemeRef.current
     );
     drawDraft(
       exportDraftGraphics,
       state.roomDraft.points,
       cursorWorldRef.current,
-      state.camera,
-      state.viewport,
+      exportCamera,
+      exportViewport,
       editorThemeRef.current
     );
 
