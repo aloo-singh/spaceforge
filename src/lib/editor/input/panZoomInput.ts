@@ -10,11 +10,19 @@ type PanZoomStore = {
   getState: () => PanZoomStoreState;
 };
 
+type PanZoomInputCallbacks = {
+  onPan?: () => void;
+};
+
 /**
  * Handles editor camera pan/zoom input and cursor feedback.
  * Rendering remains the responsibility of the canvas component.
  */
-export function attachPanZoomInput(canvas: HTMLCanvasElement, store: PanZoomStore) {
+export function attachPanZoomInput(
+  canvas: HTMLCanvasElement,
+  store: PanZoomStore,
+  callbacks: PanZoomInputCallbacks = {}
+) {
   // Space-to-pan is a core editor affordance; add this to onboarding/tutorial later.
   let isSpaceHeld = false;
   let isPanning = false;
@@ -54,6 +62,9 @@ export function attachPanZoomInput(canvas: HTMLCanvasElement, store: PanZoomStor
       x: nextPointer.x - lastPointer.x,
       y: nextPointer.y - lastPointer.y,
     });
+    if (nextPointer.x !== lastPointer.x || nextPointer.y !== lastPointer.y) {
+      callbacks.onPan?.();
+    }
 
     lastPointer = nextPointer;
   };

@@ -6,7 +6,8 @@ export type EditorOnboardingHintId =
   | "select-room-by-name"
   | "resize-room-by-dragging-edges"
   | "undo-last-action"
-  | "export-as-png";
+  | "export-as-png"
+  | "pan-canvas";
 
 type EditorOnboardingHint = {
   id: EditorOnboardingHintId;
@@ -55,6 +56,12 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
     message: "Export as PNG when you're ready",
     shouldShow: ({ roomCount, completedHintIds }) =>
       roomCount > 0 && completedHintIds.has("undo-last-action"),
+  },
+  {
+    id: "pan-canvas",
+    message: "Hold SPACE and drag to pan, or middle mouse drag",
+    shouldShow: ({ roomCount, completedHintIds }) =>
+      roomCount > 0 && completedHintIds.has("export-as-png"),
   },
 ];
 
@@ -125,6 +132,7 @@ function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
     value === "select-room-by-name" ||
     value === "resize-room-by-dragging-edges" ||
     value === "undo-last-action" ||
-    value === "export-as-png"
+    value === "export-as-png" ||
+    value === "pan-canvas"
   );
 }

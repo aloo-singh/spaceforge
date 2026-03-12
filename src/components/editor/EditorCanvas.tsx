@@ -400,7 +400,12 @@ export default function EditorCanvas() {
           editorThemeRef.current
         );
       });
-      const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore);
+      const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore, {
+        onPan: () => {
+          if (activeHintIdRef.current !== "pan-canvas") return;
+          completeHint("pan-canvas");
+        },
+      });
       const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;

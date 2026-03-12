@@ -62,8 +62,14 @@ const NWSE_RESIZE_CURSOR =
 const NESW_RESIZE_CURSOR =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 5l14 14'/%3E%3Cpath d='M14 19h5v-5'/%3E%3Cpath d='M10 5H5v5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000000' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 5l14 14'/%3E%3Cpath d='M14 19h5v-5'/%3E%3Cpath d='M10 5H5v5'/%3E%3C/g%3E%3C/svg%3E\") 12 12, nesw-resize";
 
+const NS_RESIZE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v16'/%3E%3Cpath d='M8 8l4-4 4 4'/%3E%3Cpath d='M8 16l4 4 4-4'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000000' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v16'/%3E%3Cpath d='M8 8l4-4 4 4'/%3E%3Cpath d='M8 16l4 4 4-4'/%3E%3C/g%3E%3C/svg%3E\") 12 12, ns-resize";
+
+const EW_RESIZE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M8 8l-4 4 4 4'/%3E%3Cpath d='M16 8l4 4-4 4'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000000' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M8 8l-4 4 4 4'/%3E%3Cpath d='M16 8l4 4-4 4'/%3E%3C/g%3E%3C/svg%3E\") 12 12, ew-resize";
+
 function getCursorForWall(wall: RectWall): string {
-  return wall === "top" || wall === "bottom" ? "row-resize" : "col-resize";
+  return wall === "top" || wall === "bottom" ? NS_RESIZE_CURSOR : EW_RESIZE_CURSOR;
 }
 
 function getCursorForCorner(corner: RectCorner): string {
