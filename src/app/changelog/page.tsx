@@ -10,6 +10,40 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.9.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-12</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Export</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>PNG export framing now auto-fits to actual room layout bounds instead of the live viewport</li>
+                <li>Added export framing polish for very small layouts to keep composition visually balanced</li>
+                <li>Export centering and spacing are tuned to keep breathing room, including when signatures are present</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Quality</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export PNG is now disabled on empty canvases to prevent blank downloads</li>
+                <li>Disabled export state now explains the requirement with a tooltip: &quot;Draw a room before exporting.&quot;</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Internal</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added reusable layout-bounds utilities for export composition</li>
+                <li>Introduced dedicated auto-fit export framing utility for content-based camera setup</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.8.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-12</span>
           </div>
