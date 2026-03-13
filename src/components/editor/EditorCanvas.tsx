@@ -37,6 +37,7 @@ import {
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
 import {
+  easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
   TRANSFORM_SETTLE_ROOM_ANIMATION_MS,
   TRANSFORM_SETTLE_TOTAL_MS,
@@ -621,9 +622,10 @@ function drawScene(
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
+  const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
   drawRooms(
     roomGraphics,
-    state.document.rooms,
+    renderedRooms,
     state.selectedRoomId,
     roomResizeUi,
     state.roomDraft.points.length > 0,
@@ -634,7 +636,7 @@ function drawScene(
   );
   drawRoomLabels(
     roomLabelContainer,
-    state.document.rooms,
+    renderedRooms,
     state.selectedRoomId,
     hoveredRoomLabelId,
     state.camera,
@@ -706,23 +708,20 @@ function drawRooms(
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
-  const nowMs = performance.now();
   const transformSettlingProgress =
     transformFeedback?.phase === "settling"
-      ? getTransformSettlingProgress(transformFeedback, nowMs)
-      : null;
-  const animatedRoomPoints =
-    transformFeedback?.phase === "settling" && transformFeedback.settleTarget?.points
-      ? interpolatePointLists(
-          transformFeedback.originalPoints,
-          transformFeedback.settleTarget.points,
-          easeOutCubic(transformSettlingProgress?.roomProgress ?? 1)
-        )
+      ? getTransformSettlingProgress(transformFeedback, performance.now())
       : null;
   const destinationPreviewPoints =
     transformFeedback?.phase === "settling"
       ? transformFeedback.settleTarget?.points ?? transformFeedback.previewPoints
       : transformFeedback?.previewPoints ?? null;
+  const shouldShowDestinationPreview =
+    !!transformFeedback &&
+    !!destinationPreviewPoints &&
+    destinationPreviewPoints.length >= 3 &&
+    (!arePointListsEqual(destinationPreviewPoints, transformFeedback.originalPoints) ||
+      transformFeedback.phase === "settling");
   const destinationPreviewAlpha =
     transformFeedback?.phase === "settling"
       ? 1 - easeOutCubic(transformSettlingProgress?.previewFadeProgress ?? 1)
@@ -730,10 +729,10 @@ function drawRooms(
         ? 1
         : 0;
 
-  if (destinationPreviewPoints && destinationPreviewPoints.length >= 3 && destinationPreviewAlpha > 0.01) {
+  if (shouldShowDestinationPreview && destinationPreviewAlpha > 0.02) {
     drawTransformDestinationPreview(
       graphics,
-      destinationPreviewPoints,
+      destinationPreviewPoints!,
       camera,
       viewport,
       theme,
@@ -747,30 +746,25 @@ function drawRooms(
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
-    const renderedPoints = isTransformActive
-      ? transformFeedback.originalPoints
-      : isTransformSettling && animatedRoomPoints
-        ? animatedRoomPoints
-        : room.points;
     const selectedFillAlpha = isTransformActive
-      ? 0.12
+      ? 0.1
       : isTransformSettling
-        ? 0.12 + 0.08 * easeOutCubic(transformSettlingProgress?.roomProgress ?? 1)
+        ? 0.1 + 0.1 * getTransformRoomEase(transformFeedback)
         : 0.2;
     const selectedStrokeAlpha = isTransformActive
-      ? 0.78
+      ? 0.82
       : isTransformSettling
-        ? 0.78 + 0.22 * easeOutCubic(transformSettlingProgress?.roomProgress ?? 1)
+        ? 0.82 + 0.18 * getTransformRoomEase(transformFeedback)
         : 1;
     const selectedStrokeWidth = isTransformActive
-      ? 2.15
+      ? 2.2
       : isTransformSettling
-        ? 2.15 + 0.35 * easeOutCubic(transformSettlingProgress?.roomProgress ?? 1)
+        ? 2.2 + 0.3 * getTransformRoomEase(transformFeedback)
         : 2.5;
 
     drawRoomShape(
       graphics,
-      renderedPoints,
+      room.points,
       camera,
       viewport,
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
@@ -780,10 +774,7 @@ function drawRooms(
     );
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
-    const bounds = getAxisAlignedRoomBounds({
-      ...room,
-      points: renderedPoints,
-    });
+    const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
     const hoveredWall =
       roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
@@ -869,6 +860,45 @@ function drawRooms(
   }
 }
 
+function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
+  if (!transformFeedback) return rooms;
+
+  const transformedPoints = getRenderedTransformRoomPoints(transformFeedback);
+  if (!transformedPoints) return rooms;
+
+  return rooms.map((room) =>
+    room.id === transformFeedback.roomId
+      ? {
+          ...room,
+          points: transformedPoints,
+        }
+      : room
+  );
+}
+
+function getRenderedTransformRoomPoints(transformFeedback: TransformFeedback): Point[] | null {
+  if (transformFeedback.phase === "active") {
+    return transformFeedback.originalPoints;
+  }
+
+  if (transformFeedback.phase === "settling" && transformFeedback.settleTarget?.points) {
+    return interpolatePointLists(
+      transformFeedback.originalPoints,
+      transformFeedback.settleTarget.points,
+      getTransformRoomEase(transformFeedback)
+    );
+  }
+
+  return transformFeedback.previewPoints;
+}
+
+function getTransformRoomEase(transformFeedback: TransformFeedback) {
+  if (transformFeedback.phase !== "settling") return 1;
+  return easeOutCubic(
+    getTransformSettlingProgress(transformFeedback, performance.now()).roomProgress
+  );
+}
+
 function drawRoomShape(
   graphics: Graphics,
   points: Point[],
@@ -917,7 +947,7 @@ function drawTransformDestinationPreview(
 
   graphics.setFillStyle({
     color: theme.interactiveAccent,
-    alpha: 0.05 * alpha,
+    alpha: 0.055 * alpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
   for (let index = 1; index < screenPoints.length; index += 1) {
@@ -927,9 +957,9 @@ function drawTransformDestinationPreview(
   graphics.fill();
 
   graphics.setStrokeStyle({
-    width: 8,
+    width: 11,
     color: theme.interactiveAccent,
-    alpha: 0.08 * alpha,
+    alpha: 0.12 * alpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
   for (let index = 1; index < screenPoints.length; index += 1) {
@@ -939,9 +969,9 @@ function drawTransformDestinationPreview(
   graphics.stroke();
 
   graphics.setStrokeStyle({
-    width: 4,
+    width: 5.5,
     color: theme.interactiveAccent,
-    alpha: 0.16 * alpha,
+    alpha: 0.2 * alpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
   for (let index = 1; index < screenPoints.length; index += 1) {
@@ -951,9 +981,9 @@ function drawTransformDestinationPreview(
   graphics.stroke();
 
   graphics.setStrokeStyle({
-    width: 2.2,
+    width: 1.9,
     color: theme.interactiveAccent,
-    alpha: 0.88 * alpha,
+    alpha: 0.82 * alpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
   for (let index = 1; index < screenPoints.length; index += 1) {
@@ -978,10 +1008,6 @@ function getTransformSettlingProgress(transformFeedback: TransformFeedback, nowM
   };
 }
 
-function easeOutCubic(t: number) {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 function interpolatePointLists(from: Point[], to: Point[], t: number): Point[] {
   if (from.length !== to.length) {
     return to.map((point) => ({ ...point }));
@@ -994,6 +1020,14 @@ function interpolatePointLists(from: Point[], to: Point[], t: number): Point[] {
       y: sourcePoint.y + (targetPoint.y - sourcePoint.y) * t,
     };
   });
+}
+
+function arePointListsEqual(a: Point[], b: Point[]) {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index].x !== b[index].x || a[index].y !== b[index].y) return false;
+  }
+  return true;
 }
 
 function drawHoveredWallHighlight(

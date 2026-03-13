@@ -17,6 +17,8 @@ import {
 import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
+  easeOutCubic,
+  TRANSFORM_PREVIEW_SNAP_ANIMATION_MS,
   TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
@@ -61,8 +63,6 @@ type ResizeSession = {
   latestSnappedPoints: Point[] | null;
   latestPreviewPoints: Point[] | null;
 };
-
-const SNAP_INTERPOLATION_MS = 75;
 
 const NWSE_RESIZE_CURSOR =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 19L19 5'/%3E%3Cpath d='M14 5h5v5'/%3E%3Cpath d='M10 19H5v-5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000000' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 19L19 5'/%3E%3Cpath d='M14 5h5v5'/%3E%3Cpath d='M10 19H5v-5'/%3E%3C/g%3E%3C/svg%3E\") 12 12, nwse-resize";
@@ -163,8 +163,8 @@ export function attachRoomResizeInput(
     const step = (frameTime: number) => {
       if (cycle !== interpolationCycle) return;
       const elapsed = frameTime - startedAt;
-      const t = Math.min(1, elapsed / SNAP_INTERPOLATION_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const t = Math.min(1, elapsed / TRANSFORM_PREVIEW_SNAP_ANIMATION_MS);
+      const eased = easeOutCubic(t);
       const interpolatedPoints = interpolatePointLists(fromPoints, nextPoints, eased);
       if (activeSession?.roomId === roomId) {
         activeSession.latestPreviewPoints = interpolatedPoints;

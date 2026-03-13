@@ -3,8 +3,10 @@ import type { Point } from "@/lib/editor/types";
 export type TransformMode = "move" | "resize";
 export type TransformPhase = "active" | "settling";
 
-export const TRANSFORM_SETTLE_ROOM_ANIMATION_MS = 180;
-export const TRANSFORM_SETTLE_PREVIEW_FADE_MS = 320;
+// Shared transform motion tuning lives here so move and resize stay aligned.
+export const TRANSFORM_PREVIEW_SNAP_ANIMATION_MS = 60;
+export const TRANSFORM_SETTLE_ROOM_ANIMATION_MS = 160;
+export const TRANSFORM_SETTLE_PREVIEW_FADE_MS = 220;
 export const TRANSFORM_SETTLE_TOTAL_MS =
   TRANSFORM_SETTLE_ROOM_ANIMATION_MS + TRANSFORM_SETTLE_PREVIEW_FADE_MS;
 
@@ -80,6 +82,10 @@ export function createTransformFeedbackTargetFromPoints(points: Point[]): Transf
     points: clonedPoints,
     bounds: getBoundsForPoints(clonedPoints),
   };
+}
+
+export function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function clonePoints(points: Point[]): Point[] {
