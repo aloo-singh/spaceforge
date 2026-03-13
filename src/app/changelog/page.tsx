@@ -10,6 +10,41 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.10.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-13</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>You can now drag a room by its label to move the whole room</li>
+                <li>Room movement is now fully grid-aligned, matching the editor&apos;s existing snap behaviour</li>
+                <li>Active label drags now show a subtle ghost silhouette of the room&apos;s starting position</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improvements</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Clicking a room label still selects normally, with a small pointer threshold before drag begins</li>
+                <li>Whole-room movement preserves room shape exactly while previewing the snapped destination live</li>
+                <li>Each label drag still commits as one clean undoable move instead of multiple history entries</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Quality</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed a hydration mismatch on refresh when persisted editor state restored moved rooms on the client</li>
+                <li>Move interaction feedback now clears cleanly on pointer up, cancel, blur, and missing-room failure paths</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.9.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-12</span>
           </div>
