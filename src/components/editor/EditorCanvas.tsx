@@ -36,6 +36,7 @@ import {
   type RectCorner,
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
+import type { TransformFeedback } from "@/lib/editor/transformFeedback";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
@@ -70,7 +71,7 @@ export default function EditorCanvas() {
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
-  const roomMoveGhostRef = useRef<{ roomId: string; points: Point[] } | null>(null);
+  const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -398,7 +399,7 @@ export default function EditorCanvas() {
         cursorWorldRef.current,
         hoveredRoomLabelIdRef.current,
         roomResizeUiRef.current,
-        roomMoveGhostRef.current,
+        transformFeedbackRef.current,
         editorThemeRef.current
       );
 
@@ -418,7 +419,7 @@ export default function EditorCanvas() {
           cursorWorldRef.current,
           hoveredRoomLabelIdRef.current,
           roomResizeUiRef.current,
-          roomMoveGhostRef.current,
+          transformFeedbackRef.current,
           editorThemeRef.current
         );
       });
@@ -446,7 +447,7 @@ export default function EditorCanvas() {
             cursorWorldRef.current,
             hoveredRoomLabelIdRef.current,
             roomResizeUiRef.current,
-            roomMoveGhostRef.current,
+            transformFeedbackRef.current,
             editorThemeRef.current
           );
         },
@@ -458,8 +459,8 @@ export default function EditorCanvas() {
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
         },
-        onRoomMoveGhostChange: (ghost) => {
-          roomMoveGhostRef.current = ghost;
+        onTransformFeedbackChange: (feedback) => {
+          transformFeedbackRef.current = feedback;
         },
         onRoomLabelSelected: () => {
           if (activeHintIdRef.current !== "select-room-by-name") return;
@@ -475,7 +476,7 @@ export default function EditorCanvas() {
             cursorWorldRef.current,
             hoveredRoomLabelIdRef.current,
             roomResizeUiRef.current,
-            roomMoveGhostRef.current,
+            transformFeedbackRef.current,
             editorThemeRef.current
           );
         },
@@ -495,7 +496,7 @@ export default function EditorCanvas() {
         roomRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
-        roomMoveGhostRef.current = null;
+        transformFeedbackRef.current = null;
       };
     }
 
@@ -532,7 +533,7 @@ export default function EditorCanvas() {
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
       roomResizeUiRef.current,
-      roomMoveGhostRef.current,
+      transformFeedbackRef.current,
       editorTheme
     );
   }, [editorTheme]);
@@ -604,7 +605,7 @@ function drawScene(
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
-  roomMoveGhost: { roomId: string; points: Point[] } | null,
+  transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
@@ -616,7 +617,7 @@ function drawScene(
     state.roomDraft.points.length > 0,
     state.camera,
     state.viewport,
-    roomMoveGhost,
+    transformFeedback,
     theme
   );
   drawRoomLabels(
@@ -689,15 +690,18 @@ function drawRooms(
   isDraftingRoom: boolean,
   camera: CameraState,
   viewport: ViewportSize,
-  roomMoveGhost: { roomId: string; points: Point[] } | null,
+  transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
 
-  if (roomMoveGhost && roomMoveGhost.points.length >= 3) {
+  if (
+    transformFeedback?.mode === "move" &&
+    transformFeedback.originalPoints.length >= 3
+  ) {
     drawRoomShape(
       graphics,
-      roomMoveGhost.points,
+      transformFeedback.originalPoints,
       camera,
       viewport,
       theme.interactiveAccent,

@@ -7,6 +7,11 @@ import {
   translateRoomPoints,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
+import {
+  createTransformFeedback,
+  updateTransformFeedbackPreview,
+  type TransformFeedback,
+} from "@/lib/editor/transformFeedback";
 
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
@@ -29,7 +34,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
-  onRoomMoveGhostChange?: (ghost: { roomId: string; points: Point[] } | null) => void;
+  onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
@@ -77,9 +82,17 @@ export function attachRoomDrawInput(
     callbacks.onHoveredRoomLabelChange(roomId);
   };
 
-  const setRoomMoveGhost = (ghost: { roomId: string; points: Point[] } | null) => {
-    callbacks.onRoomMoveGhostChange?.(ghost);
+  const setTransformFeedback = (feedback: TransformFeedback | null) => {
+    callbacks.onTransformFeedbackChange?.(feedback);
   };
+
+  const getMoveTransformFeedback = (roomId: string, originalPoints: Point[], previewPoints?: Point[]) =>
+    createTransformFeedback({
+      roomId,
+      mode: "move",
+      originalPoints,
+      previewPoints,
+    });
 
   const setCursor = (nextCursor: string) => {
     if (currentCursor === nextCursor) return;
@@ -132,7 +145,7 @@ export function attachRoomDrawInput(
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
-        setRoomMoveGhost(null);
+        setTransformFeedback(null);
         callbacks.requestRender();
         return;
       }
@@ -147,10 +160,7 @@ export function attachRoomDrawInput(
         }
 
         session.didDrag = true;
-        setRoomMoveGhost({
-          roomId: session.roomId,
-          points: session.startPoints.map((point) => ({ ...point })),
-        });
+        setTransformFeedback(getMoveTransformFeedback(session.roomId, session.startPoints));
         updateCursor();
       }
 
@@ -163,6 +173,12 @@ export function attachRoomDrawInput(
       const nextPoints = translateRoomPoints(session.startPoints, delta);
       state.previewRoomMove(session.roomId, nextPoints);
       session.latestPoints = nextPoints;
+      setTransformFeedback(
+        updateTransformFeedbackPreview(
+          getMoveTransformFeedback(session.roomId, session.startPoints),
+          nextPoints
+        )
+      );
 
       callbacks.requestRender();
       return;
@@ -272,7 +288,7 @@ export function attachRoomDrawInput(
       store.getState().commitRoomMove(session.roomId, session.startPoints, nextPoints);
     }
 
-    setRoomMoveGhost(null);
+    setTransformFeedback(null);
     stopLabelDragSession();
 
     const state = store.getState();
@@ -294,7 +310,7 @@ export function attachRoomDrawInput(
         .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
 
-    setRoomMoveGhost(null);
+    setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
     callbacks.requestRender();
@@ -348,7 +364,7 @@ export function attachRoomDrawInput(
         .getState()
         .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
-    setRoomMoveGhost(null);
+    setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
     updateCursor();
@@ -374,7 +390,7 @@ export function attachRoomDrawInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
-    setRoomMoveGhost(null);
+    setTransformFeedback(null);
     stopLabelDragSession();
     canvas.style.cursor = "";
   };
