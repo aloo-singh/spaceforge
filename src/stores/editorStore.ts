@@ -12,6 +12,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import { translateRoomPoints } from "@/lib/editor/roomTranslation";
 import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
@@ -62,6 +63,7 @@ type EditorState = {
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   resetCanvas: () => void;
@@ -404,6 +406,31 @@ export const useEditorStore = create<EditorState>((set) => ({
         roomId,
         previousName: room.name,
         nextName: name,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  moveRoomByDelta: (roomId, delta) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (delta.x === 0 && delta.y === 0) return state;
+
+      const nextPoints = translateRoomPoints(room.points, delta);
+      const command: EditorCommand = {
+        type: "move-room",
+        roomId,
+        previousPoints: room.points.map((point) => ({ ...point })),
+        nextPoints: nextPoints.map((point) => ({ ...point })),
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
