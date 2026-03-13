@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
@@ -77,8 +77,13 @@ export default function EditorCanvas() {
     () => getEditorCanvasTheme(editorThemeMode),
     [editorThemeMode]
   );
+  const hasHydratedClient = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
-  const hasRooms = roomCount > 0;
+  const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
