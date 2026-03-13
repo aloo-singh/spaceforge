@@ -15,8 +15,9 @@ import {
   type RoomRectBounds,
 } from "@/lib/editor/rectRoomResize";
 import {
+  createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
-  updateTransformFeedbackPreview,
+  TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
 import type { Point, Room } from "@/lib/editor/types";
@@ -58,6 +59,7 @@ type ResizeSession = {
   startBounds: RoomRectBounds;
   startPoints: Point[];
   latestSnappedPoints: Point[] | null;
+  latestPreviewPoints: Point[] | null;
 };
 
 const SNAP_INTERPOLATION_MS = 75;
@@ -96,24 +98,43 @@ export function attachRoomResizeInput(
   let currentCursor: string = "";
   let interpolationFrameId: number | null = null;
   let interpolationCycle = 0;
-  const previewRoomResize = store.getState().previewRoomResize;
   const commitRoomResize = store.getState().commitRoomResize;
+  let clearTransformFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
     callbacks.onTransformFeedbackChange?.(feedback);
+    callbacks.requestRender();
   };
 
   const getResizeTransformFeedback = (
     roomId: string,
     originalPoints: Point[],
-    previewPoints?: Point[]
+    previewPoints?: Point[],
+    settlePoints?: Point[],
+    phase: TransformFeedback["phase"] = "active"
   ) =>
     createTransformFeedback({
       roomId,
       mode: "resize",
+      phase,
       originalPoints,
       previewPoints,
+      settleTarget: settlePoints ? createTransformFeedbackTargetFromPoints(settlePoints) : null,
     });
+
+  const clearPendingTransformFeedbackTimeout = () => {
+    if (!clearTransformFeedbackTimeoutId) return;
+    clearTimeout(clearTransformFeedbackTimeoutId);
+    clearTransformFeedbackTimeoutId = null;
+  };
+
+  const scheduleTransformFeedbackClear = () => {
+    clearPendingTransformFeedbackTimeout();
+    clearTransformFeedbackTimeoutId = setTimeout(() => {
+      clearTransformFeedbackTimeoutId = null;
+      setTransformFeedback(null);
+    }, TRANSFORM_SETTLE_TOTAL_MS);
+  };
 
   const cancelInterpolation = () => {
     interpolationCycle += 1;
@@ -124,10 +145,16 @@ export function attachRoomResizeInput(
   };
 
   const previewRoomResizeWithInterpolation = (roomId: string, nextPoints: Point[]) => {
-    const currentRoom =
-      store.getState().document.rooms.find((candidate) => candidate.id === roomId) ?? null;
-    const fromPoints = currentRoom?.points ?? [];
-    if (arePointListsEqual(fromPoints, nextPoints)) return;
+    const fromPoints = activeSession?.latestPreviewPoints ?? activeSession?.startPoints ?? [];
+    if (arePointListsEqual(fromPoints, nextPoints)) {
+      if (activeSession?.roomId === roomId) {
+        activeSession.latestPreviewPoints = nextPoints;
+        setTransformFeedback(
+          getResizeTransformFeedback(roomId, activeSession.startPoints, nextPoints, nextPoints)
+        );
+      }
+      return;
+    }
 
     cancelInterpolation();
     const cycle = interpolationCycle;
@@ -139,16 +166,12 @@ export function attachRoomResizeInput(
       const t = Math.min(1, elapsed / SNAP_INTERPOLATION_MS);
       const eased = 1 - Math.pow(1 - t, 3);
       const interpolatedPoints = interpolatePointLists(fromPoints, nextPoints, eased);
-      previewRoomResize(roomId, interpolatedPoints);
       if (activeSession?.roomId === roomId) {
+        activeSession.latestPreviewPoints = interpolatedPoints;
         setTransformFeedback(
-          updateTransformFeedbackPreview(
-            getResizeTransformFeedback(roomId, activeSession.startPoints),
-            interpolatedPoints
-          )
+          getResizeTransformFeedback(roomId, activeSession.startPoints, interpolatedPoints, nextPoints)
         );
       }
-      callbacks.requestRender();
 
       if (t < 1) {
         interpolationFrameId = requestAnimationFrame(step);
@@ -156,16 +179,12 @@ export function attachRoomResizeInput(
       }
 
       interpolationFrameId = null;
-      previewRoomResize(roomId, nextPoints);
       if (activeSession?.roomId === roomId) {
+        activeSession.latestPreviewPoints = nextPoints;
         setTransformFeedback(
-          updateTransformFeedbackPreview(
-            getResizeTransformFeedback(roomId, activeSession.startPoints),
-            nextPoints
-          )
+          getResizeTransformFeedback(roomId, activeSession.startPoints, nextPoints, nextPoints)
         );
       }
-      callbacks.requestRender();
     };
 
     interpolationFrameId = requestAnimationFrame(step);
@@ -246,7 +265,6 @@ export function attachRoomResizeInput(
 
   const stopSession = () => {
     cancelInterpolation();
-    setTransformFeedback(null);
     if (!activeSession) return;
     const pointerId = activeSession.pointerId;
     if (canvas.hasPointerCapture(pointerId)) {
@@ -333,8 +351,12 @@ export function attachRoomResizeInput(
       startBounds: selected.bounds,
       startPoints: selected.room.points.map((point) => ({ ...point })),
       latestSnappedPoints: null,
+      latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
     };
-    setTransformFeedback(getResizeTransformFeedback(selected.room.id, selected.room.points));
+    clearPendingTransformFeedbackTimeout();
+    setTransformFeedback(
+      getResizeTransformFeedback(selected.room.id, selected.room.points, undefined, selected.room.points)
+    );
     hoveredWall = hitWall;
     hoveredCorner = hitCorner;
     updateCursor();
@@ -348,9 +370,20 @@ export function attachRoomResizeInput(
     cancelInterpolation();
     const session = activeSession;
     const nextPoints = session.latestSnappedPoints ?? session.startPoints;
-    previewRoomResize(session.roomId, nextPoints);
-    commitRoomResize(session.roomId, session.startPoints, nextPoints);
-    if (!arePointListsEqual(session.startPoints, nextPoints)) {
+    if (arePointListsEqual(session.startPoints, nextPoints)) {
+      setTransformFeedback(null);
+    } else {
+      setTransformFeedback(
+        getResizeTransformFeedback(
+          session.roomId,
+          session.startPoints,
+          nextPoints,
+          nextPoints,
+          "settling"
+        )
+      );
+      commitRoomResize(session.roomId, session.startPoints, nextPoints);
+      scheduleTransformFeedbackClear();
       callbacks.onRoomResizeCommitted?.(session.roomId);
     }
     stopSession();
@@ -359,7 +392,8 @@ export function attachRoomResizeInput(
   const onPointerCancel = (event: PointerEvent) => {
     if (!activeSession || event.pointerId !== activeSession.pointerId) return;
     cancelInterpolation();
-    previewRoomResize(activeSession.roomId, activeSession.startPoints);
+    clearPendingTransformFeedbackTimeout();
+    setTransformFeedback(null);
     stopSession();
   };
 
@@ -391,7 +425,8 @@ export function attachRoomResizeInput(
     isSpaceHeld = false;
     if (activeSession) {
       cancelInterpolation();
-      previewRoomResize(activeSession.roomId, activeSession.startPoints);
+      clearPendingTransformFeedbackTimeout();
+      setTransformFeedback(null);
       stopSession();
       return;
     }
@@ -418,6 +453,8 @@ export function attachRoomResizeInput(
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
     cancelInterpolation();
+    clearPendingTransformFeedbackTimeout();
+    setTransformFeedback(null);
     canvas.style.cursor = "";
     document.body.style.cursor = "";
   };

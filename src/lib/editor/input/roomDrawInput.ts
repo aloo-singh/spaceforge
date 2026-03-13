@@ -8,8 +8,9 @@ import {
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 import {
+  createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
-  updateTransformFeedbackPreview,
+  TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
 
@@ -70,8 +71,8 @@ export function attachRoomDrawInput(
   let hoveredRoomLabelId: string | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
-  const previewRoomMove = store.getState().previewRoomMove;
   const commitRoomMove = store.getState().commitRoomMove;
+  let clearTransformFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const toCanvasPoint = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
@@ -86,15 +87,38 @@ export function attachRoomDrawInput(
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
     callbacks.onTransformFeedbackChange?.(feedback);
+    callbacks.requestRender();
   };
 
-  const getMoveTransformFeedback = (roomId: string, originalPoints: Point[], previewPoints?: Point[]) =>
+  const getMoveTransformFeedback = (
+    roomId: string,
+    originalPoints: Point[],
+    previewPoints?: Point[],
+    settlePoints?: Point[],
+    phase: TransformFeedback["phase"] = "active"
+  ) =>
     createTransformFeedback({
       roomId,
       mode: "move",
+      phase,
       originalPoints,
       previewPoints,
+      settleTarget: settlePoints ? createTransformFeedbackTargetFromPoints(settlePoints) : null,
     });
+
+  const clearPendingTransformFeedbackTimeout = () => {
+    if (!clearTransformFeedbackTimeoutId) return;
+    clearTimeout(clearTransformFeedbackTimeoutId);
+    clearTransformFeedbackTimeoutId = null;
+  };
+
+  const scheduleTransformFeedbackClear = () => {
+    clearPendingTransformFeedbackTimeout();
+    clearTransformFeedbackTimeoutId = setTimeout(() => {
+      clearTransformFeedbackTimeoutId = null;
+      setTransformFeedback(null);
+    }, TRANSFORM_SETTLE_TOTAL_MS);
+  };
 
   const setCursor = (nextCursor: string) => {
     if (currentCursor === nextCursor) return;
@@ -162,6 +186,7 @@ export function attachRoomDrawInput(
         }
 
         session.didDrag = true;
+        clearPendingTransformFeedbackTimeout();
         setTransformFeedback(getMoveTransformFeedback(session.roomId, session.startPoints));
         updateCursor();
       }
@@ -173,16 +198,10 @@ export function attachRoomDrawInput(
       );
 
       const nextPoints = translateRoomPoints(session.startPoints, delta);
-      previewRoomMove(session.roomId, nextPoints);
       session.latestPoints = nextPoints;
       setTransformFeedback(
-        updateTransformFeedbackPreview(
-          getMoveTransformFeedback(session.roomId, session.startPoints),
-          nextPoints
-        )
+        getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
       );
-
-      callbacks.requestRender();
       return;
     }
 
@@ -287,10 +306,24 @@ export function attachRoomDrawInput(
     const session = activeLabelDragSession;
     if (session.didDrag) {
       const nextPoints = session.latestPoints ?? session.startPoints;
-      commitRoomMove(session.roomId, session.startPoints, nextPoints);
+      if (arePointListsEqual(session.startPoints, nextPoints)) {
+        setTransformFeedback(null);
+      } else {
+        setTransformFeedback(
+          getMoveTransformFeedback(
+            session.roomId,
+            session.startPoints,
+            nextPoints,
+            nextPoints,
+            "settling"
+          )
+        );
+        commitRoomMove(session.roomId, session.startPoints, nextPoints);
+        scheduleTransformFeedbackClear();
+      }
+    } else {
+      setTransformFeedback(null);
     }
-
-    setTransformFeedback(null);
     stopLabelDragSession();
 
     const state = store.getState();
@@ -307,7 +340,7 @@ export function attachRoomDrawInput(
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     if (activeLabelDragSession.didDrag) {
-      previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
+      clearPendingTransformFeedbackTimeout();
     }
 
     setTransformFeedback(null);
@@ -360,7 +393,7 @@ export function attachRoomDrawInput(
   const onWindowBlur = () => {
     isSpaceHeld = false;
     if (activeLabelDragSession?.didDrag) {
-      previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
+      clearPendingTransformFeedbackTimeout();
     }
     setTransformFeedback(null);
     stopLabelDragSession();
@@ -388,6 +421,7 @@ export function attachRoomDrawInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
     stopLabelDragSession();
     canvas.style.cursor = "";
@@ -398,4 +432,12 @@ function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+}
+
+function arePointListsEqual(a: Point[], b: Point[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index].x !== b[index].x || a[index].y !== b[index].y) return false;
+  }
+  return true;
 }
