@@ -14,6 +14,11 @@ import {
   type RectWall,
   type RoomRectBounds,
 } from "@/lib/editor/rectRoomResize";
+import {
+  createTransformFeedback,
+  updateTransformFeedbackPreview,
+  type TransformFeedback,
+} from "@/lib/editor/transformFeedback";
 import type { Point, Room } from "@/lib/editor/types";
 
 type RoomResizeStoreState = {
@@ -39,6 +44,7 @@ type RoomResizeInputCallbacks = {
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }) => void;
+  onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomResizeCommitted?: (roomId: string) => void;
   requestRender: () => void;
 };
@@ -93,6 +99,22 @@ export function attachRoomResizeInput(
   const previewRoomResize = store.getState().previewRoomResize;
   const commitRoomResize = store.getState().commitRoomResize;
 
+  const setTransformFeedback = (feedback: TransformFeedback | null) => {
+    callbacks.onTransformFeedbackChange?.(feedback);
+  };
+
+  const getResizeTransformFeedback = (
+    roomId: string,
+    originalPoints: Point[],
+    previewPoints?: Point[]
+  ) =>
+    createTransformFeedback({
+      roomId,
+      mode: "resize",
+      originalPoints,
+      previewPoints,
+    });
+
   const cancelInterpolation = () => {
     interpolationCycle += 1;
     if (interpolationFrameId !== null) {
@@ -118,6 +140,14 @@ export function attachRoomResizeInput(
       const eased = 1 - Math.pow(1 - t, 3);
       const interpolatedPoints = interpolatePointLists(fromPoints, nextPoints, eased);
       previewRoomResize(roomId, interpolatedPoints);
+      if (activeSession?.roomId === roomId) {
+        setTransformFeedback(
+          updateTransformFeedbackPreview(
+            getResizeTransformFeedback(roomId, activeSession.startPoints),
+            interpolatedPoints
+          )
+        );
+      }
       callbacks.requestRender();
 
       if (t < 1) {
@@ -127,6 +157,14 @@ export function attachRoomResizeInput(
 
       interpolationFrameId = null;
       previewRoomResize(roomId, nextPoints);
+      if (activeSession?.roomId === roomId) {
+        setTransformFeedback(
+          updateTransformFeedbackPreview(
+            getResizeTransformFeedback(roomId, activeSession.startPoints),
+            nextPoints
+          )
+        );
+      }
       callbacks.requestRender();
     };
 
@@ -208,6 +246,7 @@ export function attachRoomResizeInput(
 
   const stopSession = () => {
     cancelInterpolation();
+    setTransformFeedback(null);
     if (!activeSession) return;
     const pointerId = activeSession.pointerId;
     if (canvas.hasPointerCapture(pointerId)) {
@@ -295,6 +334,7 @@ export function attachRoomResizeInput(
       startPoints: selected.room.points.map((point) => ({ ...point })),
       latestSnappedPoints: null,
     };
+    setTransformFeedback(getResizeTransformFeedback(selected.room.id, selected.room.points));
     hoveredWall = hitWall;
     hoveredCorner = hitCorner;
     updateCursor();

@@ -433,6 +433,9 @@ export default function EditorCanvas() {
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;
         },
+        onTransformFeedbackChange: (feedback) => {
+          transformFeedbackRef.current = feedback;
+        },
         onRoomResizeCommitted: () => {
           if (activeHintIdRef.current !== "resize-room-by-dragging-edges") return;
           completeHint("resize-room-by-dragging-edges");
@@ -695,10 +698,7 @@ function drawRooms(
 ) {
   graphics.clear();
 
-  if (
-    transformFeedback?.mode === "move" &&
-    transformFeedback.originalPoints.length >= 3
-  ) {
+  if (transformFeedback && transformFeedback.originalPoints.length >= 3) {
     drawRoomShape(
       graphics,
       transformFeedback.originalPoints,
