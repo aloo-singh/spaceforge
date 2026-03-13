@@ -70,6 +70,8 @@ export function attachRoomDrawInput(
   let hoveredRoomLabelId: string | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
+  const previewRoomMove = store.getState().previewRoomMove;
+  const commitRoomMove = store.getState().commitRoomMove;
 
   const toCanvasPoint = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
@@ -171,7 +173,7 @@ export function attachRoomDrawInput(
       );
 
       const nextPoints = translateRoomPoints(session.startPoints, delta);
-      state.previewRoomMove(session.roomId, nextPoints);
+      previewRoomMove(session.roomId, nextPoints);
       session.latestPoints = nextPoints;
       setTransformFeedback(
         updateTransformFeedbackPreview(
@@ -285,7 +287,7 @@ export function attachRoomDrawInput(
     const session = activeLabelDragSession;
     if (session.didDrag) {
       const nextPoints = session.latestPoints ?? session.startPoints;
-      store.getState().commitRoomMove(session.roomId, session.startPoints, nextPoints);
+      commitRoomMove(session.roomId, session.startPoints, nextPoints);
     }
 
     setTransformFeedback(null);
@@ -305,9 +307,7 @@ export function attachRoomDrawInput(
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     if (activeLabelDragSession.didDrag) {
-      store
-        .getState()
-        .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
+      previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
 
     setTransformFeedback(null);
@@ -360,9 +360,7 @@ export function attachRoomDrawInput(
   const onWindowBlur = () => {
     isSpaceHeld = false;
     if (activeLabelDragSession?.didDrag) {
-      store
-        .getState()
-        .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
+      previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
     setTransformFeedback(null);
     stopLabelDragSession();

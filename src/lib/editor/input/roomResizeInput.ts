@@ -90,6 +90,8 @@ export function attachRoomResizeInput(
   let currentCursor: string = "";
   let interpolationFrameId: number | null = null;
   let interpolationCycle = 0;
+  const previewRoomResize = store.getState().previewRoomResize;
+  const commitRoomResize = store.getState().commitRoomResize;
 
   const cancelInterpolation = () => {
     interpolationCycle += 1;
@@ -115,7 +117,7 @@ export function attachRoomResizeInput(
       const t = Math.min(1, elapsed / SNAP_INTERPOLATION_MS);
       const eased = 1 - Math.pow(1 - t, 3);
       const interpolatedPoints = interpolatePointLists(fromPoints, nextPoints, eased);
-      store.getState().previewRoomResize(roomId, interpolatedPoints);
+      previewRoomResize(roomId, interpolatedPoints);
       callbacks.requestRender();
 
       if (t < 1) {
@@ -124,7 +126,7 @@ export function attachRoomResizeInput(
       }
 
       interpolationFrameId = null;
-      store.getState().previewRoomResize(roomId, nextPoints);
+      previewRoomResize(roomId, nextPoints);
       callbacks.requestRender();
     };
 
@@ -306,8 +308,8 @@ export function attachRoomResizeInput(
     cancelInterpolation();
     const session = activeSession;
     const nextPoints = session.latestSnappedPoints ?? session.startPoints;
-    store.getState().previewRoomResize(session.roomId, nextPoints);
-    store.getState().commitRoomResize(session.roomId, session.startPoints, nextPoints);
+    previewRoomResize(session.roomId, nextPoints);
+    commitRoomResize(session.roomId, session.startPoints, nextPoints);
     if (!arePointListsEqual(session.startPoints, nextPoints)) {
       callbacks.onRoomResizeCommitted?.(session.roomId);
     }
@@ -317,7 +319,7 @@ export function attachRoomResizeInput(
   const onPointerCancel = (event: PointerEvent) => {
     if (!activeSession || event.pointerId !== activeSession.pointerId) return;
     cancelInterpolation();
-    store.getState().previewRoomResize(activeSession.roomId, activeSession.startPoints);
+    previewRoomResize(activeSession.roomId, activeSession.startPoints);
     stopSession();
   };
 
@@ -349,7 +351,7 @@ export function attachRoomResizeInput(
     isSpaceHeld = false;
     if (activeSession) {
       cancelInterpolation();
-      store.getState().previewRoomResize(activeSession.roomId, activeSession.startPoints);
+      previewRoomResize(activeSession.roomId, activeSession.startPoints);
       stopSession();
       return;
     }
