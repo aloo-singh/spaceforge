@@ -10,6 +10,41 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.11.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-13</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Transform feedback</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Move and resize now share one coherent transform feedback system</li>
+                <li>Active transforms keep the selected room anchored while the snapped destination preview moves independently</li>
+                <li>Resize interactions now show the same original reference and destination feedback language as move</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Polish</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Committed transforms now settle into place with a quick eased animation and a brief fading destination glow</li>
+                <li>Room labels now animate with the settling room instead of jumping to the final position</li>
+                <li>Transform pacing, easing, and glow tuning were tightened to make move and resize feel more consistent</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Quality</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Transform preview state now clears more reliably across quick repeats, cancel paths, and end-of-interaction cleanup</li>
+                <li>No changes to geometry rules, persistence, export, or undo/redo semantics</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.10.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-13</span>
           </div>
