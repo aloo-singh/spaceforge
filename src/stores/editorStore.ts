@@ -12,6 +12,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import { translateRoomPoints } from "@/lib/editor/roomTranslation";
 import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
@@ -62,6 +63,9 @@ type EditorState = {
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  moveRoomByDelta: (roomId: string, delta: Point) => void;
+  previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
+  commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   resetCanvas: () => void;
@@ -409,6 +413,64 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  moveRoomByDelta: (roomId, delta) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (delta.x === 0 && delta.y === 0) return state;
+
+      const nextPoints = translateRoomPoints(room.points, delta);
+      const command: EditorCommand = {
+        type: "move-room",
+        roomId,
+        previousPoints: room.points.map((point) => ({ ...point })),
+        nextPoints: nextPoints.map((point) => ({ ...point })),
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  previewRoomMove: (roomId, nextPoints) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (arePointListsEqual(room.points, nextPoints)) return state;
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+      };
+    }),
+  commitRoomMove: (roomId, previousPoints, nextPoints) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (arePointListsEqual(previousPoints, nextPoints)) return state;
+
+      const command: EditorCommand = {
+        type: "move-room",
+        roomId,
+        previousPoints: previousPoints.map((point) => ({ ...point })),
+        nextPoints: nextPoints.map((point) => ({ ...point })),
+      };
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
