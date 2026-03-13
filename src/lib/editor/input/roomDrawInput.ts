@@ -1,7 +1,11 @@
 import { screenToWorld } from "@/lib/editor/camera";
+import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import { isPointInPolygon } from "@/lib/editor/roomGeometry";
-import { translateRoomPoints } from "@/lib/editor/roomTranslation";
+import {
+  getSnappedRoomTranslationDelta,
+  translateRoomPoints,
+} from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 
 type RoomDrawStoreState = {
@@ -33,7 +37,7 @@ type LabelDragSession = {
   pointerId: number;
   roomId: string;
   startScreenPoint: Point;
-  lastWorldPoint: Point;
+  startWorldPoint: Point;
   startPoints: Point[];
   latestPoints: Point[] | null;
   didDrag: boolean;
@@ -140,17 +144,15 @@ export function attachRoomDrawInput(
         updateCursor();
       }
 
-      const delta = {
-        x: cursorWorld.x - session.lastWorldPoint.x,
-        y: cursorWorld.y - session.lastWorldPoint.y,
-      };
+      const delta = getSnappedRoomTranslationDelta(
+        session.startWorldPoint,
+        cursorWorld,
+        GRID_SIZE_MM
+      );
 
-      if (delta.x !== 0 || delta.y !== 0) {
-        const nextPoints = translateRoomPoints(room.points, delta);
-        state.previewRoomMove(session.roomId, nextPoints);
-        session.lastWorldPoint = cursorWorld;
-        session.latestPoints = nextPoints;
-      }
+      const nextPoints = translateRoomPoints(session.startPoints, delta);
+      state.previewRoomMove(session.roomId, nextPoints);
+      session.latestPoints = nextPoints;
 
       callbacks.requestRender();
       return;
@@ -219,7 +221,7 @@ export function attachRoomDrawInput(
         pointerId: event.pointerId,
         roomId: labelHitRoom.id,
         startScreenPoint: screenPoint,
-        lastWorldPoint: cursorWorld,
+        startWorldPoint: cursorWorld,
         startPoints: labelHitRoom.points.map((point) => ({ ...point })),
         latestPoints: null,
         didDrag: false,
