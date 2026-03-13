@@ -36,6 +36,13 @@ import {
   type RectCorner,
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
+import {
+  easeOutCubic,
+  TRANSFORM_SETTLE_PREVIEW_FADE_MS,
+  TRANSFORM_SETTLE_ROOM_ANIMATION_MS,
+  TRANSFORM_SETTLE_TOTAL_MS,
+  type TransformFeedback,
+} from "@/lib/editor/transformFeedback";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
@@ -70,7 +77,8 @@ export default function EditorCanvas() {
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
-  const roomMoveGhostRef = useRef<{ roomId: string; points: Point[] } | null>(null);
+  const transformFeedbackRef = useRef<TransformFeedback | null>(null);
+  const transformAnimationFrameRef = useRef<number | null>(null);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -109,6 +117,68 @@ export default function EditorCanvas() {
       completedHintIds: new Set(completedHintIds),
     });
   }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
+
+  const drawCurrentScene = useCallback(() => {
+    const grid = gridRef.current;
+    const rooms = roomRef.current;
+    const roomLabels = roomLabelRef.current;
+    const draft = draftRef.current;
+    if (!grid || !rooms || !roomLabels || !draft) return;
+
+    drawScene(
+      grid,
+      rooms,
+      roomLabels,
+      draft,
+      useEditorStore.getState(),
+      cursorWorldRef.current,
+      hoveredRoomLabelIdRef.current,
+      roomResizeUiRef.current,
+      transformFeedbackRef.current,
+      editorThemeRef.current
+    );
+  }, []);
+
+  const stopTransformAnimation = useCallback(() => {
+    if (transformAnimationFrameRef.current === null) return;
+    cancelAnimationFrame(transformAnimationFrameRef.current);
+    transformAnimationFrameRef.current = null;
+  }, []);
+
+  const startTransformAnimation = useCallback(() => {
+    if (transformAnimationFrameRef.current !== null) return;
+
+    const step = () => {
+      const feedback = transformFeedbackRef.current;
+      if (!feedback || feedback.phase !== "settling") {
+        transformAnimationFrameRef.current = null;
+        return;
+      }
+
+      drawCurrentScene();
+
+      if (performance.now() - feedback.phaseStartedAtMs >= TRANSFORM_SETTLE_TOTAL_MS) {
+        transformAnimationFrameRef.current = null;
+        return;
+      }
+
+      transformAnimationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    transformAnimationFrameRef.current = requestAnimationFrame(step);
+  }, [drawCurrentScene]);
+
+  const setTransformFeedback = useCallback(
+    (feedback: TransformFeedback | null) => {
+      transformFeedbackRef.current = feedback;
+      if (feedback?.phase === "settling") {
+        startTransformAnimation();
+      } else {
+        stopTransformAnimation();
+      }
+    },
+    [startTransformAnimation, stopTransformAnimation]
+  );
 
   useEffect(() => {
     latestEligibleHintRef.current = activeHint;
@@ -389,18 +459,7 @@ export default function EditorCanvas() {
       };
 
       syncViewport();
-      drawScene(
-        grid,
-        rooms,
-        roomLabels,
-        draft,
-        useEditorStore.getState(),
-        cursorWorldRef.current,
-        hoveredRoomLabelIdRef.current,
-        roomResizeUiRef.current,
-        roomMoveGhostRef.current,
-        editorThemeRef.current
-      );
+      drawCurrentScene();
 
       const handleResize = () => {
         syncViewport();
@@ -408,19 +467,8 @@ export default function EditorCanvas() {
 
       app.renderer.on("resize", handleResize);
 
-      const unsubscribe = useEditorStore.subscribe((state) => {
-        drawScene(
-          grid,
-          rooms,
-          roomLabels,
-          draft,
-          state,
-          cursorWorldRef.current,
-          hoveredRoomLabelIdRef.current,
-          roomResizeUiRef.current,
-          roomMoveGhostRef.current,
-          editorThemeRef.current
-        );
+      const unsubscribe = useEditorStore.subscribe(() => {
+        drawCurrentScene();
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore, {
         onPan: () => {
@@ -432,23 +480,15 @@ export default function EditorCanvas() {
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;
         },
+        onTransformFeedbackChange: (feedback) => {
+          setTransformFeedback(feedback);
+        },
         onRoomResizeCommitted: () => {
           if (activeHintIdRef.current !== "resize-room-by-dragging-edges") return;
           completeHint("resize-room-by-dragging-edges");
         },
         requestRender: () => {
-          drawScene(
-            grid,
-            rooms,
-            roomLabels,
-            draft,
-            useEditorStore.getState(),
-            cursorWorldRef.current,
-            hoveredRoomLabelIdRef.current,
-            roomResizeUiRef.current,
-            roomMoveGhostRef.current,
-            editorThemeRef.current
-          );
+          drawCurrentScene();
         },
       });
       const detachRoomDrawInput = attachRoomDrawInput(app.canvas, useEditorStore, {
@@ -458,26 +498,15 @@ export default function EditorCanvas() {
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
         },
-        onRoomMoveGhostChange: (ghost) => {
-          roomMoveGhostRef.current = ghost;
+        onTransformFeedbackChange: (feedback) => {
+          setTransformFeedback(feedback);
         },
         onRoomLabelSelected: () => {
           if (activeHintIdRef.current !== "select-room-by-name") return;
           completeHint("select-room-by-name");
         },
         requestRender: () => {
-          drawScene(
-            grid,
-            rooms,
-            roomLabels,
-            draft,
-            useEditorStore.getState(),
-            cursorWorldRef.current,
-            hoveredRoomLabelIdRef.current,
-            roomResizeUiRef.current,
-            roomMoveGhostRef.current,
-            editorThemeRef.current
-          );
+          drawCurrentScene();
         },
       });
       const detachHistoryHotkeys = attachHistoryHotkeys(useEditorStore);
@@ -495,7 +524,8 @@ export default function EditorCanvas() {
         roomRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
-        roomMoveGhostRef.current = null;
+        setTransformFeedback(null);
+        stopTransformAnimation();
       };
     }
 
@@ -511,31 +541,15 @@ export default function EditorCanvas() {
         app.destroy(true, { children: true });
       }
     };
-  }, [completeHint]);
+  }, [completeHint, drawCurrentScene, setTransformFeedback, stopTransformAnimation]);
 
   useEffect(() => {
     const app = appRef.current;
-    const grid = gridRef.current;
-    const rooms = roomRef.current;
-    const roomLabels = roomLabelRef.current;
-    const draft = draftRef.current;
-    if (!app || !grid || !rooms || !roomLabels || !draft) return;
+    if (!app) return;
 
     app.renderer.background.color = editorTheme.canvasBackground;
-    const state = useEditorStore.getState();
-    drawScene(
-      grid,
-      rooms,
-      roomLabels,
-      draft,
-      state,
-      cursorWorldRef.current,
-      hoveredRoomLabelIdRef.current,
-      roomResizeUiRef.current,
-      roomMoveGhostRef.current,
-      editorTheme
-    );
-  }, [editorTheme]);
+    drawCurrentScene();
+  }, [drawCurrentScene, editorTheme]);
 
   return (
     <section
@@ -604,24 +618,25 @@ function drawScene(
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
-  roomMoveGhost: { roomId: string; points: Point[] } | null,
+  transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
+  const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
   drawRooms(
     roomGraphics,
-    state.document.rooms,
+    renderedRooms,
     state.selectedRoomId,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
     state.viewport,
-    roomMoveGhost,
+    transformFeedback,
     theme
   );
   drawRoomLabels(
     roomLabelContainer,
-    state.document.rooms,
+    renderedRooms,
     state.selectedRoomId,
     hoveredRoomLabelId,
     state.camera,
@@ -689,39 +704,76 @@ function drawRooms(
   isDraftingRoom: boolean,
   camera: CameraState,
   viewport: ViewportSize,
-  roomMoveGhost: { roomId: string; points: Point[] } | null,
+  transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
+  const transformSettlingProgress =
+    transformFeedback?.phase === "settling"
+      ? getTransformSettlingProgress(transformFeedback, performance.now())
+      : null;
+  const destinationPreviewPoints =
+    transformFeedback?.phase === "settling"
+      ? transformFeedback.settleTarget?.points ?? transformFeedback.previewPoints
+      : transformFeedback?.previewPoints ?? null;
+  const shouldShowDestinationPreview =
+    !!transformFeedback &&
+    !!destinationPreviewPoints &&
+    destinationPreviewPoints.length >= 3 &&
+    (!arePointListsEqual(destinationPreviewPoints, transformFeedback.originalPoints) ||
+      transformFeedback.phase === "settling");
+  const destinationPreviewAlpha =
+    transformFeedback?.phase === "settling"
+      ? 1 - easeOutCubic(transformSettlingProgress?.previewFadeProgress ?? 1)
+      : transformFeedback
+        ? 1
+        : 0;
 
-  if (roomMoveGhost && roomMoveGhost.points.length >= 3) {
-    drawRoomShape(
+  if (shouldShowDestinationPreview && destinationPreviewAlpha > 0.02) {
+    drawTransformDestinationPreview(
       graphics,
-      roomMoveGhost.points,
+      destinationPreviewPoints!,
       camera,
       viewport,
-      theme.interactiveAccent,
-      0.075,
-      1.75,
-      0.48
+      theme,
+      destinationPreviewAlpha
     );
   }
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId;
+    const isActiveTransformRoom = transformFeedback?.roomId === room.id;
+    const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
+    const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
+    const selectedFillAlpha = isTransformActive
+      ? 0.1
+      : isTransformSettling
+        ? 0.1 + 0.1 * getTransformRoomEase(transformFeedback)
+        : 0.2;
+    const selectedStrokeAlpha = isTransformActive
+      ? 0.82
+      : isTransformSettling
+        ? 0.82 + 0.18 * getTransformRoomEase(transformFeedback)
+        : 1;
+    const selectedStrokeWidth = isTransformActive
+      ? 2.2
+      : isTransformSettling
+        ? 2.2 + 0.3 * getTransformRoomEase(transformFeedback)
+        : 2.5;
+
     drawRoomShape(
       graphics,
       room.points,
       camera,
       viewport,
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
-      isSelected ? 0.2 : 0.12,
-      isSelected ? 2.5 : 2,
-      isSelected ? 1 : 0.9
+      isSelected ? selectedFillAlpha : 0.12,
+      isSelected ? selectedStrokeWidth : 2,
+      isSelected ? selectedStrokeAlpha : 0.9
     );
 
-    if (!isSelected || isDraftingRoom) continue;
+    if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
     const hoveredWall =
@@ -808,6 +860,45 @@ function drawRooms(
   }
 }
 
+function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
+  if (!transformFeedback) return rooms;
+
+  const transformedPoints = getRenderedTransformRoomPoints(transformFeedback);
+  if (!transformedPoints) return rooms;
+
+  return rooms.map((room) =>
+    room.id === transformFeedback.roomId
+      ? {
+          ...room,
+          points: transformedPoints,
+        }
+      : room
+  );
+}
+
+function getRenderedTransformRoomPoints(transformFeedback: TransformFeedback): Point[] | null {
+  if (transformFeedback.phase === "active") {
+    return transformFeedback.originalPoints;
+  }
+
+  if (transformFeedback.phase === "settling" && transformFeedback.settleTarget?.points) {
+    return interpolatePointLists(
+      transformFeedback.originalPoints,
+      transformFeedback.settleTarget.points,
+      getTransformRoomEase(transformFeedback)
+    );
+  }
+
+  return transformFeedback.previewPoints;
+}
+
+function getTransformRoomEase(transformFeedback: TransformFeedback) {
+  if (transformFeedback.phase !== "settling") return 1;
+  return easeOutCubic(
+    getTransformSettlingProgress(transformFeedback, performance.now()).roomProgress
+  );
+}
+
 function drawRoomShape(
   graphics: Graphics,
   points: Point[],
@@ -842,6 +933,101 @@ function drawRoomShape(
   }
   graphics.closePath();
   graphics.stroke();
+}
+
+function drawTransformDestinationPreview(
+  graphics: Graphics,
+  points: Point[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme,
+  alpha: number
+) {
+  const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
+
+  graphics.setFillStyle({
+    color: theme.interactiveAccent,
+    alpha: 0.055 * alpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let index = 1; index < screenPoints.length; index += 1) {
+    graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+
+  graphics.setStrokeStyle({
+    width: 11,
+    color: theme.interactiveAccent,
+    alpha: 0.12 * alpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let index = 1; index < screenPoints.length; index += 1) {
+    graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+
+  graphics.setStrokeStyle({
+    width: 5.5,
+    color: theme.interactiveAccent,
+    alpha: 0.2 * alpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let index = 1; index < screenPoints.length; index += 1) {
+    graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+
+  graphics.setStrokeStyle({
+    width: 1.9,
+    color: theme.interactiveAccent,
+    alpha: 0.82 * alpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let index = 1; index < screenPoints.length; index += 1) {
+    graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+}
+
+function getTransformSettlingProgress(transformFeedback: TransformFeedback, nowMs: number) {
+  const elapsed = Math.max(0, nowMs - transformFeedback.phaseStartedAtMs);
+
+  return {
+    roomProgress: Math.min(1, elapsed / TRANSFORM_SETTLE_ROOM_ANIMATION_MS),
+    previewFadeProgress:
+      elapsed <= TRANSFORM_SETTLE_ROOM_ANIMATION_MS
+        ? 0
+        : Math.min(
+            1,
+            (elapsed - TRANSFORM_SETTLE_ROOM_ANIMATION_MS) / TRANSFORM_SETTLE_PREVIEW_FADE_MS
+          ),
+  };
+}
+
+function interpolatePointLists(from: Point[], to: Point[], t: number): Point[] {
+  if (from.length !== to.length) {
+    return to.map((point) => ({ ...point }));
+  }
+
+  return to.map((targetPoint, index) => {
+    const sourcePoint = from[index];
+    return {
+      x: sourcePoint.x + (targetPoint.x - sourcePoint.x) * t,
+      y: sourcePoint.y + (targetPoint.y - sourcePoint.y) * t,
+    };
+  });
+}
+
+function arePointListsEqual(a: Point[], b: Point[]) {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index].x !== b[index].x || a[index].y !== b[index].y) return false;
+  }
+  return true;
 }
 
 function drawHoveredWallHighlight(
