@@ -29,6 +29,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
+  onRoomMoveGhostChange?: (ghost: { roomId: string; points: Point[] } | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
@@ -74,6 +75,10 @@ export function attachRoomDrawInput(
     if (hoveredRoomLabelId === roomId) return;
     hoveredRoomLabelId = roomId;
     callbacks.onHoveredRoomLabelChange(roomId);
+  };
+
+  const setRoomMoveGhost = (ghost: { roomId: string; points: Point[] } | null) => {
+    callbacks.onRoomMoveGhostChange?.(ghost);
   };
 
   const setCursor = (nextCursor: string) => {
@@ -127,6 +132,7 @@ export function attachRoomDrawInput(
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
+        setRoomMoveGhost(null);
         callbacks.requestRender();
         return;
       }
@@ -141,6 +147,10 @@ export function attachRoomDrawInput(
         }
 
         session.didDrag = true;
+        setRoomMoveGhost({
+          roomId: session.roomId,
+          points: session.startPoints.map((point) => ({ ...point })),
+        });
         updateCursor();
       }
 
@@ -262,6 +272,7 @@ export function attachRoomDrawInput(
       store.getState().commitRoomMove(session.roomId, session.startPoints, nextPoints);
     }
 
+    setRoomMoveGhost(null);
     stopLabelDragSession();
 
     const state = store.getState();
@@ -283,6 +294,7 @@ export function attachRoomDrawInput(
         .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
 
+    setRoomMoveGhost(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
     callbacks.requestRender();
@@ -336,6 +348,7 @@ export function attachRoomDrawInput(
         .getState()
         .previewRoomMove(activeLabelDragSession.roomId, activeLabelDragSession.startPoints);
     }
+    setRoomMoveGhost(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
     updateCursor();
@@ -361,6 +374,7 @@ export function attachRoomDrawInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    setRoomMoveGhost(null);
     stopLabelDragSession();
     canvas.style.cursor = "";
   };

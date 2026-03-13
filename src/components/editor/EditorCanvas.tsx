@@ -70,6 +70,7 @@ export default function EditorCanvas() {
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
+  const roomMoveGhostRef = useRef<{ roomId: string; points: Point[] } | null>(null);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -238,6 +239,7 @@ export default function EditorCanvas() {
       state.roomDraft.points.length > 0,
       exportCamera,
       exportViewport,
+      null,
       editorThemeRef.current
     );
     drawRoomLabels(
@@ -396,6 +398,7 @@ export default function EditorCanvas() {
         cursorWorldRef.current,
         hoveredRoomLabelIdRef.current,
         roomResizeUiRef.current,
+        roomMoveGhostRef.current,
         editorThemeRef.current
       );
 
@@ -415,6 +418,7 @@ export default function EditorCanvas() {
           cursorWorldRef.current,
           hoveredRoomLabelIdRef.current,
           roomResizeUiRef.current,
+          roomMoveGhostRef.current,
           editorThemeRef.current
         );
       });
@@ -442,6 +446,7 @@ export default function EditorCanvas() {
             cursorWorldRef.current,
             hoveredRoomLabelIdRef.current,
             roomResizeUiRef.current,
+            roomMoveGhostRef.current,
             editorThemeRef.current
           );
         },
@@ -452,6 +457,9 @@ export default function EditorCanvas() {
         },
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
+        },
+        onRoomMoveGhostChange: (ghost) => {
+          roomMoveGhostRef.current = ghost;
         },
         onRoomLabelSelected: () => {
           if (activeHintIdRef.current !== "select-room-by-name") return;
@@ -467,6 +475,7 @@ export default function EditorCanvas() {
             cursorWorldRef.current,
             hoveredRoomLabelIdRef.current,
             roomResizeUiRef.current,
+            roomMoveGhostRef.current,
             editorThemeRef.current
           );
         },
@@ -486,6 +495,7 @@ export default function EditorCanvas() {
         roomRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
+        roomMoveGhostRef.current = null;
       };
     }
 
@@ -522,6 +532,7 @@ export default function EditorCanvas() {
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
       roomResizeUiRef.current,
+      roomMoveGhostRef.current,
       editorTheme
     );
   }, [editorTheme]);
@@ -593,6 +604,7 @@ function drawScene(
     activeCorner: RectCorner | null;
     activeRoomId: string | null;
   },
+  roomMoveGhost: { roomId: string; points: Point[] } | null,
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
@@ -604,6 +616,7 @@ function drawScene(
     state.roomDraft.points.length > 0,
     state.camera,
     state.viewport,
+    roomMoveGhost,
     theme
   );
   drawRoomLabels(
@@ -676,37 +689,37 @@ function drawRooms(
   isDraftingRoom: boolean,
   camera: CameraState,
   viewport: ViewportSize,
+  roomMoveGhost: { roomId: string; points: Point[] } | null,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
 
+  if (roomMoveGhost && roomMoveGhost.points.length >= 3) {
+    drawRoomShape(
+      graphics,
+      roomMoveGhost.points,
+      camera,
+      viewport,
+      theme.interactiveAccent,
+      0.075,
+      1.75,
+      0.48
+    );
+  }
+
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId;
-    const screenPoints = room.points.map((point) => worldToScreen(point, camera, viewport));
-
-    graphics.setFillStyle({
-      color: theme.roomFill,
-      alpha: isSelected ? 0.2 : 0.12,
-    });
-    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
-    for (let i = 1; i < screenPoints.length; i += 1) {
-      graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
-    }
-    graphics.closePath();
-    graphics.fill();
-
-    graphics.setStrokeStyle({
-      width: isSelected ? 2.5 : 2,
-      color: isSelected ? theme.roomSelectionOutline : theme.roomOutline,
-      alpha: isSelected ? 1 : 0.9,
-    });
-    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
-    for (let i = 1; i < screenPoints.length; i += 1) {
-      graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
-    }
-    graphics.closePath();
-    graphics.stroke();
+    drawRoomShape(
+      graphics,
+      room.points,
+      camera,
+      viewport,
+      isSelected ? theme.roomSelectionOutline : theme.roomOutline,
+      isSelected ? 0.2 : 0.12,
+      isSelected ? 2.5 : 2,
+      isSelected ? 1 : 0.9
+    );
 
     if (!isSelected || isDraftingRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
@@ -793,6 +806,42 @@ function drawRooms(
       graphics.stroke();
     }
   }
+}
+
+function drawRoomShape(
+  graphics: Graphics,
+  points: Point[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  strokeColor: number,
+  fillAlpha: number,
+  strokeWidth: number,
+  strokeAlpha: number
+) {
+  const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
+
+  graphics.setFillStyle({
+    color: strokeColor,
+    alpha: fillAlpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let i = 1; i < screenPoints.length; i += 1) {
+    graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+
+  graphics.setStrokeStyle({
+    width: strokeWidth,
+    color: strokeColor,
+    alpha: strokeAlpha,
+  });
+  graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+  for (let i = 1; i < screenPoints.length; i += 1) {
+    graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
 }
 
 function drawHoveredWallHighlight(
