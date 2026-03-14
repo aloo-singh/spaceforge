@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/stores/editorStore";
@@ -15,6 +17,7 @@ export function SelectedRoomNamePanel() {
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
+  const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
     (state) => state.consumeSelectedRoomNameInputFocusRequest
   );
@@ -133,6 +136,19 @@ export function SelectedRoomNamePanel() {
         </Keycap>
         <span>cancel</span>
       </p>
+      <div className="mt-3 flex justify-end">
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={deleteSelectedRoom}
+          className="gap-2"
+          aria-label={`Delete ${selectedRoom.name}`}
+        >
+          <Trash2 />
+          Delete room
+        </Button>
+      </div>
     </aside>
   );
 }

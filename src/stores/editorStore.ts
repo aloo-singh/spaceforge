@@ -70,6 +70,7 @@ type EditorState = {
   updateRoomRenameDraft: (roomId: string, name: string) => void;
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
+  deleteSelectedRoom: () => void;
   updateRoomName: (roomId: string, name: string) => void;
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
@@ -419,6 +420,45 @@ export const useEditorStore = create<EditorState>((set) => ({
         selectedRoomId: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+      };
+    }),
+  deleteSelectedRoom: () =>
+    set((state) => {
+      const selectedRoomId = state.selectedRoomId;
+      if (!selectedRoomId) return state;
+
+      const previousIndex = state.document.rooms.findIndex((room) => room.id === selectedRoomId);
+      if (previousIndex < 0) {
+        return {
+          selectedRoomId: null,
+          shouldFocusSelectedRoomNameInput: false,
+          renameSession: null,
+        };
+      }
+
+      const room = state.document.rooms[previousIndex];
+      const command: EditorCommand = {
+        type: "delete-room",
+        room: {
+          id: room.id,
+          name: room.name,
+          points: room.points.map((point) => ({ ...point })),
+        },
+        previousIndex,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: null,
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
       };
     }),
   updateRoomName: (roomId, name) =>

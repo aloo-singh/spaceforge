@@ -10,6 +10,11 @@ export type EditorCommand =
       room: Room;
     }
   | {
+      type: "delete-room";
+      room: Room;
+      previousIndex: number;
+    }
+  | {
       type: "rename-room";
       roomId: string;
       previousName: string;
@@ -42,6 +47,26 @@ export function applyEditorCommand(
 
     return {
       rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
+    };
+  }
+
+  if (command.type === "delete-room") {
+    if (direction === "undo") {
+      const roomsWithoutDeletedRoom = document.rooms.filter((room) => room.id !== command.room.id);
+      const nextRooms = [...roomsWithoutDeletedRoom];
+      nextRooms.splice(command.previousIndex, 0, {
+        id: command.room.id,
+        name: command.room.name,
+        points: command.room.points.map((point) => ({ ...point })),
+      });
+
+      return {
+        rooms: nextRooms,
+      };
+    }
+
+    return {
+      rooms: document.rooms.filter((room) => room.id !== command.room.id),
     };
   }
 
