@@ -5,7 +5,11 @@ import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
-import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometry";
+import {
+  getOrthogonalSnappedPoint,
+  getRectangleClosingPoint,
+  snapPointToGrid,
+} from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import {
   getRoomLabelLayout,
@@ -42,17 +46,24 @@ import {
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
 import {
+  formatMetricWallDimension,
+  getRectResizeMeasurements,
+  getCornerResizeMeasurements,
+  getWallResizeMeasurementMillimetres,
+} from "@/lib/editor/measurements";
+import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
   TRANSFORM_SETTLE_ROOM_ANIMATION_MS,
   TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
-import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
+import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
+import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -64,6 +75,23 @@ const EMPTY_ROOM_RESIZE_UI = {
 } as const;
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
+const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
+const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
+const RESIZE_DIMENSION_FONT_WEIGHT = "500";
+const RESIZE_DIMENSION_LETTER_SPACING_PX = 0.2;
+const RESIZE_DIMENSION_PADDING_X_PX = 8;
+const RESIZE_DIMENSION_PADDING_Y_PX = 4;
+const RESIZE_DIMENSION_RADIUS_PX = 8;
+const RESIZE_DIMENSION_EDGE_OFFSET_PX = 18;
+const RESIZE_DIMENSION_VIEWPORT_MARGIN_PX = 10;
+const RESIZE_DIMENSION_LABEL_GAP_PX = 12;
+const RESIZE_DIMENSION_MIN_SHORT_WALL_PX = 96;
+const RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX = 20;
+const RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX = 8;
+const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
+const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
+const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
+const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -72,6 +100,7 @@ export default function EditorCanvas() {
   const roomRef = useRef<Graphics | null>(null);
   const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
+  const dimensionOverlayRef = useRef<Container | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const roomResizeUiRef = useRef<{
@@ -128,13 +157,15 @@ export default function EditorCanvas() {
     const rooms = roomRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
-    if (!grid || !rooms || !roomLabels || !draft) return;
+    const dimensionOverlay = dimensionOverlayRef.current;
+    if (!grid || !rooms || !roomLabels || !draft || !dimensionOverlay) return;
 
     drawScene(
       grid,
       rooms,
       roomLabels,
       draft,
+      dimensionOverlay,
       useEditorStore.getState(),
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
@@ -473,14 +504,17 @@ export default function EditorCanvas() {
       const rooms = new Graphics();
       const roomLabels = new Container();
       const draft = new Graphics();
+      const dimensionOverlay = new Container();
       gridRef.current = grid;
       roomRef.current = rooms;
       roomLabelRef.current = roomLabels;
       draftRef.current = draft;
+      dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
       app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
+      app.stage.addChild(dimensionOverlay);
 
       const syncViewport = () => {
         useEditorStore.getState().setViewport(app.screen.width, app.screen.height);
@@ -550,6 +584,7 @@ export default function EditorCanvas() {
         roomRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
+        dimensionOverlayRef.current = null;
         setTransformFeedback(null);
         stopTransformAnimation();
       };
@@ -633,6 +668,7 @@ function drawScene(
   roomGraphics: Graphics,
   roomLabelContainer: Container,
   draftGraphics: Graphics,
+  dimensionOverlayContainer: Container,
   state: EditorSnapshot,
   cursorWorld: Point | null,
   hoveredRoomLabelId: string | null,
@@ -649,6 +685,10 @@ function drawScene(
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
   const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
+  const renderedLabelRooms = getRenderedRoomsForLabelTransform(
+    state.document.rooms,
+    transformFeedback
+  );
   drawRooms(
     roomGraphics,
     renderedRooms,
@@ -662,12 +702,29 @@ function drawScene(
   );
   drawRoomLabels(
     roomLabelContainer,
-    getRenderedRoomsForLabelTransform(state.document.rooms, transformFeedback),
+    renderedLabelRooms,
     state.selectedRoomId,
     hoveredRoomLabelId,
     state.camera,
     state.viewport,
     transformFeedback,
+    theme
+  );
+  clearContainerChildren(dimensionOverlayContainer);
+  drawActiveResizeDimensions(
+    dimensionOverlayContainer,
+    renderedLabelRooms,
+    roomResizeUi,
+    state.camera,
+    state.viewport,
+    theme
+  );
+  drawDraftDimensions(
+    dimensionOverlayContainer,
+    state.roomDraft.points,
+    cursorWorld,
+    state.camera,
+    state.viewport,
     theme
   );
   drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
@@ -1125,8 +1182,7 @@ function drawRoomLabels(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
-  const staleLabels = labelContainer.removeChildren();
-  staleLabels.forEach((label) => label.destroy());
+  clearContainerChildren(labelContainer);
 
   for (const room of rooms) {
     const layout = getRoomLabelLayout(room, camera, viewport);
@@ -1225,8 +1281,571 @@ function drawRoomLabels(
       isActiveResizeRoom ? 1.02 : isSettlingResizeRoom ? 1 + 0.02 * resizeMotionEase : 1
     );
     labelContainer.addChild(areaText);
+    }
+  }
+
+}
+
+type ResizeDimensionLabelSpec = {
+  text: string;
+  wall: RectWall;
+  axis: "horizontal" | "vertical";
+  center: ScreenPoint;
+  outwardDirection: ScreenPoint;
+  tangentDirection: ScreenPoint;
+  wallLengthPx: number;
+};
+
+type ResizeDimensionLabelLayout = {
+  text: string;
+  center: ScreenPoint;
+  outwardDirection: ScreenPoint;
+  tangentDirection: ScreenPoint;
+  width: number;
+  height: number;
+};
+
+function drawActiveResizeDimensions(
+  labelContainer: Container,
+  rooms: Room[],
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
+    activeRoomId: string | null;
+  },
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  if (!roomResizeUi.activeRoomId) return;
+  if (!roomResizeUi.activeWall && !roomResizeUi.activeCorner) return;
+
+  const activeRoom = rooms.find((room) => room.id === roomResizeUi.activeRoomId);
+  if (!activeRoom) return;
+
+  const bounds = getAxisAlignedRoomBounds(activeRoom);
+  if (!bounds) return;
+
+  const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport);
+  const labelSpecs = getResizeDimensionLabelSpecs(
+    activeRoom,
+    bounds,
+    roomResizeUi.activeWall,
+    roomResizeUi.activeCorner,
+    camera,
+    viewport
+  );
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    labelSpecs,
+    roomLabelLayout,
+    viewport
+  );
+  drawDimensionLabels(labelContainer, labelLayouts, theme);
+}
+
+function drawDraftDimensions(
+  labelContainer: Container,
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const firstSegmentLabelSpec = getDraftFirstSegmentDimensionLabelSpec(
+    draftPoints,
+    cursorWorld,
+    camera,
+    viewport
+  );
+  if (firstSegmentLabelSpec) {
+    const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+      [firstSegmentLabelSpec],
+      null,
+      viewport
+    );
+    drawDimensionLabels(labelContainer, labelLayouts, theme);
+    return;
+  }
+
+  const draftPreviewRoom = getDraftPreviewRoom(draftPoints, cursorWorld);
+  if (!draftPreviewRoom) return;
+
+  const bounds = getAxisAlignedRoomBounds(draftPreviewRoom);
+  if (!bounds) return;
+
+  const measurements = getRectResizeMeasurements(draftPreviewRoom);
+  if (!measurements) return;
+  const draftDimensionWalls = getDraftDimensionWalls(draftPoints, draftPreviewRoom);
+
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    [
+      createDimensionLabelSpecForWallMeasurement(
+        draftDimensionWalls.horizontalWall,
+        measurements.widthMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+      createDimensionLabelSpecForWallMeasurement(
+        draftDimensionWalls.verticalWall,
+        measurements.heightMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+    ],
+    null,
+    viewport
+  );
+
+  drawDimensionLabels(labelContainer, labelLayouts, theme);
+}
+
+function drawDimensionLabels(
+  labelContainer: Container,
+  labelLayouts: ResizeDimensionLabelLayout[],
+  theme: EditorCanvasTheme
+) {
+  for (const labelLayout of labelLayouts) {
+    const textResolution = getTextResolution();
+    const text = new Text({
+      text: labelLayout.text,
+      resolution: textResolution,
+      style: {
+        fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
+        fontSize: RESIZE_DIMENSION_FONT_SIZE_PX,
+        fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
+        fill: theme.roomLabelFill,
+        stroke: {
+          color: theme.roomLabelStroke,
+          width: 1.75,
+          join: "round",
+        },
+        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX,
+      },
+    });
+
+    const pill = new Graphics();
+    const left = snapToPixel(labelLayout.center.x - labelLayout.width / 2, textResolution);
+    const top = snapToPixel(labelLayout.center.y - labelLayout.height / 2, textResolution);
+    const width = snapToPixel(labelLayout.width, textResolution);
+    const height = snapToPixel(labelLayout.height, textResolution);
+    pill.setFillStyle({ color: theme.roomLabelPillFill, alpha: RESIZE_DIMENSION_ACTIVE_FILL_ALPHA });
+    pill.roundRect(left, top, width, height, RESIZE_DIMENSION_RADIUS_PX);
+    pill.fill();
+    pill.setStrokeStyle({
+      width: 1.1,
+      color: theme.roomLabelPillSelectedStroke,
+      alpha: RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
+    });
+    pill.roundRect(left, top, width, height, RESIZE_DIMENSION_RADIUS_PX);
+    pill.stroke();
+    labelContainer.addChild(pill);
+
+    text.roundPixels = true;
+    text.anchor.set(0.5);
+    text.position.set(
+      snapToPixel(labelLayout.center.x, textResolution),
+      snapToPixel(labelLayout.center.y, textResolution)
+    );
+    text.alpha = RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA;
+    labelContainer.addChild(text);
   }
 }
+
+function getResizeDimensionLabelSpecs(
+  room: Room,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  activeWall: RectWall | null,
+  activeCorner: RectCorner | null,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec[] {
+  if (activeWall) {
+    const measurement = getWallResizeMeasurementMillimetres(room, activeWall);
+    if (measurement === null) return [];
+
+    return [createDimensionLabelSpecForWallMeasurement(activeWall, measurement, bounds, camera, viewport)];
+  }
+
+  if (activeCorner) {
+    const measurements = getCornerResizeMeasurements(room, activeCorner);
+    if (!measurements) return [];
+
+    const { horizontalWall, verticalWall } = getResizeWallsForCorner(activeCorner);
+
+    return [
+      createDimensionLabelSpecForWallMeasurement(
+        horizontalWall,
+        measurements.widthMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+      createDimensionLabelSpecForWallMeasurement(
+        verticalWall,
+        measurements.heightMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+    ];
+  }
+
+  return [];
+}
+
+function getResizeWallsForCorner(corner: RectCorner): {
+  horizontalWall: Extract<RectWall, "top" | "bottom">;
+  verticalWall: Extract<RectWall, "left" | "right">;
+} {
+  switch (corner) {
+    case "top-left":
+      return { horizontalWall: "top", verticalWall: "left" };
+    case "top-right":
+      return { horizontalWall: "top", verticalWall: "right" };
+    case "bottom-right":
+      return { horizontalWall: "bottom", verticalWall: "right" };
+    case "bottom-left":
+      return { horizontalWall: "bottom", verticalWall: "left" };
+  }
+}
+
+function createDimensionLabelSpecForWallMeasurement(
+  wall: RectWall,
+  lengthMillimetres: number,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec {
+  return {
+    text: formatMetricWallDimension(lengthMillimetres),
+    wall,
+    axis: wall === "top" || wall === "bottom" ? "horizontal" : "vertical",
+    ...getResizeDimensionAnchorForWall(bounds, wall, camera, viewport),
+  };
+}
+
+function getResizeDimensionAnchorForWall(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize
+): Pick<
+  ResizeDimensionLabelSpec,
+  "center" | "outwardDirection" | "tangentDirection" | "wallLengthPx"
+> {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+  const horizontalWallLengthPx = Math.abs(topRight.x - topLeft.x);
+  const verticalWallLengthPx = Math.abs(bottomLeft.y - topLeft.y);
+
+  const getEdgeOffsetPx = (wallLengthPx: number) =>
+    wallLengthPx < RESIZE_DIMENSION_MIN_SHORT_WALL_PX
+      ? RESIZE_DIMENSION_EDGE_OFFSET_PX + RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX
+      : RESIZE_DIMENSION_EDGE_OFFSET_PX;
+
+  switch (wall) {
+    case "top":
+      return {
+        center: {
+          x: (topLeft.x + topRight.x) / 2,
+          y: topLeft.y - getEdgeOffsetPx(horizontalWallLengthPx),
+        },
+        outwardDirection: { x: 0, y: -1 },
+        tangentDirection: { x: 1, y: 0 },
+        wallLengthPx: horizontalWallLengthPx,
+      };
+    case "right":
+      return {
+        center: {
+          x: topRight.x + getEdgeOffsetPx(verticalWallLengthPx),
+          y: (topRight.y + bottomRight.y) / 2,
+        },
+        outwardDirection: { x: 1, y: 0 },
+        tangentDirection: { x: 0, y: 1 },
+        wallLengthPx: verticalWallLengthPx,
+      };
+    case "bottom":
+      return {
+        center: {
+          x: (bottomLeft.x + bottomRight.x) / 2,
+          y: bottomLeft.y + getEdgeOffsetPx(horizontalWallLengthPx),
+        },
+        outwardDirection: { x: 0, y: 1 },
+        tangentDirection: { x: 1, y: 0 },
+        wallLengthPx: horizontalWallLengthPx,
+      };
+    case "left":
+      return {
+        center: {
+          x: topLeft.x - getEdgeOffsetPx(verticalWallLengthPx),
+          y: (topLeft.y + bottomLeft.y) / 2,
+        },
+        outwardDirection: { x: -1, y: 0 },
+        tangentDirection: { x: 0, y: 1 },
+        wallLengthPx: verticalWallLengthPx,
+      };
+  }
+}
+
+function getResolvedResizeDimensionLabelLayouts(
+  labelSpecs: ResizeDimensionLabelSpec[],
+  roomLabelLayout: ReturnType<typeof getRoomLabelLayout>,
+  viewport: ViewportSize
+): ResizeDimensionLabelLayout[] {
+  const textResolution = getTextResolution();
+  const labelLayouts = labelSpecs.map<ResizeDimensionLabelLayout>((labelSpec) => {
+    const measurementText = new Text({
+      text: labelSpec.text,
+      resolution: textResolution,
+      style: {
+        fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
+        fontSize: RESIZE_DIMENSION_FONT_SIZE_PX,
+        fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
+        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX,
+      },
+    });
+    const width = measurementText.width + RESIZE_DIMENSION_PADDING_X_PX * 2;
+    const height = measurementText.height + RESIZE_DIMENSION_PADDING_Y_PX * 2;
+    measurementText.destroy();
+
+    return {
+      text: labelSpec.text,
+      center: clampResizeDimensionLabelCenter(labelSpec.center, width, height, viewport),
+      outwardDirection: labelSpec.outwardDirection,
+      tangentDirection: labelSpec.tangentDirection,
+      width,
+      height,
+    };
+  }).filter((_, index) => labelSpecs[index].wallLengthPx >= RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX);
+
+  if (roomLabelLayout) {
+    for (let index = 0; index < labelLayouts.length; index += 1) {
+      labelLayouts[index] = nudgeResizeDimensionLabelAwayFromRect(
+        labelLayouts[index],
+        roomLabelLayout,
+        viewport,
+        roomLabelLayout.height + RESIZE_DIMENSION_LABEL_GAP_PX
+      );
+    }
+  }
+
+  for (let index = 0; index < labelLayouts.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < labelLayouts.length; otherIndex += 1) {
+      if (!rectsOverlap(getCenteredRectFromLayout(labelLayouts[index]), getCenteredRectFromLayout(labelLayouts[otherIndex]))) {
+        continue;
+      }
+
+      labelLayouts[index] = nudgeResizeDimensionLabel(
+        labelLayouts[index],
+        {
+          x: -labelLayouts[index].tangentDirection.x,
+          y: -labelLayouts[index].tangentDirection.y,
+        },
+        viewport,
+        RESIZE_DIMENSION_CORNER_SEPARATION_PX
+      );
+      labelLayouts[otherIndex] = nudgeResizeDimensionLabel(
+        labelLayouts[otherIndex],
+        labelLayouts[otherIndex].tangentDirection,
+        viewport,
+        RESIZE_DIMENSION_CORNER_SEPARATION_PX
+      );
+    }
+  }
+
+  return labelLayouts;
+}
+
+function nudgeResizeDimensionLabelAwayFromRect(
+  labelLayout: ResizeDimensionLabelLayout,
+  rect: { left: number; right: number; top: number; bottom: number },
+  viewport: ViewportSize,
+  distancePx: number
+): ResizeDimensionLabelLayout {
+  if (!rectsOverlap(getCenteredRectFromLayout(labelLayout), rect)) {
+    return labelLayout;
+  }
+
+  return nudgeResizeDimensionLabel(
+    labelLayout,
+    labelLayout.outwardDirection,
+    viewport,
+    distancePx
+  );
+}
+
+function nudgeResizeDimensionLabel(
+  labelLayout: ResizeDimensionLabelLayout,
+  direction: ScreenPoint,
+  viewport: ViewportSize,
+  distancePx: number
+): ResizeDimensionLabelLayout {
+  return {
+    ...labelLayout,
+    center: clampResizeDimensionLabelCenter(
+      {
+        x: labelLayout.center.x + direction.x * distancePx,
+        y: labelLayout.center.y + direction.y * distancePx,
+      },
+      labelLayout.width,
+      labelLayout.height,
+      viewport
+    ),
+  };
+}
+
+function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): Room | null {
+  if (!cursorWorld) return null;
+  if (draftPoints.length < 2) return null;
+
+  if (draftPoints.length === 2) {
+    const previewThirdPoint = getOrthogonalSnappedPoint(
+      draftPoints[draftPoints.length - 1],
+      cursorWorld,
+      GRID_SIZE_MM
+    );
+    const previewPoints = [...draftPoints, previewThirdPoint];
+    const closingPoint = getRectangleClosingPoint(previewPoints);
+    if (!closingPoint) return null;
+
+    return {
+      id: "__draft-preview__",
+      name: "",
+      points: [...previewPoints, closingPoint],
+    };
+  }
+
+  if (draftPoints.length === 3) {
+    const closingPoint = getRectangleClosingPoint(draftPoints);
+    if (!closingPoint) return null;
+
+    return {
+      id: "__draft-preview__",
+      name: "",
+      points: [...draftPoints, closingPoint],
+    };
+  }
+
+  return null;
+}
+
+function getDraftDimensionWalls(
+  draftPoints: Point[],
+  draftPreviewRoom: Room
+): {
+  horizontalWall: Extract<RectWall, "top" | "bottom">;
+  verticalWall: Extract<RectWall, "left" | "right">;
+} {
+  const [firstPoint, secondPoint, thirdPoint = draftPreviewRoom.points[2]] = draftPreviewRoom.points;
+
+  if (firstPoint.y === secondPoint.y) {
+    return {
+      horizontalWall: thirdPoint.y > firstPoint.y ? "top" : "bottom",
+      verticalWall: secondPoint.x > firstPoint.x ? "right" : "left",
+    };
+  }
+
+  return {
+    horizontalWall: secondPoint.y > firstPoint.y ? "bottom" : "top",
+    verticalWall: thirdPoint.x > firstPoint.x ? "left" : "right",
+  };
+}
+
+function clearContainerChildren(container: Container) {
+  const staleChildren = container.removeChildren();
+  staleChildren.forEach((child) => child.destroy());
+}
+
+function getDraftFirstSegmentDimensionLabelSpec(
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec | null {
+  if (!cursorWorld || draftPoints.length !== 1) return null;
+
+  const anchorPoint = draftPoints[0];
+  const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, GRID_SIZE_MM);
+  if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
+
+  const startScreen = worldToScreen(anchorPoint, camera, viewport);
+  const endScreen = worldToScreen(previewPoint, camera, viewport);
+  const isHorizontal = startScreen.y === endScreen.y;
+  const wall: RectWall =
+    isHorizontal
+      ? startScreen.x <= endScreen.x
+        ? "bottom"
+        : "top"
+      : startScreen.y <= endScreen.y
+        ? "right"
+        : "left";
+
+  return {
+    text: formatMetricWallDimension(getRectSegmentLengthMillimetres(anchorPoint, previewPoint)),
+    wall,
+    axis: isHorizontal ? "horizontal" : "vertical",
+    center: {
+      x: (startScreen.x + endScreen.x) / 2,
+      y: (startScreen.y + endScreen.y) / 2,
+    },
+    outwardDirection: isHorizontal
+      ? { x: 0, y: wall === "bottom" ? 1 : -1 }
+      : { x: wall === "right" ? 1 : -1, y: 0 },
+    tangentDirection: isHorizontal ? { x: 1, y: 0 } : { x: 0, y: 1 },
+    wallLengthPx: isHorizontal ? Math.abs(endScreen.x - startScreen.x) : Math.abs(endScreen.y - startScreen.y),
+  };
+}
+
+function getRectSegmentLengthMillimetres(start: Point, end: Point) {
+  return Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+}
+
+function clampResizeDimensionLabelCenter(
+  center: ScreenPoint,
+  width: number,
+  height: number,
+  viewport: ViewportSize
+): ScreenPoint {
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+
+  return {
+    x: Math.min(
+      viewport.width - RESIZE_DIMENSION_VIEWPORT_MARGIN_PX - halfWidth,
+      Math.max(RESIZE_DIMENSION_VIEWPORT_MARGIN_PX + halfWidth, center.x)
+    ),
+    y: Math.min(
+      viewport.height - RESIZE_DIMENSION_VIEWPORT_MARGIN_PX - halfHeight,
+      Math.max(RESIZE_DIMENSION_VIEWPORT_MARGIN_PX + halfHeight, center.y)
+    ),
+  };
+}
+
+function getCenteredRect(center: ScreenPoint, width: number, height: number) {
+  return {
+    left: center.x - width / 2,
+    right: center.x + width / 2,
+    top: center.y - height / 2,
+    bottom: center.y + height / 2,
+  };
+}
+
+function getCenteredRectFromLayout(labelLayout: ResizeDimensionLabelLayout) {
+  return getCenteredRect(labelLayout.center, labelLayout.width, labelLayout.height);
+}
+
+function rectsOverlap(
+  a: { left: number; right: number; top: number; bottom: number },
+  b: { left: number; right: number; top: number; bottom: number }
+) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
 function drawDraft(

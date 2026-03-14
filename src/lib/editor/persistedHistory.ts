@@ -186,7 +186,7 @@ export function buildPersistedHistorySnapshot(
   document: EditorDocumentState,
   history: HydratedCommandHistory,
   limit: number
-): PersistedHistorySnapshot {
+): PersistedHistorySnapshot | null {
   const rootDocument = history.past
     .slice()
     .reverse()
@@ -210,7 +210,7 @@ export function buildPersistedHistorySnapshot(
     },
     limit,
     document
-  )!;
+  );
 }
 
 export function hydrateCommandHistoryFromSnapshots(
