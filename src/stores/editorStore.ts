@@ -186,12 +186,32 @@ function createInitialCameraState(): CameraState {
   return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
 }
 
-let activeResetCameraAnimationFrame: number | null = null;
+type ActiveResetCameraAnimation = {
+  frameId: number;
+  sequence: number;
+  targetCamera: CameraState;
+};
+
+let activeResetCameraAnimation: ActiveResetCameraAnimation | null = null;
+let nextResetCameraAnimationSequence = 0;
 
 function stopResetCameraAnimation() {
-  if (activeResetCameraAnimationFrame === null || typeof window === "undefined") return;
-  window.cancelAnimationFrame(activeResetCameraAnimationFrame);
-  activeResetCameraAnimationFrame = null;
+  nextResetCameraAnimationSequence += 1;
+
+  if (!activeResetCameraAnimation || typeof window === "undefined") {
+    activeResetCameraAnimation = null;
+    return;
+  }
+
+  window.cancelAnimationFrame(activeResetCameraAnimation.frameId);
+  activeResetCameraAnimation = null;
+}
+
+function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean {
+  return (
+    activeResetCameraAnimation !== null &&
+    areCamerasEqual(activeResetCameraAnimation.targetCamera, targetCamera)
+  );
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -597,8 +617,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   resetCamera: () => {
-    stopResetCameraAnimation();
-
     const state = get();
     const targetCamera = getCameraFitTarget({
       rooms: state.document.rooms,
@@ -607,6 +625,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }).camera;
 
     if (areCamerasEqual(state.camera, targetCamera)) return;
+    if (hasActiveResetCameraAnimationTarget(targetCamera)) return;
+
+    stopResetCameraAnimation();
+
     if (typeof window === "undefined") {
       set({ camera: targetCamera });
       return;
@@ -614,8 +636,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const startCamera = state.camera;
     const startTime = window.performance.now();
+    const sequence = nextResetCameraAnimationSequence;
 
     const step = (now: number) => {
+      if (activeResetCameraAnimation?.sequence !== sequence) return;
+
       const elapsedMs = now - startTime;
       const progress = Math.min(1, elapsedMs / RESET_CAMERA_TRANSITION_DURATION_MS);
       const easedProgress = easeResetCameraTransition(progress);
@@ -627,14 +652,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ camera: nextCamera });
 
       if (progress >= 1) {
-        activeResetCameraAnimationFrame = null;
+        activeResetCameraAnimation = null;
         return;
       }
 
-      activeResetCameraAnimationFrame = window.requestAnimationFrame(step);
+      activeResetCameraAnimation = {
+        frameId: window.requestAnimationFrame(step),
+        sequence,
+        targetCamera,
+      };
     };
 
-    activeResetCameraAnimationFrame = window.requestAnimationFrame(step);
+    activeResetCameraAnimation = {
+      frameId: window.requestAnimationFrame(step),
+      sequence,
+      targetCamera,
+    };
   },
   resetCanvas: () => {
     stopResetCameraAnimation();

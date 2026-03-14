@@ -46,6 +46,12 @@ export function HistoryControls({
   const normalizedSignature = normalizeExportSignature(exportSignatureText);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
+  const resetCameraTitle = !hasHydrated
+    ? "Fit view is unavailable until the editor finishes loading"
+    : hasRooms
+      ? "Fit all rooms into view"
+      : "Add a room to enable fit view";
+  const resetCameraAriaLabel = hasRooms ? "Fit all rooms into view" : "Fit view unavailable";
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -60,13 +66,15 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="icon-sm"
+            size="sm"
             onClick={resetCamera}
             disabled={isResetCameraDisabled}
-            aria-label="Reset camera to fit all rooms"
-            title="Reset camera"
+            aria-label={resetCameraAriaLabel}
+            title={resetCameraTitle}
+            className="gap-2"
           >
             <LocateFixed />
+            Fit View
           </Button>
           <Button
             type="button"
