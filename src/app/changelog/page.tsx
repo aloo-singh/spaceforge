@@ -10,6 +10,37 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.16.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Live wall dimensions
+              </h3>
+              <p className="mt-2">
+                Wall dimensions now appear during drawing and resize, giving clear live
+                measurement feedback without cluttering the canvas.
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added metric wall dimension calculation and formatting helpers</li>
+                <li>Displayed live width and height dimensions while drawing rooms</li>
+                <li>Displayed one live dimension during edge resize</li>
+                <li>Displayed two live dimensions during corner resize</li>
+                <li>Updated dimensions continuously from preview geometry before commit</li>
+                <li>Matched dimension styling to the SpaceForge measurement system</li>
+                <li>
+                  Polished placement, consistency, and readability across active drawing and
+                  resize interactions
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.15.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-14</span>
           </div>

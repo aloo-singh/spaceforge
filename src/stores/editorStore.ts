@@ -26,6 +26,7 @@ import {
 } from "@/lib/editor/editorPersistence";
 import {
   buildPersistedHistorySnapshot,
+  type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
@@ -160,6 +161,27 @@ function getSelectionIfRoomExists(roomId: string | null, document: DocumentState
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
+
+function getSafePersistedHistorySnapshot(
+  document: DocumentState,
+  history: EditorState["history"]
+): PersistedHistorySnapshot {
+  return (
+    buildPersistedHistorySnapshot(document, history, PERSISTED_HISTORY_STATE_LIMIT) ?? {
+      historyStack: [
+        {
+          rooms: document.rooms.map((room) => ({
+            id: room.id,
+            name: room.name,
+            points: room.points.map((point) => ({ ...point })),
+          })),
+        },
+      ],
+      historyIndex: 0,
+    }
+  );
+}
+
 const hydrationSnapshot = loadEditorSnapshotForHydration();
 const hydratedHistoryState =
   hydrationSnapshot?.historyStack && typeof hydrationSnapshot.historyIndex === "number"
@@ -740,11 +762,7 @@ if (typeof window !== "undefined") {
   let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   let lastSavedPersistedSignature = JSON.stringify((() => {
     const state = useEditorStore.getState();
-    const historySnapshot = buildPersistedHistorySnapshot(
-      state.document,
-      state.history,
-      PERSISTED_HISTORY_STATE_LIMIT
-    );
+    const historySnapshot = getSafePersistedHistorySnapshot(state.document, state.history);
 
     return {
       document: state.document,
@@ -757,11 +775,7 @@ if (typeof window !== "undefined") {
   const flushAutosave = () => {
     autosaveTimeout = null;
     const state = useEditorStore.getState();
-    const historySnapshot = buildPersistedHistorySnapshot(
-      state.document,
-      state.history,
-      PERSISTED_HISTORY_STATE_LIMIT
-    );
+    const historySnapshot = getSafePersistedHistorySnapshot(state.document, state.history);
     const nextPersistedSignature = JSON.stringify({
       document: state.document,
       camera: state.camera,

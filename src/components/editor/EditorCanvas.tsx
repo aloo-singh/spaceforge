@@ -685,6 +685,10 @@ function drawScene(
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
   const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
+  const renderedLabelRooms = getRenderedRoomsForLabelTransform(
+    state.document.rooms,
+    transformFeedback
+  );
   drawRooms(
     roomGraphics,
     renderedRooms,
@@ -698,7 +702,7 @@ function drawScene(
   );
   drawRoomLabels(
     roomLabelContainer,
-    getRenderedRoomsForLabelTransform(state.document.rooms, transformFeedback),
+    renderedLabelRooms,
     state.selectedRoomId,
     hoveredRoomLabelId,
     state.camera,
@@ -709,7 +713,7 @@ function drawScene(
   clearContainerChildren(dimensionOverlayContainer);
   drawActiveResizeDimensions(
     dimensionOverlayContainer,
-    renderedRooms,
+    renderedLabelRooms,
     roomResizeUi,
     state.camera,
     state.viewport,
