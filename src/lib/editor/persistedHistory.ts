@@ -48,9 +48,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
-  if (removedRooms.length > 0) return null;
-
   const addedRooms = next.rooms.filter((room) => !previousById.has(room.id));
+
   const changedRooms: Array<{
     previous: Room;
     next: Room;
@@ -69,6 +68,29 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       next: room,
     });
   }
+
+  if (
+    removedRooms.length === 1 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previous.rooms.length - 1 === next.rooms.length
+  ) {
+    const deletedRoom = removedRooms[0];
+    const previousIndex = previous.rooms.findIndex((room) => room.id === deletedRoom.id);
+    if (previousIndex < 0) return null;
+
+    return {
+      type: "delete-room",
+      room: {
+        id: deletedRoom.id,
+        name: deletedRoom.name,
+        points: deletedRoom.points.map((point) => ({ ...point })),
+      },
+      previousIndex,
+    };
+  }
+
+  if (removedRooms.length > 0) return null;
 
   if (addedRooms.length === 1 && changedRooms.length === 0 && previous.rooms.length + 1 === next.rooms.length) {
     return {

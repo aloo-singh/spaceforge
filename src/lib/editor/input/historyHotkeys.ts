@@ -1,3 +1,5 @@
+import { isEditableTarget } from "@/lib/editor/input/editableTarget";
+
 type HistoryStoreState = {
   canUndo: boolean;
   canRedo: boolean;
@@ -11,7 +13,7 @@ type HistoryStore = {
 
 export function attachHistoryHotkeys(store: HistoryStore) {
   const onKeyDown = (event: KeyboardEvent) => {
-    if (isTypingTarget(event.target)) return;
+    if (isEditableTarget(event.target)) return;
     if (event.altKey) return;
 
     const key = event.key.toLowerCase();
@@ -55,10 +57,4 @@ export function attachHistoryHotkeys(store: HistoryStore) {
     document.removeEventListener("keydown", onKeyDown, listenerOptions);
     window.removeEventListener("keydown", onKeyDown, listenerOptions);
   };
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
 }

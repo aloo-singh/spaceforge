@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/stores/editorStore";
 
 export function SelectedRoomNamePanel() {
+  const panelRef = useRef<HTMLElement | null>(null);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const shouldFocusSelectedRoomNameInput = useEditorStore(
     (state) => state.shouldFocusSelectedRoomNameInput
@@ -15,6 +18,7 @@ export function SelectedRoomNamePanel() {
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
+  const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
     (state) => state.consumeSelectedRoomNameInputFocusRequest
   );
@@ -22,6 +26,7 @@ export function SelectedRoomNamePanel() {
   const focusTimeoutRef = useRef<number | null>(null);
 
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+  const canDeleteSelectedRoom = selectedRoom !== null;
 
   useEffect(() => {
     if (!shouldFocusSelectedRoomNameInput || !selectedRoom) return;
@@ -85,10 +90,25 @@ export function SelectedRoomNamePanel() {
     };
   }, [consumeSelectedRoomNameInputFocusRequest, selectedRoom, shouldFocusSelectedRoomNameInput]);
 
+  useEffect(() => {
+    const panelElement = panelRef.current;
+
+    return () => {
+      if (!panelElement) return;
+      const activeElement = document.activeElement;
+      if (!(activeElement instanceof HTMLElement)) return;
+      if (!panelElement.contains(activeElement)) return;
+      activeElement.blur();
+    };
+  }, []);
+
   if (!selectedRoom) return null;
 
   return (
-    <aside className="pointer-events-auto absolute right-4 bottom-4 left-4 z-20 rounded-lg border border-border/70 bg-card/95 p-3 text-card-foreground shadow-lg backdrop-blur-sm sm:right-auto sm:w-72">
+    <aside
+      ref={panelRef}
+      className="pointer-events-auto absolute right-4 bottom-4 left-4 z-20 rounded-lg border border-border/70 bg-card/95 p-3 text-card-foreground shadow-lg backdrop-blur-sm sm:right-auto sm:w-72"
+    >
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Selected room</p>
       <label htmlFor="room-name-input" className="mt-2 mb-1 block text-sm font-medium">
         Name
@@ -133,6 +153,43 @@ export function SelectedRoomNamePanel() {
         </Keycap>
         <span>cancel</span>
       </p>
+      <div className="mt-3 rounded-md border border-destructive/25 bg-destructive/5 p-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Delete selected room</p>
+            <p
+              id="delete-room-hint"
+              className="mt-1 text-[11px] leading-relaxed text-muted-foreground"
+            >
+              Removes this room from the layout. Undo restores it immediately.
+            </p>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground/80">
+            <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              Del
+            </Keycap>
+            <span aria-hidden="true">/</span>
+            <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              ⌫
+            </Keycap>
+          </div>
+        </div>
+        <div className="mt-2 flex justify-end">
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={deleteSelectedRoom}
+          disabled={!canDeleteSelectedRoom}
+          className="gap-2"
+          aria-label={`Delete ${selectedRoom.name}`}
+          aria-describedby="delete-room-hint"
+        >
+          <Trash2 />
+          Delete room
+        </Button>
+        </div>
+      </div>
     </aside>
   );
 }
