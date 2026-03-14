@@ -1,5 +1,6 @@
 import type { CameraState, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
+import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
 export const EDITOR_PERSISTENCE_VERSION = 2;
@@ -135,15 +136,21 @@ function getBrowserStorage(): Storage | null {
 }
 
 export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): string {
+  const normalizedHistory = normalizePersistedHistorySnapshot(
+    {
+      historyStack: snapshot.historyStack,
+      historyIndex: snapshot.historyIndex,
+    },
+    PERSISTED_HISTORY_STATE_LIMIT,
+    snapshot.document
+  );
   const payload: PersistedEditorPayloadV2 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
     history: {
-      stack: snapshot.historyStack
-        .slice(-PERSISTED_HISTORY_STATE_LIMIT)
-        .map((document) => cloneDocument(document)),
-      index: snapshot.historyIndex,
+      stack: (normalizedHistory?.historyStack ?? [snapshot.document]).map((document) => cloneDocument(document)),
+      index: normalizedHistory?.historyIndex ?? 0,
     },
   };
 
@@ -189,20 +196,21 @@ export function deserializeEditorSnapshotForHydration(
     if (!isPersistedDocument(parsed.document)) return null;
 
     const history = isPersistedHistory(parsed.history)
-      ? {
-          historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
-          historyIndex: parsed.history.index,
-        }
-      : {
-          historyStack: null,
-          historyIndex: null,
-        };
+      ? normalizePersistedHistorySnapshot(
+          {
+            historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
+            historyIndex: parsed.history.index,
+          },
+          PERSISTED_HISTORY_STATE_LIMIT,
+          parsed.document
+        )
+      : null;
 
     return {
       document: cloneDocument(parsed.document),
       camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
-      historyStack: history.historyStack,
-      historyIndex: history.historyIndex,
+      historyStack: history?.historyStack ?? null,
+      historyIndex: history?.historyIndex ?? null,
     };
   } catch {
     return null;

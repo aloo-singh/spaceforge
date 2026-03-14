@@ -18,6 +18,10 @@ import {
   loadEditorSnapshotForHydration,
   saveEditorSnapshot,
 } from "@/lib/editor/editorPersistence";
+import {
+  buildPersistedHistorySnapshot,
+  hydrateCommandHistoryFromSnapshots,
+} from "@/lib/editor/persistedHistory";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 declare global {
@@ -144,180 +148,22 @@ function areCamerasEqual(a: CameraState, b: CameraState): boolean {
   return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
 }
 
-function areDocumentsEqual(a: DocumentState, b: DocumentState): boolean {
-  if (a.rooms.length !== b.rooms.length) return false;
-
-  for (let i = 0; i < a.rooms.length; i += 1) {
-    const roomA = a.rooms[i];
-    const roomB = b.rooms[i];
-    if (roomA.id !== roomB.id || roomA.name !== roomB.name) return false;
-    if (!arePointListsEqual(roomA.points, roomB.points)) return false;
-  }
-
-  return true;
-}
-
-function cloneDocumentState(document: DocumentState): DocumentState {
-  return {
-    rooms: document.rooms.map((room) => ({
-      id: room.id,
-      name: room.name,
-      points: room.points.map((point) => ({ ...point })),
-    })),
-  };
-}
-
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
-
-function inferEditorCommand(previous: DocumentState, next: DocumentState): EditorCommand | null {
-  const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
-  const nextById = new Map(next.rooms.map((room) => [room.id, room]));
-  const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
-  if (removedRooms.length > 0) return null;
-
-  const addedRooms = next.rooms.filter((room) => !previousById.has(room.id));
-  const changedRooms: Array<{
-    previous: Room;
-    next: Room;
-  }> = [];
-
-  for (const room of next.rooms) {
-    const previousRoom = previousById.get(room.id);
-    if (!previousRoom) continue;
-
-    const didNameChange = previousRoom.name !== room.name;
-    const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
-    if (!didNameChange && !didPointsChange) continue;
-
-    changedRooms.push({
-      previous: previousRoom,
-      next: room,
-    });
-  }
-
-  if (addedRooms.length === 1 && changedRooms.length === 0 && previous.rooms.length + 1 === next.rooms.length) {
-    return {
-      type: "complete-room",
-      room: {
-        id: addedRooms[0].id,
-        name: addedRooms[0].name,
-        points: addedRooms[0].points.map((point) => ({ ...point })),
-      },
-    };
-  }
-
-  if (addedRooms.length > 0 || changedRooms.length !== 1) return null;
-
-  const changedRoom = changedRooms[0];
-  const didNameChange = changedRoom.previous.name !== changedRoom.next.name;
-  const didPointsChange = !arePointListsEqual(changedRoom.previous.points, changedRoom.next.points);
-
-  if (didNameChange && !didPointsChange) {
-    return {
-      type: "rename-room",
-      roomId: changedRoom.next.id,
-      previousName: changedRoom.previous.name,
-      nextName: changedRoom.next.name,
-    };
-  }
-
-  if (!didNameChange && didPointsChange) {
-    // Snapshot hydration cannot distinguish move from resize, but undo/redo semantics are identical.
-    return {
-      type: "move-room",
-      roomId: changedRoom.next.id,
-      previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
-      nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
-    };
-  }
-
-  return null;
-}
-
-function hydrateHistoryState(hydrationState: ReturnType<typeof loadEditorSnapshotForHydration>): {
-  past: EditorCommand[];
-  future: EditorCommand[];
-} {
-  const historyStack = hydrationState?.historyStack;
-  const historyIndex = hydrationState?.historyIndex;
-  const hydratedDocument = hydrationState?.document;
-
-  if (!historyStack || typeof historyIndex !== "number" || !hydratedDocument) {
-    return {
-      past: [],
-      future: [],
-    };
-  }
-
-  const currentHistoryDocument = historyStack[historyIndex];
-  if (!currentHistoryDocument || !areDocumentsEqual(currentHistoryDocument, hydratedDocument)) {
-    return {
-      past: [],
-      future: [],
-    };
-  }
-
-  const commands: EditorCommand[] = [];
-  for (let i = 0; i < historyStack.length - 1; i += 1) {
-    const command = inferEditorCommand(historyStack[i], historyStack[i + 1]);
-    if (!command) {
-      return {
-        past: [],
-        future: [],
-      };
-    }
-    commands.push(command);
-  }
-
-  return {
-    past: commands.slice(0, historyIndex),
-    future: commands.slice(historyIndex),
-  };
-}
-
-function buildPersistedHistorySnapshot(state: Pick<EditorState, "document" | "history">): {
-  historyStack: DocumentState[];
-  historyIndex: number;
-} {
-  const rootDocument = state.history.past
-    .slice()
-    .reverse()
-    .reduce<DocumentState>(
-      (document, command) => applyEditorCommand(document, command, "undo"),
-      cloneDocumentState(state.document)
-    );
-  const commands = [...state.history.past, ...state.history.future];
-  const historyStack = [rootDocument];
-  let cursor = rootDocument;
-
-  for (const command of commands) {
-    cursor = applyEditorCommand(cursor, command, "redo");
-    historyStack.push(cursor);
-  }
-
-  const currentIndex = state.history.past.length;
-  if (historyStack.length <= PERSISTED_HISTORY_STATE_LIMIT) {
-    return {
-      historyStack,
-      historyIndex: currentIndex,
-    };
-  }
-
-  const minimumStartIndex = Math.max(0, currentIndex - PERSISTED_HISTORY_STATE_LIMIT + 1);
-  const maximumStartIndex = Math.min(currentIndex, historyStack.length - PERSISTED_HISTORY_STATE_LIMIT);
-  const startIndex = Math.max(minimumStartIndex, maximumStartIndex);
-
-  return {
-    historyStack: historyStack.slice(startIndex, startIndex + PERSISTED_HISTORY_STATE_LIMIT),
-    historyIndex: currentIndex - startIndex,
-  };
-}
-
 const hydrationSnapshot = loadEditorSnapshotForHydration();
-const hydratedHistoryState = hydrateHistoryState(hydrationSnapshot);
+const hydratedHistoryState =
+  hydrationSnapshot?.historyStack && typeof hydrationSnapshot.historyIndex === "number"
+    ? hydrateCommandHistoryFromSnapshots(
+        {
+          historyStack: hydrationSnapshot.historyStack,
+          historyIndex: hydrationSnapshot.historyIndex,
+        },
+        hydrationSnapshot.document,
+        PERSISTED_HISTORY_STATE_LIMIT
+      ) ?? { past: [], future: [] }
+    : { past: [], future: [] };
 
 function createInitialDocumentState(): DocumentState {
   return hydrationSnapshot?.document ?? DEFAULT_DOCUMENT_STATE;
@@ -753,7 +599,11 @@ if (typeof window !== "undefined") {
   let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   let lastSavedPersistedSignature = JSON.stringify((() => {
     const state = useEditorStore.getState();
-    const historySnapshot = buildPersistedHistorySnapshot(state);
+    const historySnapshot = buildPersistedHistorySnapshot(
+      state.document,
+      state.history,
+      PERSISTED_HISTORY_STATE_LIMIT
+    );
 
     return {
       document: state.document,
@@ -766,7 +616,11 @@ if (typeof window !== "undefined") {
   const flushAutosave = () => {
     autosaveTimeout = null;
     const state = useEditorStore.getState();
-    const historySnapshot = buildPersistedHistorySnapshot(state);
+    const historySnapshot = buildPersistedHistorySnapshot(
+      state.document,
+      state.history,
+      PERSISTED_HISTORY_STATE_LIMIT
+    );
     const nextPersistedSignature = JSON.stringify({
       document: state.document,
       camera: state.camera,
