@@ -5,6 +5,7 @@ import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
 } from "@/lib/editor/camera";
+import { getCameraFitTarget } from "@/lib/editor/cameraFit";
 import {
   getOrthogonalSnappedPoint,
   getRectangleClosingPoint,
@@ -77,6 +78,7 @@ type EditorState = {
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  resetCamera: () => void;
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
@@ -575,6 +577,14 @@ export const useEditorStore = create<EditorState>((set) => ({
         canRedo: false,
       };
     }),
+  resetCamera: () =>
+    set((state) => ({
+      camera: getCameraFitTarget({
+        rooms: state.document.rooms,
+        viewport: state.viewport,
+        emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+      }).camera,
+    })),
   resetCanvas: () =>
     set((state) => ({
       document: {

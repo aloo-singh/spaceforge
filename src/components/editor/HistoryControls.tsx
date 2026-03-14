@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Download, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { Download, LocateFixed, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
@@ -31,12 +31,15 @@ export function HistoryControls({
   );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
+  const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
   const isCanvasEmpty = useEditorStore(
     (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
   );
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
+  const resetCamera = useEditorStore((state) => state.resetCamera);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
+  const isResetCameraDisabled = !hasHydrated || !hasRooms;
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
@@ -54,6 +57,17 @@ export function HistoryControls({
     <>
       <aside className="pointer-events-auto absolute top-4 right-4 z-20 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm">
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={resetCamera}
+            disabled={isResetCameraDisabled}
+            aria-label="Reset camera to fit all rooms"
+            title="Reset camera"
+          >
+            <LocateFixed />
+          </Button>
           <Button
             type="button"
             variant="outline"
