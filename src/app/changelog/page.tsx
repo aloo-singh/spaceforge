@@ -10,6 +10,34 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.15.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Room area display
+              </h3>
+              <p className="mt-2">
+                Rooms now display their calculated floor area directly on the canvas, making
+                SpaceForge more useful for quick planning and sketching.
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added metric room area calculation and formatting</li>
+                <li>Introduced JetBrains Mono for measurement-style text</li>
+                <li>Displayed room area beneath the room name in canvas labels</li>
+                <li>Hid area text automatically on very small rooms to avoid clutter</li>
+                <li>Polished two-line label layout and measurement readability</li>
+                <li>Updated room area live during resize</li>
+                <li>Added subtle live emphasis for area feedback during active resize</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.14.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-14</span>
           </div>
