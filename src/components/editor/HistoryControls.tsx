@@ -38,6 +38,8 @@ export function HistoryControls({
   const redo = useEditorStore((state) => state.redo);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
+  const isUndoDisabled = !hasHydrated || !canUndo;
+  const isRedoDisabled = !hasHydrated || !canRedo;
   const normalizedSignature = normalizeExportSignature(exportSignatureText);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
@@ -93,7 +95,7 @@ export function HistoryControls({
             variant="outline"
             size="sm"
             onClick={undo}
-            disabled={!canUndo}
+            disabled={isUndoDisabled}
             aria-label="Undo last edit, shortcut Command or Control plus Z"
             className="gap-2"
           >
@@ -108,7 +110,7 @@ export function HistoryControls({
             variant="outline"
             size="sm"
             onClick={redo}
-            disabled={!canRedo}
+            disabled={isRedoDisabled}
             aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
             className="gap-2"
           >

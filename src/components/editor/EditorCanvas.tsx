@@ -409,6 +409,10 @@ export default function EditorCanvas() {
   }, [completeHint]);
 
   useEffect(() => {
+    return attachHistoryHotkeys(useEditorStore);
+  }, []);
+
+  useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
     const resizeTarget: HTMLElement = host;
@@ -509,13 +513,11 @@ export default function EditorCanvas() {
           drawCurrentScene();
         },
       });
-      const detachHistoryHotkeys = attachHistoryHotkeys(useEditorStore);
 
       return () => {
         detachPanZoomInput();
         detachRoomResizeInput();
         detachRoomDrawInput();
-        detachHistoryHotkeys();
         unsubscribe();
         app.renderer.off("resize", handleResize);
         appRef.current = null;

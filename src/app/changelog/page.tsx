@@ -10,6 +10,34 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.12.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Persisted undo/redo history
+              </h3>
+              <p className="mt-2">
+                Undo and redo history now survives refresh and browser restart, making the editor
+                feel much more trustworthy during active work.
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Persisted undo/redo history alongside layout and camera state</li>
+                <li>Restored history position and redo availability after refresh</li>
+                <li>Preserved branch-after-undo behaviour across reloads</li>
+                <li>Added bounded history persistence to prevent unbounded storage growth</li>
+                <li>Improved hydration safety with explicit fallback behaviour</li>
+                <li>Valid layout/camera now restore even if persisted history is invalid</li>
+                <li>Added a narrow debug helper for clearing persisted editor state</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.11.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-13</span>
           </div>

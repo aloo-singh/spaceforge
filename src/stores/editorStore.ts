@@ -13,7 +13,15 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { translateRoomPoints } from "@/lib/editor/roomTranslation";
-import { loadEditorSnapshotForHydration, saveEditorSnapshot } from "@/lib/editor/editorPersistence";
+import {
+  PERSISTED_HISTORY_STATE_LIMIT,
+  loadEditorSnapshotForHydration,
+  saveEditorSnapshot,
+} from "@/lib/editor/editorPersistence";
+import {
+  buildPersistedHistorySnapshot,
+  hydrateCommandHistoryFromSnapshots,
+} from "@/lib/editor/persistedHistory";
 import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 
 declare global {
@@ -73,7 +81,6 @@ type EditorState = {
   redo: () => void;
 };
 
-const HISTORY_LIMIT = 100;
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = {
   rooms: [],
@@ -83,6 +90,7 @@ const DEFAULT_CAMERA_STATE: CameraState = {
   yMm: 0,
   pixelsPerMm: INITIAL_PIXELS_PER_MM,
 };
+const HISTORY_LIMIT = PERSISTED_HISTORY_STATE_LIMIT - 1;
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
   const nextPast = [...past, command];
@@ -144,8 +152,23 @@ function getSelectionIfRoomExists(roomId: string | null, document: DocumentState
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
 }
-
 const hydrationSnapshot = loadEditorSnapshotForHydration();
+const hydratedHistoryState =
+  hydrationSnapshot?.historyStack && typeof hydrationSnapshot.historyIndex === "number"
+    ? hydrateCommandHistoryFromSnapshots(
+        {
+          historyStack: hydrationSnapshot.historyStack,
+          historyIndex: hydrationSnapshot.historyIndex,
+        },
+        hydrationSnapshot.document,
+        PERSISTED_HISTORY_STATE_LIMIT
+      ) ?? { past: [], future: [] }
+    : { past: [], future: [] };
+// Manual QA after persistence changes:
+// 1. Edit, undo, refresh, redo.
+// 2. Edit, undo, refresh, make a new edit, confirm redo stays unavailable.
+// 3. Exceed the history cap, refresh, and confirm undo only reaches the retained window.
+// 4. Corrupt stored history manually, refresh, and confirm layout/camera restore without history.
 
 function createInitialDocumentState(): DocumentState {
   return hydrationSnapshot?.document ?? DEFAULT_DOCUMENT_STATE;
@@ -169,11 +192,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
-    past: [],
-    future: [],
+    past: hydratedHistoryState.past,
+    future: hydratedHistoryState.future,
   },
-  canUndo: false,
-  canRedo: false,
+  canUndo: hydratedHistoryState.past.length > 0,
+  canRedo: hydratedHistoryState.future.length > 0,
   setViewport: (width, height) => set({ viewport: { width, height } }),
   panCameraByPx: (delta) =>
     set((state) => ({
@@ -579,23 +602,43 @@ if (typeof window !== "undefined") {
   window.__spaceforgeEditorAutosaveCleanup__?.();
 
   let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
-  let lastSavedPersistedSignature = JSON.stringify({
-    document: useEditorStore.getState().document,
-    camera: useEditorStore.getState().camera,
-  });
+  let lastSavedPersistedSignature = JSON.stringify((() => {
+    const state = useEditorStore.getState();
+    const historySnapshot = buildPersistedHistorySnapshot(
+      state.document,
+      state.history,
+      PERSISTED_HISTORY_STATE_LIMIT
+    );
+
+    return {
+      document: state.document,
+      camera: state.camera,
+      historyStack: historySnapshot.historyStack,
+      historyIndex: historySnapshot.historyIndex,
+    };
+  })());
 
   const flushAutosave = () => {
     autosaveTimeout = null;
     const state = useEditorStore.getState();
+    const historySnapshot = buildPersistedHistorySnapshot(
+      state.document,
+      state.history,
+      PERSISTED_HISTORY_STATE_LIMIT
+    );
     const nextPersistedSignature = JSON.stringify({
       document: state.document,
       camera: state.camera,
+      historyStack: historySnapshot.historyStack,
+      historyIndex: historySnapshot.historyIndex,
     });
     if (nextPersistedSignature === lastSavedPersistedSignature) return;
 
     const didSave = saveEditorSnapshot({
       document: state.document,
       camera: state.camera,
+      historyStack: historySnapshot.historyStack,
+      historyIndex: historySnapshot.historyIndex,
     });
     if (didSave) {
       lastSavedPersistedSignature = nextPersistedSignature;
@@ -626,7 +669,9 @@ if (typeof window !== "undefined") {
   const unsubscribe = useEditorStore.subscribe((state, previousState) => {
     const didDocumentChange = state.document !== previousState.document;
     const didCameraChange = !areCamerasEqual(state.camera, previousState.camera);
-    if (!didDocumentChange && !didCameraChange) return;
+    const didPastChange = state.history.past !== previousState.history.past;
+    const didFutureChange = state.history.future !== previousState.history.future;
+    if (!didDocumentChange && !didCameraChange && !didPastChange && !didFutureChange) return;
 
     if (autosaveTimeout) {
       clearTimeout(autosaveTimeout);
