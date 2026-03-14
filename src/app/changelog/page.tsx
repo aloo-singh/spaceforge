@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.13.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Room deletion
+              </h3>
+              <p className="mt-2">
+                The editor now supports deleting the selected room, completing the basic
+                room-edit loop.
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added delete action for the selected room</li>
+                <li>Added keyboard deletion with Delete and Backspace</li>
+                <li>Prevented accidental deletion while typing in editable fields</li>
+                <li>Integrated delete with undo/redo and persisted history</li>
+                <li>Polished delete affordance in the selected-room panel</li>
+                <li>Cleaned up focus and panel state after delete, undo, and redo</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.12.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-14</span>
           </div>
