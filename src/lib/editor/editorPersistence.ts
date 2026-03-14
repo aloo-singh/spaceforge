@@ -2,6 +2,12 @@ import type { CameraState, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 
+// Browser persistence schema for the editor.
+// Compatibility rules:
+// - v1 payloads restore layout + camera only.
+// - v2 payloads restore layout + camera + bounded snapshot history.
+// - Unknown versions or malformed layout payloads are rejected entirely.
+// - Malformed history inside an otherwise valid v2 payload is dropped while layout/camera still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
 export const EDITOR_PERSISTENCE_VERSION = 2;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
@@ -47,6 +53,15 @@ export type PersistedEditorPayloadV2 = {
     index: number;
   };
 };
+
+type PersistedEditorParsedPayload =
+  | {
+      status: "ok";
+      snapshot: PersistedEditorHydrationSnapshot;
+    }
+  | {
+      status: "invalid-payload";
+    };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -135,6 +150,76 @@ function getBrowserStorage(): Storage | null {
   return window.localStorage;
 }
 
+function createHistorylessHydrationSnapshot(
+  document: EditorDocumentState,
+  camera: CameraState | null
+): PersistedEditorHydrationSnapshot {
+  return {
+    document: cloneDocument(document),
+    camera: camera ? cloneCamera(camera) : null,
+    historyStack: null,
+    historyIndex: null,
+  };
+}
+
+function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isObject(parsed)) {
+      return {
+        status: "invalid-payload",
+      };
+    }
+
+    if (parsed.version === 1) {
+      if (!isPersistedDocument(parsed.document)) {
+        return {
+          status: "invalid-payload",
+        };
+      }
+
+      return {
+        status: "ok",
+        snapshot: createHistorylessHydrationSnapshot(
+          parsed.document,
+          isCameraState(parsed.camera) ? parsed.camera : null
+        ),
+      };
+    }
+
+    if (parsed.version !== EDITOR_PERSISTENCE_VERSION || !isPersistedDocument(parsed.document)) {
+      return {
+        status: "invalid-payload",
+      };
+    }
+
+    const normalizedHistory = isPersistedHistory(parsed.history)
+      ? normalizePersistedHistorySnapshot(
+          {
+            historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
+            historyIndex: parsed.history.index,
+          },
+          PERSISTED_HISTORY_STATE_LIMIT,
+          parsed.document
+        )
+      : null;
+
+    return {
+      status: "ok",
+      snapshot: {
+        document: cloneDocument(parsed.document),
+        camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
+        historyStack: normalizedHistory?.historyStack ?? null,
+        historyIndex: normalizedHistory?.historyIndex ?? null,
+      },
+    };
+  } catch {
+    return {
+      status: "invalid-payload",
+    };
+  }
+}
+
 export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): string {
   const normalizedHistory = normalizePersistedHistorySnapshot(
     {
@@ -179,42 +264,9 @@ export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot 
 export function deserializeEditorSnapshotForHydration(
   raw: string
 ): PersistedEditorHydrationSnapshot | null {
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isObject(parsed)) return null;
-    if (parsed.version === 1) {
-      if (!isPersistedDocument(parsed.document)) return null;
-
-      return {
-        document: cloneDocument(parsed.document),
-        camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
-        historyStack: null,
-        historyIndex: null,
-      };
-    }
-    if (parsed.version !== EDITOR_PERSISTENCE_VERSION) return null;
-    if (!isPersistedDocument(parsed.document)) return null;
-
-    const history = isPersistedHistory(parsed.history)
-      ? normalizePersistedHistorySnapshot(
-          {
-            historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
-            historyIndex: parsed.history.index,
-          },
-          PERSISTED_HISTORY_STATE_LIMIT,
-          parsed.document
-        )
-      : null;
-
-    return {
-      document: cloneDocument(parsed.document),
-      camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
-      historyStack: history?.historyStack ?? null,
-      historyIndex: history?.historyIndex ?? null,
-    };
-  } catch {
-    return null;
-  }
+  const parsedPayload = parsePersistedEditorPayload(raw);
+  if (parsedPayload.status !== "ok") return null;
+  return parsedPayload.snapshot;
 }
 
 export function saveEditorSnapshot(
@@ -268,4 +320,9 @@ export function clearEditorSnapshot(storage: Storage | null = getBrowserStorage(
   } catch {
     return false;
   }
+}
+
+// Narrow debug/development escape hatch for clearing only editor persistence.
+export function resetPersistedEditorState(storage: Storage | null = getBrowserStorage()): boolean {
+  return clearEditorSnapshot(storage);
 }

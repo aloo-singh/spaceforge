@@ -126,6 +126,9 @@ export function normalizePersistedHistorySnapshot(
   limit: number,
   currentDocument?: EditorDocumentState
 ): PersistedHistorySnapshot | null {
+  // Normalization keeps the current document anchored to a single valid index.
+  // If the stored index is stale but the current document still appears uniquely in the
+  // snapshot stack, recover to that index. Otherwise reject the history entirely.
   const historyStack = snapshot.historyStack.map(cloneDocumentState);
   const resolvedIndex =
     snapshot.historyIndex >= 0 &&
@@ -193,6 +196,8 @@ export function hydrateCommandHistoryFromSnapshots(
   currentDocument: EditorDocumentState,
   limit: number
 ): HydratedCommandHistory | null {
+  // Hydration is intentionally strict: if snapshots cannot be normalized or reconstructed
+  // into a single linear history, callers should keep the current layout and drop history.
   const normalizedSnapshot = normalizePersistedHistorySnapshot(snapshot, limit, currentDocument);
   if (!normalizedSnapshot) return null;
 

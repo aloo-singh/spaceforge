@@ -164,6 +164,11 @@ const hydratedHistoryState =
         PERSISTED_HISTORY_STATE_LIMIT
       ) ?? { past: [], future: [] }
     : { past: [], future: [] };
+// Manual QA after persistence changes:
+// 1. Edit, undo, refresh, redo.
+// 2. Edit, undo, refresh, make a new edit, confirm redo stays unavailable.
+// 3. Exceed the history cap, refresh, and confirm undo only reaches the retained window.
+// 4. Corrupt stored history manually, refresh, and confirm layout/camera restore without history.
 
 function createInitialDocumentState(): DocumentState {
   return hydrationSnapshot?.document ?? DEFAULT_DOCUMENT_STATE;

@@ -29,20 +29,31 @@ export function attachHistoryHotkeys(store: HistoryStore) {
     const state = store.getState();
     if (isUndoShortcut) {
       if (!state.canUndo) return;
+      event.stopImmediatePropagation();
+      event.stopPropagation();
       event.preventDefault();
       state.undo();
       return;
     }
 
     if (!state.canRedo) return;
+    event.stopImmediatePropagation();
+    event.stopPropagation();
     event.preventDefault();
     state.redo();
   };
 
-  window.addEventListener("keydown", onKeyDown);
+  // Capture-phase interception keeps browser/app chrome shortcuts from winning
+  // before the editor can claim its own global undo/redo bindings.
+  const listenerOptions: AddEventListenerOptions = {
+    capture: true,
+  };
+  document.addEventListener("keydown", onKeyDown, listenerOptions);
+  window.addEventListener("keydown", onKeyDown, listenerOptions);
 
   return () => {
-    window.removeEventListener("keydown", onKeyDown);
+    document.removeEventListener("keydown", onKeyDown, listenerOptions);
+    window.removeEventListener("keydown", onKeyDown, listenerOptions);
   };
 }
 
