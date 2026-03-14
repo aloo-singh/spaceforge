@@ -51,7 +51,11 @@ export function HistoryControls({
     : hasRooms
       ? "Fit all rooms into view"
       : "Add a room to enable fit view";
-  const resetCameraAriaLabel = hasRooms ? "Fit all rooms into view" : "Fit view unavailable";
+  const resetCameraAriaLabel = !hasHydrated
+    ? "Fit view unavailable"
+    : hasRooms
+      ? "Fit all rooms into view"
+      : "Fit view unavailable";
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
