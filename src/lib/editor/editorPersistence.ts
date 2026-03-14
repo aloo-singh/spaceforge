@@ -2,7 +2,8 @@ import type { CameraState, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
 
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 1;
+export const EDITOR_PERSISTENCE_VERSION = 2;
+export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
 
@@ -19,17 +20,31 @@ type PersistedDocument = {
 export type PersistedEditorSnapshot = {
   document: EditorDocumentState;
   camera: CameraState;
+  historyStack: EditorDocumentState[];
+  historyIndex: number;
 };
 
 export type PersistedEditorHydrationSnapshot = {
   document: EditorDocumentState;
   camera: CameraState | null;
+  historyStack: EditorDocumentState[] | null;
+  historyIndex: number | null;
 };
 
 export type PersistedEditorPayloadV1 = {
+  version: 1;
+  document: PersistedDocument;
+  camera: CameraState;
+};
+
+export type PersistedEditorPayloadV2 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -72,6 +87,19 @@ function isPersistedDocument(value: unknown): value is PersistedDocument {
   return value.rooms.every((room) => isRoom(room));
 }
 
+function isPersistedHistory(
+  value: unknown
+): value is PersistedEditorPayloadV2["history"] {
+  if (!isObject(value)) return false;
+  if (!Array.isArray(value.stack)) return false;
+  const historyIndex = value.index;
+  if (typeof historyIndex !== "number" || !Number.isInteger(historyIndex)) return false;
+  if (value.stack.length === 0) return false;
+  if (value.stack.length > PERSISTED_HISTORY_STATE_LIMIT) return false;
+  if (historyIndex < 0 || historyIndex >= value.stack.length) return false;
+  return value.stack.every((snapshot) => isPersistedDocument(snapshot));
+}
+
 function clonePoint(point: Point): Point {
   return {
     x: point.x,
@@ -107,10 +135,16 @@ function getBrowserStorage(): Storage | null {
 }
 
 export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): string {
-  const payload: PersistedEditorPayloadV1 = {
+  const payload: PersistedEditorPayloadV2 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
+    history: {
+      stack: snapshot.historyStack
+        .slice(-PERSISTED_HISTORY_STATE_LIMIT)
+        .map((document) => cloneDocument(document)),
+      index: snapshot.historyIndex,
+    },
   };
 
   return JSON.stringify(payload);
@@ -118,11 +152,20 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
 
 export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot | null {
   const hydrationSnapshot = deserializeEditorSnapshotForHydration(raw);
-  if (!hydrationSnapshot || !hydrationSnapshot.camera) return null;
+  if (
+    !hydrationSnapshot ||
+    !hydrationSnapshot.camera ||
+    !hydrationSnapshot.historyStack ||
+    hydrationSnapshot.historyIndex === null
+  ) {
+    return null;
+  }
 
   return {
     document: hydrationSnapshot.document,
     camera: hydrationSnapshot.camera,
+    historyStack: hydrationSnapshot.historyStack,
+    historyIndex: hydrationSnapshot.historyIndex,
   };
 }
 
@@ -132,12 +175,34 @@ export function deserializeEditorSnapshotForHydration(
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isObject(parsed)) return null;
+    if (parsed.version === 1) {
+      if (!isPersistedDocument(parsed.document)) return null;
+
+      return {
+        document: cloneDocument(parsed.document),
+        camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
+        historyStack: null,
+        historyIndex: null,
+      };
+    }
     if (parsed.version !== EDITOR_PERSISTENCE_VERSION) return null;
     if (!isPersistedDocument(parsed.document)) return null;
+
+    const history = isPersistedHistory(parsed.history)
+      ? {
+          historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
+          historyIndex: parsed.history.index,
+        }
+      : {
+          historyStack: null,
+          historyIndex: null,
+        };
 
     return {
       document: cloneDocument(parsed.document),
       camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
+      historyStack: history.historyStack,
+      historyIndex: history.historyIndex,
     };
   } catch {
     return null;
