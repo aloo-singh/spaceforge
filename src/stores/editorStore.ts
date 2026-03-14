@@ -7,6 +7,11 @@ import {
 } from "@/lib/editor/camera";
 import { getCameraFitTarget } from "@/lib/editor/cameraFit";
 import {
+  easeResetCameraTransition,
+  interpolateCamera,
+  RESET_CAMERA_TRANSITION_DURATION_MS,
+} from "@/lib/editor/cameraTransition";
+import {
   getOrthogonalSnappedPoint,
   getRectangleClosingPoint,
   isZeroLengthSegment,
@@ -181,7 +186,15 @@ function createInitialCameraState(): CameraState {
   return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
+let activeResetCameraAnimationFrame: number | null = null;
+
+function stopResetCameraAnimation() {
+  if (activeResetCameraAnimationFrame === null || typeof window === "undefined") return;
+  window.cancelAnimationFrame(activeResetCameraAnimationFrame);
+  activeResetCameraAnimationFrame = null;
+}
+
+export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
   viewport: {
@@ -201,11 +214,14 @@ export const useEditorStore = create<EditorState>((set) => ({
   canUndo: hydratedHistoryState.past.length > 0,
   canRedo: hydratedHistoryState.future.length > 0,
   setViewport: (width, height) => set({ viewport: { width, height } }),
-  panCameraByPx: (delta) =>
+  panCameraByPx: (delta) => {
+    stopResetCameraAnimation();
     set((state) => ({
       camera: panCameraByScreenDelta(state.camera, delta),
-    })),
-  zoomAtScreenPoint: (screenPoint, scaleFactor) =>
+    }));
+  },
+  zoomAtScreenPoint: (screenPoint, scaleFactor) => {
+    stopResetCameraAnimation();
     set((state) => ({
       camera: zoomCameraToScreenPoint(
         state.camera,
@@ -213,15 +229,18 @@ export const useEditorStore = create<EditorState>((set) => ({
         screenPoint,
         state.camera.pixelsPerMm * scaleFactor
       ),
-    })),
-  setCameraCenterMm: (xMm, yMm) =>
+    }));
+  },
+  setCameraCenterMm: (xMm, yMm) => {
+    stopResetCameraAnimation();
     set((state) => ({
       camera: {
         ...state.camera,
         xMm,
         yMm,
       },
-    })),
+    }));
+  },
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
       const draftPoints = state.roomDraft.points;
@@ -577,15 +596,48 @@ export const useEditorStore = create<EditorState>((set) => ({
         canRedo: false,
       };
     }),
-  resetCamera: () =>
-    set((state) => ({
-      camera: getCameraFitTarget({
-        rooms: state.document.rooms,
-        viewport: state.viewport,
-        emptyLayoutCamera: DEFAULT_CAMERA_STATE,
-      }).camera,
-    })),
-  resetCanvas: () =>
+  resetCamera: () => {
+    stopResetCameraAnimation();
+
+    const state = get();
+    const targetCamera = getCameraFitTarget({
+      rooms: state.document.rooms,
+      viewport: state.viewport,
+      emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+    }).camera;
+
+    if (areCamerasEqual(state.camera, targetCamera)) return;
+    if (typeof window === "undefined") {
+      set({ camera: targetCamera });
+      return;
+    }
+
+    const startCamera = state.camera;
+    const startTime = window.performance.now();
+
+    const step = (now: number) => {
+      const elapsedMs = now - startTime;
+      const progress = Math.min(1, elapsedMs / RESET_CAMERA_TRANSITION_DURATION_MS);
+      const easedProgress = easeResetCameraTransition(progress);
+      const nextCamera =
+        progress >= 1
+          ? targetCamera
+          : interpolateCamera(startCamera, targetCamera, easedProgress);
+
+      set({ camera: nextCamera });
+
+      if (progress >= 1) {
+        activeResetCameraAnimationFrame = null;
+        return;
+      }
+
+      activeResetCameraAnimationFrame = window.requestAnimationFrame(step);
+    };
+
+    activeResetCameraAnimationFrame = window.requestAnimationFrame(step);
+  },
+  resetCanvas: () => {
+    stopResetCameraAnimation();
     set((state) => ({
       document: {
         rooms: [],
@@ -604,7 +656,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       canUndo: false,
       canRedo: false,
       viewport: state.viewport,
-    })),
+    }));
+  },
   undo: () =>
     set((state) => {
       const command = state.history.past[state.history.past.length - 1];
@@ -735,6 +788,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", onBeforeUnload);
 
   window.__spaceforgeEditorAutosaveCleanup__ = () => {
+    stopResetCameraAnimation();
     if (autosaveTimeout) {
       clearTimeout(autosaveTimeout);
       autosaveTimeout = null;
