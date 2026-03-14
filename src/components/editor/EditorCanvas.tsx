@@ -5,7 +5,11 @@ import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
-import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometry";
+import {
+  getOrthogonalSnappedPoint,
+  getRectangleClosingPoint,
+  snapPointToGrid,
+} from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import {
   getRoomLabelLayout,
@@ -43,6 +47,7 @@ import {
 } from "@/lib/editor/rectRoomResize";
 import {
   formatMetricWallDimension,
+  getRectResizeMeasurements,
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
@@ -83,9 +88,9 @@ const RESIZE_DIMENSION_LABEL_GAP_PX = 12;
 const RESIZE_DIMENSION_MIN_SHORT_WALL_PX = 96;
 const RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX = 8;
 const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
-const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 0.9;
-const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.46;
-const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 0.94;
+const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
+const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
+const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -94,6 +99,7 @@ export default function EditorCanvas() {
   const roomRef = useRef<Graphics | null>(null);
   const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
+  const dimensionOverlayRef = useRef<Container | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const roomResizeUiRef = useRef<{
@@ -150,13 +156,15 @@ export default function EditorCanvas() {
     const rooms = roomRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
-    if (!grid || !rooms || !roomLabels || !draft) return;
+    const dimensionOverlay = dimensionOverlayRef.current;
+    if (!grid || !rooms || !roomLabels || !draft || !dimensionOverlay) return;
 
     drawScene(
       grid,
       rooms,
       roomLabels,
       draft,
+      dimensionOverlay,
       useEditorStore.getState(),
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
@@ -344,7 +352,6 @@ export default function EditorCanvas() {
       state.document.rooms,
       null,
       null,
-      EMPTY_ROOM_RESIZE_UI,
       exportCamera,
       exportViewport,
       null,
@@ -496,14 +503,17 @@ export default function EditorCanvas() {
       const rooms = new Graphics();
       const roomLabels = new Container();
       const draft = new Graphics();
+      const dimensionOverlay = new Container();
       gridRef.current = grid;
       roomRef.current = rooms;
       roomLabelRef.current = roomLabels;
       draftRef.current = draft;
+      dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
       app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
+      app.stage.addChild(dimensionOverlay);
 
       const syncViewport = () => {
         useEditorStore.getState().setViewport(app.screen.width, app.screen.height);
@@ -573,6 +583,7 @@ export default function EditorCanvas() {
         roomRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
+        dimensionOverlayRef.current = null;
         setTransformFeedback(null);
         stopTransformAnimation();
       };
@@ -656,6 +667,7 @@ function drawScene(
   roomGraphics: Graphics,
   roomLabelContainer: Container,
   draftGraphics: Graphics,
+  dimensionOverlayContainer: Container,
   state: EditorSnapshot,
   cursorWorld: Point | null,
   hoveredRoomLabelId: string | null,
@@ -688,10 +700,26 @@ function drawScene(
     getRenderedRoomsForLabelTransform(state.document.rooms, transformFeedback),
     state.selectedRoomId,
     hoveredRoomLabelId,
-    roomResizeUi,
     state.camera,
     state.viewport,
     transformFeedback,
+    theme
+  );
+  clearContainerChildren(dimensionOverlayContainer);
+  drawActiveResizeDimensions(
+    dimensionOverlayContainer,
+    renderedRooms,
+    roomResizeUi,
+    state.camera,
+    state.viewport,
+    theme
+  );
+  drawDraftDimensions(
+    dimensionOverlayContainer,
+    state.roomDraft.points,
+    cursorWorld,
+    state.camera,
+    state.viewport,
     theme
   );
   drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
@@ -1144,21 +1172,12 @@ function drawRoomLabels(
   rooms: Room[],
   selectedRoomId: string | null,
   hoveredRoomLabelId: string | null,
-  roomResizeUi: {
-    hoveredWall: RectWall | null;
-    hoveredCorner: RectCorner | null;
-    hoveredRoomId: string | null;
-    activeWall: RectWall | null;
-    activeCorner: RectCorner | null;
-    activeRoomId: string | null;
-  },
   camera: CameraState,
   viewport: ViewportSize,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
-  const staleLabels = labelContainer.removeChildren();
-  staleLabels.forEach((label) => label.destroy());
+  clearContainerChildren(labelContainer);
 
   for (const room of rooms) {
     const layout = getRoomLabelLayout(room, camera, viewport);
@@ -1260,7 +1279,6 @@ function drawRoomLabels(
     }
   }
 
-  drawActiveResizeDimensions(labelContainer, rooms, roomResizeUi, camera, viewport, theme);
 }
 
 type ResizeDimensionLabelSpec = {
@@ -1320,7 +1338,80 @@ function drawActiveResizeDimensions(
     roomLabelLayout,
     viewport
   );
+  drawDimensionLabels(labelContainer, labelLayouts, theme);
+}
 
+function drawDraftDimensions(
+  labelContainer: Container,
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const firstSegmentLabelSpec = getDraftFirstSegmentDimensionLabelSpec(
+    draftPoints,
+    cursorWorld,
+    camera,
+    viewport
+  );
+  if (firstSegmentLabelSpec) {
+    const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+      [firstSegmentLabelSpec],
+      null,
+      viewport
+    );
+    drawDimensionLabels(labelContainer, labelLayouts, theme);
+    return;
+  }
+
+  const draftPreviewRoom = getDraftPreviewRoom(draftPoints, cursorWorld);
+  if (!draftPreviewRoom) return;
+
+  const bounds = getAxisAlignedRoomBounds(draftPreviewRoom);
+  if (!bounds) return;
+
+  const measurements = getRectResizeMeasurements(draftPreviewRoom);
+  if (!measurements) return;
+  const draftDimensionWalls = getDraftDimensionWalls(draftPoints, draftPreviewRoom);
+
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    [
+      {
+        text: formatMetricWallDimension(measurements.widthMillimetres),
+        wall: draftDimensionWalls.horizontalWall,
+        axis: "horizontal",
+        ...getResizeDimensionAnchorForWall(
+          bounds,
+          draftDimensionWalls.horizontalWall,
+          camera,
+          viewport
+        ),
+      },
+      {
+        text: formatMetricWallDimension(measurements.heightMillimetres),
+        wall: draftDimensionWalls.verticalWall,
+        axis: "vertical",
+        ...getResizeDimensionAnchorForWall(
+          bounds,
+          draftDimensionWalls.verticalWall,
+          camera,
+          viewport
+        ),
+      },
+    ],
+    null,
+    viewport
+  );
+
+  drawDimensionLabels(labelContainer, labelLayouts, theme);
+}
+
+function drawDimensionLabels(
+  labelContainer: Container,
+  labelLayouts: ResizeDimensionLabelLayout[],
+  theme: EditorCanvasTheme
+) {
   for (const labelLayout of labelLayouts) {
     const textResolution = getTextResolution();
     const text = new Text({
@@ -1601,6 +1692,112 @@ function nudgeResizeDimensionLabel(
       viewport
     ),
   };
+}
+
+function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): Room | null {
+  if (!cursorWorld) return null;
+  if (draftPoints.length < 2) return null;
+
+  if (draftPoints.length === 2) {
+    const previewThirdPoint = getOrthogonalSnappedPoint(
+      draftPoints[draftPoints.length - 1],
+      cursorWorld,
+      GRID_SIZE_MM
+    );
+    const previewPoints = [...draftPoints, previewThirdPoint];
+    const closingPoint = getRectangleClosingPoint(previewPoints);
+    if (!closingPoint) return null;
+
+    return {
+      id: "__draft-preview__",
+      name: "",
+      points: [...previewPoints, closingPoint],
+    };
+  }
+
+  if (draftPoints.length === 3) {
+    const closingPoint = getRectangleClosingPoint(draftPoints);
+    if (!closingPoint) return null;
+
+    return {
+      id: "__draft-preview__",
+      name: "",
+      points: [...draftPoints, closingPoint],
+    };
+  }
+
+  return null;
+}
+
+function getDraftDimensionWalls(
+  draftPoints: Point[],
+  draftPreviewRoom: Room
+): {
+  horizontalWall: Extract<RectWall, "top" | "bottom">;
+  verticalWall: Extract<RectWall, "left" | "right">;
+} {
+  const [firstPoint, secondPoint, thirdPoint = draftPreviewRoom.points[2]] = draftPreviewRoom.points;
+
+  if (firstPoint.y === secondPoint.y) {
+    return {
+      horizontalWall: thirdPoint.y > firstPoint.y ? "top" : "bottom",
+      verticalWall: secondPoint.x > firstPoint.x ? "right" : "left",
+    };
+  }
+
+  return {
+    horizontalWall: secondPoint.y > firstPoint.y ? "bottom" : "top",
+    verticalWall: thirdPoint.x > firstPoint.x ? "left" : "right",
+  };
+}
+
+function clearContainerChildren(container: Container) {
+  const staleChildren = container.removeChildren();
+  staleChildren.forEach((child) => child.destroy());
+}
+
+function getDraftFirstSegmentDimensionLabelSpec(
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec | null {
+  if (!cursorWorld || draftPoints.length !== 1) return null;
+
+  const anchorPoint = draftPoints[0];
+  const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, GRID_SIZE_MM);
+  if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
+
+  const startScreen = worldToScreen(anchorPoint, camera, viewport);
+  const endScreen = worldToScreen(previewPoint, camera, viewport);
+  const isHorizontal = startScreen.y === endScreen.y;
+  const wall: RectWall =
+    isHorizontal
+      ? startScreen.x <= endScreen.x
+        ? "bottom"
+        : "top"
+      : startScreen.y <= endScreen.y
+        ? "right"
+        : "left";
+
+  return {
+    text: formatMetricWallDimension(getRectSegmentLengthMillimetres(anchorPoint, previewPoint)),
+    wall,
+    axis: isHorizontal ? "horizontal" : "vertical",
+    center: {
+      x: (startScreen.x + endScreen.x) / 2,
+      y: (startScreen.y + endScreen.y) / 2,
+    },
+    outwardDirection: isHorizontal
+      ? { x: 0, y: wall === "bottom" ? 1 : -1 }
+      : { x: wall === "right" ? 1 : -1, y: 0 },
+    tangentDirection: isHorizontal ? { x: 1, y: 0 } : { x: 0, y: 1 },
+    wallLengthPx: isHorizontal ? Math.abs(endScreen.x - startScreen.x) : Math.abs(endScreen.y - startScreen.y),
+  };
+}
+
+function getRectSegmentLengthMillimetres(start: Point, end: Point) {
+  return Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
 }
 
 function clampResizeDimensionLabelCenter(
