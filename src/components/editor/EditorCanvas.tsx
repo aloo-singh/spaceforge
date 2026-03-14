@@ -15,6 +15,7 @@ import {
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
+import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
@@ -410,6 +411,10 @@ export default function EditorCanvas() {
 
   useEffect(() => {
     return attachHistoryHotkeys(useEditorStore);
+  }, []);
+
+  useEffect(() => {
+    return attachDeleteRoomHotkeys(useEditorStore);
   }, []);
 
   useEffect(() => {
