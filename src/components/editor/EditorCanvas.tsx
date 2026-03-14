@@ -324,6 +324,7 @@ export default function EditorCanvas() {
       null,
       exportCamera,
       exportViewport,
+      null,
       editorThemeRef.current
     );
     drawDraft(
@@ -661,11 +662,12 @@ function drawScene(
   );
   drawRoomLabels(
     roomLabelContainer,
-    renderedRooms,
+    getRenderedRoomsForLabelTransform(state.document.rooms, transformFeedback),
     state.selectedRoomId,
     hoveredRoomLabelId,
     state.camera,
     state.viewport,
+    transformFeedback,
     theme
   );
   drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
@@ -901,6 +903,28 @@ function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: Transfor
   );
 }
 
+function getRenderedRoomsForLabelTransform(
+  rooms: Room[],
+  transformFeedback: TransformFeedback | null
+): Room[] {
+  if (!transformFeedback) return rooms;
+
+  const transformedPoints =
+    transformFeedback.mode === "resize" && transformFeedback.phase === "active"
+      ? transformFeedback.previewPoints
+      : getRenderedTransformRoomPoints(transformFeedback);
+  if (!transformedPoints) return rooms;
+
+  return rooms.map((room) =>
+    room.id === transformFeedback.roomId
+      ? {
+          ...room,
+          points: transformedPoints,
+        }
+      : room
+  );
+}
+
 function getRenderedTransformRoomPoints(transformFeedback: TransformFeedback): Point[] | null {
   if (transformFeedback.phase === "active") {
     return transformFeedback.originalPoints;
@@ -1098,6 +1122,7 @@ function drawRoomLabels(
   hoveredRoomLabelId: string | null,
   camera: CameraState,
   viewport: ViewportSize,
+  transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   const staleLabels = labelContainer.removeChildren();
@@ -1118,6 +1143,15 @@ function drawRoomLabels(
 
     const isSelected = selectedRoomId === room.id;
     const isHovered = hoveredRoomLabelId === room.id;
+    const isActiveResizeRoom =
+      transformFeedback?.roomId === room.id &&
+      transformFeedback.mode === "resize" &&
+      transformFeedback.phase === "active";
+    const isSettlingResizeRoom =
+      transformFeedback?.roomId === room.id &&
+      transformFeedback.mode === "resize" &&
+      transformFeedback.phase === "settling";
+    const resizeMotionEase = isSettlingResizeRoom ? getTransformRoomEase(transformFeedback) : 1;
     const fillColor = isSelected
       ? theme.roomLabelPillSelectedFill
       : isHovered
@@ -1167,22 +1201,32 @@ function drawRoomLabels(
         style: {
           fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
           fontSize: ROOM_LABEL_AREA_FONT_SIZE_PX,
-          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
-          fill: theme.roomLabelFill,
-          stroke: {
-            color: theme.roomLabelStroke,
-            width: 2,
-            join: "round",
-          },
+        fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+        fill: theme.roomLabelFill,
+        stroke: {
+          color: theme.roomLabelStroke,
+          width: 1.75,
+          join: "round",
         },
-      });
-      areaText.roundPixels = true;
-      areaText.anchor.set(0.5);
-      areaText.position.set(centerX, areaCenterY);
-      areaText.alpha = isHovered || isSelected ? 0.84 : 0.78;
-      labelContainer.addChild(areaText);
-    }
+        letterSpacing: 0.15,
+      },
+    });
+    areaText.roundPixels = true;
+    areaText.anchor.set(0.5);
+    areaText.position.set(centerX, areaCenterY);
+    areaText.alpha = isActiveResizeRoom
+      ? 0.94
+      : isSettlingResizeRoom
+        ? 0.78 + 0.16 * resizeMotionEase
+        : isHovered || isSelected
+          ? 0.84
+          : 0.78;
+    areaText.scale.set(
+      isActiveResizeRoom ? 1.02 : isSettlingResizeRoom ? 1 + 0.02 * resizeMotionEase : 1
+    );
+    labelContainer.addChild(areaText);
   }
+}
 }
 
 function drawDraft(

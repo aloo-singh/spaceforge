@@ -17,7 +17,7 @@ export const ROOM_LABEL_AREA_FONT_WEIGHT = "500";
 const ROOM_LABEL_MIN_WIDTH_PX = 40;
 const ROOM_LABEL_PADDING_X_PX = 9;
 const ROOM_LABEL_PADDING_Y_PX = 5;
-const ROOM_LABEL_AREA_OFFSET_Y_PX = 6;
+const ROOM_LABEL_AREA_OFFSET_Y_PX = 5;
 const ROOM_LABEL_PLACEHOLDER_TEXT = "Untitled";
 
 export type RoomLabelLayout = {
