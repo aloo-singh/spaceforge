@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.14.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Reset camera
+              </h3>
+              <p className="mt-2">
+                Added a reset-camera action that reframes the canvas around the current layout,
+                making it easy to get back to a sensible view.
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added reset-camera / fit-to-rooms action</li>
+                <li>Framed all rooms using shared outer bounds with comfortable padding</li>
+                <li>Added a smooth animated camera transition</li>
+                <li>Made reset-camera interruption-safe during manual pan and zoom</li>
+                <li>Added a toolbar control for quick access</li>
+                <li>Improved no-rooms behaviour and reset-camera robustness</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.13.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-14</span>
           </div>
