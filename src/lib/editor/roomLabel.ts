@@ -1,22 +1,33 @@
 import { worldToScreen } from "@/lib/editor/camera";
+import {
+  formatMetricRoomAreaForRoom,
+  shouldShowRoomArea,
+} from "@/lib/editor/measurements";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { CameraState, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
-import { UI_TEXT_FONT_FAMILY } from "@/lib/fonts";
+import { MEASUREMENT_TEXT_FONT_FAMILY, UI_TEXT_FONT_FAMILY } from "@/lib/fonts";
 
-export const ROOM_LABEL_FONT_FAMILY = UI_TEXT_FONT_FAMILY;
-export const ROOM_LABEL_FONT_SIZE_PX = 13;
-export const ROOM_LABEL_FONT_WEIGHT = "500";
+export const ROOM_LABEL_NAME_FONT_FAMILY = UI_TEXT_FONT_FAMILY;
+export const ROOM_LABEL_NAME_FONT_SIZE_PX = 13;
+export const ROOM_LABEL_NAME_FONT_WEIGHT = "500";
+export const ROOM_LABEL_AREA_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
+export const ROOM_LABEL_AREA_FONT_SIZE_PX = 11;
+export const ROOM_LABEL_AREA_FONT_WEIGHT = "500";
 
 const ROOM_LABEL_MIN_WIDTH_PX = 40;
 const ROOM_LABEL_PADDING_X_PX = 9;
 const ROOM_LABEL_PADDING_Y_PX = 5;
+const ROOM_LABEL_AREA_OFFSET_Y_PX = 6;
 const ROOM_LABEL_PLACEHOLDER_TEXT = "Untitled";
 
 export type RoomLabelLayout = {
   roomId: string;
-  text: string;
-  isPlaceholder: boolean;
   center: ScreenPoint;
+  nameText: string;
+  isPlaceholderName: boolean;
+  areaText: string | null;
+  nameCenterY: number;
+  areaCenterY: number | null;
   width: number;
   height: number;
   left: number;
@@ -36,16 +47,24 @@ export function getRoomLabelLayout(
 ): RoomLabelLayout | null {
   if (room.points.length < 3) return null;
   const trimmedName = room.name.trim();
-  const isPlaceholder = trimmedName.length === 0;
-  const text = isPlaceholder ? ROOM_LABEL_PLACEHOLDER_TEXT : trimmedName;
+  const isPlaceholderName = trimmedName.length === 0;
+  const nameText = isPlaceholderName ? ROOM_LABEL_PLACEHOLDER_TEXT : trimmedName;
+  const areaText = shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
 
   const anchorWorld = getPolygonLabelAnchor(room.points);
   if (!anchorWorld) return null;
 
   const center = worldToScreen(anchorWorld, camera, viewport);
-  const estimatedTextWidth = estimateLabelTextWidthPx(text);
-  const width = Math.max(ROOM_LABEL_MIN_WIDTH_PX, estimatedTextWidth + ROOM_LABEL_PADDING_X_PX * 2);
-  const height = ROOM_LABEL_FONT_SIZE_PX + ROOM_LABEL_PADDING_Y_PX * 2;
+  const estimatedNameWidth = estimateLabelTextWidthPx(nameText, ROOM_LABEL_NAME_FONT_SIZE_PX);
+  const width = Math.max(ROOM_LABEL_MIN_WIDTH_PX, estimatedNameWidth + ROOM_LABEL_PADDING_X_PX * 2);
+  const height = ROOM_LABEL_NAME_FONT_SIZE_PX + ROOM_LABEL_PADDING_Y_PX * 2;
+  const nameCenterY = center.y;
+  const areaCenterY = areaText
+    ? center.y +
+      height / 2 +
+      ROOM_LABEL_AREA_OFFSET_Y_PX +
+      ROOM_LABEL_AREA_FONT_SIZE_PX / 2
+    : null;
 
   const left = center.x - width / 2;
   const right = center.x + width / 2;
@@ -54,9 +73,12 @@ export function getRoomLabelLayout(
 
   return {
     roomId: room.id,
-    text,
-    isPlaceholder,
     center,
+    nameText,
+    isPlaceholderName,
+    areaText,
+    nameCenterY,
+    areaCenterY,
     width,
     height,
     left,
@@ -101,7 +123,7 @@ export function isScreenPointInsideRoomLabel(
   );
 }
 
-function estimateLabelTextWidthPx(text: string): number {
+function estimateLabelTextWidthPx(text: string, fontSizePx = ROOM_LABEL_NAME_FONT_SIZE_PX): number {
   let width = 0;
 
   for (const character of text) {
@@ -118,5 +140,5 @@ function estimateLabelTextWidthPx(text: string): number {
     width += 7;
   }
 
-  return width;
+  return width * (fontSizePx / ROOM_LABEL_NAME_FONT_SIZE_PX);
 }

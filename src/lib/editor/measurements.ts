@@ -3,6 +3,7 @@ import type { Point, Room } from "@/lib/editor/types";
 const SQUARE_MILLIMETRES_PER_SQUARE_METRE = 1_000_000;
 const ROOM_AREA_DISPLAY_STEP_SQUARE_METRES = 0.1;
 const ROOM_AREA_DISPLAY_MAX_FRACTION_DIGITS = 1;
+export const MIN_ROOM_AREA_LABEL_DISPLAY_SQUARE_METRES = 2;
 
 export function getPolygonAreaSquareMillimetres(points: Point[]): number {
   if (points.length < 3) return 0;
@@ -45,5 +46,8 @@ export function formatMetricRoomAreaForRoom(room: Room): string {
 }
 
 export function shouldShowRoomArea(room: Room): boolean {
-  return getRoomAreaSquareMillimetres(room) > 0;
+  return (
+    convertSquareMillimetresToSquareMetres(getRoomAreaSquareMillimetres(room)) >=
+    MIN_ROOM_AREA_LABEL_DISPLAY_SQUARE_METRES
+  );
 }

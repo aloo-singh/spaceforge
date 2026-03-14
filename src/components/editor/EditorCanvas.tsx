@@ -9,9 +9,12 @@ import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometr
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import {
   getRoomLabelLayout,
-  ROOM_LABEL_FONT_FAMILY,
-  ROOM_LABEL_FONT_SIZE_PX,
-  ROOM_LABEL_FONT_WEIGHT,
+  ROOM_LABEL_AREA_FONT_FAMILY,
+  ROOM_LABEL_AREA_FONT_SIZE_PX,
+  ROOM_LABEL_AREA_FONT_WEIGHT,
+  ROOM_LABEL_NAME_FONT_FAMILY,
+  ROOM_LABEL_NAME_FONT_SIZE_PX,
+  ROOM_LABEL_NAME_FONT_WEIGHT,
 } from "@/lib/editor/roomLabel";
 import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
@@ -1109,7 +1112,9 @@ function drawRoomLabels(
     const width = snapToPixel(layout.width, textResolution);
     const height = snapToPixel(layout.height, textResolution);
     const centerX = snapToPixel(layout.center.x, textResolution);
-    const centerY = snapToPixel(layout.center.y, textResolution);
+    const nameCenterY = snapToPixel(layout.nameCenterY, textResolution);
+    const areaCenterY =
+      layout.areaCenterY === null ? null : snapToPixel(layout.areaCenterY, textResolution);
 
     const isSelected = selectedRoomId === room.id;
     const isHovered = hoveredRoomLabelId === room.id;
@@ -1134,13 +1139,13 @@ function drawRoomLabels(
     pill.stroke();
     labelContainer.addChild(pill);
 
-    const text = new Text({
-      text: layout.text,
+    const nameText = new Text({
+      text: layout.nameText,
       resolution: textResolution,
       style: {
-        fontFamily: ROOM_LABEL_FONT_FAMILY,
-        fontSize: ROOM_LABEL_FONT_SIZE_PX,
-        fontWeight: ROOM_LABEL_FONT_WEIGHT,
+        fontFamily: ROOM_LABEL_NAME_FONT_FAMILY,
+        fontSize: ROOM_LABEL_NAME_FONT_SIZE_PX,
+        fontWeight: ROOM_LABEL_NAME_FONT_WEIGHT,
         fill: theme.roomLabelFill,
         stroke: {
           color: theme.roomLabelStroke,
@@ -1149,11 +1154,34 @@ function drawRoomLabels(
         },
       },
     });
-    text.roundPixels = true;
-    text.anchor.set(0.5);
-    text.position.set(centerX, centerY);
-    text.alpha = layout.isPlaceholder ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
-    labelContainer.addChild(text);
+    nameText.roundPixels = true;
+    nameText.anchor.set(0.5);
+    nameText.position.set(centerX, nameCenterY);
+    nameText.alpha = layout.isPlaceholderName ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
+    labelContainer.addChild(nameText);
+
+    if (layout.areaText && areaCenterY !== null) {
+      const areaText = new Text({
+        text: layout.areaText,
+        resolution: textResolution,
+        style: {
+          fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
+          fontSize: ROOM_LABEL_AREA_FONT_SIZE_PX,
+          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+          fill: theme.roomLabelFill,
+          stroke: {
+            color: theme.roomLabelStroke,
+            width: 2,
+            join: "round",
+          },
+        },
+      });
+      areaText.roundPixels = true;
+      areaText.anchor.set(0.5);
+      areaText.position.set(centerX, areaCenterY);
+      areaText.alpha = isHovered || isSelected ? 0.84 : 0.78;
+      labelContainer.addChild(areaText);
+    }
   }
 }
 
