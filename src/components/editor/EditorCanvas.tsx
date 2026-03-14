@@ -86,6 +86,7 @@ const RESIZE_DIMENSION_EDGE_OFFSET_PX = 18;
 const RESIZE_DIMENSION_VIEWPORT_MARGIN_PX = 10;
 const RESIZE_DIMENSION_LABEL_GAP_PX = 12;
 const RESIZE_DIMENSION_MIN_SHORT_WALL_PX = 96;
+const RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX = 20;
 const RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX = 8;
 const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
@@ -1377,28 +1378,20 @@ function drawDraftDimensions(
 
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
     [
-      {
-        text: formatMetricWallDimension(measurements.widthMillimetres),
-        wall: draftDimensionWalls.horizontalWall,
-        axis: "horizontal",
-        ...getResizeDimensionAnchorForWall(
-          bounds,
-          draftDimensionWalls.horizontalWall,
-          camera,
-          viewport
-        ),
-      },
-      {
-        text: formatMetricWallDimension(measurements.heightMillimetres),
-        wall: draftDimensionWalls.verticalWall,
-        axis: "vertical",
-        ...getResizeDimensionAnchorForWall(
-          bounds,
-          draftDimensionWalls.verticalWall,
-          camera,
-          viewport
-        ),
-      },
+      createDimensionLabelSpecForWallMeasurement(
+        draftDimensionWalls.horizontalWall,
+        measurements.widthMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+      createDimensionLabelSpecForWallMeasurement(
+        draftDimensionWalls.verticalWall,
+        measurements.heightMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
     ],
     null,
     viewport
@@ -1471,14 +1464,7 @@ function getResizeDimensionLabelSpecs(
     const measurement = getWallResizeMeasurementMillimetres(room, activeWall);
     if (measurement === null) return [];
 
-    return [
-      {
-        text: formatMetricWallDimension(measurement),
-        wall: activeWall,
-        axis: activeWall === "top" || activeWall === "bottom" ? "horizontal" : "vertical",
-        ...getResizeDimensionAnchorForWall(bounds, activeWall, camera, viewport),
-      },
-    ];
+    return [createDimensionLabelSpecForWallMeasurement(activeWall, measurement, bounds, camera, viewport)];
   }
 
   if (activeCorner) {
@@ -1488,18 +1474,20 @@ function getResizeDimensionLabelSpecs(
     const { horizontalWall, verticalWall } = getResizeWallsForCorner(activeCorner);
 
     return [
-      {
-        text: formatMetricWallDimension(measurements.widthMillimetres),
-        wall: horizontalWall,
-        axis: "horizontal",
-        ...getResizeDimensionAnchorForWall(bounds, horizontalWall, camera, viewport),
-      },
-      {
-        text: formatMetricWallDimension(measurements.heightMillimetres),
-        wall: verticalWall,
-        axis: "vertical",
-        ...getResizeDimensionAnchorForWall(bounds, verticalWall, camera, viewport),
-      },
+      createDimensionLabelSpecForWallMeasurement(
+        horizontalWall,
+        measurements.widthMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
+      createDimensionLabelSpecForWallMeasurement(
+        verticalWall,
+        measurements.heightMillimetres,
+        bounds,
+        camera,
+        viewport
+      ),
     ];
   }
 
@@ -1520,6 +1508,21 @@ function getResizeWallsForCorner(corner: RectCorner): {
     case "bottom-left":
       return { horizontalWall: "bottom", verticalWall: "left" };
   }
+}
+
+function createDimensionLabelSpecForWallMeasurement(
+  wall: RectWall,
+  lengthMillimetres: number,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec {
+  return {
+    text: formatMetricWallDimension(lengthMillimetres),
+    wall,
+    axis: wall === "top" || wall === "bottom" ? "horizontal" : "vertical",
+    ...getResizeDimensionAnchorForWall(bounds, wall, camera, viewport),
+  };
 }
 
 function getResizeDimensionAnchorForWall(
@@ -1616,7 +1619,7 @@ function getResolvedResizeDimensionLabelLayouts(
       width,
       height,
     };
-  });
+  }).filter((_, index) => labelSpecs[index].wallLengthPx >= RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX);
 
   if (roomLabelLayout) {
     for (let index = 0; index < labelLayouts.length; index += 1) {
