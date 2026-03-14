@@ -1,8 +1,9 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { CameraState, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import { UI_TEXT_FONT_FAMILY } from "@/lib/fonts";
 
-export const ROOM_LABEL_FONT_FAMILY = "Inter, sans-serif";
+export const ROOM_LABEL_FONT_FAMILY = UI_TEXT_FONT_FAMILY;
 export const ROOM_LABEL_FONT_SIZE_PX = 13;
 export const ROOM_LABEL_FONT_WEIGHT = "500";
 

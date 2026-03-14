@@ -6,6 +6,7 @@ import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
 import { getOrthogonalSnappedPoint, snapPointToGrid } from "@/lib/editor/geometry";
+import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import {
   getRoomLabelLayout,
   ROOM_LABEL_FONT_FAMILY,
@@ -374,6 +375,20 @@ export default function EditorCanvas() {
   useEffect(() => {
     editorThemeRef.current = editorTheme;
   }, [editorTheme]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void preloadEditorCanvasFonts().then(() => {
+      if (!cancelled) {
+        drawCurrentScene();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawCurrentScene]);
 
   useEffect(() => {
     activeHintIdRef.current = displayedHint?.id ?? null;
