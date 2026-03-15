@@ -136,10 +136,10 @@ export function ResponsiveDialog({
         tabIndex={-1}
         data-surface={isMobile ? "drawer" : "dialog"}
         className={cn(
-          "w-full border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
+          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
           isMobile
-            ? "rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            : "max-w-md rounded-xl p-5",
+            ? "w-full rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            : "w-[min(100%,28rem)] rounded-xl p-5",
           className
         )}
         onClick={(event) => event.stopPropagation()}
