@@ -25,6 +25,12 @@ import {
   saveEditorSnapshot,
 } from "@/lib/editor/editorPersistence";
 import {
+  areEditorSettingsEqual,
+  cloneEditorSettings,
+  DEFAULT_EDITOR_SETTINGS,
+  type EditorSettings,
+} from "@/lib/editor/settings";
+import {
   buildPersistedHistorySnapshot,
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
@@ -53,6 +59,7 @@ type RenameSessionState = {
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
+  settings: EditorSettings;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
@@ -65,6 +72,7 @@ type EditorState = {
   canUndo: boolean;
   canRedo: boolean;
   setViewport: (width: number, height: number) => void;
+  updateSettings: (settings: Partial<EditorSettings>) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
@@ -208,6 +216,10 @@ function createInitialCameraState(): CameraState {
   return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
 }
 
+function createInitialEditorSettings(): EditorSettings {
+  return hydrationSnapshot?.settings ?? cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
+}
+
 type ActiveResetCameraAnimation = {
   frameId: number;
   sequence: number;
@@ -239,6 +251,7 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
+  settings: createInitialEditorSettings(),
   viewport: {
     width: 1,
     height: 1,
@@ -256,6 +269,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canUndo: hydratedHistoryState.past.length > 0,
   canRedo: hydratedHistoryState.future.length > 0,
   setViewport: (width, height) => set({ viewport: { width, height } }),
+  updateSettings: (settings) =>
+    set((state) => {
+      const nextSettings: EditorSettings = {
+        ...state.settings,
+        ...settings,
+      };
+      if (areEditorSettingsEqual(state.settings, nextSettings)) return state;
+
+      return {
+        settings: nextSettings,
+      };
+    }),
   panCameraByPx: (delta) => {
     stopResetCameraAnimation();
     set((state) => ({
@@ -767,6 +792,7 @@ if (typeof window !== "undefined") {
     return {
       document: state.document,
       camera: state.camera,
+      settings: state.settings,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     };
@@ -779,6 +805,7 @@ if (typeof window !== "undefined") {
     const nextPersistedSignature = JSON.stringify({
       document: state.document,
       camera: state.camera,
+      settings: state.settings,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     });
@@ -787,6 +814,7 @@ if (typeof window !== "undefined") {
     const didSave = saveEditorSnapshot({
       document: state.document,
       camera: state.camera,
+      settings: state.settings,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     });
@@ -819,9 +847,10 @@ if (typeof window !== "undefined") {
   const unsubscribe = useEditorStore.subscribe((state, previousState) => {
     const didDocumentChange = state.document !== previousState.document;
     const didCameraChange = !areCamerasEqual(state.camera, previousState.camera);
+    const didSettingsChange = !areEditorSettingsEqual(state.settings, previousState.settings);
     const didPastChange = state.history.past !== previousState.history.past;
     const didFutureChange = state.history.future !== previousState.history.future;
-    if (!didDocumentChange && !didCameraChange && !didPastChange && !didFutureChange) return;
+    if (!didDocumentChange && !didCameraChange && !didSettingsChange && !didPastChange && !didFutureChange) return;
 
     if (autosaveTimeout) {
       clearTimeout(autosaveTimeout);

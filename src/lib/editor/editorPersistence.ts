@@ -1,15 +1,22 @@
 import type { CameraState, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
+import {
+  cloneEditorSettings,
+  DEFAULT_EDITOR_SETTINGS,
+  isEditorSettings,
+  type EditorSettings,
+} from "@/lib/editor/settings";
 
 // Browser persistence schema for the editor.
 // Compatibility rules:
 // - v1 payloads restore layout + camera only.
 // - v2 payloads restore layout + camera + bounded snapshot history.
+// - v3 payloads restore layout + camera + bounded snapshot history + editor settings.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2 payload is dropped while layout/camera still hydrate.
+// - Malformed history inside an otherwise valid v2/v3 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 2;
+export const EDITOR_PERSISTENCE_VERSION = 3;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -27,6 +34,7 @@ type PersistedDocument = {
 export type PersistedEditorSnapshot = {
   document: EditorDocumentState;
   camera: CameraState;
+  settings: EditorSettings;
   historyStack: EditorDocumentState[];
   historyIndex: number;
 };
@@ -34,6 +42,7 @@ export type PersistedEditorSnapshot = {
 export type PersistedEditorHydrationSnapshot = {
   document: EditorDocumentState;
   camera: CameraState | null;
+  settings: EditorSettings;
   historyStack: EditorDocumentState[] | null;
   historyIndex: number | null;
 };
@@ -45,9 +54,20 @@ export type PersistedEditorPayloadV1 = {
 };
 
 export type PersistedEditorPayloadV2 = {
+  version: 2;
+  document: PersistedDocument;
+  camera: CameraState;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV3 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
+  settings: EditorSettings;
   history: {
     stack: PersistedDocument[];
     index: number;
@@ -157,6 +177,7 @@ function createHistorylessHydrationSnapshot(
   return {
     document: cloneDocument(document),
     camera: camera ? cloneCamera(camera) : null,
+    settings: cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
     historyStack: null,
     historyIndex: null,
   };
@@ -187,7 +208,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       };
     }
 
-    if (parsed.version !== EDITOR_PERSISTENCE_VERSION || !isPersistedDocument(parsed.document)) {
+    if ((parsed.version !== 2 && parsed.version !== EDITOR_PERSISTENCE_VERSION) || !isPersistedDocument(parsed.document)) {
       return {
         status: "invalid-payload",
       };
@@ -209,6 +230,9 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       snapshot: {
         document: cloneDocument(parsed.document),
         camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
+        settings: isEditorSettings(parsed.settings)
+          ? cloneEditorSettings(parsed.settings)
+          : cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
         historyStack: normalizedHistory?.historyStack ?? null,
         historyIndex: normalizedHistory?.historyIndex ?? null,
       },
@@ -229,10 +253,11 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV2 = {
+  const payload: PersistedEditorPayloadV3 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
+    settings: cloneEditorSettings(snapshot.settings),
     history: {
       stack: (normalizedHistory?.historyStack ?? [snapshot.document]).map((document) => cloneDocument(document)),
       index: normalizedHistory?.historyIndex ?? 0,
@@ -256,6 +281,7 @@ export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot 
   return {
     document: hydrationSnapshot.document,
     camera: hydrationSnapshot.camera,
+    settings: hydrationSnapshot.settings,
     historyStack: hydrationSnapshot.historyStack,
     historyIndex: hydrationSnapshot.historyIndex,
   };

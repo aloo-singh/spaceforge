@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Download, LocateFixed, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -22,7 +23,9 @@ export function HistoryControls({
   exportDisabled = false,
   exportDisabledReason,
 }: HistoryControlsProps) {
+  const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [exportSignatureText, setExportSignatureText] = useState("");
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -67,6 +70,19 @@ export function HistoryControls({
     <>
       <aside className="pointer-events-auto absolute top-4 right-4 z-20 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm">
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setIsSettingsDialogOpen(true)}
+            aria-label="Open editor settings"
+            aria-haspopup="dialog"
+            aria-expanded={isSettingsDialogOpen}
+            aria-controls={settingsDialogId}
+            title="Editor settings"
+          >
+            <Settings2 />
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -156,14 +172,30 @@ export function HistoryControls({
         description="This will remove your current layout from the canvas and clear saved local editor data for this device."
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsResetDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={confirmResetCanvas}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmResetCanvas}
+              className="w-full sm:w-auto"
+            >
               Reset canvas
             </Button>
           </>
         }
+      />
+
+      <EditorSettingsDialog
+        contentId={settingsDialogId}
+        open={isSettingsDialogOpen}
+        onOpenChange={setIsSettingsDialogOpen}
       />
     </>
   );
