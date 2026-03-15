@@ -23,6 +23,7 @@ export function HistoryControls({
   exportDisabled = false,
   exportDisabledReason,
 }: HistoryControlsProps) {
+  const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [exportSignatureText, setExportSignatureText] = useState("");
@@ -75,6 +76,9 @@ export function HistoryControls({
             size="icon-sm"
             onClick={() => setIsSettingsDialogOpen(true)}
             aria-label="Open editor settings"
+            aria-haspopup="dialog"
+            aria-expanded={isSettingsDialogOpen}
+            aria-controls={settingsDialogId}
             title="Editor settings"
           >
             <Settings2 />
@@ -168,10 +172,20 @@ export function HistoryControls({
         description="This will remove your current layout from the canvas and clear saved local editor data for this device."
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsResetDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={confirmResetCanvas}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmResetCanvas}
+              className="w-full sm:w-auto"
+            >
               Reset canvas
             </Button>
           </>
@@ -179,6 +193,7 @@ export function HistoryControls({
       />
 
       <EditorSettingsDialog
+        contentId={settingsDialogId}
         open={isSettingsDialogOpen}
         onOpenChange={setIsSettingsDialogOpen}
       />
