@@ -121,7 +121,7 @@ export function ResponsiveDialog({
   return (
     <div
       className={cn(
-        "pointer-events-auto fixed inset-0 z-40 bg-black/55",
+        "pointer-events-auto fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]",
         isMobile ? "flex items-end justify-stretch" : "flex items-center justify-center p-4"
       )}
       onClick={() => onOpenChange(false)}
@@ -136,10 +136,10 @@ export function ResponsiveDialog({
         tabIndex={-1}
         data-surface={isMobile ? "drawer" : "dialog"}
         className={cn(
-          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
+          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none overflow-y-auto",
           isMobile
-            ? "w-full rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            : "w-[min(100%,28rem)] rounded-xl p-5",
+            ? "w-full max-h-[min(85vh,calc(100vh-0.75rem))] rounded-t-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+            : "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] rounded-xl p-5",
           className
         )}
         onClick={(event) => event.stopPropagation()}
@@ -157,9 +157,9 @@ export function ResponsiveDialog({
             {description}
           </p>
         ) : null}
-        {children ? <div className="mt-4">{children}</div> : null}
+        {children ? <div className="mt-5">{children}</div> : null}
         {footer ? (
-          <div className={cn("mt-5 flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
+          <div className={cn("mt-6 flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
             {footer}
           </div>
         ) : null}

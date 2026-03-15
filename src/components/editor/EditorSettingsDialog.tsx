@@ -35,17 +35,17 @@ export function EditorSettingsDialog({
         </Button>
       }
     >
-      <section className="space-y-3">
+      <section className="space-y-3.5">
         <div
           aria-labelledby="editor-settings-measurements-title"
-          className="rounded-lg border border-border/70 bg-muted/30 p-3"
+          className="rounded-xl border border-border/70 bg-muted/30 p-3"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 id="editor-settings-measurements-title" className="text-sm font-medium text-foreground">
                 Measurements
               </h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                 Current editor behaviour stays interaction-based for now. Future visibility and unit
                 controls will extend this section.
               </p>
@@ -61,12 +61,12 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-coming-soon-title"
-          className="rounded-lg border border-dashed border-border/70 p-3"
+          className="rounded-xl border border-dashed border-border/70 p-3"
         >
           <h3 id="editor-settings-coming-soon-title" className="text-sm font-medium text-foreground">
             Coming soon
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
             Dimensions visibility, typography sizing, and other editor display preferences will be
             added here incrementally.
           </p>
