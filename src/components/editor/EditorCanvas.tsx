@@ -86,6 +86,10 @@ const EMPTY_ROOM_RESIZE_UI = {
   activeCorner: null,
   activeRoomId: null,
 } as const;
+const EMPTY_HOVERED_SELECTABLE_WALL = null as {
+  roomId: string;
+  wall: RectWall;
+} | null;
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
@@ -123,6 +127,10 @@ export default function EditorCanvas() {
   const dimensionOverlayRef = useRef<Container | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
+  const hoveredSelectableWallRef = useRef<{
+    roomId: string;
+    wall: RectWall;
+  } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -189,6 +197,7 @@ export default function EditorCanvas() {
       useEditorStore.getState(),
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
+      hoveredSelectableWallRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
       editorThemeRef.current
@@ -360,6 +369,7 @@ export default function EditorCanvas() {
     drawRooms(
       exportRoomGraphics,
       state.document.rooms,
+      null,
       null,
       null,
       EMPTY_ROOM_RESIZE_UI,
@@ -620,6 +630,9 @@ export default function EditorCanvas() {
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
         },
+        onHoveredSelectableWallChange: (wallSelection) => {
+          hoveredSelectableWallRef.current = wallSelection;
+        },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
         },
@@ -732,6 +745,10 @@ function drawScene(
   state: EditorSnapshot,
   cursorWorld: Point | null,
   hoveredRoomLabelId: string | null,
+  hoveredSelectableWall: {
+    roomId: string;
+    wall: RectWall;
+  } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -758,6 +775,7 @@ function drawScene(
     renderedRooms,
     state.selectedRoomId,
     state.selectedWall,
+    hoveredSelectableWall,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -848,6 +866,10 @@ function drawRooms(
   rooms: Room[],
   selectedRoomId: string | null,
   selectedWall: RoomWallSelection | null,
+  hoveredSelectableWall: {
+    roomId: string;
+    wall: RectWall;
+  } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -940,16 +962,26 @@ function drawRooms(
       }
     }
 
+    if (!isDraftingRoom && !isActiveTransformRoom) {
+      const bounds = getAxisAlignedRoomBounds(room);
+      const hoveredSelectableRoomWall =
+        hoveredSelectableWall?.roomId === room.id ? hoveredSelectableWall.wall : null;
+      const hoveredResizeWall =
+        roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
+      const hoveredWall = hoveredSelectableRoomWall ?? hoveredResizeWall;
+      const isSelectedWall =
+        selectedWall?.roomId === room.id && selectedWall.wall === hoveredWall;
+
+      if (bounds && hoveredWall && !isSelectedWall) {
+        drawHoveredWallHighlight(graphics, bounds, hoveredWall, camera, viewport, theme);
+      }
+    }
+
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
-    const hoveredWall =
-      roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
-    if (hoveredWall) {
-      drawHoveredWallHighlight(graphics, bounds, hoveredWall, camera, viewport, theme);
-    }
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
@@ -1232,9 +1264,9 @@ function drawHoveredWallHighlight(
   const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
 
   graphics.setStrokeStyle({
-    width: 3,
-    color: theme.interactiveAccent,
-    alpha: 0.58,
+    width: 2,
+    color: theme.wallSelectionAccent,
+    alpha: 0.55,
   });
   graphics.moveTo(from.x, from.y);
   graphics.lineTo(to.x, to.y);
@@ -1252,7 +1284,7 @@ function drawSelectedWallHighlight(
   const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
 
   graphics.setStrokeStyle({
-    width: 6,
+    width: 5,
     color: theme.canvasBackground,
     alpha: 0.96,
   });
@@ -1262,7 +1294,7 @@ function drawSelectedWallHighlight(
 
   graphics.setStrokeStyle({
     width: 3,
-    color: theme.interactiveAccent,
+    color: theme.wallSelectionAccent,
     alpha: 1,
   });
   graphics.moveTo(from.x, from.y);

@@ -41,6 +41,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
+  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RectWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
@@ -98,7 +99,14 @@ export function attachRoomDrawInput(
   };
 
   const setHoveredSelectableWall = (wallSelection: { roomId: string; wall: RectWall } | null) => {
+    if (
+      hoveredSelectableWall?.roomId === wallSelection?.roomId &&
+      hoveredSelectableWall?.wall === wallSelection?.wall
+    ) {
+      return;
+    }
     hoveredSelectableWall = wallSelection;
+    callbacks.onHoveredSelectableWallChange?.(wallSelection);
   };
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
