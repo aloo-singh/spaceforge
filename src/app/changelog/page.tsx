@@ -10,6 +10,46 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.17.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Editor settings foundation introduced</li>
+                <li>Settings button added to the editor toolbar</li>
+                <li>Responsive settings surface with a dialog on desktop and a drawer on mobile</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Global button press feedback now uses a subtle 0.97 press scale</li>
+                <li>Disabled buttons now show a <code>not-allowed</code> cursor</li>
+                <li>Improved accessibility for editor dialogs</li>
+                <li>Introduced a responsive dialog wrapper for future settings and help surfaces</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Architecture
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added an editor settings model to the Zustand store</li>
+                <li>Integrated settings persistence with the editor snapshot system</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.16.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-14</span>
           </div>
