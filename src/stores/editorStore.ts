@@ -60,6 +60,7 @@ type EditorState = {
   document: DocumentState;
   camera: CameraState;
   settings: EditorSettings;
+  isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
@@ -71,6 +72,7 @@ type EditorState = {
   };
   canUndo: boolean;
   canRedo: boolean;
+  setDimensionsVisibilityOverrideActive: (isActive: boolean) => void;
   setViewport: (width: number, height: number) => void;
   updateSettings: (settings: Partial<EditorSettings>) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
@@ -252,6 +254,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
   settings: createInitialEditorSettings(),
+  isDimensionsVisibilityOverrideActive: false,
   viewport: {
     width: 1,
     height: 1,
@@ -268,6 +271,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   canUndo: hydratedHistoryState.past.length > 0,
   canRedo: hydratedHistoryState.future.length > 0,
+  setDimensionsVisibilityOverrideActive: (isActive) =>
+    set((state) => {
+      if (state.isDimensionsVisibilityOverrideActive === isActive) return state;
+
+      return {
+        isDimensionsVisibilityOverrideActive: isActive,
+      };
+    }),
   setViewport: (width, height) => set({ viewport: { width, height } }),
   updateSettings: (settings) =>
     set((state) => {

@@ -469,6 +469,44 @@ export default function EditorCanvas() {
   }, []);
 
   useEffect(() => {
+    const syncDimensionsOverride = (isActive: boolean) => {
+      useEditorStore.getState().setDimensionsVisibilityOverrideActive(isActive);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey) return;
+      syncDimensionsOverride(true);
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      syncDimensionsOverride(event.altKey);
+    };
+
+    const clearDimensionsOverride = () => {
+      syncDimensionsOverride(false);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        clearDimensionsOverride();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clearDimensionsOverride);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearDimensionsOverride);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearDimensionsOverride();
+    };
+  }, []);
+
+  useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
     const resizeTarget: HTMLElement = host;
@@ -685,7 +723,10 @@ function drawScene(
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
-  const showDimensions = shouldShowDimensions(state.settings);
+  const showDimensions = shouldShowDimensions(
+    state.settings,
+    state.isDimensionsVisibilityOverrideActive
+  );
   const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(
     state.document.rooms,
