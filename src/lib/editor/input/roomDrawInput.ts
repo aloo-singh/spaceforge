@@ -1,7 +1,8 @@
 import { screenToWorld } from "@/lib/editor/camera";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
+import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
-import { isPointInPolygon } from "@/lib/editor/roomGeometry";
+import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
 import {
   getSnappedRoomTranslationDelta,
   translateRoomPoints,
@@ -69,6 +70,7 @@ export function attachRoomDrawInput(
   let isSpaceHeld = false;
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
+  let hoveredSelectableRoomId: string | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
@@ -83,6 +85,10 @@ export function attachRoomDrawInput(
     if (hoveredRoomLabelId === roomId) return;
     hoveredRoomLabelId = roomId;
     callbacks.onHoveredRoomLabelChange(roomId);
+  };
+
+  const setHoveredSelectableRoomId = (roomId: string | null) => {
+    hoveredSelectableRoomId = roomId;
   };
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
@@ -138,7 +144,7 @@ export function attachRoomDrawInput(
       return;
     }
 
-    if (!isSpaceHeld && hoveredRoomLabelId) {
+    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId)) {
       setCursor("pointer");
       return;
     }
@@ -171,6 +177,7 @@ export function attachRoomDrawInput(
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
+        setHoveredSelectableRoomId(null);
         setTransformFeedback(null);
         callbacks.requestRender();
         return;
@@ -213,8 +220,15 @@ export function attachRoomDrawInput(
         state.viewport
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+      if (!hoveredRoom) {
+        const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
+        setHoveredSelectableRoomId(hoveredBodyRoom?.id ?? null);
+      } else {
+        setHoveredSelectableRoomId(null);
+      }
     } else {
       setHoveredRoomLabelId(null);
+      setHoveredSelectableRoomId(null);
     }
     updateCursor();
     callbacks.requestRender();
@@ -224,6 +238,7 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    setHoveredSelectableRoomId(null);
     updateCursor();
     callbacks.requestRender();
   };
@@ -281,6 +296,14 @@ export function attachRoomDrawInput(
       return;
     }
 
+    const bodyHitRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
+    if (bodyHitRoom) {
+      state.selectRoomById(bodyHitRoom.id);
+      setHoveredSelectableRoomId(bodyHitRoom.id);
+      updateCursor();
+      return;
+    }
+
     if (state.selectedRoomId) {
       const selectedRoom =
         state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
@@ -333,6 +356,7 @@ export function attachRoomDrawInput(
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
 
@@ -346,6 +370,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
 
@@ -398,6 +423,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableRoomId(null);
     updateCursor();
   };
 
@@ -426,6 +452,19 @@ export function attachRoomDrawInput(
     stopLabelDragSession();
     canvas.style.cursor = "";
   };
+}
+
+function findSelectableRoomAtScreenPoint(
+  state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
+  worldPoint: Point
+): Room | null {
+  const room = findRoomAtPoint(state.document.rooms, worldPoint);
+  if (!room) return null;
+
+  const declutter = getRoomDeclutterState(room, state.camera, state.viewport);
+  if (declutter.showLabel) return null;
+
+  return room;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

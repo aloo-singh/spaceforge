@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.22.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added progressive low-zoom decluttering for rooms and editing chrome</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Very small rooms now hide label pills and use room-body selection as a fallback</li>
+                <li>Small rooms hide resize handles before hiding more essential selection visibility</li>
+                <li>Room area text now appears only when the room is large enough on screen to support it cleanly</li>
+                <li>Selected rooms remain visibly selected even when low-zoom decluttering is active</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Large zoomed-out layouts are now calmer and easier to read</li>
+                <li>Editing chrome is reduced when it becomes too small to be useful</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.21.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>
