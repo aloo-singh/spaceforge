@@ -43,13 +43,19 @@ export type RoomLabelLayout = {
 export function getRoomLabelLayout(
   room: Room,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  options?: {
+    showArea?: boolean;
+  }
 ): RoomLabelLayout | null {
   if (room.points.length < 3) return null;
   const trimmedName = room.name.trim();
   const isPlaceholderName = trimmedName.length === 0;
   const nameText = isPlaceholderName ? ROOM_LABEL_PLACEHOLDER_TEXT : trimmedName;
-  const areaText = shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
+  const areaText =
+    (options?.showArea ?? true) && shouldShowRoomArea(room)
+      ? formatMetricRoomAreaForRoom(room)
+      : null;
 
   const anchorWorld = getPolygonLabelAnchor(room.points);
   if (!anchorWorld) return null;
