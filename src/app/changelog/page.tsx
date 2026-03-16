@@ -10,6 +10,45 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.19.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hold <strong>Alt/Option</strong> to temporarily invert the dimensions visibility setting</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Dimensions visibility can now be temporarily revealed or hidden during drawing and resizing</li>
+                <li>Added inline discoverability hint in Editor Settings for the temporary override</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Temporary override affects draw-time segment dimensions</li>
+                <li>Temporary override affects draw-time width/height previews</li>
+                <li>Temporary override affects wall resize dimensions</li>
+                <li>Temporary override affects corner resize dimensions</li>
+                <li>Room area beneath the room label pill remains visible</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.18.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>
