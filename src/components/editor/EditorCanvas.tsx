@@ -713,11 +713,12 @@ export default function EditorCanvas() {
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
-        room body to select that room, and click near a room wall edge to select that wall. When a
-        room is selected, clicking outside clears selection first, then a following click can start
-        drawing. Hold Space and drag to pan, middle mouse drag also pans, mouse wheel zooms, and
-        Escape cancels the current room draft or clears selection. Right click also cancels the
-        current room draft. Undo is Cmd or Ctrl plus Z, and redo is Shift+Cmd+Z or Ctrl+Y.
+        room body to select that room. When a room is selected, click near one of that room&apos;s
+        wall edges to select that wall. Clicking outside a selected room clears selection first,
+        then a following click can start drawing. Hold Space and drag to pan, middle mouse drag
+        also pans, mouse wheel zooms, and Escape cancels the current room draft or clears
+        selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
+        and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div
         ref={containerRef}

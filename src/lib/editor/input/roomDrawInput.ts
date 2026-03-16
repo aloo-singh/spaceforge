@@ -511,6 +511,10 @@ function findSelectableWallAtScreenPoint(
   screenPoint: Point,
   worldPoint: Point
 ): { roomId: string; wall: RectWall } | null {
+  if (!state.selectedRoomId) {
+    return null;
+  }
+
   const candidates: Array<{
     roomId: string;
     wall: RectWall;
