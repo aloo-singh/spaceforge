@@ -33,8 +33,12 @@ export function isEditorDimensionsVisibility(value: unknown): value is EditorDim
   return value === "visible" || value === "hidden";
 }
 
-export function shouldShowDimensions(settings: Pick<EditorSettings, "dimensionsVisibility">): boolean {
-  return settings.dimensionsVisibility === "visible";
+export function shouldShowDimensions(
+  settings: Pick<EditorSettings, "dimensionsVisibility">,
+  invertVisibility = false
+): boolean {
+  const areDimensionsVisible = settings.dimensionsVisibility === "visible";
+  return invertVisibility ? !areDimensionsVisible : areDimensionsVisible;
 }
 
 export function normalizeEditorSettings(value: unknown): EditorSettings | null {
