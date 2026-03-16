@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { Badge } from "@/components/ui/badge";
 import {
   appSansFont,
@@ -32,8 +33,8 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <header className="flex h-14 items-center justify-between border-b border-black/10 bg-background/90 px-4 backdrop-blur sm:px-6">
-            <Link href="/" className="text-sm font-semibold tracking-tight">
-              SpaceForge
+            <Link href="/" aria-label="SpaceForge home">
+              <BrandWordmark />
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               <Link href="/" className="text-foreground/80 hover:text-foreground">
