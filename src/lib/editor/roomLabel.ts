@@ -1,4 +1,5 @@
 import { worldToScreen } from "@/lib/editor/camera";
+import { getMeasurementTextScale, type EditorSettings } from "@/lib/editor/settings";
 import {
   formatMetricRoomAreaForRoom,
   shouldShowRoomArea,
@@ -43,13 +44,16 @@ export type RoomLabelLayout = {
 export function getRoomLabelLayout(
   room: Room,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings?: Pick<EditorSettings, "measurementFontSize">
 ): RoomLabelLayout | null {
   if (room.points.length < 3) return null;
   const trimmedName = room.name.trim();
   const isPlaceholderName = trimmedName.length === 0;
   const nameText = isPlaceholderName ? ROOM_LABEL_PLACEHOLDER_TEXT : trimmedName;
   const areaText = shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
+  const measurementTextScale = settings ? getMeasurementTextScale(settings) : 1;
+  const areaFontSizePx = ROOM_LABEL_AREA_FONT_SIZE_PX * measurementTextScale;
 
   const anchorWorld = getPolygonLabelAnchor(room.points);
   if (!anchorWorld) return null;
@@ -62,8 +66,8 @@ export function getRoomLabelLayout(
   const areaCenterY = areaText
     ? center.y +
       height / 2 +
-      ROOM_LABEL_AREA_OFFSET_Y_PX +
-      ROOM_LABEL_AREA_FONT_SIZE_PX / 2
+      ROOM_LABEL_AREA_OFFSET_Y_PX * measurementTextScale +
+      areaFontSizePx / 2
     : null;
 
   const left = center.x - width / 2;

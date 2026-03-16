@@ -1,4 +1,5 @@
 import { MEASUREMENT_TEXT_FONT_FAMILY, UI_TEXT_FONT_FAMILY } from "@/lib/fonts";
+import { getMeasurementTextScale } from "@/lib/editor/settings";
 import {
   ROOM_LABEL_AREA_FONT_SIZE_PX,
   ROOM_LABEL_AREA_FONT_WEIGHT,
@@ -31,6 +32,13 @@ export async function preloadEditorCanvasFonts(): Promise<void> {
       buildFontLoadDescriptor(
         MEASUREMENT_TEXT_FONT_FAMILY,
         ROOM_LABEL_AREA_FONT_SIZE_PX,
+        ROOM_LABEL_AREA_FONT_WEIGHT
+      )
+    ),
+    document.fonts.load(
+      buildFontLoadDescriptor(
+        MEASUREMENT_TEXT_FONT_FAMILY,
+        ROOM_LABEL_AREA_FONT_SIZE_PX * getMeasurementTextScale({ measurementFontSize: "large" }),
         ROOM_LABEL_AREA_FONT_WEIGHT
       )
     ),
