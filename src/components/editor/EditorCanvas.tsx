@@ -51,6 +51,7 @@ import {
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
+import { shouldShowDimensions } from "@/lib/editor/settings";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -684,6 +685,7 @@ function drawScene(
   theme: EditorCanvasTheme
 ) {
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
+  const showDimensions = shouldShowDimensions(state.settings);
   const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(
     state.document.rooms,
@@ -711,22 +713,24 @@ function drawScene(
     theme
   );
   clearContainerChildren(dimensionOverlayContainer);
-  drawActiveResizeDimensions(
-    dimensionOverlayContainer,
-    renderedLabelRooms,
-    roomResizeUi,
-    state.camera,
-    state.viewport,
-    theme
-  );
-  drawDraftDimensions(
-    dimensionOverlayContainer,
-    state.roomDraft.points,
-    cursorWorld,
-    state.camera,
-    state.viewport,
-    theme
-  );
+  if (showDimensions) {
+    drawActiveResizeDimensions(
+      dimensionOverlayContainer,
+      renderedLabelRooms,
+      roomResizeUi,
+      state.camera,
+      state.viewport,
+      theme
+    );
+    drawDraftDimensions(
+      dimensionOverlayContainer,
+      state.roomDraft.points,
+      cursorWorld,
+      state.camera,
+      state.viewport,
+      theme
+    );
+  }
   drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
 }
 
@@ -1257,33 +1261,32 @@ function drawRoomLabels(
         style: {
           fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
           fontSize: ROOM_LABEL_AREA_FONT_SIZE_PX,
-        fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
-        fill: theme.roomLabelFill,
-        stroke: {
-          color: theme.roomLabelStroke,
-          width: 1.75,
-          join: "round",
+          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+          fill: theme.roomLabelFill,
+          stroke: {
+            color: theme.roomLabelStroke,
+            width: 1.75,
+            join: "round",
+          },
+          letterSpacing: 0.15,
         },
-        letterSpacing: 0.15,
-      },
-    });
-    areaText.roundPixels = true;
-    areaText.anchor.set(0.5);
-    areaText.position.set(centerX, areaCenterY);
-    areaText.alpha = isActiveResizeRoom
-      ? 0.94
-      : isSettlingResizeRoom
-        ? 0.78 + 0.16 * resizeMotionEase
-        : isHovered || isSelected
-          ? 0.84
-          : 0.78;
-    areaText.scale.set(
-      isActiveResizeRoom ? 1.02 : isSettlingResizeRoom ? 1 + 0.02 * resizeMotionEase : 1
-    );
-    labelContainer.addChild(areaText);
+      });
+      areaText.roundPixels = true;
+      areaText.anchor.set(0.5);
+      areaText.position.set(centerX, areaCenterY);
+      areaText.alpha = isActiveResizeRoom
+        ? 0.94
+        : isSettlingResizeRoom
+          ? 0.78 + 0.16 * resizeMotionEase
+          : isHovered || isSelected
+            ? 0.84
+            : 0.78;
+      areaText.scale.set(
+        isActiveResizeRoom ? 1.02 : isSettlingResizeRoom ? 1 + 0.02 * resizeMotionEase : 1
+      );
+      labelContainer.addChild(areaText);
     }
   }
-
 }
 
 type ResizeDimensionLabelSpec = {

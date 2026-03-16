@@ -4,7 +4,7 @@ import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory
 import {
   cloneEditorSettings,
   DEFAULT_EDITOR_SETTINGS,
-  isEditorSettings,
+  normalizeEditorSettings,
   type EditorSettings,
 } from "@/lib/editor/settings";
 
@@ -12,11 +12,12 @@ import {
 // Compatibility rules:
 // - v1 payloads restore layout + camera only.
 // - v2 payloads restore layout + camera + bounded snapshot history.
-// - v3 payloads restore layout + camera + bounded snapshot history + editor settings.
+// - v3 payloads restore layout + camera + bounded snapshot history + legacy editor settings.
+// - v4 payloads restore layout + camera + bounded snapshot history + current editor settings.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 3;
+export const EDITOR_PERSISTENCE_VERSION = 4;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -64,6 +65,17 @@ export type PersistedEditorPayloadV2 = {
 };
 
 export type PersistedEditorPayloadV3 = {
+  version: 3;
+  document: PersistedDocument;
+  camera: CameraState;
+  settings: unknown;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV4 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -208,7 +220,12 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       };
     }
 
-    if ((parsed.version !== 2 && parsed.version !== EDITOR_PERSISTENCE_VERSION) || !isPersistedDocument(parsed.document)) {
+    if (
+      (parsed.version !== 2 &&
+        parsed.version !== 3 &&
+        parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
+      !isPersistedDocument(parsed.document)
+    ) {
       return {
         status: "invalid-payload",
       };
@@ -230,9 +247,11 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       snapshot: {
         document: cloneDocument(parsed.document),
         camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
-        settings: isEditorSettings(parsed.settings)
-          ? cloneEditorSettings(parsed.settings)
-          : cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
+        settings: cloneEditorSettings(
+          parsed.version === 2
+            ? DEFAULT_EDITOR_SETTINGS
+            : normalizeEditorSettings(parsed.settings) ?? DEFAULT_EDITOR_SETTINGS
+        ),
         historyStack: normalizedHistory?.historyStack ?? null,
         historyIndex: normalizedHistory?.historyIndex ?? null,
       },
@@ -253,7 +272,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV3 = {
+  const payload: PersistedEditorPayloadV4 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
