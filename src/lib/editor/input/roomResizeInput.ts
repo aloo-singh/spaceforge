@@ -1,5 +1,6 @@
 import { screenToWorld } from "@/lib/editor/camera";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
+import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
@@ -205,6 +206,8 @@ export function attachRoomResizeInput(
 
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) return null;
+    const declutter = getRoomDeclutterState(room, state.camera, state.viewport);
+    if (!declutter.showSelectionControls) return null;
 
     return { room, bounds, state };
   };

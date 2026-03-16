@@ -1,4 +1,5 @@
 import { worldToScreen } from "@/lib/editor/camera";
+import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { getMeasurementTextScale, type EditorSettings } from "@/lib/editor/settings";
 import {
   formatMetricRoomAreaForRoom,
@@ -51,7 +52,11 @@ export function getRoomLabelLayout(
   const trimmedName = room.name.trim();
   const isPlaceholderName = trimmedName.length === 0;
   const nameText = isPlaceholderName ? ROOM_LABEL_PLACEHOLDER_TEXT : trimmedName;
-  const areaText = shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
+  const declutter = getRoomDeclutterState(room, camera, viewport);
+  if (!declutter.showLabel) return null;
+
+  const areaText =
+    declutter.showArea && shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
   const measurementTextScale = settings ? getMeasurementTextScale(settings) : 1;
   const areaFontSizePx = ROOM_LABEL_AREA_FONT_SIZE_PX * measurementTextScale;
 

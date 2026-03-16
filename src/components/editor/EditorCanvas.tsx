@@ -11,6 +11,7 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
+import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getRoomLabelLayout,
   ROOM_LABEL_AREA_FONT_FAMILY,
@@ -920,6 +921,8 @@ function drawRooms(
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
+    const declutter = getRoomDeclutterState(room, camera, viewport);
+    if (!declutter.showSelectionControls) continue;
     const hoveredWall =
       roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
     if (hoveredWall) {
