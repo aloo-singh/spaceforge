@@ -31,6 +31,8 @@ type RoomResizeStoreState = {
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
+  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
+  clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
 };
@@ -356,6 +358,11 @@ export function attachRoomResizeInput(
       latestSnappedPoints: null,
       latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
     };
+    if (hitWall) {
+      selected.state.selectWallByRoomId(selected.room.id, hitWall);
+    } else {
+      selected.state.clearSelectedWall();
+    }
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(
       getResizeTransformFeedback(selected.room.id, selected.room.points, undefined, selected.room.points)

@@ -64,7 +64,14 @@ import {
   TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
-import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import type {
+  CameraState,
+  Point,
+  Room,
+  RoomWallSelection,
+  ScreenPoint,
+  ViewportSize,
+} from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
@@ -79,6 +86,10 @@ const EMPTY_ROOM_RESIZE_UI = {
   activeCorner: null,
   activeRoomId: null,
 } as const;
+const EMPTY_HOVERED_SELECTABLE_WALL = null as {
+  roomId: string;
+  wall: RectWall;
+} | null;
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
@@ -111,11 +122,16 @@ export default function EditorCanvas() {
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
   const roomRef = useRef<Graphics | null>(null);
+  const wallOverlayRef = useRef<Graphics | null>(null);
   const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
   const dimensionOverlayRef = useRef<Container | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
+  const hoveredSelectableWallRef = useRef<{
+    roomId: string;
+    wall: RectWall;
+  } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -168,20 +184,23 @@ export default function EditorCanvas() {
   const drawCurrentScene = useCallback(() => {
     const grid = gridRef.current;
     const rooms = roomRef.current;
+    const wallOverlay = wallOverlayRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
     const dimensionOverlay = dimensionOverlayRef.current;
-    if (!grid || !rooms || !roomLabels || !draft || !dimensionOverlay) return;
+    if (!grid || !rooms || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
 
     drawScene(
       grid,
       rooms,
+      wallOverlay,
       roomLabels,
       draft,
       dimensionOverlay,
       useEditorStore.getState(),
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
+      hoveredSelectableWallRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
       editorThemeRef.current
@@ -344,15 +363,29 @@ export default function EditorCanvas() {
     setIsExportingPng(true);
     const exportStage = new Container();
     const exportRoomGraphics = new Graphics();
+    const exportWallOverlayGraphics = new Graphics();
     const exportRoomLabels = new Container();
     const exportDraftGraphics = new Graphics();
     exportStage.addChild(exportRoomGraphics);
+    exportStage.addChild(exportWallOverlayGraphics);
     exportStage.addChild(exportRoomLabels);
     exportStage.addChild(exportDraftGraphics);
 
     drawRooms(
       exportRoomGraphics,
       state.document.rooms,
+      null,
+      EMPTY_ROOM_RESIZE_UI,
+      state.roomDraft.points.length > 0,
+      exportCamera,
+      exportViewport,
+      null,
+      editorThemeRef.current
+    );
+    drawWallInteractionOverlay(
+      exportWallOverlayGraphics,
+      state.document.rooms,
+      null,
       null,
       EMPTY_ROOM_RESIZE_UI,
       state.roomDraft.points.length > 0,
@@ -554,16 +587,19 @@ export default function EditorCanvas() {
 
       const grid = new Graphics();
       const rooms = new Graphics();
+      const wallOverlay = new Graphics();
       const roomLabels = new Container();
       const draft = new Graphics();
       const dimensionOverlay = new Container();
       gridRef.current = grid;
       roomRef.current = rooms;
+      wallOverlayRef.current = wallOverlay;
       roomLabelRef.current = roomLabels;
       draftRef.current = draft;
       dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
+      app.stage.addChild(wallOverlay);
       app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
       app.stage.addChild(dimensionOverlay);
@@ -612,6 +648,9 @@ export default function EditorCanvas() {
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
         },
+        onHoveredSelectableWallChange: (wallSelection) => {
+          hoveredSelectableWallRef.current = wallSelection;
+        },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
         },
@@ -634,6 +673,7 @@ export default function EditorCanvas() {
         setIsCanvasReadyForExport(false);
         gridRef.current = null;
         roomRef.current = null;
+        wallOverlayRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
         dimensionOverlayRef.current = null;
@@ -672,12 +712,12 @@ export default function EditorCanvas() {
       className="relative h-full w-full"
     >
       <p id={instructionsId} className="sr-only">
-        Editor controls: left click places room corners while drafting. Click a room name label to
-        select that room. When a room is selected, clicking outside clears selection first, then a
-        following click can start drawing. Hold Space and drag to pan, middle mouse drag also pans,
-        mouse wheel zooms, and Escape cancels the current room draft or clears selection. Right
-        click also cancels the current room draft. Undo is Cmd or Ctrl plus Z, and redo is
-        Shift+Cmd+Z or Ctrl+Y.
+        Editor controls: left click places room corners while drafting. Click a room name label or
+        room body to select that room, and click near a room wall edge to select that wall. When a
+        room is selected, clicking outside clears selection first, then a following click can start
+        drawing. Hold Space and drag to pan, middle mouse drag also pans, mouse wheel zooms, and
+        Escape cancels the current room draft or clears selection. Right click also cancels the
+        current room draft. Undo is Cmd or Ctrl plus Z, and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div
         ref={containerRef}
@@ -718,12 +758,17 @@ type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 function drawScene(
   gridGraphics: Graphics,
   roomGraphics: Graphics,
+  wallOverlayGraphics: Graphics,
   roomLabelContainer: Container,
   draftGraphics: Graphics,
   dimensionOverlayContainer: Container,
   state: EditorSnapshot,
   cursorWorld: Point | null,
   hoveredRoomLabelId: string | null,
+  hoveredSelectableWall: {
+    roomId: string;
+    wall: RectWall;
+  } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -749,6 +794,18 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
+    roomResizeUi,
+    state.roomDraft.points.length > 0,
+    state.camera,
+    state.viewport,
+    transformFeedback,
+    theme
+  );
+  drawWallInteractionOverlay(
+    wallOverlayGraphics,
+    renderedRooms,
+    state.selectedWall,
+    hoveredSelectableWall,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -923,11 +980,6 @@ function drawRooms(
     if (!bounds) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
-    const hoveredWall =
-      roomResizeUi.hoveredRoomId === room.id ? roomResizeUi.hoveredWall : null;
-    if (hoveredWall) {
-      drawHoveredWallHighlight(graphics, bounds, hoveredWall, camera, viewport, theme);
-    }
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
@@ -1005,6 +1057,68 @@ function drawRooms(
       graphics.stroke();
     }
   }
+}
+
+function drawWallInteractionOverlay(
+  graphics: Graphics,
+  rooms: Room[],
+  selectedWall: RoomWallSelection | null,
+  hoveredSelectableWall: {
+    roomId: string;
+    wall: RectWall;
+  } | null,
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
+    activeRoomId: string | null;
+  },
+  isDraftingRoom: boolean,
+  camera: CameraState,
+  viewport: ViewportSize,
+  transformFeedback: TransformFeedback | null,
+  theme: EditorCanvasTheme
+) {
+  graphics.clear();
+  if (isDraftingRoom) return;
+
+  let hoveredBounds: ReturnType<typeof getAxisAlignedRoomBounds> = null;
+  let hoveredWall: RectWall | null = null;
+
+  if (hoveredSelectableWall) {
+    const hoveredRoom = rooms.find((room) => room.id === hoveredSelectableWall.roomId);
+    if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
+      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
+      hoveredWall = hoveredSelectableWall.wall;
+    }
+  } else if (roomResizeUi.hoveredRoomId && roomResizeUi.hoveredWall) {
+    const hoveredRoom = rooms.find((room) => room.id === roomResizeUi.hoveredRoomId);
+    if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
+      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
+      hoveredWall = roomResizeUi.hoveredWall;
+    }
+  }
+
+  const isSelectedWallAlsoHovered =
+    hoveredWall !== null &&
+    selectedWall?.roomId === (hoveredSelectableWall?.roomId ?? roomResizeUi.hoveredRoomId) &&
+    selectedWall.wall === hoveredWall;
+
+  if (hoveredBounds && hoveredWall && !isSelectedWallAlsoHovered) {
+    drawHoveredWallHighlight(graphics, hoveredBounds, hoveredWall, camera, viewport, theme);
+  }
+
+  if (!selectedWall) return;
+  const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
+  if (!selectedRoom) return;
+  if (transformFeedback?.roomId === selectedRoom.id) return;
+
+  const selectedBounds = getAxisAlignedRoomBounds(selectedRoom);
+  if (!selectedBounds) return;
+
+  drawSelectedWallHighlight(graphics, selectedBounds, selectedWall.wall, camera, viewport, theme);
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
@@ -1207,32 +1321,68 @@ function drawHoveredWallHighlight(
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
+  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+
+  graphics.setStrokeStyle({
+    width: 2,
+    color: theme.wallSelectionAccent,
+    alpha: 0.55,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+}
+
+function drawSelectedWallHighlight(
+  graphics: Graphics,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+
+  graphics.setStrokeStyle({
+    width: 5,
+    color: theme.canvasBackground,
+    alpha: 0.96,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+
+  graphics.setStrokeStyle({
+    width: 3,
+    color: theme.wallSelectionAccent,
+    alpha: 1,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+}
+
+function getWallScreenSegment(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
   const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
   const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
   const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
   const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
 
-  let from = topLeft;
-  let to = topRight;
-  if (wall === "right") {
-    from = topRight;
-    to = bottomRight;
-  } else if (wall === "bottom") {
-    from = bottomLeft;
-    to = bottomRight;
-  } else if (wall === "left") {
-    from = topLeft;
-    to = bottomLeft;
+  switch (wall) {
+    case "top":
+      return { from: topLeft, to: topRight };
+    case "right":
+      return { from: topRight, to: bottomRight };
+    case "bottom":
+      return { from: bottomLeft, to: bottomRight };
+    case "left":
+      return { from: topLeft, to: bottomLeft };
   }
-
-  graphics.setStrokeStyle({
-    width: 3,
-    color: theme.interactiveAccent,
-    alpha: 0.58,
-  });
-  graphics.moveTo(from.x, from.y);
-  graphics.lineTo(to.x, to.y);
-  graphics.stroke();
 }
 
 function drawRoomLabels(

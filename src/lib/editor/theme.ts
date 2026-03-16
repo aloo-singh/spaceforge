@@ -6,6 +6,7 @@ export type EditorCanvasTheme = {
   gridMajor: number;
   originAxis: number;
   interactiveAccent: number;
+  wallSelectionAccent: number;
   draftWall: number;
   roomOutline: number;
   roomFill: number;
@@ -27,6 +28,7 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     gridMajor: 0xcbd2da,
     originAxis: 0xa8b2be,
     interactiveAccent: 0x2d7ff9,
+    wallSelectionAccent: 0xf59e0b,
     draftWall: 0x2d7ff9,
     roomOutline: 0x245fc2,
     roomFill: 0x2d7ff9,
@@ -46,6 +48,7 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     gridMajor: 0x313944,
     originAxis: 0x4b5868,
     interactiveAccent: 0x60a5fa,
+    wallSelectionAccent: 0xf59e0b,
     draftWall: 0x60a5fa,
     roomOutline: 0x93c5fd,
     roomFill: 0x60a5fa,

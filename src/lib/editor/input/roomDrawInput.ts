@@ -1,8 +1,12 @@
 import { screenToWorld } from "@/lib/editor/camera";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
-import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
+import {
+  getAxisAlignedRoomBounds,
+  hitTestRoomWallEdge,
+  type RectWall,
+} from "@/lib/editor/rectRoomResize";
 import {
   getSnappedRoomTranslationDelta,
   translateRoomPoints,
@@ -24,6 +28,7 @@ type RoomDrawStoreState = {
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
+  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
   clearRoomSelection: () => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -36,6 +41,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
+  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RectWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
@@ -52,6 +58,7 @@ type LabelDragSession = {
 };
 
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
+const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 
 /**
  * Handles room drawing interactions:
@@ -71,6 +78,7 @@ export function attachRoomDrawInput(
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
+  let hoveredSelectableWall: { roomId: string; wall: RectWall } | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
@@ -89,6 +97,17 @@ export function attachRoomDrawInput(
 
   const setHoveredSelectableRoomId = (roomId: string | null) => {
     hoveredSelectableRoomId = roomId;
+  };
+
+  const setHoveredSelectableWall = (wallSelection: { roomId: string; wall: RectWall } | null) => {
+    if (
+      hoveredSelectableWall?.roomId === wallSelection?.roomId &&
+      hoveredSelectableWall?.wall === wallSelection?.wall
+    ) {
+      return;
+    }
+    hoveredSelectableWall = wallSelection;
+    callbacks.onHoveredSelectableWallChange?.(wallSelection);
   };
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
@@ -144,7 +163,7 @@ export function attachRoomDrawInput(
       return;
     }
 
-    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId)) {
+    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall)) {
       setCursor("pointer");
       return;
     }
@@ -177,6 +196,7 @@ export function attachRoomDrawInput(
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
+        setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
         setTransformFeedback(null);
         callbacks.requestRender();
@@ -221,13 +241,19 @@ export function attachRoomDrawInput(
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       if (!hoveredRoom) {
+        const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
+        setHoveredSelectableWall(hoveredWall);
         const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
-        setHoveredSelectableRoomId(hoveredBodyRoom?.id ?? null);
+        setHoveredSelectableRoomId(
+          hoveredWall ? hoveredWall.roomId : hoveredBodyRoom?.id ?? null
+        );
       } else {
+        setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
     } else {
       setHoveredRoomLabelId(null);
+      setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
     updateCursor();
@@ -238,6 +264,7 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
     callbacks.requestRender();
@@ -296,9 +323,19 @@ export function attachRoomDrawInput(
       return;
     }
 
+    const wallHit = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
+    if (wallHit) {
+      state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      setHoveredSelectableWall(wallHit);
+      setHoveredSelectableRoomId(wallHit.roomId);
+      updateCursor();
+      return;
+    }
+
     const bodyHitRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
     if (bodyHitRoom) {
       state.selectRoomById(bodyHitRoom.id);
+      setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(bodyHitRoom.id);
       updateCursor();
       return;
@@ -315,7 +352,10 @@ export function attachRoomDrawInput(
         return;
       }
 
-      // Keep selection when clicking inside the selected room body.
+      state.selectRoomById(selectedRoom.id);
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(selectedRoom.id);
+      updateCursor();
       return;
     }
 
@@ -356,6 +396,7 @@ export function attachRoomDrawInput(
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
@@ -370,6 +411,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
@@ -402,6 +444,8 @@ export function attachRoomDrawInput(
         updateCursor();
       } else {
         state.clearRoomSelection();
+        setHoveredSelectableWall(null);
+        setHoveredSelectableRoomId(null);
       }
     }
   };
@@ -423,6 +467,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
   };
@@ -458,13 +503,90 @@ function findSelectableRoomAtScreenPoint(
   state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
   worldPoint: Point
 ): Room | null {
-  const room = findRoomAtPoint(state.document.rooms, worldPoint);
-  if (!room) return null;
+  return findRoomAtPoint(state.document.rooms, worldPoint);
+}
 
-  const declutter = getRoomDeclutterState(room, state.camera, state.viewport);
-  if (declutter.showLabel) return null;
+function findSelectableWallAtScreenPoint(
+  state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document" | "selectedRoomId">,
+  screenPoint: Point,
+  worldPoint: Point
+): { roomId: string; wall: RectWall } | null {
+  const candidates: Array<{
+    roomId: string;
+    wall: RectWall;
+    clickCameFromInterior: boolean;
+  }> = [];
 
-  return room;
+  for (let index = state.document.rooms.length - 1; index >= 0; index -= 1) {
+    const room = state.document.rooms[index];
+    const bounds = getAxisAlignedRoomBounds(room);
+    if (!bounds) continue;
+
+    const wall = hitTestRoomWallEdge(bounds, screenPoint, state.camera, state.viewport);
+    if (!wall) continue;
+
+    candidates.push({
+      roomId: room.id,
+      wall,
+      clickCameFromInterior: isPointOnInteriorSideOfRectWall(bounds, wall, worldPoint),
+    });
+  }
+
+  if (candidates.length === 0) return null;
+
+  const interiorCandidates = candidates.filter((candidate) => candidate.clickCameFromInterior);
+  if (interiorCandidates.length === 1) {
+    return interiorCandidates[0];
+  }
+
+  if (state.selectedRoomId) {
+    const selectedInteriorCandidate = interiorCandidates.find(
+      (candidate) => candidate.roomId === state.selectedRoomId
+    );
+    if (selectedInteriorCandidate) {
+      return selectedInteriorCandidate;
+    }
+
+    const selectedCandidate = candidates.find((candidate) => candidate.roomId === state.selectedRoomId);
+    if (selectedCandidate) {
+      return selectedCandidate;
+    }
+  }
+
+  return interiorCandidates[0] ?? candidates[0];
+}
+
+function isPointOnInteriorSideOfRectWall(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  point: Point
+) {
+  switch (wall) {
+    case "top":
+      return (
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM
+      );
+    case "right":
+      return (
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM
+      );
+    case "bottom":
+      return (
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM
+      );
+    case "left":
+      return (
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM
+      );
+  }
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

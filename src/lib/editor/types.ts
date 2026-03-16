@@ -25,10 +25,17 @@ export type ScreenPoint = {
   y: number;
 };
 
+export type RoomWall = "left" | "right" | "top" | "bottom";
+
 export type Wall = {
   id: string;
   a: Point;
   b: Point;
+};
+
+export type RoomWallSelection = {
+  roomId: string;
+  wall: RoomWall;
 };
 
 export type Room = {
