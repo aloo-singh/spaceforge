@@ -5,7 +5,8 @@ import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
 } from "@/lib/editor/camera";
-import { getCameraFitTarget } from "@/lib/editor/cameraFit";
+import { getCameraFitTarget, getDrawingAwareMinPixelsPerMm } from "@/lib/editor/cameraFit";
+import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   easeResetCameraTransition,
   interpolateCamera,
@@ -300,14 +301,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   zoomAtScreenPoint: (screenPoint, scaleFactor) => {
     stopResetCameraAnimation();
-    set((state) => ({
-      camera: zoomCameraToScreenPoint(
-        state.camera,
-        state.viewport,
-        screenPoint,
-        state.camera.pixelsPerMm * scaleFactor
-      ),
-    }));
+    set((state) => {
+      const layoutBounds = getLayoutBoundsFromRooms(state.document.rooms);
+      const minimumPixelsPerMm = getDrawingAwareMinPixelsPerMm({
+        layoutBounds,
+        viewport: state.viewport,
+      });
+
+      return {
+        camera: zoomCameraToScreenPoint(
+          state.camera,
+          state.viewport,
+          screenPoint,
+          state.camera.pixelsPerMm * scaleFactor,
+          minimumPixelsPerMm
+        ),
+      };
+    });
   },
   setCameraCenterMm: (xMm, yMm) => {
     stopResetCameraAnimation();
