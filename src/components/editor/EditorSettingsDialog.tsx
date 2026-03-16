@@ -199,7 +199,12 @@ export function EditorSettingsDialog({
               id="editor-settings-export-signature-help"
               className="text-xs leading-relaxed text-muted-foreground"
             >
-              Exported images will show "Designed by {normalizedExportSignature || "your name"}"
+              Exported images will show
+              {" "}
+              <span className="font-medium text-foreground/90">
+                {`"Designed by ${normalizedExportSignature || "your name"}"`}
+              </span>
+              {" "}
               when this field is filled in.
             </p>
           </div>
