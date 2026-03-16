@@ -86,6 +86,9 @@ export function EditorSettingsDialog({
               Hide
             </Button>
           </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            Hold Alt/Option to temporarily invert this while drawing or resizing.
+          </p>
         </div>
 
         <div
@@ -96,7 +99,7 @@ export function EditorSettingsDialog({
             Coming soon
           </h3>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-            Temporary visibility override, typography sizing, and units will be added here incrementally.
+            Typography sizing and units will be added here incrementally.
           </p>
         </div>
       </section>
