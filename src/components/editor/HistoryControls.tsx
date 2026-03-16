@@ -73,25 +73,26 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="icon-sm"
+            size="icon"
             onClick={() => setIsSettingsDialogOpen(true)}
             aria-label="Open editor settings"
             aria-haspopup="dialog"
             aria-expanded={isSettingsDialogOpen}
             aria-controls={settingsDialogId}
             title="Editor settings"
+            className="sm:size-8"
           >
             <Settings2 />
           </Button>
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="default"
             onClick={resetCamera}
             disabled={isResetCameraDisabled}
             aria-label={resetCameraAriaLabel}
             title={resetCameraTitle}
-            className="gap-2 px-2 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
           >
             <LocateFixed />
             <span className="hidden sm:inline">Fit View</span>
@@ -99,12 +100,12 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="default"
             onClick={() => onExportPng?.(normalizedSignature || undefined)}
             disabled={isExportButtonDisabled}
             aria-label="Export current canvas as PNG"
             title={exportButtonTitle}
-            className="gap-2 px-2 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
           >
             <Download />
             <span className="hidden sm:inline">{isExportingPng ? "Exporting..." : "Export PNG"}</span>
@@ -112,11 +113,12 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="icon-sm"
+            size="icon"
             onClick={() => setIsResetDialogOpen(true)}
             disabled={isResetDisabled}
             aria-label="Reset canvas"
             title="Reset canvas"
+            className="sm:size-8"
           >
             <RotateCcw />
           </Button>
@@ -126,11 +128,11 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="default"
             onClick={undo}
             disabled={isUndoDisabled}
             aria-label="Undo last edit, shortcut Command or Control plus Z"
-            className="gap-2 px-2 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
           >
             <Undo2 />
             <span className="hidden sm:inline">Undo</span>
@@ -144,11 +146,11 @@ export function HistoryControls({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="default"
             onClick={redo}
             disabled={isRedoDisabled}
             aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-            className="gap-2 px-2 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
           >
             <Redo2 />
             <span className="hidden sm:inline">Redo</span>
