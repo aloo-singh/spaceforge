@@ -19,6 +19,7 @@ export function EditorSettingsDialog({
   const settings = useEditorStore((state) => state.settings);
   const updateSettings = useEditorStore((state) => state.updateSettings);
   const dimensionsVisible = shouldShowDimensions(settings);
+  const isLargeMeasurementText = settings.measurementFontSize === "large";
 
   return (
     <ResponsiveDialog
@@ -43,7 +44,7 @@ export function EditorSettingsDialog({
           aria-labelledby="editor-settings-measurements-title"
           className="rounded-xl border border-border/70 bg-muted/30 p-3"
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3 id="editor-settings-measurements-title" className="text-sm font-medium text-foreground">
                 Dimensions
@@ -52,7 +53,7 @@ export function EditorSettingsDialog({
                 Show or hide room area and live dimension overlays while keeping the editor calm.
               </p>
             </div>
-            <dl className="shrink-0">
+            <dl className="shrink-0 self-start">
               <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 <dt className="sr-only">Dimensions visibility</dt>
                 <dd>{dimensionsVisible ? "Shown" : "Hidden"}</dd>
@@ -61,7 +62,7 @@ export function EditorSettingsDialog({
           </div>
 
           <div
-            className="mt-3 inline-flex rounded-lg border border-border/70 bg-background p-1"
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background p-1 sm:inline-flex sm:w-auto"
             role="group"
             aria-label="Dimensions visibility"
           >
@@ -71,7 +72,7 @@ export function EditorSettingsDialog({
               variant={dimensionsVisible ? "secondary" : "ghost"}
               aria-pressed={dimensionsVisible}
               onClick={() => updateSettings({ dimensionsVisibility: "visible" })}
-              className="min-w-20"
+              className="min-w-20 flex-1 sm:flex-none"
             >
               Show
             </Button>
@@ -81,7 +82,7 @@ export function EditorSettingsDialog({
               variant={!dimensionsVisible ? "secondary" : "ghost"}
               aria-pressed={!dimensionsVisible}
               onClick={() => updateSettings({ dimensionsVisibility: "hidden" })}
-              className="min-w-20"
+              className="min-w-20 flex-1 sm:flex-none"
             >
               Hide
             </Button>
@@ -92,14 +93,60 @@ export function EditorSettingsDialog({
         </div>
 
         <div
-          aria-labelledby="editor-settings-coming-soon-title"
-          className="rounded-xl border border-dashed border-border/70 p-3"
+          aria-labelledby="editor-settings-measurement-font-size-title"
+          className="rounded-xl border border-border/70 bg-muted/30 p-3"
         >
-          <h3 id="editor-settings-coming-soon-title" className="text-sm font-medium text-foreground">
-            Coming soon
-          </h3>
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3
+                id="editor-settings-measurement-font-size-title"
+                className="text-sm font-medium text-foreground"
+              >
+                Measurement text size
+              </h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                Increase room area and live dimension text for readability without changing the
+                broader editor typography.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Measurement text size</dt>
+                <dd>{isLargeMeasurementText ? "Large" : "Normal"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Measurement text size"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={!isLargeMeasurementText ? "secondary" : "ghost"}
+              aria-pressed={!isLargeMeasurementText}
+              onClick={() => updateSettings({ measurementFontSize: "normal" })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Normal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={isLargeMeasurementText ? "secondary" : "ghost"}
+              aria-pressed={isLargeMeasurementText}
+              onClick={() => updateSettings({ measurementFontSize: "large" })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Large
+            </Button>
+          </div>
+
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-            Typography sizing and units will be added here incrementally.
+            Applies to room area beneath the label pill and live draw or resize dimensions on both
+            desktop and mobile settings surfaces.
           </p>
         </div>
       </section>

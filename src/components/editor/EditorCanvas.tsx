@@ -51,7 +51,11 @@ import {
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
-import { shouldShowDimensions } from "@/lib/editor/settings";
+import {
+  getMeasurementTextScale,
+  shouldShowDimensions,
+  type EditorSettings,
+} from "@/lib/editor/settings";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -93,6 +97,13 @@ const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+
+function getScaledMeasurementPx(
+  value: number,
+  settings: Pick<EditorSettings, "measurementFontSize">
+): number {
+  return value * getMeasurementTextScale(settings);
+}
 
 export default function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -356,6 +367,7 @@ export default function EditorCanvas() {
       null,
       exportCamera,
       exportViewport,
+      state.settings,
       null,
       editorThemeRef.current
     );
@@ -750,6 +762,7 @@ function drawScene(
     hoveredRoomLabelId,
     state.camera,
     state.viewport,
+    state.settings,
     transformFeedback,
     theme
   );
@@ -761,6 +774,7 @@ function drawScene(
       roomResizeUi,
       state.camera,
       state.viewport,
+      state.settings,
       theme
     );
     drawDraftDimensions(
@@ -769,6 +783,7 @@ function drawScene(
       cursorWorld,
       state.camera,
       state.viewport,
+      state.settings,
       theme
     );
   }
@@ -1224,13 +1239,16 @@ function drawRoomLabels(
   hoveredRoomLabelId: string | null,
   camera: CameraState,
   viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   clearContainerChildren(labelContainer);
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const areaFontSizePx = getScaledMeasurementPx(ROOM_LABEL_AREA_FONT_SIZE_PX, settings);
 
   for (const room of rooms) {
-    const layout = getRoomLabelLayout(room, camera, viewport);
+    const layout = getRoomLabelLayout(room, camera, viewport, settings);
     if (!layout) continue;
     const textResolution = getTextResolution();
     const left = snapToPixel(layout.left, textResolution);
@@ -1301,15 +1319,15 @@ function drawRoomLabels(
         resolution: textResolution,
         style: {
           fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
-          fontSize: ROOM_LABEL_AREA_FONT_SIZE_PX,
+          fontSize: areaFontSizePx,
           fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
           fill: theme.roomLabelFill,
           stroke: {
             color: theme.roomLabelStroke,
-            width: 1.75,
+            width: 1.75 * measurementTextScale,
             join: "round",
           },
-          letterSpacing: 0.15,
+          letterSpacing: 0.15 * measurementTextScale,
         },
       });
       areaText.roundPixels = true;
@@ -1362,6 +1380,7 @@ function drawActiveResizeDimensions(
   },
   camera: CameraState,
   viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
   if (!roomResizeUi.activeRoomId) return;
@@ -1373,21 +1392,23 @@ function drawActiveResizeDimensions(
   const bounds = getAxisAlignedRoomBounds(activeRoom);
   if (!bounds) return;
 
-  const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport);
+  const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport, settings);
   const labelSpecs = getResizeDimensionLabelSpecs(
     activeRoom,
     bounds,
     roomResizeUi.activeWall,
     roomResizeUi.activeCorner,
     camera,
-    viewport
+    viewport,
+    settings
   );
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
     labelSpecs,
     roomLabelLayout,
-    viewport
+    viewport,
+    settings
   );
-  drawDimensionLabels(labelContainer, labelLayouts, theme);
+  drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
 }
 
 function drawDraftDimensions(
@@ -1396,6 +1417,7 @@ function drawDraftDimensions(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
   const firstSegmentLabelSpec = getDraftFirstSegmentDimensionLabelSpec(
@@ -1408,9 +1430,10 @@ function drawDraftDimensions(
     const labelLayouts = getResolvedResizeDimensionLabelLayouts(
       [firstSegmentLabelSpec],
       null,
-      viewport
+      viewport,
+      settings
     );
-    drawDimensionLabels(labelContainer, labelLayouts, theme);
+    drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
     return;
   }
 
@@ -1431,28 +1454,36 @@ function drawDraftDimensions(
         measurements.widthMillimetres,
         bounds,
         camera,
-        viewport
+        viewport,
+        settings
       ),
       createDimensionLabelSpecForWallMeasurement(
         draftDimensionWalls.verticalWall,
         measurements.heightMillimetres,
         bounds,
         camera,
-        viewport
+        viewport,
+        settings
       ),
     ],
     null,
-    viewport
+    viewport,
+    settings
   );
 
-  drawDimensionLabels(labelContainer, labelLayouts, theme);
+  drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
 }
 
 function drawDimensionLabels(
   labelContainer: Container,
   labelLayouts: ResizeDimensionLabelLayout[],
+  settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const dimensionFontSizePx = getScaledMeasurementPx(RESIZE_DIMENSION_FONT_SIZE_PX, settings);
+  const dimensionRadiusPx = getScaledMeasurementPx(RESIZE_DIMENSION_RADIUS_PX, settings);
+
   for (const labelLayout of labelLayouts) {
     const textResolution = getTextResolution();
     const text = new Text({
@@ -1460,15 +1491,15 @@ function drawDimensionLabels(
       resolution: textResolution,
       style: {
         fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
-        fontSize: RESIZE_DIMENSION_FONT_SIZE_PX,
+        fontSize: dimensionFontSizePx,
         fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
         fill: theme.roomLabelFill,
         stroke: {
           color: theme.roomLabelStroke,
-          width: 1.75,
+          width: 1.75 * measurementTextScale,
           join: "round",
         },
-        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX,
+        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX * measurementTextScale,
       },
     });
 
@@ -1478,14 +1509,14 @@ function drawDimensionLabels(
     const width = snapToPixel(labelLayout.width, textResolution);
     const height = snapToPixel(labelLayout.height, textResolution);
     pill.setFillStyle({ color: theme.roomLabelPillFill, alpha: RESIZE_DIMENSION_ACTIVE_FILL_ALPHA });
-    pill.roundRect(left, top, width, height, RESIZE_DIMENSION_RADIUS_PX);
+    pill.roundRect(left, top, width, height, dimensionRadiusPx);
     pill.fill();
     pill.setStrokeStyle({
-      width: 1.1,
+      width: 1.1 * measurementTextScale,
       color: theme.roomLabelPillSelectedStroke,
       alpha: RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
     });
-    pill.roundRect(left, top, width, height, RESIZE_DIMENSION_RADIUS_PX);
+    pill.roundRect(left, top, width, height, dimensionRadiusPx);
     pill.stroke();
     labelContainer.addChild(pill);
 
@@ -1506,13 +1537,23 @@ function getResizeDimensionLabelSpecs(
   activeWall: RectWall | null,
   activeCorner: RectCorner | null,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">
 ): ResizeDimensionLabelSpec[] {
   if (activeWall) {
     const measurement = getWallResizeMeasurementMillimetres(room, activeWall);
     if (measurement === null) return [];
 
-    return [createDimensionLabelSpecForWallMeasurement(activeWall, measurement, bounds, camera, viewport)];
+    return [
+      createDimensionLabelSpecForWallMeasurement(
+        activeWall,
+        measurement,
+        bounds,
+        camera,
+        viewport,
+        settings
+      ),
+    ];
   }
 
   if (activeCorner) {
@@ -1527,14 +1568,16 @@ function getResizeDimensionLabelSpecs(
         measurements.widthMillimetres,
         bounds,
         camera,
-        viewport
+        viewport,
+        settings
       ),
       createDimensionLabelSpecForWallMeasurement(
         verticalWall,
         measurements.heightMillimetres,
         bounds,
         camera,
-        viewport
+        viewport,
+        settings
       ),
     ];
   }
@@ -1563,13 +1606,14 @@ function createDimensionLabelSpecForWallMeasurement(
   lengthMillimetres: number,
   bounds: { minX: number; maxX: number; minY: number; maxY: number },
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">
 ): ResizeDimensionLabelSpec {
   return {
     text: formatMetricWallDimension(lengthMillimetres),
     wall,
     axis: wall === "top" || wall === "bottom" ? "horizontal" : "vertical",
-    ...getResizeDimensionAnchorForWall(bounds, wall, camera, viewport),
+    ...getResizeDimensionAnchorForWall(bounds, wall, camera, viewport, settings),
   };
 }
 
@@ -1577,7 +1621,8 @@ function getResizeDimensionAnchorForWall(
   bounds: { minX: number; maxX: number; minY: number; maxY: number },
   wall: RectWall,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">
 ): Pick<
   ResizeDimensionLabelSpec,
   "center" | "outwardDirection" | "tangentDirection" | "wallLengthPx"
@@ -1591,8 +1636,11 @@ function getResizeDimensionAnchorForWall(
 
   const getEdgeOffsetPx = (wallLengthPx: number) =>
     wallLengthPx < RESIZE_DIMENSION_MIN_SHORT_WALL_PX
-      ? RESIZE_DIMENSION_EDGE_OFFSET_PX + RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX
-      : RESIZE_DIMENSION_EDGE_OFFSET_PX;
+      ? getScaledMeasurementPx(
+          RESIZE_DIMENSION_EDGE_OFFSET_PX + RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX,
+          settings
+        )
+      : getScaledMeasurementPx(RESIZE_DIMENSION_EDGE_OFFSET_PX, settings);
 
   switch (wall) {
     case "top":
@@ -1641,22 +1689,29 @@ function getResizeDimensionAnchorForWall(
 function getResolvedResizeDimensionLabelLayouts(
   labelSpecs: ResizeDimensionLabelSpec[],
   roomLabelLayout: ReturnType<typeof getRoomLabelLayout>,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">
 ): ResizeDimensionLabelLayout[] {
   const textResolution = getTextResolution();
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const dimensionFontSizePx = getScaledMeasurementPx(RESIZE_DIMENSION_FONT_SIZE_PX, settings);
+  const dimensionPaddingXPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_X_PX, settings);
+  const dimensionPaddingYPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_Y_PX, settings);
+  const labelGapPx = getScaledMeasurementPx(RESIZE_DIMENSION_LABEL_GAP_PX, settings);
+  const cornerSeparationPx = getScaledMeasurementPx(RESIZE_DIMENSION_CORNER_SEPARATION_PX, settings);
   const labelLayouts = labelSpecs.map<ResizeDimensionLabelLayout>((labelSpec) => {
     const measurementText = new Text({
       text: labelSpec.text,
       resolution: textResolution,
       style: {
         fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
-        fontSize: RESIZE_DIMENSION_FONT_SIZE_PX,
+        fontSize: dimensionFontSizePx,
         fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
-        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX,
+        letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX * measurementTextScale,
       },
     });
-    const width = measurementText.width + RESIZE_DIMENSION_PADDING_X_PX * 2;
-    const height = measurementText.height + RESIZE_DIMENSION_PADDING_Y_PX * 2;
+    const width = measurementText.width + dimensionPaddingXPx * 2;
+    const height = measurementText.height + dimensionPaddingYPx * 2;
     measurementText.destroy();
 
     return {
@@ -1675,7 +1730,7 @@ function getResolvedResizeDimensionLabelLayouts(
         labelLayouts[index],
         roomLabelLayout,
         viewport,
-        roomLabelLayout.height + RESIZE_DIMENSION_LABEL_GAP_PX
+        roomLabelLayout.height + labelGapPx
       );
     }
   }
@@ -1693,13 +1748,13 @@ function getResolvedResizeDimensionLabelLayouts(
           y: -labelLayouts[index].tangentDirection.y,
         },
         viewport,
-        RESIZE_DIMENSION_CORNER_SEPARATION_PX
+        cornerSeparationPx
       );
       labelLayouts[otherIndex] = nudgeResizeDimensionLabel(
         labelLayouts[otherIndex],
         labelLayouts[otherIndex].tangentDirection,
         viewport,
-        RESIZE_DIMENSION_CORNER_SEPARATION_PX
+        cornerSeparationPx
       );
     }
   }

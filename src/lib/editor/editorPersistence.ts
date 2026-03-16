@@ -13,11 +13,12 @@ import {
 // - v1 payloads restore layout + camera only.
 // - v2 payloads restore layout + camera + bounded snapshot history.
 // - v3 payloads restore layout + camera + bounded snapshot history + legacy editor settings.
-// - v4 payloads restore layout + camera + bounded snapshot history + current editor settings.
+// - v4 payloads restore layout + camera + bounded snapshot history + legacy editor settings.
+// - v5 payloads restore layout + camera + bounded snapshot history + current editor settings.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 4;
+export const EDITOR_PERSISTENCE_VERSION = 5;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -76,6 +77,17 @@ export type PersistedEditorPayloadV3 = {
 };
 
 export type PersistedEditorPayloadV4 = {
+  version: 4;
+  document: PersistedDocument;
+  camera: CameraState;
+  settings: unknown;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV5 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -223,6 +235,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
     if (
       (parsed.version !== 2 &&
         parsed.version !== 3 &&
+        parsed.version !== 4 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -272,7 +285,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV4 = {
+  const payload: PersistedEditorPayloadV5 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
