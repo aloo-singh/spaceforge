@@ -36,7 +36,14 @@ import {
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
-import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import type {
+  CameraState,
+  Point,
+  Room,
+  RoomWallSelection,
+  ScreenPoint,
+  ViewportSize,
+} from "@/lib/editor/types";
 
 declare global {
   interface Window {
@@ -65,6 +72,7 @@ type EditorState = {
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
+  selectedWall: RoomWallSelection | null;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
@@ -82,6 +90,8 @@ type EditorState = {
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
+  selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
+  clearSelectedWall: () => void;
   clearRoomSelection: () => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -171,6 +181,14 @@ function areCamerasEqual(a: CameraState, b: CameraState): boolean {
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
   if (!roomId) return null;
   return document.rooms.some((room) => room.id === roomId) ? roomId : null;
+}
+
+function getSelectedWallIfRoomExists(
+  selectedWall: RoomWallSelection | null,
+  document: DocumentState
+): RoomWallSelection | null {
+  if (!selectedWall) return null;
+  return document.rooms.some((room) => room.id === selectedWall.roomId) ? selectedWall : null;
 }
 
 function getSafePersistedHistorySnapshot(
@@ -264,6 +282,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     points: [],
   },
   selectedRoomId: null,
+  selectedWall: null,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
@@ -369,6 +388,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             points: [],
           },
           selectedRoomId: room.id,
+          selectedWall: null,
           shouldFocusSelectedRoomNameInput: true,
           renameSession: null,
           history: {
@@ -401,17 +421,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectRoomById: (roomId) =>
     set((state) => {
-      if (state.selectedRoomId === roomId) return state;
+      if (state.selectedRoomId === roomId && state.selectedWall === null) return state;
 
       return {
         selectedRoomId: roomId,
+        selectedWall: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+      };
+    }),
+  selectWallByRoomId: (roomId, wall) =>
+    set((state) => {
+      if (
+        state.selectedRoomId === roomId &&
+        state.selectedWall?.roomId === roomId &&
+        state.selectedWall.wall === wall
+      ) {
+        return state;
+      }
+
+      return {
+        selectedRoomId: roomId,
+        selectedWall: { roomId, wall },
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+      };
+    }),
+  clearSelectedWall: () =>
+    set((state) => {
+      if (state.selectedWall === null) return state;
+      return {
+        selectedWall: null,
       };
     }),
   clearRoomSelection: () =>
     set({
       selectedRoomId: null,
+      selectedWall: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
     }),
@@ -462,13 +508,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!renameSession) {
         if (!state.selectedRoomId) return state;
         if (!deselectIfUnchanged) return state;
-        return { selectedRoomId: null };
+        return { selectedRoomId: null, selectedWall: null };
       }
 
       const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
       if (!room) {
         return {
           selectedRoomId: null,
+          selectedWall: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -483,6 +530,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
         return {
           selectedRoomId: null,
+          selectedWall: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -497,6 +545,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         selectedRoomId: null,
+        selectedWall: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -514,6 +563,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (!state.selectedRoomId) return state;
         return {
           selectedRoomId: null,
+          selectedWall: null,
           shouldFocusSelectedRoomNameInput: false,
         };
       }
@@ -527,6 +577,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedRoomId: null,
+        selectedWall: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -540,6 +591,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (previousIndex < 0) {
         return {
           selectedRoomId: null,
+          selectedWall: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -560,6 +612,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedRoomId: null,
+        selectedWall: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -748,6 +801,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         points: [],
       },
       selectedRoomId: null,
+      selectedWall: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       history: {
@@ -770,6 +824,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -790,6 +845,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {

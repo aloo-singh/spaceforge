@@ -1,8 +1,12 @@
 import { screenToWorld } from "@/lib/editor/camera";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
-import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
+import {
+  getAxisAlignedRoomBounds,
+  hitTestRoomWallEdge,
+  type RectWall,
+} from "@/lib/editor/rectRoomResize";
 import {
   getSnappedRoomTranslationDelta,
   translateRoomPoints,
@@ -24,6 +28,7 @@ type RoomDrawStoreState = {
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
+  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
   clearRoomSelection: () => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -71,6 +76,7 @@ export function attachRoomDrawInput(
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
+  let hoveredSelectableWall: { roomId: string; wall: RectWall } | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
@@ -89,6 +95,10 @@ export function attachRoomDrawInput(
 
   const setHoveredSelectableRoomId = (roomId: string | null) => {
     hoveredSelectableRoomId = roomId;
+  };
+
+  const setHoveredSelectableWall = (wallSelection: { roomId: string; wall: RectWall } | null) => {
+    hoveredSelectableWall = wallSelection;
   };
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
@@ -144,7 +154,7 @@ export function attachRoomDrawInput(
       return;
     }
 
-    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId)) {
+    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall)) {
       setCursor("pointer");
       return;
     }
@@ -177,6 +187,7 @@ export function attachRoomDrawInput(
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
+        setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
         setTransformFeedback(null);
         callbacks.requestRender();
@@ -221,13 +232,19 @@ export function attachRoomDrawInput(
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       if (!hoveredRoom) {
+        const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint);
+        setHoveredSelectableWall(hoveredWall);
         const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
-        setHoveredSelectableRoomId(hoveredBodyRoom?.id ?? null);
+        setHoveredSelectableRoomId(
+          hoveredWall ? hoveredWall.roomId : hoveredBodyRoom?.id ?? null
+        );
       } else {
+        setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
     } else {
       setHoveredRoomLabelId(null);
+      setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
     updateCursor();
@@ -238,6 +255,7 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
     callbacks.requestRender();
@@ -296,9 +314,19 @@ export function attachRoomDrawInput(
       return;
     }
 
+    const wallHit = findSelectableWallAtScreenPoint(state, screenPoint);
+    if (wallHit) {
+      state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      setHoveredSelectableWall(wallHit);
+      setHoveredSelectableRoomId(wallHit.roomId);
+      updateCursor();
+      return;
+    }
+
     const bodyHitRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
     if (bodyHitRoom) {
       state.selectRoomById(bodyHitRoom.id);
+      setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(bodyHitRoom.id);
       updateCursor();
       return;
@@ -315,7 +343,10 @@ export function attachRoomDrawInput(
         return;
       }
 
-      // Keep selection when clicking inside the selected room body.
+      state.selectRoomById(selectedRoom.id);
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(selectedRoom.id);
+      updateCursor();
       return;
     }
 
@@ -356,6 +387,7 @@ export function attachRoomDrawInput(
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
@@ -370,6 +402,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
@@ -402,6 +435,8 @@ export function attachRoomDrawInput(
         updateCursor();
       } else {
         state.clearRoomSelection();
+        setHoveredSelectableWall(null);
+        setHoveredSelectableRoomId(null);
       }
     }
   };
@@ -423,6 +458,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
   };
@@ -458,13 +494,28 @@ function findSelectableRoomAtScreenPoint(
   state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
   worldPoint: Point
 ): Room | null {
-  const room = findRoomAtPoint(state.document.rooms, worldPoint);
-  if (!room) return null;
+  return findRoomAtPoint(state.document.rooms, worldPoint);
+}
 
-  const declutter = getRoomDeclutterState(room, state.camera, state.viewport);
-  if (declutter.showLabel) return null;
+function findSelectableWallAtScreenPoint(
+  state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
+  screenPoint: Point
+): { roomId: string; wall: RectWall } | null {
+  for (let index = state.document.rooms.length - 1; index >= 0; index -= 1) {
+    const room = state.document.rooms[index];
+    const bounds = getAxisAlignedRoomBounds(room);
+    if (!bounds) continue;
 
-  return room;
+    const wall = hitTestRoomWallEdge(bounds, screenPoint, state.camera, state.viewport);
+    if (!wall) continue;
+
+    return {
+      roomId: room.id,
+      wall,
+    };
+  }
+
+  return null;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

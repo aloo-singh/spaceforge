@@ -64,7 +64,14 @@ import {
   TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
-import type { CameraState, Point, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
+import type {
+  CameraState,
+  Point,
+  Room,
+  RoomWallSelection,
+  ScreenPoint,
+  ViewportSize,
+} from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
@@ -353,6 +360,7 @@ export default function EditorCanvas() {
     drawRooms(
       exportRoomGraphics,
       state.document.rooms,
+      null,
       null,
       EMPTY_ROOM_RESIZE_UI,
       state.roomDraft.points.length > 0,
@@ -672,12 +680,12 @@ export default function EditorCanvas() {
       className="relative h-full w-full"
     >
       <p id={instructionsId} className="sr-only">
-        Editor controls: left click places room corners while drafting. Click a room name label to
-        select that room. When a room is selected, clicking outside clears selection first, then a
-        following click can start drawing. Hold Space and drag to pan, middle mouse drag also pans,
-        mouse wheel zooms, and Escape cancels the current room draft or clears selection. Right
-        click also cancels the current room draft. Undo is Cmd or Ctrl plus Z, and redo is
-        Shift+Cmd+Z or Ctrl+Y.
+        Editor controls: left click places room corners while drafting. Click a room name label or
+        room body to select that room, and click near a room wall edge to select that wall. When a
+        room is selected, clicking outside clears selection first, then a following click can start
+        drawing. Hold Space and drag to pan, middle mouse drag also pans, mouse wheel zooms, and
+        Escape cancels the current room draft or clears selection. Right click also cancels the
+        current room draft. Undo is Cmd or Ctrl plus Z, and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div
         ref={containerRef}
@@ -749,6 +757,7 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
+    state.selectedWall,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -838,6 +847,7 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
+  selectedWall: RoomWallSelection | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -917,6 +927,18 @@ function drawRooms(
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9
     );
+
+    if (
+      isSelected &&
+      selectedWall?.roomId === room.id &&
+      !isDraftingRoom &&
+      !isActiveTransformRoom
+    ) {
+      const bounds = getAxisAlignedRoomBounds(room);
+      if (bounds) {
+        drawSelectedWallHighlight(graphics, bounds, selectedWall.wall, camera, viewport, theme);
+      }
+    }
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const bounds = getAxisAlignedRoomBounds(room);
@@ -1207,23 +1229,7 @@ function drawHoveredWallHighlight(
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
-  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
-  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
-  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
-
-  let from = topLeft;
-  let to = topRight;
-  if (wall === "right") {
-    from = topRight;
-    to = bottomRight;
-  } else if (wall === "bottom") {
-    from = bottomLeft;
-    to = bottomRight;
-  } else if (wall === "left") {
-    from = topLeft;
-    to = bottomLeft;
-  }
+  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
 
   graphics.setStrokeStyle({
     width: 3,
@@ -1233,6 +1239,67 @@ function drawHoveredWallHighlight(
   graphics.moveTo(from.x, from.y);
   graphics.lineTo(to.x, to.y);
   graphics.stroke();
+}
+
+function drawSelectedWallHighlight(
+  graphics: Graphics,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+
+  graphics.setStrokeStyle({
+    width: 10,
+    color: theme.interactiveAccent,
+    alpha: 0.14,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+
+  graphics.setStrokeStyle({
+    width: 5,
+    color: theme.interactiveAccent,
+    alpha: 0.3,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+
+  graphics.setStrokeStyle({
+    width: 2.5,
+    color: theme.interactiveAccent,
+    alpha: 0.94,
+  });
+  graphics.moveTo(from.x, from.y);
+  graphics.lineTo(to.x, to.y);
+  graphics.stroke();
+}
+
+function getWallScreenSegment(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+
+  switch (wall) {
+    case "top":
+      return { from: topLeft, to: topRight };
+    case "right":
+      return { from: topRight, to: bottomRight };
+    case "bottom":
+      return { from: bottomLeft, to: bottomRight };
+    case "left":
+      return { from: topLeft, to: bottomLeft };
+  }
 }
 
 function drawRoomLabels(

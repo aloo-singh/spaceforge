@@ -1,9 +1,9 @@
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { worldToScreen } from "@/lib/editor/camera";
-import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
+import type { CameraState, Point, Room, RoomWall, ViewportSize } from "@/lib/editor/types";
 
-export type RectWall = "left" | "right" | "top" | "bottom";
+export type RectWall = RoomWall;
 export type RectCorner = "top-left" | "top-right" | "bottom-right" | "bottom-left";
 
 export type RoomRectBounds = {
@@ -34,6 +34,7 @@ const HANDLE_EDGE_PADDING_PX = 8;
 const HANDLE_HIT_PADDING_PX = 8;
 const CORNER_HANDLE_SIZE_PX = 10;
 const CORNER_HIT_PADDING_PX = 8;
+const WALL_SELECTION_HIT_PADDING_PX = 14;
 export const MIN_ROOM_SIZE_MM = GRID_SIZE_MM;
 
 export function getAxisAlignedRoomBounds(room: Room): RoomRectBounds | null {
@@ -135,6 +136,58 @@ export function hitTestWallHandle(
   }
 
   return null;
+}
+
+export function hitTestRoomWallEdge(
+  bounds: RoomRectBounds,
+  point: Point,
+  camera: CameraState,
+  viewport: ViewportSize,
+  hitPaddingPx = WALL_SELECTION_HIT_PADDING_PX
+): RectWall | null {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+
+  const candidates: Array<{ wall: RectWall; distancePx: number }> = [];
+
+  if (
+    point.x >= topLeft.x - hitPaddingPx &&
+    point.x <= topRight.x + hitPaddingPx &&
+    Math.abs(point.y - topLeft.y) <= hitPaddingPx
+  ) {
+    candidates.push({ wall: "top", distancePx: Math.abs(point.y - topLeft.y) });
+  }
+
+  if (
+    point.y >= topRight.y - hitPaddingPx &&
+    point.y <= bottomRight.y + hitPaddingPx &&
+    Math.abs(point.x - topRight.x) <= hitPaddingPx
+  ) {
+    candidates.push({ wall: "right", distancePx: Math.abs(point.x - topRight.x) });
+  }
+
+  if (
+    point.x >= bottomLeft.x - hitPaddingPx &&
+    point.x <= bottomRight.x + hitPaddingPx &&
+    Math.abs(point.y - bottomLeft.y) <= hitPaddingPx
+  ) {
+    candidates.push({ wall: "bottom", distancePx: Math.abs(point.y - bottomLeft.y) });
+  }
+
+  if (
+    point.y >= topLeft.y - hitPaddingPx &&
+    point.y <= bottomLeft.y + hitPaddingPx &&
+    Math.abs(point.x - topLeft.x) <= hitPaddingPx
+  ) {
+    candidates.push({ wall: "left", distancePx: Math.abs(point.x - topLeft.x) });
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => a.distancePx - b.distancePx);
+  return candidates[0].wall;
 }
 
 export function getCornerHandleLayouts(
