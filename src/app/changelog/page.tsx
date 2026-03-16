@@ -10,6 +10,45 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.20.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a measurement font size setting in Editor Settings</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Measurement text can now be shown in Normal or Large size</li>
+                <li>The setting affects:</li>
+                <li>room area beneath the room label pill</li>
+                <li>draw-time dimension overlays</li>
+                <li>resize-time dimension overlays</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Measurement text scaling now adjusts related spacing and offsets to keep overlays balanced</li>
+                <li>Settings controls now stack more cleanly on mobile and expand appropriately in the drawer</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.19.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>
