@@ -10,6 +10,40 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.21.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fit View now works more reliably for larger drawings</li>
+                <li>Zoom-out limits now adapt to the size of the current drawing</li>
+                <li>
+                  Larger layouts can zoom out farther without making small layouts feel lost in
+                  empty space
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Small or empty drawings retain a comfortable zoom floor</li>
+                <li>Larger drawings can lower the effective minimum zoom when needed</li>
+                <li>Manual zoom and Fit View now use compatible drawing-aware zoom bounds</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.20.1</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>

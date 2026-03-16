@@ -1,8 +1,11 @@
 import type { CameraState, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 import { MAX_PIXELS_PER_MM, MIN_PIXELS_PER_MM } from "@/lib/editor/constants";
 
-export function clampPixelsPerMm(pixelsPerMm: number): number {
-  return Math.min(MAX_PIXELS_PER_MM, Math.max(MIN_PIXELS_PER_MM, pixelsPerMm));
+export function clampPixelsPerMm(
+  pixelsPerMm: number,
+  minimumPixelsPerMm = MIN_PIXELS_PER_MM
+): number {
+  return Math.min(MAX_PIXELS_PER_MM, Math.max(minimumPixelsPerMm, pixelsPerMm));
 }
 
 export function worldToScreen(
@@ -42,9 +45,10 @@ export function zoomCameraToScreenPoint(
   camera: CameraState,
   viewport: ViewportSize,
   screenPoint: ScreenPoint,
-  nextPixelsPerMm: number
+  nextPixelsPerMm: number,
+  minimumPixelsPerMm = MIN_PIXELS_PER_MM
 ): CameraState {
-  const clampedPixelsPerMm = clampPixelsPerMm(nextPixelsPerMm);
+  const clampedPixelsPerMm = clampPixelsPerMm(nextPixelsPerMm, minimumPixelsPerMm);
   const worldUnderCursor = screenToWorld(screenPoint, camera, viewport);
 
   return {
