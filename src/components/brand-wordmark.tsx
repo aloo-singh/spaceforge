@@ -6,7 +6,7 @@ type BrandWordmarkProps = ComponentPropsWithoutRef<"span">;
 export function BrandWordmark({ className, ...props }: BrandWordmarkProps) {
   return (
     <span
-      className={cn("font-measurement text-sm font-semibold tracking-tight text-foreground", className)}
+      className={cn("font-measurement text-lg leading-none font-semibold tracking-tight text-foreground", className)}
       {...props}
     >
       <span className="text-brand">[s]</span>
