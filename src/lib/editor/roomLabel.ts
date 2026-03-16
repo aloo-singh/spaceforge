@@ -1,10 +1,7 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { getMeasurementTextScale, type EditorSettings } from "@/lib/editor/settings";
-import {
-  formatMetricRoomAreaForRoom,
-  shouldShowRoomArea,
-} from "@/lib/editor/measurements";
+import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { CameraState, Room, ScreenPoint, ViewportSize } from "@/lib/editor/types";
 import { MEASUREMENT_TEXT_FONT_FAMILY, UI_TEXT_FONT_FAMILY } from "@/lib/fonts";
@@ -55,8 +52,7 @@ export function getRoomLabelLayout(
   const declutter = getRoomDeclutterState(room, camera, viewport);
   if (!declutter.showLabel) return null;
 
-  const areaText =
-    declutter.showArea && shouldShowRoomArea(room) ? formatMetricRoomAreaForRoom(room) : null;
+  const areaText = declutter.showArea ? formatMetricRoomAreaForRoom(room) : null;
   const measurementTextScale = settings ? getMeasurementTextScale(settings) : 1;
   const areaFontSizePx = ROOM_LABEL_AREA_FONT_SIZE_PX * measurementTextScale;
 
