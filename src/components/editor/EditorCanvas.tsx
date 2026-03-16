@@ -709,7 +709,6 @@ function drawScene(
     hoveredRoomLabelId,
     state.camera,
     state.viewport,
-    showDimensions,
     transformFeedback,
     theme
   );
@@ -1184,16 +1183,13 @@ function drawRoomLabels(
   hoveredRoomLabelId: string | null,
   camera: CameraState,
   viewport: ViewportSize,
-  showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
   clearContainerChildren(labelContainer);
 
   for (const room of rooms) {
-    const layout = getRoomLabelLayout(room, camera, viewport, {
-      showArea: showDimensions,
-    });
+    const layout = getRoomLabelLayout(room, camera, viewport);
     if (!layout) continue;
     const textResolution = getTextResolution();
     const left = snapToPixel(layout.left, textResolution);
