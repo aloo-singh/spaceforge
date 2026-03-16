@@ -58,6 +58,7 @@ type LabelDragSession = {
 };
 
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
+const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 
 /**
  * Handles room drawing interactions:
@@ -562,13 +563,29 @@ function isPointOnInteriorSideOfRectWall(
 ) {
   switch (wall) {
     case "top":
-      return point.x >= bounds.minX && point.x <= bounds.maxX && point.y > bounds.minY;
+      return (
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM
+      );
     case "right":
-      return point.y >= bounds.minY && point.y <= bounds.maxY && point.x < bounds.maxX;
+      return (
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM
+      );
     case "bottom":
-      return point.x >= bounds.minX && point.x <= bounds.maxX && point.y < bounds.maxY;
+      return (
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x <= bounds.maxX + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM
+      );
     case "left":
-      return point.y >= bounds.minY && point.y <= bounds.maxY && point.x > bounds.minX;
+      return (
+        point.y >= bounds.minY - WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.y <= bounds.maxY + WALL_INTERIOR_SIDE_EPSILON_MM &&
+        point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM
+      );
   }
 }
 
