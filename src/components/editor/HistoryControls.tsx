@@ -3,11 +3,11 @@
 import { useState, useSyncExternalStore } from "react";
 import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
+import { normalizeEditorExportSignature } from "@/lib/editor/settings";
 import { useEditorStore } from "@/stores/editorStore";
 
 type HistoryControlsProps = {
@@ -26,7 +26,6 @@ export function HistoryControls({
   const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-  const [exportSignatureText, setExportSignatureText] = useState("");
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -34,6 +33,7 @@ export function HistoryControls({
   );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
+  const exportSignatureText = useEditorStore((state) => state.settings.exportSignatureText);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
   const isCanvasEmpty = useEditorStore(
     (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
@@ -46,7 +46,7 @@ export function HistoryControls({
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
-  const normalizedSignature = normalizeExportSignature(exportSignatureText);
+  const normalizedSignature = normalizeEditorExportSignature(exportSignatureText);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
   const resetCameraTitle = !hasHydrated
@@ -68,8 +68,8 @@ export function HistoryControls({
 
   return (
     <>
-      <aside className="pointer-events-auto absolute top-4 right-4 z-20 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm">
-        <div className="flex items-center gap-2">
+      <aside className="pointer-events-auto absolute top-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-start justify-end gap-1.5 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm sm:flex-nowrap sm:items-center sm:gap-2">
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0">
           <Button
             type="button"
             variant="outline"
@@ -91,10 +91,23 @@ export function HistoryControls({
             disabled={isResetCameraDisabled}
             aria-label={resetCameraAriaLabel}
             title={resetCameraTitle}
-            className="gap-2"
+            className="gap-2 px-2 sm:px-2.5"
           >
             <LocateFixed />
-            Fit View
+            <span className="hidden sm:inline">Fit View</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onExportPng?.(normalizedSignature || undefined)}
+            disabled={isExportButtonDisabled}
+            aria-label="Export current canvas as PNG"
+            title={exportButtonTitle}
+            className="gap-2 px-2 sm:px-2.5"
+          >
+            <Download />
+            <span className="hidden sm:inline">{isExportingPng ? "Exporting..." : "Export PNG"}</span>
           </Button>
           <Button
             type="button"
@@ -107,31 +120,9 @@ export function HistoryControls({
           >
             <RotateCcw />
           </Button>
-          <div className="h-5 w-px bg-border/70" aria-hidden="true" />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onExportPng?.(normalizedSignature || undefined)}
-            disabled={isExportButtonDisabled}
-            aria-label="Export current canvas as PNG"
-            title={exportButtonTitle}
-            className="gap-2"
-          >
-            <Download />
-            {isExportingPng ? "Exporting..." : "Export PNG"}
-          </Button>
-          <Input
-            type="text"
-            value={exportSignatureText}
-            onChange={(event) => setExportSignatureText(event.target.value)}
-            maxLength={40}
-            placeholder="Designed by..."
-            aria-label="Optional export signature text"
-            className="h-8 w-40 text-xs"
-            disabled={isExportingPng}
-          />
-          <div className="h-5 w-px bg-border/70" aria-hidden="true" />
+        </div>
+
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0">
           <Button
             type="button"
             variant="outline"
@@ -139,11 +130,14 @@ export function HistoryControls({
             onClick={undo}
             disabled={isUndoDisabled}
             aria-label="Undo last edit, shortcut Command or Control plus Z"
-            className="gap-2"
+            className="gap-2 px-2 sm:px-2.5"
           >
             <Undo2 />
-            Undo
-            <Keycap aria-hidden="true" className="h-5 min-w-0 rounded-sm px-1.5 text-[10px]">
+            <span className="hidden sm:inline">Undo</span>
+            <Keycap
+              aria-hidden="true"
+              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex"
+            >
               ⌘Z
             </Keycap>
           </Button>
@@ -154,11 +148,14 @@ export function HistoryControls({
             onClick={redo}
             disabled={isRedoDisabled}
             aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-            className="gap-2"
+            className="gap-2 px-2 sm:px-2.5"
           >
             <Redo2 />
-            Redo
-            <Keycap aria-hidden="true" className="h-5 min-w-0 rounded-sm px-1.5 text-[10px]">
+            <span className="hidden sm:inline">Redo</span>
+            <Keycap
+              aria-hidden="true"
+              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex"
+            >
               ⇧⌘Z
             </Keycap>
           </Button>
@@ -199,8 +196,4 @@ export function HistoryControls({
       />
     </>
   );
-}
-
-function normalizeExportSignature(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
 }
