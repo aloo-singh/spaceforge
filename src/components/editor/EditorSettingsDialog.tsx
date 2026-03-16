@@ -1,8 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
-import { shouldShowDimensions } from "@/lib/editor/settings";
+import {
+  EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
+  normalizeEditorExportSignature,
+  shouldShowDimensions,
+} from "@/lib/editor/settings";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -20,6 +25,7 @@ export function EditorSettingsDialog({
   const updateSettings = useEditorStore((state) => state.updateSettings);
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
+  const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
 
   return (
     <ResponsiveDialog
@@ -148,6 +154,60 @@ export function EditorSettingsDialog({
             Applies to room area beneath the label pill and live draw or resize dimensions on both
             desktop and mobile settings surfaces.
           </p>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-export-title"
+          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+        >
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-export-title" className="text-sm font-medium text-foreground">
+                Export signature
+              </h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                Add an optional designer credit to exported PNGs without keeping a text field in the
+                toolbar.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Export signature status</dt>
+                <dd>{normalizedExportSignature ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <label
+              htmlFor="editor-settings-export-signature"
+              className="text-xs font-medium text-foreground"
+            >
+              Designed by
+            </label>
+            <Input
+              id="editor-settings-export-signature"
+              type="text"
+              value={settings.exportSignatureText}
+              onChange={(event) => updateSettings({ exportSignatureText: event.target.value })}
+              maxLength={EDITOR_EXPORT_SIGNATURE_MAX_LENGTH}
+              placeholder="Your name or studio"
+              aria-describedby="editor-settings-export-signature-help"
+              className="h-9"
+            />
+            <p
+              id="editor-settings-export-signature-help"
+              className="text-xs leading-relaxed text-muted-foreground"
+            >
+              Exported images will show
+              {" "}
+              <span className="font-medium text-foreground/90">
+                {`"Designed by ${normalizedExportSignature || "your name"}"`}
+              </span>
+              {" "}
+              when this field is filled in.
+            </p>
+          </div>
         </div>
       </section>
     </ResponsiveDialog>

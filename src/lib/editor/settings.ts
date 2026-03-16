@@ -1,17 +1,20 @@
 export type EditorMeasurementDisplayMode = "interactive";
 export type EditorDimensionsVisibility = "visible" | "hidden";
 export type EditorMeasurementFontSize = "normal" | "large";
+export const EDITOR_EXPORT_SIGNATURE_MAX_LENGTH = 40;
 
 export type EditorSettings = {
   measurementDisplayMode: EditorMeasurementDisplayMode;
   dimensionsVisibility: EditorDimensionsVisibility;
   measurementFontSize: EditorMeasurementFontSize;
+  exportSignatureText: string;
 };
 
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   measurementDisplayMode: "interactive",
   dimensionsVisibility: "visible",
   measurementFontSize: "normal",
+  exportSignatureText: "",
 };
 
 export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
@@ -19,6 +22,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     measurementDisplayMode: settings.measurementDisplayMode,
     dimensionsVisibility: settings.dimensionsVisibility,
     measurementFontSize: settings.measurementFontSize,
+    exportSignatureText: settings.exportSignatureText,
   };
 }
 
@@ -26,7 +30,8 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
   return (
     a.measurementDisplayMode === b.measurementDisplayMode &&
     a.dimensionsVisibility === b.dimensionsVisibility &&
-    a.measurementFontSize === b.measurementFontSize
+    a.measurementFontSize === b.measurementFontSize &&
+    a.exportSignatureText === b.exportSignatureText
   );
 }
 
@@ -56,6 +61,10 @@ export function getMeasurementTextScale(
   return settings.measurementFontSize === "large" ? 1.2 : 1;
 }
 
+export function normalizeEditorExportSignature(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 export function normalizeEditorSettings(value: unknown): EditorSettings | null {
   if (typeof value !== "object" || value === null) return null;
   if (
@@ -75,6 +84,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "measurementFontSize" in value && isEditorMeasurementFontSize(value.measurementFontSize)
         ? value.measurementFontSize
         : DEFAULT_EDITOR_SETTINGS.measurementFontSize,
+    exportSignatureText:
+      "exportSignatureText" in value && typeof value.exportSignatureText === "string"
+        ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)
+        : DEFAULT_EDITOR_SETTINGS.exportSignatureText,
   };
 }
 

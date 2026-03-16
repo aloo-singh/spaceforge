@@ -10,6 +10,37 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.20.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Improved editor toolbar layout on small screens</li>
+                <li>Moved the export signature field into Editor Settings under Export</li>
+                <li>Kept key toolbar actions reachable on mobile with simplified icon-first controls</li>
+                <li>Reduced mobile toolbar width pressure by removing the inline signature field</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Settings is now reachable on small screens</li>
+                <li>Export signature is now configured from Editor Settings rather than directly in the toolbar</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.20.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>
