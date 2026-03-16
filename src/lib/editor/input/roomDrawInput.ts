@@ -232,7 +232,7 @@ export function attachRoomDrawInput(
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       if (!hoveredRoom) {
-        const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint);
+        const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
         setHoveredSelectableWall(hoveredWall);
         const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
         setHoveredSelectableRoomId(
@@ -314,7 +314,7 @@ export function attachRoomDrawInput(
       return;
     }
 
-    const wallHit = findSelectableWallAtScreenPoint(state, screenPoint);
+    const wallHit = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
     if (wallHit) {
       state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
       setHoveredSelectableWall(wallHit);
@@ -498,9 +498,16 @@ function findSelectableRoomAtScreenPoint(
 }
 
 function findSelectableWallAtScreenPoint(
-  state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
-  screenPoint: Point
+  state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document" | "selectedRoomId">,
+  screenPoint: Point,
+  worldPoint: Point
 ): { roomId: string; wall: RectWall } | null {
+  const candidates: Array<{
+    roomId: string;
+    wall: RectWall;
+    clickCameFromInterior: boolean;
+  }> = [];
+
   for (let index = state.document.rooms.length - 1; index >= 0; index -= 1) {
     const room = state.document.rooms[index];
     const bounds = getAxisAlignedRoomBounds(room);
@@ -509,13 +516,52 @@ function findSelectableWallAtScreenPoint(
     const wall = hitTestRoomWallEdge(bounds, screenPoint, state.camera, state.viewport);
     if (!wall) continue;
 
-    return {
+    candidates.push({
       roomId: room.id,
       wall,
-    };
+      clickCameFromInterior: isPointOnInteriorSideOfRectWall(bounds, wall, worldPoint),
+    });
   }
 
-  return null;
+  if (candidates.length === 0) return null;
+
+  const interiorCandidates = candidates.filter((candidate) => candidate.clickCameFromInterior);
+  if (interiorCandidates.length === 1) {
+    return interiorCandidates[0];
+  }
+
+  if (state.selectedRoomId) {
+    const selectedInteriorCandidate = interiorCandidates.find(
+      (candidate) => candidate.roomId === state.selectedRoomId
+    );
+    if (selectedInteriorCandidate) {
+      return selectedInteriorCandidate;
+    }
+
+    const selectedCandidate = candidates.find((candidate) => candidate.roomId === state.selectedRoomId);
+    if (selectedCandidate) {
+      return selectedCandidate;
+    }
+  }
+
+  return interiorCandidates[0] ?? candidates[0];
+}
+
+function isPointOnInteriorSideOfRectWall(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  wall: RectWall,
+  point: Point
+) {
+  switch (wall) {
+    case "top":
+      return point.x >= bounds.minX && point.x <= bounds.maxX && point.y > bounds.minY;
+    case "right":
+      return point.y >= bounds.minY && point.y <= bounds.maxY && point.x < bounds.maxX;
+    case "bottom":
+      return point.x >= bounds.minX && point.x <= bounds.maxX && point.y < bounds.maxY;
+    case "left":
+      return point.y >= bounds.minY && point.y <= bounds.maxY && point.x > bounds.minX;
+  }
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

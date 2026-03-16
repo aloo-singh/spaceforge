@@ -1252,27 +1252,18 @@ function drawSelectedWallHighlight(
   const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
 
   graphics.setStrokeStyle({
-    width: 10,
-    color: theme.interactiveAccent,
-    alpha: 0.14,
+    width: 6,
+    color: theme.canvasBackground,
+    alpha: 0.96,
   });
   graphics.moveTo(from.x, from.y);
   graphics.lineTo(to.x, to.y);
   graphics.stroke();
 
   graphics.setStrokeStyle({
-    width: 5,
+    width: 3,
     color: theme.interactiveAccent,
-    alpha: 0.3,
-  });
-  graphics.moveTo(from.x, from.y);
-  graphics.lineTo(to.x, to.y);
-  graphics.stroke();
-
-  graphics.setStrokeStyle({
-    width: 2.5,
-    color: theme.interactiveAccent,
-    alpha: 0.94,
+    alpha: 1,
   });
   graphics.moveTo(from.x, from.y);
   graphics.lineTo(to.x, to.y);
