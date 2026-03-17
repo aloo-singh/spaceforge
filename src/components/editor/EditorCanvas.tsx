@@ -82,8 +82,10 @@ import {
   trackAppOpened,
   trackFirstAction,
   trackFirstSuccess,
+  trackOncePerSession,
 } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import type { EditorCommand } from "@/lib/editor/history";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -116,6 +118,15 @@ const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+const TOTAL_ONBOARDING_STEPS = 6;
+
+function isDefaultRoomName(name: string) {
+  return /^Room \d+$/.test(name);
+}
+
+function getLatestHistoryCommand(commandHistory: { past: EditorCommand[] }) {
+  return commandHistory.past[commandHistory.past.length - 1] ?? null;
+}
 
 function getScaledMeasurementPx(
   value: number,
@@ -283,6 +294,7 @@ export default function EditorCanvas() {
     };
 
     const startEnter = (hint: ActiveEditorOnboardingHint) => {
+      trackOncePerSession(ANALYTICS_EVENTS.onboardingStarted);
       setDisplayedHint(hint);
       setHintMotionState("entering");
       requestAnimationFrame(() => {
@@ -341,6 +353,11 @@ export default function EditorCanvas() {
       if (previous.includes(hintId)) return previous;
       const next = [...previous, hintId];
       saveCompletedEditorHintIds(next);
+      if (next.length === TOTAL_ONBOARDING_STEPS) {
+        trackOncePerSession(ANALYTICS_EVENTS.onboardingCompleted, {
+          stepsCompleted: next.length,
+        });
+      }
       return next;
     });
   }, []);
@@ -514,6 +531,21 @@ export default function EditorCanvas() {
       });
       trackFirstAction(ANALYTICS_EVENTS.roomCreated);
       trackFirstSuccess(ANALYTICS_EVENTS.roomCreated);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (state.history.past.length <= previousState.history.past.length) return;
+
+      const latestCommand = getLatestHistoryCommand(state.history);
+      if (!latestCommand || latestCommand.type !== "rename-room") return;
+
+      track(ANALYTICS_EVENTS.roomRenamed, {
+        renamedFromDefault: isDefaultRoomName(latestCommand.previousName),
+      });
     });
 
     return unsubscribe;
