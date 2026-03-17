@@ -1,4 +1,6 @@
 import { screenToWorld } from "@/lib/editor/camera";
+import { track } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
@@ -25,6 +27,7 @@ type RoomDrawStoreState = {
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
+  selectedWall: { roomId: string; wall: RectWall } | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
@@ -57,6 +60,12 @@ type LabelDragSession = {
   didDrag: boolean;
 };
 
+type SelectableWallHit = {
+  roomId: string;
+  wall: RectWall;
+  candidateCount: number;
+};
+
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 
@@ -78,7 +87,7 @@ export function attachRoomDrawInput(
   let shouldSuppressNextContextMenu = false;
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
-  let hoveredSelectableWall: { roomId: string; wall: RectWall } | null = null;
+  let hoveredSelectableWall: SelectableWallHit | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
@@ -99,7 +108,7 @@ export function attachRoomDrawInput(
     hoveredSelectableRoomId = roomId;
   };
 
-  const setHoveredSelectableWall = (wallSelection: { roomId: string; wall: RectWall } | null) => {
+  const setHoveredSelectableWall = (wallSelection: SelectableWallHit | null) => {
     if (
       hoveredSelectableWall?.roomId === wallSelection?.roomId &&
       hoveredSelectableWall?.wall === wallSelection?.wall
@@ -325,9 +334,22 @@ export function attachRoomDrawInput(
 
     const wallHit = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
     if (wallHit) {
+      const didChangeSelectedWall =
+        state.selectedWall?.roomId !== wallHit.roomId || state.selectedWall.wall !== wallHit.wall;
+
       state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
       setHoveredSelectableWall(wallHit);
       setHoveredSelectableRoomId(wallHit.roomId);
+      if (didChangeSelectedWall) {
+        track(ANALYTICS_EVENTS.wallSelected, {
+          selectionKind: wallHit.candidateCount > 1 ? "shared" : "single",
+        });
+        if (wallHit.candidateCount > 1) {
+          track(ANALYTICS_EVENTS.sharedWallDisambiguationUsed, {
+            optionCount: wallHit.candidateCount,
+          });
+        }
+      }
       updateCursor();
       return;
     }
@@ -510,7 +532,7 @@ function findSelectableWallAtScreenPoint(
   state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document" | "selectedRoomId">,
   screenPoint: Point,
   worldPoint: Point
-): { roomId: string; wall: RectWall } | null {
+): SelectableWallHit | null {
   if (!state.selectedRoomId) {
     return null;
   }
@@ -540,7 +562,7 @@ function findSelectableWallAtScreenPoint(
 
   const interiorCandidates = candidates.filter((candidate) => candidate.clickCameFromInterior);
   if (interiorCandidates.length === 1) {
-    return interiorCandidates[0];
+    return { ...interiorCandidates[0], candidateCount: candidates.length };
   }
 
   if (state.selectedRoomId) {
@@ -548,16 +570,20 @@ function findSelectableWallAtScreenPoint(
       (candidate) => candidate.roomId === state.selectedRoomId
     );
     if (selectedInteriorCandidate) {
-      return selectedInteriorCandidate;
+      return { ...selectedInteriorCandidate, candidateCount: candidates.length };
     }
 
     const selectedCandidate = candidates.find((candidate) => candidate.roomId === state.selectedRoomId);
     if (selectedCandidate) {
-      return selectedCandidate;
+      return { ...selectedCandidate, candidateCount: candidates.length };
     }
   }
 
-  return interiorCandidates[0] ?? candidates[0];
+  const resolvedCandidate = interiorCandidates[0] ?? candidates[0];
+  return {
+    ...resolvedCandidate,
+    candidateCount: candidates.length,
+  };
 }
 
 function isPointOnInteriorSideOfRectWall(

@@ -1,4 +1,6 @@
 import { screenToWorld } from "@/lib/editor/camera";
+import { track } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
@@ -359,6 +361,9 @@ export function attachRoomResizeInput(
       latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
     };
     if (hitWall) {
+      track(ANALYTICS_EVENTS.wallSelected, {
+        selectionKind: "single",
+      });
       selected.state.selectWallByRoomId(selected.room.id, hitWall);
     } else {
       selected.state.clearSelectedWall();

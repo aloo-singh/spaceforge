@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
+import { track } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { normalizeEditorExportSignature } from "@/lib/editor/settings";
 import { useEditorStore } from "@/stores/editorStore";
@@ -66,6 +68,12 @@ export function HistoryControls({
     setIsResetDialogOpen(false);
   };
 
+  const openSettingsDialog = () => {
+    if (isSettingsDialogOpen) return;
+    track(ANALYTICS_EVENTS.settingsOpened);
+    setIsSettingsDialogOpen(true);
+  };
+
   return (
     <>
       <aside className="pointer-events-auto absolute top-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-start justify-end gap-1.5 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm sm:flex-nowrap sm:items-center sm:gap-2">
@@ -74,7 +82,7 @@ export function HistoryControls({
             type="button"
             variant="outline"
             size="icon"
-            onClick={() => setIsSettingsDialogOpen(true)}
+            onClick={openSettingsDialog}
             aria-label="Open editor settings"
             aria-haspopup="dialog"
             aria-expanded={isSettingsDialogOpen}
