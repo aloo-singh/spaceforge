@@ -12,9 +12,7 @@ import {
   appUiSansFont,
   measurementMonoFont,
 } from "@/lib/fonts";
-import packageJson from "../../package.json";
-
-const APP_VERSION_LABEL = `v${packageJson.version}`;
+import { APP_VERSION_LABEL } from "@/lib/appVersion";
 
 export const metadata: Metadata = {
   title: "SpaceForge",

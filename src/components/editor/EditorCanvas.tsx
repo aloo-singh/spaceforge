@@ -77,6 +77,7 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
+import { track } from "@/lib/analytics/client";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -481,6 +482,10 @@ export default function EditorCanvas() {
     setDismissedHintIds(loadDismissedEditorHintIds());
     setCompletedHintIds(loadCompletedEditorHintIds());
     setHasHydratedHints(true);
+  }, []);
+
+  useEffect(() => {
+    track("editor_loaded");
   }, []);
 
   useEffect(() => {
