@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.22.2</h2>
+            <span className="text-sm text-muted-foreground">2026-03-17</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a subtle PREVIEW badge to the top navigation to communicate product stage</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Clarifies product state for users arriving via the live domain</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.22.1</h2>
             <span className="text-sm text-muted-foreground">2026-03-16</span>
           </div>
