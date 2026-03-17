@@ -4,34 +4,70 @@ import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-[calc(100vh-3.5rem)] overflow-hidden bg-[#f8f6ef] text-[#161616]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,#ffd45e_0%,transparent_50%),radial-gradient(circle_at_85%_25%,#9fd9ff_0%,transparent_45%),radial-gradient(circle_at_65%_80%,#ffc7bf_0%,transparent_40%)]" />
+    <main className="min-h-[calc(100vh-3.5rem)] bg-background text-foreground">
+      <section className="mx-auto grid min-h-[calc(100vh-3.5rem)] w-full max-w-6xl items-center gap-14 px-6 py-16 sm:px-10 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:gap-20 lg:py-24">
+        <div className="max-w-xl">
+          <h1 className="text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
+            Sketch home layouts in seconds
+          </h1>
 
-      <section className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-6xl flex-col justify-center px-6 py-20 sm:px-10">
-        <p className="mb-5 inline-flex w-fit rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-medium tracking-wide uppercase">
-          SpaceForge • Floor Plan Editor
-        </p>
+          <p className="mt-5 max-w-lg text-base leading-7 text-foreground/68 sm:text-lg">
+            No setup. No complexity. Just draw and explore.
+          </p>
 
-        <h1 className="max-w-4xl text-4xl leading-tight font-semibold tracking-tight sm:text-6xl">
-          Plan spaces visually.
-          <br />
-          Edit layouts in millimetres.
-        </h1>
+          <div className="mt-8 flex flex-col items-start gap-3">
+            <Button
+              asChild
+              size="lg"
+              className="h-11 rounded-full bg-blue-500 px-6 text-sm text-white hover:bg-blue-500/90"
+            >
+              <Link href="/editor">
+                Start designing
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <p className="text-sm text-foreground/52">Takes seconds. No signup required.</p>
+          </div>
+        </div>
 
-        <p className="mt-6 max-w-2xl text-base leading-relaxed text-black/75 sm:text-lg">
-          This is a temporary homepage inspired by Mural&apos;s clear intro style.
-          Jump straight into the editor to pan, zoom, and build precise plans.
-        </p>
+        <div className="relative">
+          <div className="absolute inset-x-6 top-6 h-24 rounded-full bg-blue-500/10 blur-3xl" />
+          <div className="relative overflow-hidden rounded-3xl border border-black/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.08)]">
+            <div className="flex items-center gap-2 border-b border-black/10 px-5 py-4">
+              <span className="size-2 rounded-full bg-black/15" />
+              <span className="size-2 rounded-full bg-blue-500/70" />
+              <span className="size-2 rounded-full bg-black/15" />
+            </div>
 
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Button asChild size="lg" className="h-11 rounded-full px-6 text-sm">
-            <Link href="/editor">
-              Open Editor
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <div className="rounded-full border border-black/10 bg-white/70 px-4 py-2 text-xs text-black/70">
-            No signup required for local MVP flow
+            <div className="grid gap-6 bg-[linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-[size:32px_32px] p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="font-measurement text-[11px] font-semibold tracking-[0.2em] text-blue-500 uppercase">
+                    Live Preview
+                  </p>
+                  <p className="text-sm text-foreground/60">A simple sketch surface with precise feedback.</p>
+                </div>
+                <div className="rounded-full border border-black/10 bg-background px-3 py-1 font-measurement text-[11px] text-foreground/55">
+                  8.4m x 6.2m
+                </div>
+              </div>
+
+              <div className="relative min-h-[280px] rounded-2xl border border-black/10 bg-white/90 p-4 sm:min-h-[340px] sm:p-6">
+                <div className="absolute left-4 top-4 rounded-full border border-blue-500/20 bg-blue-500/8 px-3 py-1 font-measurement text-[11px] text-blue-500 sm:left-6 sm:top-6">
+                  Living Area
+                </div>
+                <div className="absolute inset-x-4 bottom-4 top-16 rounded-[1.4rem] border-2 border-blue-500/85 bg-blue-500/[0.05] sm:inset-x-6 sm:bottom-6 sm:top-20">
+                  <div className="absolute left-[17%] top-0 h-full border-l border-dashed border-blue-500/30" />
+                  <div className="absolute left-0 right-0 top-[42%] border-t border-dashed border-blue-500/30" />
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-background px-2 font-measurement text-[10px] text-foreground/45">
+                    8.4m
+                  </div>
+                  <div className="absolute -right-3 top-1/2 -translate-y-1/2 rounded-full bg-background px-2 font-measurement text-[10px] text-foreground/45">
+                    6.2m
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
