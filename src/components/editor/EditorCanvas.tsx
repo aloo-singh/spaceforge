@@ -80,6 +80,7 @@ import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
   trackAppOpened,
+  trackEditorLoaded,
   trackFirstAction,
   trackFirstSuccess,
   trackOncePerSession,
@@ -678,6 +679,7 @@ export default function EditorCanvas() {
 
       syncViewport();
       drawCurrentScene();
+      trackEditorLoaded();
 
       const handleResize = () => {
         syncViewport();

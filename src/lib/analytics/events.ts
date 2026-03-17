@@ -1,5 +1,6 @@
 export const ANALYTICS_EVENTS = {
   appOpened: "app_opened",
+  editorLoaded: "editor_loaded",
   roomCreated: "room_created",
   firstAction: "first_action",
   firstSuccess: "first_success",

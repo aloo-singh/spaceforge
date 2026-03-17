@@ -353,6 +353,11 @@ export function trackAppOpened() {
   return trackOncePerSession(ANALYTICS_EVENTS.appOpened);
 }
 
+export function trackEditorLoaded() {
+  getAnalyticsSessionId();
+  return trackOncePerSession(ANALYTICS_EVENTS.editorLoaded);
+}
+
 export function trackFirstAction(action: "room_created" | "export_started") {
   return trackOncePerSession(ANALYTICS_EVENTS.firstAction, {
     action,
