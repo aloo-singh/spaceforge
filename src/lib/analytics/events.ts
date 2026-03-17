@@ -9,6 +9,7 @@ export const ANALYTICS_EVENTS = {
   settingsOpened: "settings_opened",
   onboardingStarted: "onboarding_started",
   onboardingCompleted: "onboarding_completed",
+  sessionSummary: "session_summary",
 } as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
