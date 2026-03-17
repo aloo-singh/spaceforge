@@ -1,12 +1,16 @@
 "use client";
 
 import { APP_VERSION } from "@/lib/appVersion";
+import { ANALYTICS_EVENTS, type AnalyticsEventName } from "@/lib/analytics/events";
 import type { AnalyticsEvent, AnalyticsEventProperties } from "@/lib/analytics/types";
 
 const ANALYTICS_ENDPOINT = "/api/analytics";
 const ANALYTICS_SESSION_STORAGE_KEY = "spaceforge.analytics.session-id";
+const ANALYTICS_LOAD_STARTED_AT_STORAGE_KEY = "spaceforge.analytics.load-started-at";
+const ANALYTICS_TRACKED_EVENT_STORAGE_KEY_PREFIX = "spaceforge.analytics.tracked.";
 
 let fallbackSessionId: string | null = null;
+let fallbackLoadStartedAtMs: number | null = null;
 
 function createAnalyticsSessionId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -17,6 +21,10 @@ function createAnalyticsSessionId() {
 }
 
 function getSessionStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
   try {
     return window.sessionStorage;
   } catch {
@@ -44,6 +52,31 @@ function getAnalyticsSessionId() {
   const nextSessionId = createAnalyticsSessionId();
   sessionStorage.setItem(ANALYTICS_SESSION_STORAGE_KEY, nextSessionId);
   return nextSessionId;
+}
+
+function getTrackedEventStorageKey(event: AnalyticsEventName) {
+  return `${ANALYTICS_TRACKED_EVENT_STORAGE_KEY_PREFIX}${event}`;
+}
+
+function getAnalyticsLoadStartedAtMs() {
+  const sessionStorage = getSessionStorage();
+
+  if (!sessionStorage) {
+    fallbackLoadStartedAtMs ??= Date.now();
+    return fallbackLoadStartedAtMs;
+  }
+
+  const existingLoadStartedAt = sessionStorage.getItem(ANALYTICS_LOAD_STARTED_AT_STORAGE_KEY);
+  if (existingLoadStartedAt) {
+    const parsedLoadStartedAt = Number(existingLoadStartedAt);
+    if (Number.isFinite(parsedLoadStartedAt) && parsedLoadStartedAt > 0) {
+      return parsedLoadStartedAt;
+    }
+  }
+
+  const nextLoadStartedAt = Date.now();
+  sessionStorage.setItem(ANALYTICS_LOAD_STARTED_AT_STORAGE_KEY, String(nextLoadStartedAt));
+  return nextLoadStartedAt;
 }
 
 function buildAnalyticsEvent(event: string, properties?: AnalyticsEventProperties): AnalyticsEvent {
@@ -89,4 +122,55 @@ export function track(event: string, properties?: AnalyticsEventProperties) {
   }
 
   void sendAnalyticsEvent(buildAnalyticsEvent(event, properties));
+}
+
+export function trackOncePerSession(
+  event: AnalyticsEventName,
+  properties?: AnalyticsEventProperties
+) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const sessionStorage = getSessionStorage();
+  if (!sessionStorage) {
+    return false;
+  }
+
+  const trackedEventStorageKey = getTrackedEventStorageKey(event);
+  if (sessionStorage.getItem(trackedEventStorageKey) === "1") {
+    return false;
+  }
+
+  sessionStorage.setItem(trackedEventStorageKey, "1");
+  track(event, properties);
+  return true;
+}
+
+export function getTimeSinceAnalyticsLoadMs() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  return Math.max(0, Date.now() - getAnalyticsLoadStartedAtMs());
+}
+
+export function trackAppOpened() {
+  getAnalyticsSessionId();
+  getAnalyticsLoadStartedAtMs();
+  return trackOncePerSession(ANALYTICS_EVENTS.appOpened);
+}
+
+export function trackFirstAction(action: "room_created" | "export_started") {
+  return trackOncePerSession(ANALYTICS_EVENTS.firstAction, {
+    action,
+    timeSinceLoadMs: getTimeSinceAnalyticsLoadMs(),
+  });
+}
+
+export function trackFirstSuccess(type: "room_created" | "export_completed") {
+  return trackOncePerSession(ANALYTICS_EVENTS.firstSuccess, {
+    type,
+    timeSinceLoadMs: getTimeSinceAnalyticsLoadMs(),
+  });
 }

@@ -77,7 +77,13 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
-import { track } from "@/lib/analytics/client";
+import {
+  track,
+  trackAppOpened,
+  trackFirstAction,
+  trackFirstSuccess,
+} from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -342,6 +348,12 @@ export default function EditorCanvas() {
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
     if (!app || isExportingPng) return;
+
+    track(ANALYTICS_EVENTS.exportStarted, {
+      exportType: "png",
+    });
+    trackFirstAction(ANALYTICS_EVENTS.exportStarted);
+
     const state = useEditorStore.getState();
     const hasSignature = Boolean(signatureText?.trim());
     const layoutBounds = getLayoutBoundsFromDocument(state.document);
@@ -443,6 +455,10 @@ export default function EditorCanvas() {
       link.href = downloadUrl;
       link.download = `spaceforge-editor-${timestamp}.png`;
       link.click();
+      track(ANALYTICS_EVENTS.exportCompleted, {
+        exportType: "png",
+      });
+      trackFirstSuccess(ANALYTICS_EVENTS.exportCompleted);
       if (activeHintIdRef.current === "export-as-png") {
         completeHint("export-as-png");
       }
@@ -485,7 +501,22 @@ export default function EditorCanvas() {
   }, []);
 
   useEffect(() => {
-    track("editor_loaded");
+    trackAppOpened();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      const didCreateRoom = state.document.rooms.length === previousState.document.rooms.length + 1;
+      if (!didCreateRoom) return;
+
+      track(ANALYTICS_EVENTS.roomCreated, {
+        inputMethod: "draw",
+      });
+      trackFirstAction(ANALYTICS_EVENTS.roomCreated);
+      trackFirstSuccess(ANALYTICS_EVENTS.roomCreated);
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
