@@ -10,6 +10,46 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.23.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-17</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a lightweight internal analytics pipeline with a Next.js ingest route and Supabase raw-event storage</li>
+                <li>Introduced session-level analytics context including session IDs, route, app version, and send-time timestamps</li>
+                <li>Added a Supabase SQL review file with copy-paste analytics queries for recent events and session summaries</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Captures a first wave of meaningful editor events including app entry, editor readiness, room creation, first action, first success, export flow, room rename, settings open, onboarding progress, wall selection, and shared-wall disambiguation</li>
+                <li>Emits a best-effort per-tab session summary event with duration and compact session outcome counts</li>
+                <li>Lifecycle analytics are now explicitly session-scoped so app and editor load events avoid duplicate noise within the same tab</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Analytics stays vendor-neutral and storage-neutral at the app API boundary</li>
+                <li>Tracking avoids geometry, room names, dimensions, and free text to keep early analytics low-risk and focused</li>
+                <li>Shared-wall editing discoverability can now be reviewed without adding dashboard infrastructure</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.22.2</h2>
             <span className="text-sm text-muted-foreground">2026-03-17</span>
           </div>
