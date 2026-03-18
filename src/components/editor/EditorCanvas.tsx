@@ -11,6 +11,7 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
+import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getRoomLabelLayout,
@@ -1048,10 +1049,32 @@ function drawRooms(
     );
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
-    const bounds = getAxisAlignedRoomBounds(room);
-    if (!bounds) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
+    const vertexHandles = getConstrainedVertexHandleLayouts(room, camera, viewport);
+
+    if (vertexHandles.length > 0) {
+      for (const handle of vertexHandles) {
+        const radius = handle.size / 2;
+
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.28 });
+        graphics.circle(handle.center.x, handle.center.y, radius);
+        graphics.fill();
+
+        graphics.setStrokeStyle({
+          width: 1.6,
+          color: theme.roomOutline,
+          alpha: 0.92,
+        });
+        graphics.circle(handle.center.x, handle.center.y, radius);
+        graphics.stroke();
+      }
+
+      continue;
+    }
+
+    const bounds = getAxisAlignedRoomBounds(room);
+    if (!bounds) continue;
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
 
