@@ -14,12 +14,15 @@ import {
 } from "@/lib/editor/cameraTransition";
 import {
   getOrthogonalSnappedPoint,
-  getRectangleClosingPoint,
   isZeroLengthSegment,
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
-import { isAxisAlignedRectangle } from "@/lib/editor/roomGeometry";
+import {
+  isAxisAlignedRectangle,
+  isOrthogonalPointPath,
+  isSimplePolygon,
+} from "@/lib/editor/roomGeometry";
 import { translateRoomPoints } from "@/lib/editor/roomTranslation";
 import {
   PERSISTED_HISTORY_STATE_LIMIT,
@@ -368,17 +371,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
-      if (draftPoints.length === 3) {
-        const closingPoint = getRectangleClosingPoint(draftPoints);
-        if (!closingPoint || !pointsEqual(nextPoint, closingPoint)) {
-          return state;
-        }
+      const startPoint = draftPoints[0];
+      if (pointsEqual(nextPoint, startPoint)) {
+        if (draftPoints.length < 4) return state;
+        if (!isValidDraftRoomClosure(draftPoints)) return state;
 
-        const roomPoints = [...draftPoints, closingPoint];
         const room: Room = {
           id: createRoomId(),
           name: `Room ${state.document.rooms.length + 1}`,
-          points: roomPoints,
+          points: draftPoints.map((point) => ({ ...point })),
         };
         const command: EditorCommand = {
           type: "complete-room",
@@ -403,11 +404,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      if (draftPoints.length === 2) {
-        const firstPoint = draftPoints[0];
-        if (firstPoint.x === nextPoint.x || firstPoint.y === nextPoint.y) {
-          return state;
-        }
+      if (draftPoints.some((point, index) => index !== 0 && pointsEqual(point, nextPoint))) {
+        return state;
+      }
+
+      if (!isValidDraftTurn(draftPoints, nextPoint)) {
+        return state;
       }
 
       return {
@@ -965,4 +967,26 @@ if (typeof window !== "undefined") {
     window.removeEventListener("pagehide", onPageHide);
     window.removeEventListener("beforeunload", onBeforeUnload);
   };
+}
+
+function isValidDraftTurn(draftPoints: Point[], nextPoint: Point): boolean {
+  if (draftPoints.length < 2) return true;
+
+  const previousPoint = draftPoints[draftPoints.length - 2];
+  const currentPoint = draftPoints[draftPoints.length - 1];
+  const previousAxis = getSegmentAxis(previousPoint, currentPoint);
+  const nextAxis = getSegmentAxis(currentPoint, nextPoint);
+
+  if (!previousAxis || !nextAxis) return false;
+  return previousAxis !== nextAxis;
+}
+
+function getSegmentAxis(start: Point, end: Point): "horizontal" | "vertical" | null {
+  if (start.x === end.x && start.y !== end.y) return "vertical";
+  if (start.y === end.y && start.x !== end.x) return "horizontal";
+  return null;
+}
+
+function isValidDraftRoomClosure(points: Point[]): boolean {
+  return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
 }
