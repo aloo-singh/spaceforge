@@ -1,38 +1,44 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { Safari } from "@/components/ui/safari";
 import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-[calc(100vh-3.5rem)] overflow-hidden bg-[#f8f6ef] text-[#161616]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,#ffd45e_0%,transparent_50%),radial-gradient(circle_at_85%_25%,#9fd9ff_0%,transparent_45%),radial-gradient(circle_at_65%_80%,#ffc7bf_0%,transparent_40%)]" />
+    <main className="min-h-[calc(100vh-3.5rem)] bg-background text-foreground">
+      <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-7xl flex-col justify-center gap-10 px-6 py-16 sm:px-10 lg:gap-14 lg:py-18">
+        <div className="max-w-5xl">
+          <h1 className="text-[2.2rem] leading-[1.02] font-semibold tracking-tight sm:text-5xl md:text-[3.5rem] lg:text-[4.8rem]">
+            <span className="block whitespace-nowrap">Sketch home layouts</span>
+            <span className="block">in seconds</span>
+          </h1>
 
-      <section className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-6xl flex-col justify-center px-6 py-20 sm:px-10">
-        <p className="mb-5 inline-flex w-fit rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-medium tracking-wide uppercase">
-          SpaceForge • Floor Plan Editor
-        </p>
+          <p className="mt-7 max-w-2xl text-base leading-7 text-foreground/68 sm:text-lg">
+            No setup. No complexity. Just draw and explore.
+          </p>
 
-        <h1 className="max-w-4xl text-4xl leading-tight font-semibold tracking-tight sm:text-6xl">
-          Plan spaces visually.
-          <br />
-          Edit layouts in millimetres.
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-base leading-relaxed text-black/75 sm:text-lg">
-          This is a temporary homepage inspired by Mural&apos;s clear intro style.
-          Jump straight into the editor to pan, zoom, and build precise plans.
-        </p>
-
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Button asChild size="lg" className="h-11 rounded-full px-6 text-sm">
-            <Link href="/editor">
-              Open Editor
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <div className="rounded-full border border-black/10 bg-white/70 px-4 py-2 text-xs text-black/70">
-            No signup required for local MVP flow
+          <div className="mt-8 flex flex-col items-start gap-2.5">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 rounded-full bg-blue-500 px-7 text-sm text-white shadow-[0_10px_24px_rgba(59,130,246,0.18)] hover:bg-blue-500/90"
+            >
+              <Link href="/editor">
+                Start designing
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <p className="text-sm text-foreground/52">Takes seconds. No signup required.</p>
+            <p className="text-sm text-foreground/42">For quick layout ideas, not perfect plans.</p>
           </div>
+        </div>
+
+        <div className="pt-1 sm:pt-2">
+          <Safari
+            url="spaceforge.app"
+            imageSrc="/images/home/editor-hero.png?v=20260318"
+            className="w-full"
+          />
         </div>
       </section>
     </main>

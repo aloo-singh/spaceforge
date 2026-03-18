@@ -11,16 +11,15 @@ export default function ChangelogPage() {
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.23.0</h2>
-            <span className="text-sm text-muted-foreground">2026-03-17</span>
+            <span className="text-sm text-muted-foreground">2026-03-18</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Added a lightweight internal analytics pipeline with a Next.js ingest route and Supabase raw-event storage</li>
-                <li>Introduced session-level analytics context including session IDs, route, app version, and send-time timestamps</li>
-                <li>Added a Supabase SQL review file with copy-paste analytics queries for recent events and session summaries</li>
+                <li>Added a minimal public homepage at `/` with clear product framing and a direct path into the editor</li>
+                <li>Introduced a restrained Safari-style hero mockup using a real editor screenshot for stronger product credibility</li>
               </ul>
             </div>
 
@@ -29,9 +28,8 @@ export default function ChangelogPage() {
                 Behaviour
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Captures a first wave of meaningful editor events including app entry, editor readiness, room creation, first action, first success, export flow, room rename, settings open, onboarding progress, wall selection, and shared-wall disambiguation</li>
-                <li>Emits a best-effort per-tab session summary event with duration and compact session outcome counts</li>
-                <li>Lifecycle analytics are now explicitly session-scoped so app and editor load events avoid duplicate noise within the same tab</li>
+                <li>Homepage messaging now prioritises immediate editor starts with a single primary CTA and low-friction reassurance copy</li>
+                <li>The hero now flows vertically from copy into the product screenshot, with calmer spacing and clearer visual hierarchy across desktop and mobile</li>
               </ul>
             </div>
 
@@ -40,9 +38,8 @@ export default function ChangelogPage() {
                 Improvements
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Analytics stays vendor-neutral and storage-neutral at the app API boundary</li>
-                <li>Tracking avoids geometry, room names, dimensions, and free text to keep early analytics low-risk and focused</li>
-                <li>Shared-wall editing discoverability can now be reviewed without adding dashboard infrastructure</li>
+                <li>Updated the public-facing navigation and homepage metadata to better match the new market-layer entry point</li>
+                <li>Refined the hero screenshot presentation, headline breaks, responsive title sizing, and cache-busting for homepage image updates</li>
               </ul>
             </div>
           </div>
