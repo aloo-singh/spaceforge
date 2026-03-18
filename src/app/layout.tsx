@@ -14,8 +14,26 @@ import {
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
 
 export const metadata: Metadata = {
-  title: "spaceforge.app",
-  description: "Sketch home layouts in seconds. No setup. No complexity. Just draw and explore.",
+  metadataBase: new URL("https://spaceforge.app"),
+  title: "[s]paceforge - Sketch home layouts in seconds",
+  description:
+    "Draw and explore home layouts in seconds. No setup, no signup. Just sketch and iterate.",
+  openGraph: {
+    title: "Spaceforge",
+    description:
+      "Draw and explore home layouts in seconds. No setup, no signup. Just sketch and iterate.",
+    url: "https://spaceforge.app",
+    siteName: "Spaceforge",
+    images: ["/opengraph-image.png"],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Spaceforge",
+    description:
+      "Draw and explore home layouts in seconds. No setup, no signup. Just sketch and iterate.",
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default function RootLayout({
