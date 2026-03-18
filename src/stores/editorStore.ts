@@ -13,7 +13,11 @@ import {
   RESET_CAMERA_TRANSITION_DURATION_MS,
 } from "@/lib/editor/cameraTransition";
 import {
+  applyCandidatePointToDraftPath,
+  getDraftLoopCandidate,
+  getOrthogonalSegmentAxis,
   getOrthogonalSnappedPoint,
+  normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
   snapPointToGrid,
@@ -356,7 +360,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
-      const draftPoints = state.roomDraft.points;
+      const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
 
       if (draftPoints.length === 0) {
         return {
@@ -404,17 +408,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      if (draftPoints.some((point, index) => index !== 0 && pointsEqual(point, nextPoint))) {
+      const loopCandidate = getDraftLoopCandidate(draftPoints, nextPoint);
+      if (loopCandidate && !pointsEqual(nextPoint, startPoint)) {
         return state;
       }
 
-      if (!isValidDraftTurn(draftPoints, nextPoint)) {
+      const nextDraftPoints = applyCandidatePointToDraftPath(draftPoints, nextPoint);
+
+      if (!isValidDraftPathProgression(draftPoints, nextDraftPoints, nextPoint)) {
         return state;
       }
+
+      if (arePointListsEqual(draftPoints, nextDraftPoints)) return state;
 
       return {
         roomDraft: {
-          points: [...draftPoints, nextPoint],
+          points: nextDraftPoints,
         },
       };
     }),
@@ -969,24 +978,44 @@ if (typeof window !== "undefined") {
   };
 }
 
-function isValidDraftTurn(draftPoints: Point[], nextPoint: Point): boolean {
-  if (draftPoints.length < 2) return true;
-
-  const previousPoint = draftPoints[draftPoints.length - 2];
-  const currentPoint = draftPoints[draftPoints.length - 1];
-  const previousAxis = getSegmentAxis(previousPoint, currentPoint);
-  const nextAxis = getSegmentAxis(currentPoint, nextPoint);
-
-  if (!previousAxis || !nextAxis) return false;
-  return previousAxis !== nextAxis;
-}
-
-function getSegmentAxis(start: Point, end: Point): "horizontal" | "vertical" | null {
-  if (start.x === end.x && start.y !== end.y) return "vertical";
-  if (start.y === end.y && start.x !== end.x) return "horizontal";
-  return null;
-}
-
 function isValidDraftRoomClosure(points: Point[]): boolean {
   return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+}
+
+function isValidDraftPathProgression(
+  previousDraftPoints: Point[],
+  nextDraftPoints: Point[],
+  rawNextPoint: Point
+): boolean {
+  if (nextDraftPoints.length === 0) return false;
+  if (nextDraftPoints.length === 1) return true;
+
+  const terminalPreviousPoint = nextDraftPoints[nextDraftPoints.length - 2];
+  const terminalPoint = nextDraftPoints[nextDraftPoints.length - 1];
+  if (pointsEqual(terminalPreviousPoint, terminalPoint)) {
+    return false;
+  }
+
+  const isTailAdjustment = nextDraftPoints.length === previousDraftPoints.length;
+  if (isTailAdjustment) {
+    return !nextDraftPoints
+      .slice(0, -1)
+      .some((point, index) => index !== 0 && pointsEqual(point, terminalPoint));
+  }
+
+  if (previousDraftPoints.length < 2) {
+    return true;
+  }
+
+  const previousPoint = previousDraftPoints[previousDraftPoints.length - 2];
+  const currentPoint = previousDraftPoints[previousDraftPoints.length - 1];
+  const previousAxis = getOrthogonalSegmentAxis(previousPoint, currentPoint);
+  const nextAxis = getOrthogonalSegmentAxis(currentPoint, rawNextPoint);
+
+  if (!previousAxis || !nextAxis) return false;
+  if (previousAxis === nextAxis) return false;
+
+  return !nextDraftPoints
+    .slice(0, -1)
+    .some((point, index) => index !== 0 && pointsEqual(point, terminalPoint));
 }
