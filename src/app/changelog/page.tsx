@@ -10,6 +10,25 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.23.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-18</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a minimal SEO baseline with homepage title, description, Open Graph, and Twitter metadata</li>
+                <li>Added install-surface metadata via the app manifest and verified file-based favicon, icon, apple icon, and Open Graph image routes</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.23.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-18</span>
           </div>
