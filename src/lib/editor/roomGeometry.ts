@@ -116,6 +116,10 @@ export function getAxisAlignedRectangleBounds(points: Point[]): PolygonBounds | 
   return bounds;
 }
 
+export function isAxisAlignedRectangle(points: Point[]): boolean {
+  return getAxisAlignedRectangleBounds(points) !== null;
+}
+
 export function getRectanglePointsFromBounds(bounds: PolygonBounds): Point[] {
   return [
     { x: bounds.minX, y: bounds.minY },

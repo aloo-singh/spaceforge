@@ -19,6 +19,7 @@ import {
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import { isAxisAlignedRectangle } from "@/lib/editor/roomGeometry";
 import { translateRoomPoints } from "@/lib/editor/roomTranslation";
 import {
   PERSISTED_HISTORY_STATE_LIMIT,
@@ -188,7 +189,9 @@ function getSelectedWallIfRoomExists(
   document: DocumentState
 ): RoomWallSelection | null {
   if (!selectedWall) return null;
-  return document.rooms.some((room) => room.id === selectedWall.roomId) ? selectedWall : null;
+  const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
+  if (!room) return null;
+  return isAxisAlignedRectangle(room.points) ? selectedWall : null;
 }
 
 function getSafePersistedHistorySnapshot(
@@ -432,6 +435,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (!isAxisAlignedRectangle(room.points)) {
+        return {
+          selectedRoomId: roomId,
+          selectedWall: null,
+          shouldFocusSelectedRoomNameInput: false,
+          renameSession: null,
+        };
+      }
+
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall?.roomId === roomId &&

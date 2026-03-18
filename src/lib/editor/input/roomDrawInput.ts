@@ -3,7 +3,11 @@ import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
-import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
+import {
+  findRoomAtPoint,
+  isAxisAlignedRectangle,
+  isPointInPolygon,
+} from "@/lib/editor/roomGeometry";
 import {
   getAxisAlignedRoomBounds,
   hitTestRoomWallEdge,
@@ -534,6 +538,11 @@ function findSelectableWallAtScreenPoint(
   worldPoint: Point
 ): SelectableWallHit | null {
   if (!state.selectedRoomId) {
+    return null;
+  }
+
+  const selectedRoom = state.document.rooms.find((room) => room.id === state.selectedRoomId);
+  if (!selectedRoom || !isAxisAlignedRectangle(selectedRoom.points)) {
     return null;
   }
 
