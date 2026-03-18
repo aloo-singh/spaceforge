@@ -4,12 +4,14 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BrandWordmark } from "@/components/brand-wordmark";
+import { Badge } from "@/components/ui/badge";
 import {
   appSansFont,
   appUiMonoFont,
   appUiSansFont,
   measurementMonoFont,
 } from "@/lib/fonts";
+import { APP_VERSION_LABEL } from "@/lib/appVersion";
 
 export const metadata: Metadata = {
   title: "spaceforge.app",
@@ -37,6 +39,11 @@ export default function RootLayout({
                 className="text-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
               >
                 Editor
+              </Link>
+              <Link href="/changelog" className="ml-4 leading-none">
+                <Badge variant="outline" className="text-[11px] font-medium">
+                  {APP_VERSION_LABEL}
+                </Badge>
               </Link>
             </nav>
           </header>
