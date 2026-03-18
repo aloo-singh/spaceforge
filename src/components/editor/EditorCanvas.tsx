@@ -7,7 +7,7 @@ import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
 import {
   getOrthogonalSnappedPoint,
-  getRectangleClosingPoint,
+  pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
@@ -29,6 +29,7 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
+import { isOrthogonalPointPath, isSimplePolygon } from "@/lib/editor/roomGeometry";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
   type ActiveEditorOnboardingHint,
@@ -2026,37 +2027,23 @@ function nudgeResizeDimensionLabel(
 
 function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): Room | null {
   if (!cursorWorld) return null;
-  if (draftPoints.length < 2) return null;
+  if (draftPoints.length < 4) return null;
 
-  if (draftPoints.length === 2) {
-    const previewThirdPoint = getOrthogonalSnappedPoint(
-      draftPoints[draftPoints.length - 1],
-      cursorWorld,
-      GRID_SIZE_MM
-    );
-    const previewPoints = [...draftPoints, previewThirdPoint];
-    const closingPoint = getRectangleClosingPoint(previewPoints);
-    if (!closingPoint) return null;
-
-    return {
-      id: "__draft-preview__",
-      name: "",
-      points: [...previewPoints, closingPoint],
-    };
+  const previewPoint = getOrthogonalSnappedPoint(
+    draftPoints[draftPoints.length - 1],
+    cursorWorld,
+    GRID_SIZE_MM
+  );
+  if (!pointsEqual(previewPoint, draftPoints[0])) return null;
+  if (!isOrthogonalPointPath(draftPoints, { closed: true }) || !isSimplePolygon(draftPoints)) {
+    return null;
   }
 
-  if (draftPoints.length === 3) {
-    const closingPoint = getRectangleClosingPoint(draftPoints);
-    if (!closingPoint) return null;
-
-    return {
-      id: "__draft-preview__",
-      name: "",
-      points: [...draftPoints, closingPoint],
-    };
-  }
-
-  return null;
+  return {
+    id: "__draft-preview__",
+    name: "",
+    points: draftPoints,
+  };
 }
 
 function getDraftDimensionWalls(

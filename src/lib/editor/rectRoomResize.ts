@@ -1,5 +1,9 @@
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { snapToGrid } from "@/lib/editor/geometry";
+import {
+  getAxisAlignedRectangleBounds,
+  getRectanglePointsFromBounds,
+} from "@/lib/editor/roomGeometry";
 import { worldToScreen } from "@/lib/editor/camera";
 import type { CameraState, Point, Room, RoomWall, ViewportSize } from "@/lib/editor/types";
 
@@ -38,38 +42,11 @@ const WALL_SELECTION_HIT_PADDING_PX = 14;
 export const MIN_ROOM_SIZE_MM = GRID_SIZE_MM;
 
 export function getAxisAlignedRoomBounds(room: Room): RoomRectBounds | null {
-  if (room.points.length < 4) return null;
-
-  const xs = Array.from(new Set(room.points.map((point) => point.x)));
-  const ys = Array.from(new Set(room.points.map((point) => point.y)));
-  if (xs.length !== 2 || ys.length !== 2) return null;
-
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  if (minX === maxX || minY === maxY) return null;
-
-  const corners = new Set(room.points.map((point) => `${point.x}:${point.y}`));
-  if (
-    !corners.has(`${minX}:${minY}`) ||
-    !corners.has(`${maxX}:${minY}`) ||
-    !corners.has(`${maxX}:${maxY}`) ||
-    !corners.has(`${minX}:${maxY}`)
-  ) {
-    return null;
-  }
-
-  return { minX, maxX, minY, maxY };
+  return getAxisAlignedRectangleBounds(room.points);
 }
 
 export function getRoomPointsFromBounds(bounds: RoomRectBounds): Point[] {
-  return [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-  ];
+  return getRectanglePointsFromBounds(bounds);
 }
 
 export function getWallHandleLayouts(

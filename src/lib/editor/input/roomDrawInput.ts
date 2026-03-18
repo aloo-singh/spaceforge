@@ -3,7 +3,11 @@ import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
-import { findRoomAtPoint, isPointInPolygon } from "@/lib/editor/roomGeometry";
+import {
+  findRoomAtPoint,
+  isAxisAlignedRectangle,
+  isPointInPolygon,
+} from "@/lib/editor/roomGeometry";
 import {
   getAxisAlignedRoomBounds,
   hitTestRoomWallEdge,
@@ -29,6 +33,7 @@ type RoomDrawStoreState = {
   selectedRoomId: string | null;
   selectedWall: { roomId: string; wall: RectWall } | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
+  stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RectWall) => void;
@@ -76,6 +81,7 @@ const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
  * - first click outside an active selection clears it without starting draw
  * - right click cancels active draft
  * - escape cancels active draft or clears room selection
+ * - backspace steps the active draft back one click before fully canceling
  * Rendering stays in EditorCanvas.
  */
 export function attachRoomDrawInput(
@@ -469,6 +475,17 @@ export function attachRoomDrawInput(
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
+      return;
+    }
+
+    if (event.code === "Backspace" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const state = store.getState();
+      if (state.roomDraft.points.length === 0) return;
+
+      event.preventDefault();
+      state.stepBackDraft();
+      updateCursor();
+      callbacks.requestRender();
     }
   };
 
@@ -534,6 +551,11 @@ function findSelectableWallAtScreenPoint(
   worldPoint: Point
 ): SelectableWallHit | null {
   if (!state.selectedRoomId) {
+    return null;
+  }
+
+  const selectedRoom = state.document.rooms.find((room) => room.id === state.selectedRoomId);
+  if (!selectedRoom || !isAxisAlignedRectangle(selectedRoom.points)) {
     return null;
   }
 

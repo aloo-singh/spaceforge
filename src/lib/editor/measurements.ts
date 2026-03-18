@@ -1,4 +1,5 @@
 import type { RectCorner, RectWall } from "@/lib/editor/rectRoomResize";
+import { getAxisAlignedRectangleBounds } from "@/lib/editor/roomGeometry";
 import type { Point, Room } from "@/lib/editor/types";
 
 const MILLIMETRES_PER_METRE = 1_000;
@@ -83,12 +84,12 @@ export function formatMetricWallDimension(lengthMillimetres: number): string {
 }
 
 export function getRectResizeMeasurements(room: Room): RectResizeMeasurements | null {
-  const edges = getRoomEdgeMeasurements(room);
-  if (edges.length !== 4) return null;
+  const bounds = getAxisAlignedRectangleBounds(room.points);
+  if (!bounds) return null;
 
   return {
-    widthMillimetres: edges[0].lengthMillimetres,
-    heightMillimetres: edges[1].lengthMillimetres,
+    widthMillimetres: bounds.maxX - bounds.minX,
+    heightMillimetres: bounds.maxY - bounds.minY,
   };
 }
 

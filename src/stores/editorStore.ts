@@ -13,12 +13,20 @@ import {
   RESET_CAMERA_TRANSITION_DURATION_MS,
 } from "@/lib/editor/cameraTransition";
 import {
+  applyCandidatePointToDraftPath,
+  getDraftLoopCandidate,
+  getOrthogonalSegmentAxis,
   getOrthogonalSnappedPoint,
-  getRectangleClosingPoint,
+  normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
+import {
+  isAxisAlignedRectangle,
+  isOrthogonalPointPath,
+  isSimplePolygon,
+} from "@/lib/editor/roomGeometry";
 import { translateRoomPoints } from "@/lib/editor/roomTranslation";
 import {
   PERSISTED_HISTORY_STATE_LIMIT,
@@ -53,6 +61,7 @@ declare global {
 
 type RoomDraftState = {
   points: Point[];
+  history: Point[][];
 };
 
 type DocumentState = {
@@ -88,6 +97,7 @@ type EditorState = {
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
+  stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -119,6 +129,10 @@ const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
   yMm: 0,
   pixelsPerMm: INITIAL_PIXELS_PER_MM,
+};
+const EMPTY_ROOM_DRAFT: RoomDraftState = {
+  points: [],
+  history: [],
 };
 const HISTORY_LIMIT = PERSISTED_HISTORY_STATE_LIMIT - 1;
 
@@ -174,6 +188,10 @@ function arePointListsEqual(a: Point[], b: Point[]): boolean {
   return true;
 }
 
+function clonePoints(points: Point[]): Point[] {
+  return points.map((point) => ({ ...point }));
+}
+
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
   return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
 }
@@ -188,7 +206,9 @@ function getSelectedWallIfRoomExists(
   document: DocumentState
 ): RoomWallSelection | null {
   if (!selectedWall) return null;
-  return document.rooms.some((room) => room.id === selectedWall.roomId) ? selectedWall : null;
+  const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
+  if (!room) return null;
+  return isAxisAlignedRectangle(room.points) ? selectedWall : null;
 }
 
 function getSafePersistedHistorySnapshot(
@@ -278,9 +298,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
-  roomDraft: {
-    points: [],
-  },
+  roomDraft: EMPTY_ROOM_DRAFT,
   selectedRoomId: null,
   selectedWall: null,
   shouldFocusSelectedRoomNameInput: false,
@@ -350,12 +368,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
-      const draftPoints = state.roomDraft.points;
+      const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
             points: [snapPointToGrid(cursorWorld, GRID_SIZE_MM)],
+            history: [],
           },
         };
       }
@@ -365,59 +384,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
-      if (draftPoints.length === 3) {
-        const closingPoint = getRectangleClosingPoint(draftPoints);
-        if (!closingPoint || !pointsEqual(nextPoint, closingPoint)) {
-          return state;
-        }
-
-        const roomPoints = [...draftPoints, closingPoint];
-        const room: Room = {
-          id: createRoomId(),
-          name: `Room ${state.document.rooms.length + 1}`,
-          points: roomPoints,
-        };
-        const command: EditorCommand = {
-          type: "complete-room",
-          room,
-        };
-        const nextDocument = applyEditorCommand(state.document, command, "redo");
-        return {
-          document: nextDocument,
-          roomDraft: {
-            points: [],
-          },
-          selectedRoomId: room.id,
-          selectedWall: null,
-          shouldFocusSelectedRoomNameInput: true,
-          renameSession: null,
-          history: {
-            past: pushToPast(state.history.past, command),
-            future: [],
-          },
-          canUndo: true,
-          canRedo: false,
-        };
+      const startPoint = draftPoints[0];
+      if (pointsEqual(nextPoint, startPoint)) {
+        if (draftPoints.length < 4) return state;
+        if (!isValidDraftRoomClosure(draftPoints)) return state;
+        return completeDraftRoom(state, draftPoints);
       }
 
-      if (draftPoints.length === 2) {
-        const firstPoint = draftPoints[0];
-        if (firstPoint.x === nextPoint.x || firstPoint.y === nextPoint.y) {
-          return state;
-        }
+      const loopCandidate = getDraftLoopCandidate(draftPoints, nextPoint);
+      if (loopCandidate && !pointsEqual(nextPoint, startPoint)) {
+        return completeDraftRoom(state, loopCandidate);
+      }
+
+      const nextDraftPoints = applyCandidatePointToDraftPath(draftPoints, nextPoint);
+
+      if (!isValidDraftPathProgression(draftPoints, nextDraftPoints, nextPoint)) {
+        return state;
+      }
+
+      if (arePointListsEqual(draftPoints, nextDraftPoints)) return state;
+
+      return {
+        roomDraft: {
+          points: nextDraftPoints,
+          history: [...state.roomDraft.history, clonePoints(draftPoints)],
+        },
+      };
+    }),
+  stepBackDraft: () =>
+    set((state) => {
+      if (state.roomDraft.points.length === 0) return state;
+
+      const previousDraftPoints = state.roomDraft.history[state.roomDraft.history.length - 1] ?? null;
+      if (!previousDraftPoints) {
+        return {
+          roomDraft: EMPTY_ROOM_DRAFT,
+        };
       }
 
       return {
         roomDraft: {
-          points: [...draftPoints, nextPoint],
+          points: clonePoints(previousDraftPoints),
+          history: state.roomDraft.history
+            .slice(0, -1)
+            .map((snapshot) => clonePoints(snapshot)),
         },
       };
     }),
   resetDraft: () =>
     set({
-      roomDraft: {
-        points: [],
-      },
+      roomDraft: EMPTY_ROOM_DRAFT,
     }),
   selectRoomById: (roomId) =>
     set((state) => {
@@ -432,6 +448,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (!isAxisAlignedRectangle(room.points)) {
+        return {
+          selectedRoomId: roomId,
+          selectedWall: null,
+          shouldFocusSelectedRoomNameInput: false,
+          renameSession: null,
+        };
+      }
+
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall?.roomId === roomId &&
@@ -799,6 +826,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       camera: { ...DEFAULT_CAMERA_STATE },
       roomDraft: {
         points: [],
+        history: [],
       },
       selectedRoomId: null,
       selectedWall: null,
@@ -951,4 +979,81 @@ if (typeof window !== "undefined") {
     window.removeEventListener("pagehide", onPageHide);
     window.removeEventListener("beforeunload", onBeforeUnload);
   };
+}
+
+function isValidDraftRoomClosure(points: Point[]): boolean {
+  return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+}
+
+function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
+  const normalizedRoomPoints = normalizeDraftPointChain(draftPoints);
+  if (normalizedRoomPoints.length < 4) return state;
+  if (!isValidDraftRoomClosure(normalizedRoomPoints)) return state;
+
+  const room: Room = {
+    id: createRoomId(),
+    name: `Room ${state.document.rooms.length + 1}`,
+    points: normalizedRoomPoints.map((point) => ({ ...point })),
+  };
+  const command: EditorCommand = {
+    type: "complete-room",
+    room,
+  };
+  const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+  return {
+    document: nextDocument,
+    roomDraft: {
+      points: [],
+      history: [],
+    },
+    selectedRoomId: room.id,
+    selectedWall: null,
+    shouldFocusSelectedRoomNameInput: true,
+    renameSession: null,
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
+}
+
+function isValidDraftPathProgression(
+  previousDraftPoints: Point[],
+  nextDraftPoints: Point[],
+  rawNextPoint: Point
+): boolean {
+  if (nextDraftPoints.length === 0) return false;
+  if (nextDraftPoints.length === 1) return true;
+
+  const terminalPreviousPoint = nextDraftPoints[nextDraftPoints.length - 2];
+  const terminalPoint = nextDraftPoints[nextDraftPoints.length - 1];
+  if (pointsEqual(terminalPreviousPoint, terminalPoint)) {
+    return false;
+  }
+
+  const isTailAdjustment = nextDraftPoints.length === previousDraftPoints.length;
+  if (isTailAdjustment) {
+    return !nextDraftPoints
+      .slice(0, -1)
+      .some((point, index) => index !== 0 && pointsEqual(point, terminalPoint));
+  }
+
+  if (previousDraftPoints.length < 2) {
+    return true;
+  }
+
+  const previousPoint = previousDraftPoints[previousDraftPoints.length - 2];
+  const currentPoint = previousDraftPoints[previousDraftPoints.length - 1];
+  const previousAxis = getOrthogonalSegmentAxis(previousPoint, currentPoint);
+  const nextAxis = getOrthogonalSegmentAxis(currentPoint, rawNextPoint);
+
+  if (!previousAxis || !nextAxis) return false;
+  if (previousAxis === nextAxis) return false;
+
+  return !nextDraftPoints
+    .slice(0, -1)
+    .some((point, index) => index !== 0 && pointsEqual(point, terminalPoint));
 }
