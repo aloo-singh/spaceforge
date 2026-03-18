@@ -93,9 +93,11 @@ import type { EditorCommand } from "@/lib/editor/history";
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
   hoveredCorner: null,
+  hoveredVertexIndex: null,
   hoveredRoomId: null,
   activeWall: null,
   activeCorner: null,
+  activeVertexIndex: null,
   activeRoomId: null,
 } as const;
 const EMPTY_HOVERED_SELECTABLE_WALL = null as {
@@ -156,9 +158,11 @@ export default function EditorCanvas() {
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
@@ -845,9 +849,11 @@ function drawScene(
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
     activeRoomId: string | null;
   },
   transformFeedback: TransformFeedback | null,
@@ -971,9 +977,11 @@ function drawRooms(
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -1055,16 +1063,33 @@ function drawRooms(
 
     if (vertexHandles.length > 0) {
       for (const handle of vertexHandles) {
-        const radius = handle.size / 2;
+        const isHovered =
+          roomResizeUi.hoveredRoomId === room.id &&
+          roomResizeUi.hoveredVertexIndex === handle.vertexIndex;
+        const isActive =
+          roomResizeUi.activeRoomId === room.id &&
+          roomResizeUi.activeVertexIndex === handle.vertexIndex;
+        const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
+        const radius = size / 2;
+        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
 
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.28 });
+        if (haloPadding > 0) {
+          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
+          graphics.circle(handle.center.x, handle.center.y, radius + haloPadding);
+          graphics.fill();
+        }
+
+        graphics.setFillStyle({
+          color: theme.interactiveAccent,
+          alpha: isActive ? 0.5 : isHovered ? 0.38 : 0.28,
+        });
         graphics.circle(handle.center.x, handle.center.y, radius);
         graphics.fill();
 
         graphics.setStrokeStyle({
-          width: 1.6,
+          width: isActive ? 2 : isHovered ? 1.8 : 1.6,
           color: theme.roomOutline,
-          alpha: 0.92,
+          alpha: isActive ? 1 : isHovered ? 0.97 : 0.92,
         });
         graphics.circle(handle.center.x, handle.center.y, radius);
         graphics.stroke();
@@ -1165,9 +1190,11 @@ function drawWallInteractionOverlay(
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -1621,9 +1648,11 @@ function drawActiveResizeDimensions(
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
     activeRoomId: string | null;
   },
   camera: CameraState,

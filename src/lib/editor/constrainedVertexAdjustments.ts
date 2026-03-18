@@ -15,6 +15,7 @@ export type ConstrainedVertexHandleLayout = {
 };
 
 const VERTEX_HANDLE_SIZE_PX = 12;
+const VERTEX_HANDLE_HIT_PADDING_PX = 8;
 const ELIGIBILITY_NUDGE_DIRECTIONS: Point[] = [
   { x: -1, y: -1 },
   { x: 0, y: -1 },
@@ -64,6 +65,24 @@ export function getConstrainedVertexHandleLayouts(
     center: worldToScreen(room.points[vertexIndex], camera, viewport),
     size: VERTEX_HANDLE_SIZE_PX,
   }));
+}
+
+export function hitTestConstrainedVertexHandle(
+  handles: ConstrainedVertexHandleLayout[],
+  point: Point
+): number | null {
+  for (const handle of handles) {
+    const radius = handle.size / 2;
+    const hitRadius = radius + VERTEX_HANDLE_HIT_PADDING_PX;
+    const distanceSquared =
+      (point.x - handle.center.x) ** 2 + (point.y - handle.center.y) ** 2;
+
+    if (distanceSquared <= hitRadius ** 2) {
+      return handle.vertexIndex;
+    }
+  }
+
+  return null;
 }
 
 export function getConstrainedVertexAdjustmentResult(
