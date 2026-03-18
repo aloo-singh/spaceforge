@@ -61,6 +61,7 @@ declare global {
 
 type RoomDraftState = {
   points: Point[];
+  history: Point[][];
 };
 
 type DocumentState = {
@@ -96,6 +97,7 @@ type EditorState = {
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
+  stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -127,6 +129,10 @@ const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
   yMm: 0,
   pixelsPerMm: INITIAL_PIXELS_PER_MM,
+};
+const EMPTY_ROOM_DRAFT: RoomDraftState = {
+  points: [],
+  history: [],
 };
 const HISTORY_LIMIT = PERSISTED_HISTORY_STATE_LIMIT - 1;
 
@@ -180,6 +186,10 @@ function arePointListsEqual(a: Point[], b: Point[]): boolean {
     if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
   }
   return true;
+}
+
+function clonePoints(points: Point[]): Point[] {
+  return points.map((point) => ({ ...point }));
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
@@ -288,9 +298,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
-  roomDraft: {
-    points: [],
-  },
+  roomDraft: EMPTY_ROOM_DRAFT,
   selectedRoomId: null,
   selectedWall: null,
   shouldFocusSelectedRoomNameInput: false,
@@ -366,6 +374,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           roomDraft: {
             points: [snapPointToGrid(cursorWorld, GRID_SIZE_MM)],
+            history: [],
           },
         };
       }
@@ -398,14 +407,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         roomDraft: {
           points: nextDraftPoints,
+          history: [...state.roomDraft.history, clonePoints(draftPoints)],
+        },
+      };
+    }),
+  stepBackDraft: () =>
+    set((state) => {
+      if (state.roomDraft.points.length === 0) return state;
+
+      const previousDraftPoints = state.roomDraft.history[state.roomDraft.history.length - 1] ?? null;
+      if (!previousDraftPoints) {
+        return {
+          roomDraft: EMPTY_ROOM_DRAFT,
+        };
+      }
+
+      return {
+        roomDraft: {
+          points: clonePoints(previousDraftPoints),
+          history: state.roomDraft.history
+            .slice(0, -1)
+            .map((snapshot) => clonePoints(snapshot)),
         },
       };
     }),
   resetDraft: () =>
     set({
-      roomDraft: {
-        points: [],
-      },
+      roomDraft: EMPTY_ROOM_DRAFT,
     }),
   selectRoomById: (roomId) =>
     set((state) => {
@@ -798,6 +826,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       camera: { ...DEFAULT_CAMERA_STATE },
       roomDraft: {
         points: [],
+        history: [],
       },
       selectedRoomId: null,
       selectedWall: null,
@@ -976,6 +1005,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     document: nextDocument,
     roomDraft: {
       points: [],
+      history: [],
     },
     selectedRoomId: room.id,
     selectedWall: null,
