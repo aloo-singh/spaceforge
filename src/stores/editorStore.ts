@@ -379,38 +379,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pointsEqual(nextPoint, startPoint)) {
         if (draftPoints.length < 4) return state;
         if (!isValidDraftRoomClosure(draftPoints)) return state;
-
-        const room: Room = {
-          id: createRoomId(),
-          name: `Room ${state.document.rooms.length + 1}`,
-          points: draftPoints.map((point) => ({ ...point })),
-        };
-        const command: EditorCommand = {
-          type: "complete-room",
-          room,
-        };
-        const nextDocument = applyEditorCommand(state.document, command, "redo");
-        return {
-          document: nextDocument,
-          roomDraft: {
-            points: [],
-          },
-          selectedRoomId: room.id,
-          selectedWall: null,
-          shouldFocusSelectedRoomNameInput: true,
-          renameSession: null,
-          history: {
-            past: pushToPast(state.history.past, command),
-            future: [],
-          },
-          canUndo: true,
-          canRedo: false,
-        };
+        return completeDraftRoom(state, draftPoints);
       }
 
       const loopCandidate = getDraftLoopCandidate(draftPoints, nextPoint);
       if (loopCandidate && !pointsEqual(nextPoint, startPoint)) {
-        return state;
+        return completeDraftRoom(state, loopCandidate);
       }
 
       const nextDraftPoints = applyCandidatePointToDraftPath(draftPoints, nextPoint);
@@ -980,6 +954,40 @@ if (typeof window !== "undefined") {
 
 function isValidDraftRoomClosure(points: Point[]): boolean {
   return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+}
+
+function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
+  const normalizedRoomPoints = normalizeDraftPointChain(draftPoints);
+  if (normalizedRoomPoints.length < 4) return state;
+  if (!isValidDraftRoomClosure(normalizedRoomPoints)) return state;
+
+  const room: Room = {
+    id: createRoomId(),
+    name: `Room ${state.document.rooms.length + 1}`,
+    points: normalizedRoomPoints.map((point) => ({ ...point })),
+  };
+  const command: EditorCommand = {
+    type: "complete-room",
+    room,
+  };
+  const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+  return {
+    document: nextDocument,
+    roomDraft: {
+      points: [],
+    },
+    selectedRoomId: room.id,
+    selectedWall: null,
+    shouldFocusSelectedRoomNameInput: true,
+    renameSession: null,
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
 }
 
 function isValidDraftPathProgression(
