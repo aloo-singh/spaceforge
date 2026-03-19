@@ -873,7 +873,7 @@ export default function EditorCanvas() {
             </aside>
           ) : null}
         </div>
-        <aside className="hidden min-h-0 lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
+        <aside className="hidden min-h-0 overflow-hidden lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
           {selectedRoomId ? (
             <SelectedRoomNamePanel className="h-full" />
           ) : (

@@ -118,7 +118,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   if (!selectedRoom) return null;
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1", className)}>
       <EditorInspectorSection
         title="Selected room"
         description="Review the current room name and quick actions."
