@@ -37,6 +37,7 @@ export function EditorSettingsDialog({
       onOpenChange={onOpenChange}
       title="Editor settings"
       description="A focused home for editor preferences."
+      className="sm:w-[min(100%,32rem)] sm:p-4"
       footer={
         <Button
           type="button"
@@ -48,17 +49,17 @@ export function EditorSettingsDialog({
         </Button>
       }
     >
-      <section className="space-y-3.5">
+      <section className="space-y-3">
         <div
           aria-labelledby="editor-settings-appearance-title"
-          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
         >
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3 id="editor-settings-appearance-title" className="text-sm font-medium text-foreground">
                 Appearance
               </h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Choose how the editor and app shell should look.
               </p>
             </div>
@@ -71,7 +72,7 @@ export function EditorSettingsDialog({
           </div>
 
           <div
-            className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background p-1"
+            className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
             role="group"
             aria-label="Appearance mode"
           >
@@ -107,14 +108,14 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-measurements-title"
-          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
         >
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3 id="editor-settings-measurements-title" className="text-sm font-medium text-foreground">
                 Dimensions
               </h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Show or hide room area and live dimension overlays while keeping the editor calm.
               </p>
             </div>
@@ -127,7 +128,7 @@ export function EditorSettingsDialog({
           </div>
 
           <div
-            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background p-1 sm:inline-flex sm:w-auto"
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
             role="group"
             aria-label="Dimensions visibility"
           >
@@ -152,16 +153,16 @@ export function EditorSettingsDialog({
               Hide
             </Button>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
             Hold Alt/Option to temporarily invert this while drawing or resizing.
           </p>
         </div>
 
         <div
           aria-labelledby="editor-settings-measurement-font-size-title"
-          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
         >
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3
                 id="editor-settings-measurement-font-size-title"
@@ -169,7 +170,7 @@ export function EditorSettingsDialog({
               >
                 Measurement text size
               </h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Increase room area and live dimension text for readability without changing the
                 broader editor typography.
               </p>
@@ -183,7 +184,7 @@ export function EditorSettingsDialog({
           </div>
 
           <div
-            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background p-1 sm:inline-flex sm:w-auto"
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
             role="group"
             aria-label="Measurement text size"
           >
@@ -209,7 +210,7 @@ export function EditorSettingsDialog({
             </Button>
           </div>
 
-          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
             Applies to room area beneath the label pill and live draw or resize dimensions on both
             desktop and mobile settings surfaces.
           </p>
@@ -217,14 +218,14 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-export-title"
-          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
         >
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3 id="editor-settings-export-title" className="text-sm font-medium text-foreground">
                 Export signature
               </h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Add an optional designer credit to exported PNGs without keeping a text field in the
                 toolbar.
               </p>
@@ -237,7 +238,7 @@ export function EditorSettingsDialog({
             </dl>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2.5">
             <label
               htmlFor="editor-settings-export-signature"
               className="text-xs font-medium text-foreground"
