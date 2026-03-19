@@ -99,11 +99,9 @@ export type DraftLoopClosureResult = {
   discardedPrefix: Point[];
 };
 
-export function getDraftLoopClosureResult(
-  points: Point[],
-  nextPoint: Point
+export function getDraftLoopClosureResultFromPath(
+  nextDraftPath: Point[]
 ): DraftLoopClosureResult | null {
-  const nextDraftPath = applyCandidatePointToDraftPath(points, nextPoint);
   if (nextDraftPath.length < 5) return null;
 
   const loopEndpoint = nextDraftPath[nextDraftPath.length - 1];
@@ -132,6 +130,13 @@ export function getDraftLoopClosureResult(
     committedLoop: nextDraftPath.slice(loopStartIndex, -1),
     discardedPrefix: nextDraftPath.slice(0, loopStartIndex),
   };
+}
+
+export function getDraftLoopClosureResult(
+  points: Point[],
+  nextPoint: Point
+): DraftLoopClosureResult | null {
+  return getDraftLoopClosureResultFromPath(applyCandidatePointToDraftPath(points, nextPoint));
 }
 
 export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
