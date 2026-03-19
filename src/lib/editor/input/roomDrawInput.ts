@@ -1,4 +1,5 @@
 import { findOpeningAtScreenPoint } from "@/lib/editor/openings";
+import { findRoomWallAtScreenPoint } from "@/lib/editor/openings";
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
@@ -19,6 +20,7 @@ import {
   translateRoomPoints,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
+import type { RoomWall } from "@/lib/editor/types";
 import { getOpeningMoveOffsetForCursor } from "@/stores/editorStore";
 import {
   createTransformFeedbackTargetFromPoints,
@@ -33,13 +35,13 @@ type RoomDrawStoreState = {
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
-  selectedWall: { roomId: string; wall: RectWall } | null;
+  selectedWall: { roomId: string; wall: RoomWall } | null;
   selectedOpening: { roomId: string; openingId: string } | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
-  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
+  selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
   clearRoomSelection: () => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
@@ -60,7 +62,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
-  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RectWall } | null) => void;
+  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RoomWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
@@ -88,7 +90,7 @@ type OpeningDragSession = {
 
 type SelectableWallHit = {
   roomId: string;
-  wall: RectWall;
+  wall: RoomWall;
   candidateCount: number;
 };
 
@@ -732,7 +734,16 @@ function findSelectableWallAtScreenPoint(
 
   const selectedRoom = state.document.rooms.find((room) => room.id === state.selectedRoomId);
   if (!selectedRoom || !isAxisAlignedRectangle(selectedRoom.points)) {
-    return null;
+    const nonRectWall = selectedRoom
+      ? findRoomWallAtScreenPoint(selectedRoom, screenPoint, state.camera, state.viewport)
+      : null;
+    return nonRectWall === null
+      ? null
+      : {
+          roomId: selectedRoom?.id ?? state.selectedRoomId!,
+          wall: nonRectWall,
+          candidateCount: 1,
+        };
   }
 
   const candidates: Array<{
@@ -815,6 +826,8 @@ function isPointOnInteriorSideOfRectWall(
         point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM
       );
   }
+
+  return false;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

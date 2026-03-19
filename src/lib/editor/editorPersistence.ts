@@ -1,4 +1,7 @@
-import { cloneRoomOpenings } from "@/lib/editor/openings";
+import {
+  cloneRoomOpenings,
+  normalizeRoomOpeningsForSegmentAnchoring,
+} from "@/lib/editor/openings";
 import type { CameraState, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
@@ -17,10 +20,11 @@ import {
 // - v4 payloads restore layout + camera + bounded snapshot history + legacy editor settings.
 // - v5 payloads restore layout + camera + bounded snapshot history + current editor settings.
 // - v6 payloads restore layout + camera + bounded snapshot history + current editor settings + room openings.
+// - v7 payloads also preserve canonical segment-local opening offsets for numeric wall hosts.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 6;
+export const EDITOR_PERSISTENCE_VERSION = 7;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -102,6 +106,17 @@ export type PersistedEditorPayloadV5 = {
 };
 
 export type PersistedEditorPayloadV6 = {
+  version: 6;
+  document: PersistedDocument;
+  camera: CameraState;
+  settings: EditorSettings;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV7 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -142,12 +157,13 @@ function isRoomOpening(value: unknown): value is Room["openings"][number] {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
   if (!isOpeningType(value.type)) return false;
-  if (
-    value.wall !== "left" &&
-    value.wall !== "right" &&
-    value.wall !== "top" &&
-    value.wall !== "bottom"
-  ) {
+  const isLegacyRectWall =
+    value.wall === "left" ||
+    value.wall === "right" ||
+    value.wall === "top" ||
+    value.wall === "bottom";
+  const isSegmentIndex = typeof value.wall === "number" && Number.isInteger(value.wall) && value.wall >= 0;
+  if (!isLegacyRectWall && !isSegmentIndex) {
     return false;
   }
 
@@ -245,6 +261,27 @@ function createHistorylessHydrationSnapshot(
   };
 }
 
+function normalizeDocumentForSegmentAnchoring(
+  document: PersistedDocument | EditorDocumentState,
+  options?: { migrateNumericSegmentOffsets?: boolean }
+): EditorDocumentState {
+  const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
+
+  return {
+    rooms: document.rooms.map((room) => {
+      const clonedRoom = cloneRoom(room);
+      if (!migrateNumericSegmentOffsets || clonedRoom.openings.length === 0) {
+        return clonedRoom;
+      }
+
+      return {
+        ...clonedRoom,
+        openings: normalizeRoomOpeningsForSegmentAnchoring(clonedRoom),
+      };
+    }),
+  };
+}
+
 function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -275,6 +312,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 3 &&
         parsed.version !== 4 &&
         parsed.version !== 5 &&
+        parsed.version !== 6 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -283,21 +321,30 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       };
     }
 
+    const shouldMigrateNumericSegmentOffsets = parsed.version < EDITOR_PERSISTENCE_VERSION;
+    const normalizedDocument = normalizeDocumentForSegmentAnchoring(parsed.document, {
+      migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
+    });
+
     const normalizedHistory = isPersistedHistory(parsed.history)
       ? normalizePersistedHistorySnapshot(
           {
-            historyStack: parsed.history.stack.map((document) => cloneDocument(document)),
+            historyStack: parsed.history.stack.map((document) =>
+              normalizeDocumentForSegmentAnchoring(document, {
+                migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
+              })
+            ),
             historyIndex: parsed.history.index,
           },
           PERSISTED_HISTORY_STATE_LIMIT,
-          cloneDocument(parsed.document)
+          normalizedDocument
         )
       : null;
 
     return {
       status: "ok",
       snapshot: {
-        document: cloneDocument(parsed.document),
+        document: normalizedDocument,
         camera: isCameraState(parsed.camera) ? cloneCamera(parsed.camera) : null,
         settings: cloneEditorSettings(
           parsed.version === 2
@@ -324,7 +371,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV6 = {
+  const payload: PersistedEditorPayloadV7 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),

@@ -13,6 +13,7 @@ import {
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
+import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getRoomLabelLayout,
@@ -74,6 +75,7 @@ import type {
   Point,
   Room,
   RoomOpeningSelection,
+  RoomWall,
   RoomWallSelection,
   ScreenPoint,
   ViewportSize,
@@ -107,7 +109,7 @@ const EMPTY_ROOM_RESIZE_UI = {
 } as const;
 const EMPTY_HOVERED_SELECTABLE_WALL = null as {
   roomId: string;
-  wall: RectWall;
+  wall: RoomWall;
 } | null;
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
@@ -167,7 +169,7 @@ export default function EditorCanvas() {
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const hoveredSelectableWallRef = useRef<{
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
@@ -907,7 +909,7 @@ function drawScene(
   hoveredRoomLabelId: string | null,
   hoveredSelectableWall: {
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
@@ -1284,7 +1286,7 @@ function drawWallInteractionOverlay(
   selectedWall: RoomWallSelection | null,
   hoveredSelectableWall: {
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
@@ -1305,41 +1307,42 @@ function drawWallInteractionOverlay(
   graphics.clear();
   if (isDraftingRoom) return;
 
-  let hoveredBounds: ReturnType<typeof getAxisAlignedRoomBounds> = null;
-  let hoveredWall: RectWall | null = null;
+  let hoveredRoom: Room | null = null;
+  let hoveredWall: RoomWall | null = null;
+  let hoveredRoomId: string | null = null;
 
   if (hoveredSelectableWall) {
-    const hoveredRoom = rooms.find((room) => room.id === hoveredSelectableWall.roomId);
+    hoveredRoom = rooms.find((room) => room.id === hoveredSelectableWall.roomId) ?? null;
     if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
-      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
       hoveredWall = hoveredSelectableWall.wall;
+      hoveredRoomId = hoveredSelectableWall.roomId;
+    } else {
+      hoveredRoom = null;
     }
   } else if (roomResizeUi.hoveredRoomId && roomResizeUi.hoveredWall) {
-    const hoveredRoom = rooms.find((room) => room.id === roomResizeUi.hoveredRoomId);
+    hoveredRoom = rooms.find((room) => room.id === roomResizeUi.hoveredRoomId) ?? null;
     if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
-      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
       hoveredWall = roomResizeUi.hoveredWall;
+      hoveredRoomId = roomResizeUi.hoveredRoomId;
+    } else {
+      hoveredRoom = null;
     }
   }
 
   const isSelectedWallAlsoHovered =
     hoveredWall !== null &&
-    selectedWall?.roomId === (hoveredSelectableWall?.roomId ?? roomResizeUi.hoveredRoomId) &&
+    selectedWall?.roomId === hoveredRoomId &&
     selectedWall.wall === hoveredWall;
 
-  if (hoveredBounds && hoveredWall && !isSelectedWallAlsoHovered) {
-    drawHoveredWallHighlight(graphics, hoveredBounds, hoveredWall, camera, viewport, theme);
+  if (hoveredRoom && hoveredWall !== null && !isSelectedWallAlsoHovered) {
+    drawHoveredWallHighlight(graphics, hoveredRoom, hoveredWall, camera, viewport, theme);
   }
 
   if (!selectedWall) return;
   const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
   if (!selectedRoom) return;
   if (transformFeedback?.roomId === selectedRoom.id) return;
-
-  const selectedBounds = getAxisAlignedRoomBounds(selectedRoom);
-  if (!selectedBounds) return;
-
-  drawSelectedWallHighlight(graphics, selectedBounds, selectedWall.wall, camera, viewport, theme);
+  drawSelectedWallHighlight(graphics, selectedRoom, selectedWall.wall, camera, viewport, theme);
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
@@ -1649,13 +1652,15 @@ function arePointListsEqual(a: Point[], b: Point[]) {
 
 function drawHoveredWallHighlight(
   graphics: Graphics,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+  const screenSegment = getRoomWallScreenSegment(room, wall, camera, viewport);
+  if (!screenSegment) return;
+  const { from, to } = screenSegment;
 
   graphics.setStrokeStyle({
     width: 2,
@@ -1669,13 +1674,15 @@ function drawHoveredWallHighlight(
 
 function drawSelectedWallHighlight(
   graphics: Graphics,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+  const screenSegment = getRoomWallScreenSegment(room, wall, camera, viewport);
+  if (!screenSegment) return;
+  const { from, to } = screenSegment;
 
   graphics.setStrokeStyle({
     width: 5,
@@ -1696,27 +1703,19 @@ function drawSelectedWallHighlight(
   graphics.stroke();
 }
 
-function getWallScreenSegment(
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+function getRoomWallScreenSegment(
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize
 ) {
-  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
-  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
-  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
-  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+  const segment = getRoomWallSegment(room, wall);
+  if (!segment) return null;
 
-  switch (wall) {
-    case "top":
-      return { from: topLeft, to: topRight };
-    case "right":
-      return { from: topRight, to: bottomRight };
-    case "bottom":
-      return { from: bottomLeft, to: bottomRight };
-    case "left":
-      return { from: topLeft, to: bottomLeft };
-  }
+  return {
+    from: worldToScreen(segment.start, camera, viewport),
+    to: worldToScreen(segment.end, camera, viewport),
+  };
 }
 
 function drawRoomLabels(
@@ -1933,7 +1932,7 @@ function drawSelectedRoomDimensions(
     showArea: true,
   });
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport, settings),
+    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport),
     roomLabelLayout,
     viewport,
     settings
@@ -2214,32 +2213,35 @@ function getResizeDimensionAnchorForWall(
         wallLengthPx: verticalWallLengthPx,
       };
   }
+
+  return {
+    center: {
+      x: (topLeft.x + bottomRight.x) / 2,
+      y: (topLeft.y + bottomRight.y) / 2,
+    },
+    outwardDirection: { x: 0, y: -1 },
+    tangentDirection: { x: 1, y: 0 },
+    wallLengthPx: 0,
+  };
 }
 
 function getSelectedRoomDimensionLabelSpecs(
   room: Room,
   selectedWall: RoomWallSelection | null,
   camera: CameraState,
-  viewport: ViewportSize,
-  settings: Pick<EditorSettings, "measurementFontSize">
+  viewport: ViewportSize
 ): ResizeDimensionLabelSpec[] {
   if (selectedWall) {
-    const bounds = getAxisAlignedRoomBounds(room);
-    const wallLengthMillimetres = bounds
-      ? getWallResizeMeasurementMillimetres(room, selectedWall.wall)
-      : null;
-    if (!bounds || wallLengthMillimetres === null) return [];
+    const wallMeasurement = getRoomWallMeasurement(room, selectedWall.wall);
+    if (!wallMeasurement) return [];
 
-    return [
-      createDimensionLabelSpecForWallMeasurement(
-        selectedWall.wall,
-        wallLengthMillimetres,
-        bounds,
-        camera,
-        viewport,
-        settings
-      ),
-    ];
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(
+      room,
+      wallMeasurement,
+      camera,
+      viewport
+    );
+    return labelSpec ? [labelSpec] : [];
   }
 
   return getRoomEdgeMeasurements(room).flatMap((edge) => {

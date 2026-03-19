@@ -23,7 +23,6 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import {
-  isAxisAlignedRectangle,
   isOrthogonalPointPath,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
@@ -47,6 +46,7 @@ import {
 import {
   cloneRoomOpenings,
   createCenteredRoomOpening,
+  getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
 import type {
@@ -261,7 +261,7 @@ function getSelectedWallIfRoomExists(
   if (!selectedWall) return null;
   const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
   if (!room) return null;
-  return isAxisAlignedRectangle(room.points) ? selectedWall : null;
+  return getRoomWallSegment(room, selectedWall.wall) ? selectedWall : null;
 }
 
 function getSelectedOpeningIfExists(
@@ -282,7 +282,7 @@ function getSelectedWallHostRoom(
 ): Room | null {
   if (!selectedWall) return null;
   const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
-  if (!room || !isAxisAlignedRectangle(room.points)) return null;
+  if (!room || !getRoomWallSegment(room, selectedWall.wall)) return null;
   return room;
 }
 
@@ -587,7 +587,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
-      if (!isAxisAlignedRectangle(room.points)) {
+      if (!getRoomWallSegment(room, wall)) {
         return {
           selectedRoomId: roomId,
           selectedWall: null,

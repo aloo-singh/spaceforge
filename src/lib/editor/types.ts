@@ -25,7 +25,8 @@ export type ScreenPoint = {
   y: number;
 };
 
-export type RoomWall = "left" | "right" | "top" | "bottom";
+export type RectangularRoomWall = "left" | "right" | "top" | "bottom";
+export type RoomWall = RectangularRoomWall | number;
 
 export type OpeningType = "door" | "window";
 
@@ -34,8 +35,7 @@ export type RoomOpening = {
   type: OpeningType;
   wall: RoomWall;
   /**
-   * Distance in mm from the wall's canonical start point to the opening center.
-   * Horizontal walls measure from minX, vertical walls from minY.
+   * Distance in mm from the host segment's start point to the opening center.
    */
   offsetMm: number;
   /**
