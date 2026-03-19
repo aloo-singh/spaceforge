@@ -10,6 +10,48 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.25.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Forgiving local loop closure now commits only the intended closed orthogonal room and discards dangling path segments outside the committed loop</li>
+                <li>Local loop closure now handles exact vertex closure, endpoint-on-segment closure, and segment-crossing closure conservatively when a single valid ring is formed</li>
+                <li>Rectangular wall and corner resize preview now tracks snapped drag updates more directly, reducing laggy or chasing motion during resize</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Dimensions
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Restored live draw-time wall length feedback for open orthogonal chains</li>
+                <li>Room area beneath the room label now obeys the dimensions visibility setting consistently in the live editor and export path</li>
+                <li>Holding Alt or Option now reliably inverts the dimensions visibility setting while held and restores the configured state immediately on release</li>
+                <li>Selected rooms now show contextual wall dimensions when dimensions are visible, including non-rectangular orthogonal rooms, while selected walls continue to show a focused single-wall measurement</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Selected-room dimension overlays now derive labels from ordered orthogonal polygon edges rather than rectangle-only assumptions where needed</li>
+                <li>Dimension visibility and contextual measurement overlays now align more closely with the intended low-clutter design-instrument feel</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.24.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-18</span>
           </div>

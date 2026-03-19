@@ -43,7 +43,8 @@ export function getRoomLabelLayout(
   room: Room,
   camera: CameraState,
   viewport: ViewportSize,
-  settings?: Pick<EditorSettings, "measurementFontSize">
+  settings?: Pick<EditorSettings, "measurementFontSize">,
+  options?: { showArea?: boolean }
 ): RoomLabelLayout | null {
   if (room.points.length < 3) return null;
   const trimmedName = room.name.trim();
@@ -52,7 +53,8 @@ export function getRoomLabelLayout(
   const declutter = getRoomDeclutterState(room, camera, viewport);
   if (!declutter.showLabel) return null;
 
-  const areaText = declutter.showArea ? formatMetricRoomAreaForRoom(room) : null;
+  const shouldShowArea = options?.showArea ?? true;
+  const areaText = shouldShowArea && declutter.showArea ? formatMetricRoomAreaForRoom(room) : null;
   const measurementTextScale = settings ? getMeasurementTextScale(settings) : 1;
   const areaFontSizePx = ROOM_LABEL_AREA_FONT_SIZE_PX * measurementTextScale;
 
