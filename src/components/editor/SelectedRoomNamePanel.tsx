@@ -6,8 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/stores/editorStore";
+import { cn } from "@/lib/utils";
 
-export function SelectedRoomNamePanel() {
+type SelectedRoomNamePanelProps = {
+  className?: string;
+};
+
+export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps) {
   const panelRef = useRef<HTMLElement | null>(null);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const shouldFocusSelectedRoomNameInput = useEditorStore(
@@ -107,7 +112,10 @@ export function SelectedRoomNamePanel() {
   return (
     <aside
       ref={panelRef}
-      className="pointer-events-auto absolute right-4 bottom-4 left-4 z-20 rounded-lg border border-border/70 bg-card/95 p-3 text-card-foreground shadow-lg backdrop-blur-sm sm:right-auto sm:w-72"
+      className={cn(
+        "pointer-events-auto rounded-xl border border-border/70 bg-card/95 p-3 text-card-foreground shadow-sm backdrop-blur-sm",
+        className
+      )}
     >
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Selected room</p>
       <label htmlFor="room-name-input" className="mt-2 mb-1 block text-sm font-medium">
@@ -175,19 +183,19 @@ export function SelectedRoomNamePanel() {
           </div>
         </div>
         <div className="mt-2 flex justify-end">
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          onClick={deleteSelectedRoom}
-          disabled={!canDeleteSelectedRoom}
-          className="gap-2"
-          aria-label={`Delete ${selectedRoom.name}`}
-          aria-describedby="delete-room-hint"
-        >
-          <Trash2 />
-          Delete room
-        </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={deleteSelectedRoom}
+            disabled={!canDeleteSelectedRoom}
+            className="gap-2"
+            aria-label={`Delete ${selectedRoom.name}`}
+            aria-describedby="delete-room-hint"
+          >
+            <Trash2 />
+            Delete room
+          </Button>
         </div>
       </div>
     </aside>

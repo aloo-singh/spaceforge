@@ -11,12 +11,14 @@ import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { normalizeEditorExportSignature } from "@/lib/editor/settings";
 import { useEditorStore } from "@/stores/editorStore";
+import { cn } from "@/lib/utils";
 
 type HistoryControlsProps = {
   onExportPng?: (signatureText?: string) => void | Promise<void>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
+  className?: string;
 };
 
 export function HistoryControls({
@@ -24,6 +26,7 @@ export function HistoryControls({
   isExportingPng = false,
   exportDisabled = false,
   exportDisabledReason,
+  className,
 }: HistoryControlsProps) {
   const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -76,7 +79,12 @@ export function HistoryControls({
 
   return (
     <>
-      <aside className="pointer-events-auto absolute top-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-start justify-end gap-1.5 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm sm:flex-nowrap sm:items-center sm:gap-2">
+      <aside
+        className={cn(
+          "pointer-events-auto flex w-full flex-wrap items-start justify-between gap-2 text-card-foreground sm:flex-nowrap sm:items-center",
+          className
+        )}
+      >
         <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0">
           <Button
             type="button"
