@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.24.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-18</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added support for drawing orthogonal non-rectangular room shapes such as L-shapes and stepped rooms</li>
+                <li>Added Backspace step-back while drafting so room shapes can be corrected incrementally before completion</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Room drawing now closes explicitly by clicking the starting point rather than assuming rectangle completion</li>
+                <li>The active tail segment can be adjusted while drafting, making orthogonal shape construction more precise</li>
+                <li>Valid local loops now auto-complete during drawing when they form a safe closed orthogonal room</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Refactored room geometry helpers to validate orthogonal simple polygons more directly</li>
+                <li>Rectangle-only wall affordances are now gated away from non-rectangular rooms to avoid misleading edit UI</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.23.1</h2>
             <span className="text-sm text-muted-foreground">2026-03-18</span>
           </div>
