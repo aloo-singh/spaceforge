@@ -44,6 +44,7 @@ import {
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
+import { cloneRoomOpenings } from "@/lib/editor/openings";
 import type {
   CameraState,
   Point,
@@ -223,6 +224,7 @@ function getSafePersistedHistorySnapshot(
             id: room.id,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
+            openings: cloneRoomOpenings(room.openings),
           })),
         },
       ],
@@ -630,6 +632,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           id: room.id,
           name: room.name,
           points: room.points.map((point) => ({ ...point })),
+          openings: cloneRoomOpenings(room.openings),
         },
         previousIndex,
       };
@@ -993,6 +996,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     id: createRoomId(),
     name: `Room ${state.document.rooms.length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),
+    openings: [],
   };
   const command: EditorCommand = {
     type: "complete-room",

@@ -12,6 +12,7 @@ import {
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getRoomLabelLayout,
@@ -126,6 +127,12 @@ const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+const OPENING_CUTOUT_STROKE_PX = 10;
+const OPENING_SYMBOL_STROKE_PX = 1.75;
+const DOOR_LEAF_LENGTH_SCALE = 0.72;
+const DOOR_LEAF_DEPTH_SCALE = 0.72;
+const WINDOW_LINE_INSET_PX = 5;
+const WINDOW_LINE_SEPARATION_PX = 4;
 const TOTAL_ONBOARDING_STEPS = 6;
 
 function isDefaultRoomName(name: string) {
@@ -1102,6 +1109,7 @@ function drawRooms(
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9
     );
+    drawRoomOpenings(graphics, room, camera, viewport, theme);
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
@@ -1385,6 +1393,79 @@ function drawRoomShape(
   }
   graphics.closePath();
   graphics.stroke();
+}
+
+function drawRoomOpenings(
+  graphics: Graphics,
+  room: Room,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  for (const opening of room.openings) {
+    const layout = getResolvedRoomOpeningLayout(room, opening);
+    if (!layout) continue;
+
+    const start = worldToScreen(layout.start, camera, viewport);
+    const end = worldToScreen(layout.end, camera, viewport);
+    const center = worldToScreen(layout.center, camera, viewport);
+    const tangent = layout.axis === "horizontal" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const interiorNormal = {
+      x: layout.interiorNormal.x,
+      y: layout.interiorNormal.y,
+    };
+    const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
+
+    graphics.setStrokeStyle({
+      width: OPENING_CUTOUT_STROKE_PX,
+      color: theme.canvasBackground,
+      alpha: 1,
+      cap: "round",
+    });
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+
+    if (opening.type === "door") {
+      const leafLengthPx = Math.min(24, Math.max(10, openingWidthPx * DOOR_LEAF_LENGTH_SCALE));
+      const leafDepthPx = Math.min(20, Math.max(8, openingWidthPx * DOOR_LEAF_DEPTH_SCALE));
+
+      graphics.setStrokeStyle({
+        width: OPENING_SYMBOL_STROKE_PX,
+        color: theme.roomOutline,
+        alpha: 0.96,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(
+        start.x + tangent.x * leafLengthPx + interiorNormal.x * leafDepthPx,
+        start.y + tangent.y * leafLengthPx + interiorNormal.y * leafDepthPx
+      );
+      graphics.stroke();
+      continue;
+    }
+
+    const lineLengthPx = Math.max(openingWidthPx - WINDOW_LINE_INSET_PX * 2, 0);
+    if (lineLengthPx <= 0) continue;
+
+    for (const offset of [-WINDOW_LINE_SEPARATION_PX / 2, WINDOW_LINE_SEPARATION_PX / 2]) {
+      graphics.setStrokeStyle({
+        width: OPENING_SYMBOL_STROKE_PX,
+        color: theme.roomOutline,
+        alpha: 0.92,
+        cap: "round",
+      });
+      graphics.moveTo(
+        center.x - tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+        center.y - tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+      );
+      graphics.lineTo(
+        center.x + tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+        center.y + tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+      );
+      graphics.stroke();
+    }
+  }
 }
 
 function drawTransformDestinationPreview(
@@ -2302,6 +2383,7 @@ function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): R
     id: "__draft-preview__",
     name: "",
     points: draftPoints,
+    openings: [],
   };
 }
 

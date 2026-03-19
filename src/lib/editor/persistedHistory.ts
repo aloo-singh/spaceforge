@@ -1,4 +1,5 @@
 import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
+import { areRoomOpeningsEqual, cloneRoomOpenings } from "@/lib/editor/openings";
 import type { Room } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
@@ -19,6 +20,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     const roomB = b.rooms[i];
     if (roomA.id !== roomB.id || roomA.name !== roomB.name) return false;
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
+    if (!areRoomOpeningsEqual(roomA.openings, roomB.openings)) return false;
   }
 
   return true;
@@ -30,6 +32,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       id: room.id,
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
+      openings: cloneRoomOpenings(room.openings),
     })),
   };
 }
@@ -85,6 +88,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         id: deletedRoom.id,
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
+        openings: cloneRoomOpenings(deletedRoom.openings),
       },
       previousIndex,
     };
@@ -99,6 +103,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         id: addedRooms[0].id,
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),
+        openings: cloneRoomOpenings(addedRooms[0].openings),
       },
     };
   }

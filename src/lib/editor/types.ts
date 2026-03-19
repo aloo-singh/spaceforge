@@ -27,6 +27,23 @@ export type ScreenPoint = {
 
 export type RoomWall = "left" | "right" | "top" | "bottom";
 
+export type OpeningType = "door" | "window";
+
+export type RoomOpening = {
+  id: string;
+  type: OpeningType;
+  wall: RoomWall;
+  /**
+   * Distance in mm from the wall's canonical start point to the opening center.
+   * Horizontal walls measure from minX, vertical walls from minY.
+   */
+  offsetMm: number;
+  /**
+   * Opening width in plan view, measured along the host wall.
+   */
+  widthMm: number;
+};
+
 export type Wall = {
   id: string;
   a: Point;
@@ -42,4 +59,5 @@ export type Room = {
   id: string;
   name: string;
   points: Point[];
+  openings: RoomOpening[];
 };

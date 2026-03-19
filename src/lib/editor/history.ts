@@ -1,3 +1,4 @@
+import { cloneRoomOpenings } from "@/lib/editor/openings";
 import type { Room } from "@/lib/editor/types";
 
 export type EditorDocumentState = {
@@ -58,6 +59,7 @@ export function applyEditorCommand(
         id: command.room.id,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
+        openings: cloneRoomOpenings(command.room.openings),
       });
 
       return {
