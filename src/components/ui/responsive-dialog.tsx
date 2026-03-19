@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type ResponsiveDialogProps = {
@@ -116,9 +117,9 @@ export function ResponsiveDialog({
     };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className={cn(
         "pointer-events-auto fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]",
@@ -164,7 +165,8 @@ export function ResponsiveDialog({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -11,12 +11,14 @@ import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { normalizeEditorExportSignature } from "@/lib/editor/settings";
 import { useEditorStore } from "@/stores/editorStore";
+import { cn } from "@/lib/utils";
 
 type HistoryControlsProps = {
   onExportPng?: (signatureText?: string) => void | Promise<void>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
+  className?: string;
 };
 
 export function HistoryControls({
@@ -24,6 +26,7 @@ export function HistoryControls({
   isExportingPng = false,
   exportDisabled = false,
   exportDisabledReason,
+  className,
 }: HistoryControlsProps) {
   const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -76,8 +79,13 @@ export function HistoryControls({
 
   return (
     <>
-      <aside className="pointer-events-auto absolute top-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-start justify-end gap-1.5 rounded-lg border border-border/70 bg-card/90 p-2 text-card-foreground shadow-md backdrop-blur-sm sm:flex-nowrap sm:items-center sm:gap-2">
-        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0">
+      <aside
+        className={cn(
+          "pointer-events-auto flex w-full flex-wrap items-start justify-between gap-2 text-card-foreground sm:flex-nowrap sm:items-center [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5",
+          className
+        )}
+      >
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
           <Button
             type="button"
             variant="outline"
@@ -88,7 +96,7 @@ export function HistoryControls({
             aria-expanded={isSettingsDialogOpen}
             aria-controls={settingsDialogId}
             title="Editor settings"
-            className="sm:size-8"
+            className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
           >
             <Settings2 />
           </Button>
@@ -100,10 +108,10 @@ export function HistoryControls({
             disabled={isResetCameraDisabled}
             aria-label={resetCameraAriaLabel}
             title={resetCameraTitle}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <LocateFixed />
-            <span className="hidden sm:inline">Fit View</span>
+            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Fit View</span>
           </Button>
           <Button
             type="button"
@@ -113,10 +121,12 @@ export function HistoryControls({
             disabled={isExportButtonDisabled}
             aria-label="Export current canvas as PNG"
             title={exportButtonTitle}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <Download />
-            <span className="hidden sm:inline">{isExportingPng ? "Exporting..." : "Export PNG"}</span>
+            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">
+              {isExportingPng ? "Exporting..." : "Export PNG"}
+            </span>
           </Button>
           <Button
             type="button"
@@ -126,13 +136,13 @@ export function HistoryControls({
             disabled={isResetDisabled}
             aria-label="Reset canvas"
             title="Reset canvas"
-            className="sm:size-8"
+            className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
           >
             <RotateCcw />
           </Button>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0">
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
           <Button
             type="button"
             variant="outline"
@@ -140,13 +150,13 @@ export function HistoryControls({
             onClick={undo}
             disabled={isUndoDisabled}
             aria-label="Undo last edit, shortcut Command or Control plus Z"
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <Undo2 />
-            <span className="hidden sm:inline">Undo</span>
+            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Undo</span>
             <Keycap
               aria-hidden="true"
-              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex"
+              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
             >
               ⌘Z
             </Keycap>
@@ -158,13 +168,13 @@ export function HistoryControls({
             onClick={redo}
             disabled={isRedoDisabled}
             aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5"
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <Redo2 />
-            <span className="hidden sm:inline">Redo</span>
+            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Redo</span>
             <Keycap
               aria-hidden="true"
-              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex"
+              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
             >
               ⇧⌘Z
             </Keycap>

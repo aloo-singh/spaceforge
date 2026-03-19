@@ -80,6 +80,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
+import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
@@ -182,6 +183,7 @@ export default function EditorCanvas() {
     () => false
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -797,7 +799,7 @@ export default function EditorCanvas() {
       aria-label="SpaceForge floor plan editor canvas"
       aria-describedby={instructionsId}
       role="region"
-      className="relative h-full w-full"
+      className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)]"
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
@@ -808,36 +810,57 @@ export default function EditorCanvas() {
         selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
         and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
-      <div
-        ref={containerRef}
-        tabIndex={-1}
-        className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      />
-      {displayedHint ? (
-        <aside
-          className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
-            hintMotionState === "visible"
-              ? "translate-y-0 opacity-100"
-              : hintMotionState === "entering"
-                ? "translate-y-2 opacity-0"
-                : "-translate-y-1.5 opacity-0"
-          }`}
-          style={{ transitionDuration: `${HINT_TRANSITION_MS}ms` }}
-        >
-          <OnboardingHintCard
-            message={displayedHint.message}
-            invertedTheme={editorThemeMode === "light" ? "dark" : "light"}
-            onDismiss={() => dismissHint(displayedHint.id)}
+      <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
+        <HistoryControls
+          onExportPng={exportCurrentCanvasAsPng}
+          isExportingPng={isExportingPng}
+          exportDisabled={!isCanvasReadyForExport || !hasRooms}
+          exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
+        />
+      </div>
+      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
+        <div className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+          <div
+            ref={containerRef}
+            tabIndex={-1}
+            className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
+          {displayedHint ? (
+            <aside
+              className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
+                hintMotionState === "visible"
+                  ? "translate-y-0 opacity-100"
+                  : hintMotionState === "entering"
+                    ? "translate-y-2 opacity-0"
+                    : "-translate-y-1.5 opacity-0"
+              }`}
+              style={{ transitionDuration: `${HINT_TRANSITION_MS}ms` }}
+            >
+              <OnboardingHintCard
+                message={displayedHint.message}
+                invertedTheme={editorThemeMode === "light" ? "dark" : "light"}
+                onDismiss={() => dismissHint(displayedHint.id)}
+              />
+            </aside>
+          ) : null}
+        </div>
+        <aside className="hidden min-h-0 lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
+          {selectedRoomId ? (
+            <SelectedRoomNamePanel className="h-full" />
+          ) : (
+            <EditorInspectorEmptyState className="h-full" />
+          )}
         </aside>
-      ) : null}
-      <HistoryControls
-        onExportPng={exportCurrentCanvasAsPng}
-        isExportingPng={isExportingPng}
-        exportDisabled={!isCanvasReadyForExport || !hasRooms}
-        exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
-      />
-      <SelectedRoomNamePanel />
+        {selectedRoomId ? (
+          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
+            <SelectedRoomNamePanel />
+          </aside>
+        ) : (
+          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
+            <EditorInspectorEmptyState />
+          </aside>
+        )}
+      </div>
     </section>
   );
 }
