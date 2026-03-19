@@ -128,14 +128,14 @@ const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
-const OPENING_CUTOUT_STROKE_PX = 10;
-const OPENING_SYMBOL_STROKE_PX = 1.75;
+const OPENING_CUTOUT_WORLD_MM = 64;
+const OPENING_SYMBOL_WORLD_MM = 18;
 const DOOR_LEAF_LENGTH_SCALE = 0.72;
 const DOOR_LEAF_DEPTH_SCALE = 0.72;
-const WINDOW_LINE_INSET_PX = 5;
-const WINDOW_LINE_SEPARATION_PX = 4;
-const OPENING_SELECTION_HALO_PX = 6;
-const OPENING_SELECTION_STROKE_PX = 3;
+const WINDOW_LINE_INSET_WORLD_MM = 44;
+const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
+const OPENING_SELECTION_HALO_WORLD_MM = 120;
+const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const TOTAL_ONBOARDING_STEPS = 6;
 
 function isDefaultRoomName(name: string) {
@@ -1424,11 +1424,19 @@ function drawRoomOpenings(
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
     const isSelected =
       selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id;
+    const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
+    const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
+    const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
+    const selectionHaloStrokePx = Math.max(
+      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
+      selectionStrokePx + 2
+    );
+    const selectionColor = theme.wallSelectionAccent;
 
     if (isSelected) {
       graphics.setStrokeStyle({
-        width: OPENING_CUTOUT_STROKE_PX + OPENING_SELECTION_HALO_PX,
-        color: theme.interactiveAccent,
+        width: selectionHaloStrokePx,
+        color: selectionColor,
         alpha: 0.18,
         cap: "round",
       });
@@ -1438,7 +1446,7 @@ function drawRoomOpenings(
     }
 
     graphics.setStrokeStyle({
-      width: OPENING_CUTOUT_STROKE_PX,
+      width: cutoutStrokePx,
       color: theme.canvasBackground,
       alpha: 1,
       cap: "round",
@@ -1447,13 +1455,25 @@ function drawRoomOpenings(
     graphics.lineTo(end.x, end.y);
     graphics.stroke();
 
+    if (isSelected) {
+      graphics.setStrokeStyle({
+        width: selectionStrokePx,
+        color: selectionColor,
+        alpha: 0.96,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
+      graphics.stroke();
+    }
+
     if (opening.type === "door") {
-      const leafLengthPx = Math.min(24, Math.max(10, openingWidthPx * DOOR_LEAF_LENGTH_SCALE));
-      const leafDepthPx = Math.min(20, Math.max(8, openingWidthPx * DOOR_LEAF_DEPTH_SCALE));
+      const leafLengthPx = openingWidthPx * DOOR_LEAF_LENGTH_SCALE;
+      const leafDepthPx = openingWidthPx * DOOR_LEAF_DEPTH_SCALE;
 
       graphics.setStrokeStyle({
-        width: isSelected ? OPENING_SELECTION_STROKE_PX : OPENING_SYMBOL_STROKE_PX,
-        color: isSelected ? theme.interactiveAccent : theme.roomOutline,
+        width: isSelected ? selectionStrokePx : symbolStrokePx,
+        color: isSelected ? selectionColor : theme.roomOutline,
         alpha: isSelected ? 1 : 0.96,
         cap: "round",
       });
@@ -1466,13 +1486,18 @@ function drawRoomOpenings(
       continue;
     }
 
-    const lineLengthPx = Math.max(openingWidthPx - WINDOW_LINE_INSET_PX * 2, 0);
+    const windowLineInsetPx = Math.max(camera.pixelsPerMm * WINDOW_LINE_INSET_WORLD_MM, 1.5);
+    const windowLineSeparationPx = Math.max(
+      camera.pixelsPerMm * WINDOW_LINE_SEPARATION_WORLD_MM,
+      2
+    );
+    const lineLengthPx = Math.max(openingWidthPx - windowLineInsetPx * 2, 0);
     if (lineLengthPx <= 0) continue;
 
-    for (const offset of [-WINDOW_LINE_SEPARATION_PX / 2, WINDOW_LINE_SEPARATION_PX / 2]) {
+    for (const offset of [-windowLineSeparationPx / 2, windowLineSeparationPx / 2]) {
       graphics.setStrokeStyle({
-        width: isSelected ? OPENING_SELECTION_STROKE_PX : OPENING_SYMBOL_STROKE_PX,
-        color: isSelected ? theme.interactiveAccent : theme.roomOutline,
+        width: isSelected ? selectionStrokePx : symbolStrokePx,
+        color: isSelected ? selectionColor : theme.roomOutline,
         alpha: isSelected ? 1 : 0.92,
         cap: "round",
       });
