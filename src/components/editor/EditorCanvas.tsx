@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
-import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
+import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
   getOrthogonalSnappedPoint,
   pointsEqual,
@@ -829,8 +829,17 @@ export default function EditorCanvas() {
     drawCurrentScene();
   }, [drawCurrentScene, editorTheme]);
 
-  const scaleOverlay = useMemo(() => getScaleOverlayState(camera), [camera]);
-  const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(camera), [camera]);
+  const overlayCamera = useMemo(
+    () =>
+      hasHydratedClient
+        ? camera
+        : {
+            pixelsPerMm: INITIAL_PIXELS_PER_MM,
+          },
+    [camera, hasHydratedClient]
+  );
+  const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
+  const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
 
   return (
     <section
