@@ -4,6 +4,8 @@ const ROOM_DELETE_SHORTCUT_KEYS = ["Delete", "Backspace"] as const;
 
 type DeleteRoomStoreState = {
   selectedRoomId: string | null;
+  selectedOpening: { roomId: string; openingId: string } | null;
+  deleteSelectedOpening: () => void;
   deleteSelectedRoom: () => void;
 };
 
@@ -18,11 +20,15 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
     if (!isRoomDeleteShortcutKey(event.key)) return;
 
     const state = store.getState();
-    if (!state.selectedRoomId) return;
+    if (!state.selectedOpening && !state.selectedRoomId) return;
 
     event.stopImmediatePropagation();
     event.stopPropagation();
     event.preventDefault();
+    if (state.selectedOpening) {
+      state.deleteSelectedOpening();
+      return;
+    }
     state.deleteSelectedRoom();
   };
 

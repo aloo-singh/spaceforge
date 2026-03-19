@@ -1,3 +1,6 @@
+import { findOpeningAtScreenPoint } from "@/lib/editor/openings";
+import { findRoomWallAtScreenPoint } from "@/lib/editor/openings";
+import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openings";
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
@@ -18,6 +21,11 @@ import {
   translateRoomPoints,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
+import type { RoomWall } from "@/lib/editor/types";
+import {
+  getOpeningMoveOffsetForCursor,
+  getOpeningResizeWidthForCursor,
+} from "@/stores/editorStore";
 import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
@@ -31,13 +39,29 @@ type RoomDrawStoreState = {
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
-  selectedWall: { roomId: string; wall: RectWall } | null;
+  selectedWall: { roomId: string; wall: RoomWall } | null;
+  selectedOpening: { roomId: string; openingId: string } | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
-  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
+  selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
+  selectOpeningById: (roomId: string, openingId: string) => void;
   clearRoomSelection: () => void;
+  previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
+  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
+  commitOpeningMove: (
+    roomId: string,
+    openingId: string,
+    previousOffsetMm: number,
+    nextOffsetMm: number
+  ) => void;
+  commitOpeningResize: (
+    roomId: string,
+    openingId: string,
+    previousWidthMm: number,
+    nextWidthMm: number
+  ) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
 };
@@ -49,7 +73,7 @@ type RoomDrawStore = {
 type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
-  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RectWall } | null) => void;
+  onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RoomWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
@@ -65,9 +89,29 @@ type LabelDragSession = {
   didDrag: boolean;
 };
 
+type OpeningDragSession = {
+  pointerId: number;
+  roomId: string;
+  openingId: string;
+  startScreenPoint: Point;
+  startOffsetMm: number;
+  latestOffsetMm: number | null;
+  didDrag: boolean;
+};
+
+type OpeningResizeSession = {
+  pointerId: number;
+  roomId: string;
+  openingId: string;
+  startScreenPoint: Point;
+  startWidthMm: number;
+  latestWidthMm: number | null;
+  didDrag: boolean;
+};
+
 type SelectableWallHit = {
   roomId: string;
-  wall: RectWall;
+  wall: RoomWall;
   candidateCount: number;
 };
 
@@ -94,9 +138,17 @@ export function attachRoomDrawInput(
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
   let hoveredSelectableWall: SelectableWallHit | null = null;
+  let hoveredOpening: { roomId: string; openingId: string } | null = null;
+  let hoveredOpeningWidthHandle:
+    | { roomId: string; openingId: string; edge: "start" | "end"; axis: "horizontal" | "vertical" }
+    | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
+  let activeOpeningDragSession: OpeningDragSession | null = null;
+  let activeOpeningResizeSession: OpeningResizeSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
+  const commitOpeningMove = store.getState().commitOpeningMove;
+  const commitOpeningResize = store.getState().commitOpeningResize;
   let clearTransformFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const toCanvasPoint = (event: PointerEvent) => {
@@ -172,13 +224,31 @@ export function attachRoomDrawInput(
       return;
     }
 
+    if (activeOpeningDragSession?.didDrag) {
+      setCursor("grabbing");
+      return;
+    }
+
+    if (activeOpeningResizeSession?.didDrag) {
+      setCursor("grabbing");
+      return;
+    }
+
+    if (hoveredOpeningWidthHandle && !isSpaceHeld) {
+      setCursor(hoveredOpeningWidthHandle.axis === "horizontal" ? "ew-resize" : "ns-resize");
+      return;
+    }
+
     const isDrawingModeActive = store.getState().roomDraft.points.length > 0;
     if (!isSpaceHeld && isDrawingModeActive) {
       setCursor("crosshair");
       return;
     }
 
-    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall)) {
+    if (
+      !isSpaceHeld &&
+      (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall || hoveredOpening)
+    ) {
       setCursor("pointer");
       return;
     }
@@ -194,6 +264,26 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeLabelDragSession = null;
+    updateCursor();
+  };
+
+  const stopOpeningDragSession = () => {
+    if (!activeOpeningDragSession) return;
+    const pointerId = activeOpeningDragSession.pointerId;
+    if (canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+    activeOpeningDragSession = null;
+    updateCursor();
+  };
+
+  const stopOpeningResizeSession = () => {
+    if (!activeOpeningResizeSession) return;
+    const pointerId = activeOpeningResizeSession.pointerId;
+    if (canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+    activeOpeningResizeSession = null;
     updateCursor();
   };
 
@@ -247,6 +337,64 @@ export function attachRoomDrawInput(
       return;
     }
 
+    if (activeOpeningDragSession) {
+      const session = activeOpeningDragSession;
+      if (event.pointerId !== session.pointerId) return;
+
+      const dragThresholdSquared = ROOM_LABEL_DRAG_THRESHOLD_PX * ROOM_LABEL_DRAG_THRESHOLD_PX;
+      const dx = screenPoint.x - session.startScreenPoint.x;
+      const dy = screenPoint.y - session.startScreenPoint.y;
+      if (!session.didDrag && dx * dx + dy * dy < dragThresholdSquared) {
+        callbacks.requestRender();
+        return;
+      }
+
+      const moveTarget = getOpeningMoveOffsetForCursor(session.roomId, session.openingId, cursorWorld);
+      if (!moveTarget) {
+        callbacks.requestRender();
+        return;
+      }
+
+      session.didDrag = true;
+      session.latestOffsetMm = moveTarget.nextOffsetMm;
+      store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
+      updateCursor();
+      callbacks.requestRender();
+      return;
+    }
+
+    if (activeOpeningResizeSession) {
+      const session = activeOpeningResizeSession;
+      if (event.pointerId !== session.pointerId) return;
+
+      const dragThresholdSquared = ROOM_LABEL_DRAG_THRESHOLD_PX * ROOM_LABEL_DRAG_THRESHOLD_PX;
+      const dx = screenPoint.x - session.startScreenPoint.x;
+      const dy = screenPoint.y - session.startScreenPoint.y;
+      if (!session.didDrag && dx * dx + dy * dy < dragThresholdSquared) {
+        callbacks.requestRender();
+        return;
+      }
+
+      const resizeTarget = getOpeningResizeWidthForCursor(
+        session.roomId,
+        session.openingId,
+        cursorWorld
+      );
+      if (!resizeTarget) {
+        callbacks.requestRender();
+        return;
+      }
+
+      session.didDrag = true;
+      session.latestWidthMm = resizeTarget.nextWidthMm;
+      store
+        .getState()
+        .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm);
+      updateCursor();
+      callbacks.requestRender();
+      return;
+    }
+
     if (!isSpaceHeld && state.roomDraft.points.length === 0) {
       const hoveredRoom = findRoomLabelAtScreenPoint(
         state.document.rooms,
@@ -256,18 +404,39 @@ export function attachRoomDrawInput(
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       if (!hoveredRoom) {
+        hoveredOpeningWidthHandle = findSelectedOpeningWidthHandleAtScreenPoint(
+          state.document.rooms,
+          state.selectedOpening,
+          screenPoint,
+          state.camera,
+          state.viewport
+        );
+        hoveredOpening = findOpeningAtScreenPoint(
+          state.document.rooms,
+          screenPoint,
+          state.camera,
+          state.viewport
+        );
         const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
         setHoveredSelectableWall(hoveredWall);
         const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
         setHoveredSelectableRoomId(
-          hoveredWall ? hoveredWall.roomId : hoveredBodyRoom?.id ?? null
+          hoveredOpeningWidthHandle?.roomId ??
+            hoveredOpening?.roomId ??
+            hoveredWall?.roomId ??
+            hoveredBodyRoom?.id ??
+            null
         );
       } else {
+        hoveredOpeningWidthHandle = null;
+        hoveredOpening = null;
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
     } else {
       setHoveredRoomLabelId(null);
+      hoveredOpeningWidthHandle = null;
+      hoveredOpening = null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
@@ -276,9 +445,11 @@ export function attachRoomDrawInput(
   };
 
   const onPointerLeave = () => {
-    if (activeLabelDragSession) return;
+    if (activeLabelDragSession || activeOpeningDragSession || activeOpeningResizeSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    hoveredOpeningWidthHandle = null;
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
@@ -338,6 +509,70 @@ export function attachRoomDrawInput(
       return;
     }
 
+    const openingWidthHandleHit = findSelectedOpeningWidthHandleAtScreenPoint(
+      state.document.rooms,
+      state.selectedOpening,
+      screenPoint,
+      state.camera,
+      state.viewport
+    );
+    if (openingWidthHandleHit) {
+      event.preventDefault();
+      state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
+      hoveredOpeningWidthHandle = openingWidthHandleHit;
+      hoveredOpening = { roomId: openingWidthHandleHit.roomId, openingId: openingWidthHandleHit.openingId };
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(openingWidthHandleHit.roomId);
+      const room =
+        state.document.rooms.find((candidate) => candidate.id === openingWidthHandleHit.roomId) ?? null;
+      const opening =
+        room?.openings.find((candidate) => candidate.id === openingWidthHandleHit.openingId) ?? null;
+      if (room && opening) {
+        canvas.setPointerCapture(event.pointerId);
+        activeOpeningResizeSession = {
+          pointerId: event.pointerId,
+          roomId: openingWidthHandleHit.roomId,
+          openingId: openingWidthHandleHit.openingId,
+          startScreenPoint: screenPoint,
+          startWidthMm: opening.widthMm,
+          latestWidthMm: null,
+          didDrag: false,
+        };
+      }
+      updateCursor();
+      return;
+    }
+
+    const openingHit = findOpeningAtScreenPoint(
+      state.document.rooms,
+      screenPoint,
+      state.camera,
+      state.viewport
+    );
+    if (openingHit) {
+      event.preventDefault();
+      state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      hoveredOpening = openingHit;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(openingHit.roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === openingHit.roomId) ?? null;
+      const opening = room?.openings.find((candidate) => candidate.id === openingHit.openingId) ?? null;
+      if (room && opening) {
+        canvas.setPointerCapture(event.pointerId);
+        activeOpeningDragSession = {
+          pointerId: event.pointerId,
+          roomId: openingHit.roomId,
+          openingId: openingHit.openingId,
+          startScreenPoint: screenPoint,
+          startOffsetMm: opening.offsetMm,
+          latestOffsetMm: null,
+          didDrag: false,
+        };
+      }
+      updateCursor();
+      return;
+    }
+
     const wallHit = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
     if (wallHit) {
       const didChangeSelectedWall =
@@ -392,6 +627,75 @@ export function attachRoomDrawInput(
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    const screenPoint = toCanvasPoint(event);
+
+    if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
+      const session = activeOpeningDragSession;
+      if (session.didDrag) {
+        const nextOffsetMm = session.latestOffsetMm ?? session.startOffsetMm;
+        if (nextOffsetMm !== session.startOffsetMm) {
+          commitOpeningMove(
+            session.roomId,
+            session.openingId,
+            session.startOffsetMm,
+            nextOffsetMm
+          );
+        }
+      }
+      stopOpeningDragSession();
+
+      const state = store.getState();
+      const hoveredRoom =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+      hoveredOpening =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
+    if (activeOpeningResizeSession && event.pointerId === activeOpeningResizeSession.pointerId) {
+      const session = activeOpeningResizeSession;
+      if (session.didDrag) {
+        const nextWidthMm = session.latestWidthMm ?? session.startWidthMm;
+        if (nextWidthMm !== session.startWidthMm) {
+          commitOpeningResize(session.roomId, session.openingId, session.startWidthMm, nextWidthMm);
+        }
+      }
+      stopOpeningResizeSession();
+
+      const state = store.getState();
+      const hoveredRoom =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+      hoveredOpeningWidthHandle =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findSelectedOpeningWidthHandleAtScreenPoint(
+              state.document.rooms,
+              state.selectedOpening,
+              screenPoint,
+              state.camera,
+              state.viewport
+            )
+          : null;
+      hoveredOpening =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     const session = activeLabelDragSession;
@@ -418,18 +722,63 @@ export function attachRoomDrawInput(
     stopLabelDragSession();
 
     const state = store.getState();
-    const screenPoint = toCanvasPoint(event);
     const hoveredRoom =
       !isSpaceHeld && state.roomDraft.points.length === 0
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    hoveredOpening =
+      !isSpaceHeld && state.roomDraft.points.length === 0
+        ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+        : null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
   };
 
   const onPointerCancel = (event: PointerEvent) => {
+    if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
+      if (activeOpeningDragSession.didDrag) {
+        store
+          .getState()
+          .previewOpeningMove(
+            activeOpeningDragSession.roomId,
+            activeOpeningDragSession.openingId,
+            activeOpeningDragSession.startOffsetMm
+          );
+      }
+
+      stopOpeningDragSession();
+      setHoveredRoomLabelId(null);
+      hoveredOpeningWidthHandle = null;
+      hoveredOpening = null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
+    if (activeOpeningResizeSession && event.pointerId === activeOpeningResizeSession.pointerId) {
+      if (activeOpeningResizeSession.didDrag) {
+        store
+          .getState()
+          .previewOpeningResize(
+            activeOpeningResizeSession.roomId,
+            activeOpeningResizeSession.openingId,
+            activeOpeningResizeSession.startWidthMm
+          );
+      }
+
+      stopOpeningResizeSession();
+      setHoveredRoomLabelId(null);
+      hoveredOpeningWidthHandle = null;
+      hoveredOpening = null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     if (activeLabelDragSession.didDrag) {
@@ -439,6 +788,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
@@ -472,6 +822,7 @@ export function attachRoomDrawInput(
         updateCursor();
       } else {
         state.clearRoomSelection();
+        hoveredOpening = null;
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
@@ -503,9 +854,31 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession?.didDrag) {
       clearPendingTransformFeedbackTimeout();
     }
+    if (activeOpeningDragSession?.didDrag) {
+      store
+        .getState()
+        .previewOpeningMove(
+          activeOpeningDragSession.roomId,
+          activeOpeningDragSession.openingId,
+          activeOpeningDragSession.startOffsetMm
+        );
+    }
+    if (activeOpeningResizeSession?.didDrag) {
+      store
+        .getState()
+        .previewOpeningResize(
+          activeOpeningResizeSession.roomId,
+          activeOpeningResizeSession.openingId,
+          activeOpeningResizeSession.startWidthMm
+        );
+    }
     setTransformFeedback(null);
     stopLabelDragSession();
+    stopOpeningDragSession();
+    stopOpeningResizeSession();
     setHoveredRoomLabelId(null);
+    hoveredOpeningWidthHandle = null;
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
@@ -534,6 +907,7 @@ export function attachRoomDrawInput(
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
     stopLabelDragSession();
+    stopOpeningResizeSession();
     canvas.style.cursor = "";
   };
 }
@@ -556,7 +930,16 @@ function findSelectableWallAtScreenPoint(
 
   const selectedRoom = state.document.rooms.find((room) => room.id === state.selectedRoomId);
   if (!selectedRoom || !isAxisAlignedRectangle(selectedRoom.points)) {
-    return null;
+    const nonRectWall = selectedRoom
+      ? findRoomWallAtScreenPoint(selectedRoom, screenPoint, state.camera, state.viewport)
+      : null;
+    return nonRectWall === null
+      ? null
+      : {
+          roomId: selectedRoom?.id ?? state.selectedRoomId!,
+          wall: nonRectWall,
+          candidateCount: 1,
+        };
   }
 
   const candidates: Array<{
@@ -639,6 +1022,8 @@ function isPointOnInteriorSideOfRectWall(
         point.x >= bounds.minX - WALL_INTERIOR_SIDE_EPSILON_MM
       );
   }
+
+  return false;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

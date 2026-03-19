@@ -12,49 +12,48 @@ type HistoryStore = {
 };
 
 export function attachHistoryHotkeys(store: HistoryStore) {
+  const isHistoryShortcutEvent = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    const code = event.code;
+    const isPrimaryModifier = event.metaKey || event.ctrlKey;
+    if (!isPrimaryModifier || event.altKey) {
+      return null;
+    }
+
+    const isZKey = key === "z" || code === "KeyZ";
+    const isYKey = key === "y" || code === "KeyY";
+    if (isZKey && !event.shiftKey) return "undo" as const;
+    if (isZKey && event.shiftKey) return "redo" as const;
+    if (event.ctrlKey && isYKey && !event.metaKey) return "redo" as const;
+
+    return null;
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (isEditableTarget(event.target)) return;
-    if (event.altKey) return;
+    if (event.defaultPrevented) return;
 
-    const key = event.key.toLowerCase();
-    const isPrimaryModifier = event.metaKey || event.ctrlKey;
-    if (!isPrimaryModifier) return;
-
-    const isUndoShortcut = key === "z" && !event.shiftKey;
-    const isRedoShortcut =
-      (event.metaKey && key === "z" && event.shiftKey) ||
-      (event.ctrlKey && key === "z" && event.shiftKey) ||
-      (event.ctrlKey && key === "y" && !event.metaKey);
-
-    if (!isUndoShortcut && !isRedoShortcut) return;
+    const shortcut = isHistoryShortcutEvent(event);
+    if (!shortcut) return;
 
     const state = store.getState();
-    if (isUndoShortcut) {
+    if (shortcut === "undo") {
       if (!state.canUndo) return;
-      event.stopImmediatePropagation();
-      event.stopPropagation();
-      event.preventDefault();
-      state.undo();
+    } else if (!state.canRedo) {
       return;
     }
 
-    if (!state.canRedo) return;
-    event.stopImmediatePropagation();
-    event.stopPropagation();
     event.preventDefault();
-    state.redo();
+    event.stopPropagation();
+    state[shortcut]();
   };
 
   // Capture-phase interception keeps browser/app chrome shortcuts from winning
   // before the editor can claim its own global undo/redo bindings.
-  const listenerOptions: AddEventListenerOptions = {
-    capture: true,
-  };
-  document.addEventListener("keydown", onKeyDown, listenerOptions);
+  const listenerOptions: AddEventListenerOptions = { capture: true };
   window.addEventListener("keydown", onKeyDown, listenerOptions);
 
   return () => {
-    document.removeEventListener("keydown", onKeyDown, listenerOptions);
     window.removeEventListener("keydown", onKeyDown, listenerOptions);
   };
 }

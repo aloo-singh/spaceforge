@@ -12,6 +12,8 @@ import {
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
+import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getRoomLabelLayout,
@@ -72,6 +74,8 @@ import type {
   CameraState,
   Point,
   Room,
+  RoomOpeningSelection,
+  RoomWall,
   RoomWallSelection,
   ScreenPoint,
   ViewportSize,
@@ -105,7 +109,7 @@ const EMPTY_ROOM_RESIZE_UI = {
 } as const;
 const EMPTY_HOVERED_SELECTABLE_WALL = null as {
   roomId: string;
-  wall: RectWall;
+  wall: RoomWall;
 } | null;
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
@@ -126,6 +130,17 @@ const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+const OPENING_CUTOUT_WORLD_MM = 64;
+const OPENING_SYMBOL_WORLD_MM = 18;
+const DOOR_LEAF_LENGTH_SCALE = 0.72;
+const DOOR_LEAF_DEPTH_SCALE = 0.72;
+const WINDOW_LINE_INSET_WORLD_MM = 44;
+const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
+const OPENING_SELECTION_HALO_WORLD_MM = 120;
+const OPENING_SELECTION_STROKE_WORLD_MM = 28;
+const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
+const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
+const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
 const TOTAL_ONBOARDING_STEPS = 6;
 
 function isDefaultRoomName(name: string) {
@@ -148,6 +163,7 @@ export default function EditorCanvas() {
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
   const roomRef = useRef<Graphics | null>(null);
+  const openingRef = useRef<Graphics | null>(null);
   const wallOverlayRef = useRef<Graphics | null>(null);
   const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
@@ -156,7 +172,7 @@ export default function EditorCanvas() {
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
   const hoveredSelectableWallRef = useRef<{
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
@@ -213,15 +229,17 @@ export default function EditorCanvas() {
   const drawCurrentScene = useCallback(() => {
     const grid = gridRef.current;
     const rooms = roomRef.current;
+    const openings = openingRef.current;
     const wallOverlay = wallOverlayRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
     const dimensionOverlay = dimensionOverlayRef.current;
-    if (!grid || !rooms || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
+    if (!grid || !rooms || !openings || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
 
     drawScene(
       grid,
       rooms,
+      openings,
       wallOverlay,
       roomLabels,
       draft,
@@ -404,10 +422,12 @@ export default function EditorCanvas() {
     setIsExportingPng(true);
     const exportStage = new Container();
     const exportRoomGraphics = new Graphics();
+    const exportOpeningGraphics = new Graphics();
     const exportWallOverlayGraphics = new Graphics();
     const exportRoomLabels = new Container();
     const exportDraftGraphics = new Graphics();
     exportStage.addChild(exportRoomGraphics);
+    exportStage.addChild(exportOpeningGraphics);
     exportStage.addChild(exportWallOverlayGraphics);
     exportStage.addChild(exportRoomLabels);
     exportStage.addChild(exportDraftGraphics);
@@ -421,6 +441,14 @@ export default function EditorCanvas() {
       exportCamera,
       exportViewport,
       null,
+      editorThemeRef.current
+    );
+    drawOpenings(
+      exportOpeningGraphics,
+      state.document.rooms,
+      null,
+      exportCamera,
+      exportViewport,
       editorThemeRef.current
     );
     drawWallInteractionOverlay(
@@ -676,18 +704,21 @@ export default function EditorCanvas() {
 
       const grid = new Graphics();
       const rooms = new Graphics();
+      const openings = new Graphics();
       const wallOverlay = new Graphics();
       const roomLabels = new Container();
       const draft = new Graphics();
       const dimensionOverlay = new Container();
       gridRef.current = grid;
       roomRef.current = rooms;
+      openingRef.current = openings;
       wallOverlayRef.current = wallOverlay;
       roomLabelRef.current = roomLabels;
       draftRef.current = draft;
       dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
+      app.stage.addChild(openings);
       app.stage.addChild(wallOverlay);
       app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
@@ -763,6 +794,7 @@ export default function EditorCanvas() {
         setIsCanvasReadyForExport(false);
         gridRef.current = null;
         roomRef.current = null;
+        openingRef.current = null;
         wallOverlayRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
@@ -844,7 +876,7 @@ export default function EditorCanvas() {
             </aside>
           ) : null}
         </div>
-        <aside className="hidden min-h-0 lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
+        <aside className="hidden min-h-0 overflow-hidden lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
           {selectedRoomId ? (
             <SelectedRoomNamePanel className="h-full" />
           ) : (
@@ -870,6 +902,7 @@ type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 function drawScene(
   gridGraphics: Graphics,
   roomGraphics: Graphics,
+  openingGraphics: Graphics,
   wallOverlayGraphics: Graphics,
   roomLabelContainer: Container,
   draftGraphics: Graphics,
@@ -879,7 +912,7 @@ function drawScene(
   hoveredRoomLabelId: string | null,
   hoveredSelectableWall: {
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
@@ -913,6 +946,14 @@ function drawScene(
     state.camera,
     state.viewport,
     transformFeedback,
+    theme
+  );
+  drawOpenings(
+    openingGraphics,
+    renderedRooms,
+    state.selectedOpening,
+    state.camera,
+    state.viewport,
     theme
   );
   drawWallInteractionOverlay(
@@ -1226,13 +1267,29 @@ function drawRooms(
   }
 }
 
+function drawOpenings(
+  graphics: Graphics,
+  rooms: Room[],
+  selectedOpening: RoomOpeningSelection | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  graphics.clear();
+
+  for (const room of rooms) {
+    if (room.points.length < 3) continue;
+    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
+  }
+}
+
 function drawWallInteractionOverlay(
   graphics: Graphics,
   rooms: Room[],
   selectedWall: RoomWallSelection | null,
   hoveredSelectableWall: {
     roomId: string;
-    wall: RectWall;
+    wall: RoomWall;
   } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
@@ -1253,41 +1310,42 @@ function drawWallInteractionOverlay(
   graphics.clear();
   if (isDraftingRoom) return;
 
-  let hoveredBounds: ReturnType<typeof getAxisAlignedRoomBounds> = null;
-  let hoveredWall: RectWall | null = null;
+  let hoveredRoom: Room | null = null;
+  let hoveredWall: RoomWall | null = null;
+  let hoveredRoomId: string | null = null;
 
   if (hoveredSelectableWall) {
-    const hoveredRoom = rooms.find((room) => room.id === hoveredSelectableWall.roomId);
+    hoveredRoom = rooms.find((room) => room.id === hoveredSelectableWall.roomId) ?? null;
     if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
-      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
       hoveredWall = hoveredSelectableWall.wall;
+      hoveredRoomId = hoveredSelectableWall.roomId;
+    } else {
+      hoveredRoom = null;
     }
   } else if (roomResizeUi.hoveredRoomId && roomResizeUi.hoveredWall) {
-    const hoveredRoom = rooms.find((room) => room.id === roomResizeUi.hoveredRoomId);
+    hoveredRoom = rooms.find((room) => room.id === roomResizeUi.hoveredRoomId) ?? null;
     if (hoveredRoom && transformFeedback?.roomId !== hoveredRoom.id) {
-      hoveredBounds = getAxisAlignedRoomBounds(hoveredRoom);
       hoveredWall = roomResizeUi.hoveredWall;
+      hoveredRoomId = roomResizeUi.hoveredRoomId;
+    } else {
+      hoveredRoom = null;
     }
   }
 
   const isSelectedWallAlsoHovered =
     hoveredWall !== null &&
-    selectedWall?.roomId === (hoveredSelectableWall?.roomId ?? roomResizeUi.hoveredRoomId) &&
+    selectedWall?.roomId === hoveredRoomId &&
     selectedWall.wall === hoveredWall;
 
-  if (hoveredBounds && hoveredWall && !isSelectedWallAlsoHovered) {
-    drawHoveredWallHighlight(graphics, hoveredBounds, hoveredWall, camera, viewport, theme);
+  if (hoveredRoom && hoveredWall !== null && !isSelectedWallAlsoHovered) {
+    drawHoveredWallHighlight(graphics, hoveredRoom, hoveredWall, camera, viewport, theme);
   }
 
   if (!selectedWall) return;
   const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
   if (!selectedRoom) return;
   if (transformFeedback?.roomId === selectedRoom.id) return;
-
-  const selectedBounds = getAxisAlignedRoomBounds(selectedRoom);
-  if (!selectedBounds) return;
-
-  drawSelectedWallHighlight(graphics, selectedBounds, selectedWall.wall, camera, viewport, theme);
+  drawSelectedWallHighlight(graphics, selectedRoom, selectedWall.wall, camera, viewport, theme);
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
@@ -1384,6 +1442,176 @@ function drawRoomShape(
     graphics.lineTo(screenPoints[i].x, screenPoints[i].y);
   }
   graphics.closePath();
+  graphics.stroke();
+}
+
+function drawRoomOpenings(
+  graphics: Graphics,
+  room: Room,
+  selectedOpening: RoomOpeningSelection | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  for (const opening of room.openings) {
+    const layout = getResolvedRoomOpeningLayout(room, opening);
+    if (!layout) continue;
+
+    const start = worldToScreen(layout.start, camera, viewport);
+    const end = worldToScreen(layout.end, camera, viewport);
+    const center = worldToScreen(layout.center, camera, viewport);
+    const tangent = layout.axis === "horizontal" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const interiorNormal = {
+      x: layout.interiorNormal.x,
+      y: layout.interiorNormal.y,
+    };
+    const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
+    const isSelected =
+      selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id;
+    const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
+    const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
+    const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
+    const selectionHaloStrokePx = Math.max(
+      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
+      selectionStrokePx + 2
+    );
+    const selectionColor = theme.wallSelectionAccent;
+
+    if (isSelected) {
+      graphics.setStrokeStyle({
+        width: selectionHaloStrokePx,
+        color: selectionColor,
+        alpha: 0.18,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
+      graphics.stroke();
+    }
+
+    graphics.setStrokeStyle({
+      width: cutoutStrokePx,
+      color: theme.canvasBackground,
+      alpha: 1,
+      cap: "round",
+    });
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+
+    if (isSelected) {
+      graphics.setStrokeStyle({
+        width: selectionStrokePx,
+        color: selectionColor,
+        alpha: 0.96,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
+      graphics.stroke();
+    }
+
+    if (opening.type === "door") {
+      const leafLengthPx = openingWidthPx * DOOR_LEAF_LENGTH_SCALE;
+      const leafDepthPx = openingWidthPx * DOOR_LEAF_DEPTH_SCALE;
+      const hingePoint = opening.hingeSide === "end" ? end : start;
+      const hingeTangent =
+        opening.hingeSide === "end"
+          ? { x: -tangent.x, y: -tangent.y }
+          : tangent;
+      const swingNormal =
+        opening.openingSide === "exterior"
+          ? { x: -interiorNormal.x, y: -interiorNormal.y }
+          : interiorNormal;
+
+      graphics.setStrokeStyle({
+        width: isSelected ? selectionStrokePx : symbolStrokePx,
+        color: isSelected ? selectionColor : theme.roomOutline,
+        alpha: isSelected ? 1 : 0.96,
+        cap: "round",
+      });
+      graphics.moveTo(hingePoint.x, hingePoint.y);
+      graphics.lineTo(
+        hingePoint.x + hingeTangent.x * leafLengthPx + swingNormal.x * leafDepthPx,
+        hingePoint.y + hingeTangent.y * leafLengthPx + swingNormal.y * leafDepthPx
+      );
+      graphics.stroke();
+    } else {
+      const windowLineInsetPx = Math.max(camera.pixelsPerMm * WINDOW_LINE_INSET_WORLD_MM, 1.5);
+      const windowLineSeparationPx = Math.max(
+        camera.pixelsPerMm * WINDOW_LINE_SEPARATION_WORLD_MM,
+        2
+      );
+      const lineLengthPx = Math.max(openingWidthPx - windowLineInsetPx * 2, 0);
+      if (lineLengthPx > 0) {
+        for (const offset of [-windowLineSeparationPx / 2, windowLineSeparationPx / 2]) {
+          graphics.setStrokeStyle({
+            width: isSelected ? selectionStrokePx : symbolStrokePx,
+            color: isSelected ? selectionColor : theme.roomOutline,
+            alpha: isSelected ? 1 : 0.92,
+            cap: "round",
+          });
+          graphics.moveTo(
+            center.x - tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+            center.y - tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+          );
+          graphics.lineTo(
+            center.x + tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+            center.y + tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+          );
+          graphics.stroke();
+        }
+      }
+    }
+
+    if (!isSelected) continue;
+
+    drawOpeningWidthHandle(graphics, start, selectionColor, theme);
+    drawOpeningWidthHandle(graphics, end, selectionColor, theme);
+  }
+}
+
+function drawOpeningWidthHandle(
+  graphics: Graphics,
+  point: ScreenPoint,
+  color: number,
+  theme: EditorCanvasTheme
+) {
+  const outerHalf = OPENING_WIDTH_HANDLE_HALO_SIZE_PX / 2;
+  const innerHalf = OPENING_WIDTH_HANDLE_SIZE_PX / 2;
+
+  graphics.setFillStyle({ color: theme.canvasBackground, alpha: 0.98 });
+  graphics.roundRect(
+    point.x - outerHalf,
+    point.y - outerHalf,
+    OPENING_WIDTH_HANDLE_HALO_SIZE_PX,
+    OPENING_WIDTH_HANDLE_HALO_SIZE_PX,
+    3
+  );
+  graphics.fill();
+
+  graphics.setFillStyle({ color, alpha: 0.96 });
+  graphics.roundRect(
+    point.x - innerHalf,
+    point.y - innerHalf,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    2
+  );
+  graphics.fill();
+
+  graphics.setStrokeStyle({
+    width: OPENING_WIDTH_HANDLE_STROKE_PX,
+    color: theme.canvasBackground,
+    alpha: 0.9,
+  });
+  graphics.roundRect(
+    point.x - innerHalf,
+    point.y - innerHalf,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    2
+  );
   graphics.stroke();
 }
 
@@ -1484,13 +1712,15 @@ function arePointListsEqual(a: Point[], b: Point[]) {
 
 function drawHoveredWallHighlight(
   graphics: Graphics,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+  const screenSegment = getRoomWallScreenSegment(room, wall, camera, viewport);
+  if (!screenSegment) return;
+  const { from, to } = screenSegment;
 
   graphics.setStrokeStyle({
     width: 2,
@@ -1504,13 +1734,15 @@ function drawHoveredWallHighlight(
 
 function drawSelectedWallHighlight(
   graphics: Graphics,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const { from, to } = getWallScreenSegment(bounds, wall, camera, viewport);
+  const screenSegment = getRoomWallScreenSegment(room, wall, camera, viewport);
+  if (!screenSegment) return;
+  const { from, to } = screenSegment;
 
   graphics.setStrokeStyle({
     width: 5,
@@ -1531,27 +1763,19 @@ function drawSelectedWallHighlight(
   graphics.stroke();
 }
 
-function getWallScreenSegment(
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  wall: RectWall,
+function getRoomWallScreenSegment(
+  room: Room,
+  wall: RoomWall,
   camera: CameraState,
   viewport: ViewportSize
 ) {
-  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
-  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
-  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
-  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+  const segment = getRoomWallSegment(room, wall);
+  if (!segment) return null;
 
-  switch (wall) {
-    case "top":
-      return { from: topLeft, to: topRight };
-    case "right":
-      return { from: topRight, to: bottomRight };
-    case "bottom":
-      return { from: bottomLeft, to: bottomRight };
-    case "left":
-      return { from: topLeft, to: bottomLeft };
-  }
+  return {
+    from: worldToScreen(segment.start, camera, viewport),
+    to: worldToScreen(segment.end, camera, viewport),
+  };
 }
 
 function drawRoomLabels(
@@ -1768,7 +1992,7 @@ function drawSelectedRoomDimensions(
     showArea: true,
   });
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport, settings),
+    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport),
     roomLabelLayout,
     viewport,
     settings
@@ -2049,32 +2273,35 @@ function getResizeDimensionAnchorForWall(
         wallLengthPx: verticalWallLengthPx,
       };
   }
+
+  return {
+    center: {
+      x: (topLeft.x + bottomRight.x) / 2,
+      y: (topLeft.y + bottomRight.y) / 2,
+    },
+    outwardDirection: { x: 0, y: -1 },
+    tangentDirection: { x: 1, y: 0 },
+    wallLengthPx: 0,
+  };
 }
 
 function getSelectedRoomDimensionLabelSpecs(
   room: Room,
   selectedWall: RoomWallSelection | null,
   camera: CameraState,
-  viewport: ViewportSize,
-  settings: Pick<EditorSettings, "measurementFontSize">
+  viewport: ViewportSize
 ): ResizeDimensionLabelSpec[] {
   if (selectedWall) {
-    const bounds = getAxisAlignedRoomBounds(room);
-    const wallLengthMillimetres = bounds
-      ? getWallResizeMeasurementMillimetres(room, selectedWall.wall)
-      : null;
-    if (!bounds || wallLengthMillimetres === null) return [];
+    const wallMeasurement = getRoomWallMeasurement(room, selectedWall.wall);
+    if (!wallMeasurement) return [];
 
-    return [
-      createDimensionLabelSpecForWallMeasurement(
-        selectedWall.wall,
-        wallLengthMillimetres,
-        bounds,
-        camera,
-        viewport,
-        settings
-      ),
-    ];
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(
+      room,
+      wallMeasurement,
+      camera,
+      viewport
+    );
+    return labelSpec ? [labelSpec] : [];
   }
 
   return getRoomEdgeMeasurements(room).flatMap((edge) => {
@@ -2302,6 +2529,7 @@ function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): R
     id: "__draft-preview__",
     name: "",
     points: draftPoints,
+    openings: [],
   };
 }
 

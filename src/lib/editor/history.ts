@@ -1,4 +1,5 @@
-import type { Room } from "@/lib/editor/types";
+import { cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
+import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type EditorDocumentState = {
   rooms: Room[];
@@ -31,6 +32,29 @@ export type EditorCommand =
       roomId: string;
       previousPoints: Room["points"];
       nextPoints: Room["points"];
+    }
+  | {
+      type: "add-opening";
+      roomId: string;
+      opening: RoomOpening;
+    }
+  | {
+      type: "delete-opening";
+      roomId: string;
+      opening: RoomOpening;
+    }
+  | {
+      type: "move-opening";
+      roomId: string;
+      openingId: string;
+      previousOffsetMm: number;
+      nextOffsetMm: number;
+    }
+  | {
+      type: "update-opening";
+      roomId: string;
+      previousOpening: RoomOpening;
+      nextOpening: RoomOpening;
     };
 
 export function applyEditorCommand(
@@ -58,6 +82,7 @@ export function applyEditorCommand(
         id: command.room.id,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
+        openings: cloneRoomOpenings(command.room.openings),
       });
 
       return {
@@ -95,6 +120,85 @@ export function applyEditorCommand(
             }
           : room
       ),
+    };
+  }
+
+  if (command.type === "add-opening") {
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings:
+            direction === "undo"
+              ? room.openings.filter((opening) => opening.id !== command.opening.id)
+              : [
+                  ...room.openings.filter((opening) => opening.id !== command.opening.id),
+                  cloneRoomOpening(command.opening),
+                ],
+        };
+      }),
+    };
+  }
+
+  if (command.type === "delete-opening") {
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings:
+            direction === "undo"
+              ? [
+                  ...room.openings.filter((opening) => opening.id !== command.opening.id),
+                  cloneRoomOpening(command.opening),
+                ]
+              : room.openings.filter((opening) => opening.id !== command.opening.id),
+        };
+      }),
+    };
+  }
+
+  if (command.type === "move-opening") {
+    const nextOffsetMm =
+      direction === "undo" ? command.previousOffsetMm : command.nextOffsetMm;
+
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings: room.openings.map((opening) =>
+            opening.id === command.openingId
+              ? {
+                  ...opening,
+                  offsetMm: nextOffsetMm,
+                }
+              : opening
+          ),
+        };
+      }),
+    };
+  }
+
+  if (command.type === "update-opening") {
+    const nextOpening =
+      direction === "undo" ? command.previousOpening : command.nextOpening;
+
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings: room.openings.map((opening) =>
+            opening.id === nextOpening.id ? cloneRoomOpening(nextOpening) : opening
+          ),
+        };
+      }),
     };
   }
 
