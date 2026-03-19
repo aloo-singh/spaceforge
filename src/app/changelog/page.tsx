@@ -10,6 +10,46 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.26.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Introduced the first structured editor layout with clear top bar, canvas, and inspector zones</li>
+                <li>Added a stable inspector surface with a selected-room panel and a calm empty state when nothing is selected</li>
+                <li>Moved appearance control into Editor Settings with explicit System, Light, and Dark modes</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>The editor shell now keeps controls and inspector placement predictable without changing drawing, editing, or geometry behaviour</li>
+                <li>Settings and reset dialogs now render above the full editor surface reliably after being portaled out of the toolbar stacking context</li>
+                <li>Short-height mobile landscape screens now keep the canvas primary by compacting toolbar chrome and moving the inspector into a proportionate side column</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Unified inspector spacing, section headers, and visual rhythm so empty and selected states feel like one system</li>
+                <li>Tightened settings dialog grouping and spacing so appearance, dimensions, and export preferences read as a coherent product surface</li>
+                <li>Improved empty inspector readability in light mode while preserving the restrained monochrome look</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.25.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-19</span>
           </div>
