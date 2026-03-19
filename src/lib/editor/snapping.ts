@@ -1,8 +1,8 @@
 import type { CameraState } from "@/lib/editor/types";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 
-export const ADAPTIVE_SNAP_STEP_LARGE_MM = 500;
-export const ADAPTIVE_SNAP_STEP_MEDIUM_MM = 250;
+export const ADAPTIVE_SNAP_STEP_LARGE_MM = 1_000;
+export const ADAPTIVE_SNAP_STEP_MEDIUM_MM = 500;
 export const ADAPTIVE_SNAP_STEP_FINE_MM = 100;
 const ADAPTIVE_SNAP_MEDIUM_ZOOM_THRESHOLD = 0.15;
 const ADAPTIVE_SNAP_FINE_ZOOM_THRESHOLD = 0.45;
