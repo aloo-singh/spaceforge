@@ -80,6 +80,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
+import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
@@ -844,13 +845,21 @@ export default function EditorCanvas() {
           ) : null}
         </div>
         <aside className="hidden min-h-0 lg:block" aria-label="Editor inspector">
-          <SelectedRoomNamePanel className="h-full" />
+          {selectedRoomId ? (
+            <SelectedRoomNamePanel className="h-full" />
+          ) : (
+            <EditorInspectorEmptyState className="h-full" />
+          )}
         </aside>
         {selectedRoomId ? (
           <aside className="lg:hidden" aria-label="Editor inspector">
             <SelectedRoomNamePanel />
           </aside>
-        ) : null}
+        ) : (
+          <aside className="lg:hidden" aria-label="Editor inspector">
+            <EditorInspectorEmptyState />
+          </aside>
+        )}
       </div>
     </section>
   );
