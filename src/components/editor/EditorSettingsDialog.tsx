@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
@@ -21,11 +22,13 @@ export function EditorSettingsDialog({
   open,
   onOpenChange,
 }: EditorSettingsDialogProps) {
+  const { theme, setTheme } = useTheme();
   const settings = useEditorStore((state) => state.settings);
   const updateSettings = useEditorStore((state) => state.updateSettings);
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
+  const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
 
   return (
     <ResponsiveDialog
@@ -33,7 +36,7 @@ export function EditorSettingsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Editor settings"
-      description="A lightweight home for editor preferences. Display and accessibility controls will continue to land here incrementally."
+      description="A focused home for editor preferences."
       footer={
         <Button
           type="button"
@@ -46,6 +49,62 @@ export function EditorSettingsDialog({
       }
     >
       <section className="space-y-3.5">
+        <div
+          aria-labelledby="editor-settings-appearance-title"
+          className="rounded-xl border border-border/70 bg-muted/30 p-3"
+        >
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-appearance-title" className="text-sm font-medium text-foreground">
+                Appearance
+              </h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                Choose how the editor and app shell should look.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+                <dt className="sr-only">Appearance mode</dt>
+                <dd>{selectedAppearance}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background p-1"
+            role="group"
+            aria-label="Appearance mode"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={selectedAppearance === "system" ? "secondary" : "ghost"}
+              aria-pressed={selectedAppearance === "system"}
+              onClick={() => setTheme("system")}
+            >
+              System
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={selectedAppearance === "light" ? "secondary" : "ghost"}
+              aria-pressed={selectedAppearance === "light"}
+              onClick={() => setTheme("light")}
+            >
+              Light
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={selectedAppearance === "dark" ? "secondary" : "ghost"}
+              aria-pressed={selectedAppearance === "dark"}
+              onClick={() => setTheme("dark")}
+            >
+              Dark
+            </Button>
+          </div>
+        </div>
+
         <div
           aria-labelledby="editor-settings-measurements-title"
           className="rounded-xl border border-border/70 bg-muted/30 p-3"
