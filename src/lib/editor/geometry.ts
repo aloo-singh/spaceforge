@@ -104,11 +104,20 @@ export function getDraftLoopClosureResultFromPath(
 ): DraftLoopClosureResult | null {
   if (nextDraftPath.length < 5) return null;
 
-  const vertexClosure = getVertexDraftLoopClosureResult(nextDraftPath);
-  const segmentIntersectionClosure = getSegmentIntersectionDraftLoopClosureResult(nextDraftPath);
+  const closureCandidates = [
+    getVertexDraftLoopClosureResult(nextDraftPath),
+    getEndpointOnSegmentDraftLoopClosureResult(nextDraftPath),
+    getSegmentIntersectionDraftLoopClosureResult(nextDraftPath),
+  ].filter((candidate): candidate is DraftLoopClosureResult => candidate !== null);
 
-  if (vertexClosure && segmentIntersectionClosure) return null;
-  return vertexClosure ?? segmentIntersectionClosure;
+  const distinctClosures = new Map<string, DraftLoopClosureResult>();
+  for (const candidate of closureCandidates) {
+    const key = candidate.committedLoop.map((point) => `${point.x}:${point.y}`).join("|");
+    distinctClosures.set(key, candidate);
+  }
+
+  if (distinctClosures.size !== 1) return null;
+  return [...distinctClosures.values()][0];
 }
 
 export function getDraftLoopClosureResult(
@@ -146,6 +155,36 @@ function getVertexDraftLoopClosureResult(nextDraftPath: Point[]): DraftLoopClosu
     committedLoop: nextDraftPath.slice(loopStartIndex, -1),
     discardedPrefix: nextDraftPath.slice(0, loopStartIndex),
   };
+}
+
+function getEndpointOnSegmentDraftLoopClosureResult(
+  nextDraftPath: Point[]
+): DraftLoopClosureResult | null {
+  const loopEndpoint = nextDraftPath[nextDraftPath.length - 1];
+  const terminalStartIndex = nextDraftPath.length - 2;
+  const validClosures: DraftLoopClosureResult[] = [];
+
+  for (let segmentStartIndex = 0; segmentStartIndex < terminalStartIndex - 1; segmentStartIndex += 1) {
+    const segmentStart = nextDraftPath[segmentStartIndex];
+    const segmentEnd = nextDraftPath[segmentStartIndex + 1];
+    if (!isPointStrictlyInsideOrthogonalSegment(loopEndpoint, segmentStart, segmentEnd)) {
+      continue;
+    }
+
+    const candidate = [loopEndpoint, ...nextDraftPath.slice(segmentStartIndex + 1, -1)];
+    if (!isValidCommittedDraftLoop(candidate)) continue;
+
+    validClosures.push({
+      nextDraftPath,
+      committedLoop: candidate,
+      discardedPrefix: nextDraftPath.slice(0, segmentStartIndex + 1),
+    });
+    if (validClosures.length > 1) {
+      return null;
+    }
+  }
+
+  return validClosures[0] ?? null;
 }
 
 function getSegmentIntersectionDraftLoopClosureResult(
