@@ -10,6 +10,46 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.27.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added the first wall-attached openings system with support for doors and windows on orthogonal room walls</li>
+                <li>Selected walls now expose direct insertion actions so openings can be placed from the existing editor workflow without leaving the canvas context</li>
+                <li>Selected openings now have a dedicated inspector panel with core controls such as width plus door-specific side and hinge settings</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Openings stay constrained to their host wall segment while moving and resizing, including on non-rectangular orthogonal room shapes</li>
+                <li>Opening selection, deletion, persistence, and undo or redo now behave as part of the main editor model rather than as a temporary overlay system</li>
+                <li>On-canvas width handles make opening sizing direct in the editor while preserving the project&apos;s low-clutter interaction model</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Moved openings into a dedicated render layer and tightened zoom-aware rendering so wall-attached elements stay legible at different scales</li>
+                <li>Improved segment-local anchoring and selection emphasis so openings feel visually attached and easier to target precisely</li>
+                <li>Restored editor undo and redo keyboard shortcuts cleanly alongside the expanded opening interaction model</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.26.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-19</span>
           </div>
