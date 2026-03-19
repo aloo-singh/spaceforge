@@ -104,6 +104,25 @@ export function getDraftLoopClosureResultFromPath(
 ): DraftLoopClosureResult | null {
   if (nextDraftPath.length < 5) return null;
 
+  const vertexClosure = getVertexDraftLoopClosureResult(nextDraftPath);
+  const segmentIntersectionClosure = getSegmentIntersectionDraftLoopClosureResult(nextDraftPath);
+
+  if (vertexClosure && segmentIntersectionClosure) return null;
+  return vertexClosure ?? segmentIntersectionClosure;
+}
+
+export function getDraftLoopClosureResult(
+  points: Point[],
+  nextPoint: Point
+): DraftLoopClosureResult | null {
+  return getDraftLoopClosureResultFromPath(applyCandidatePointToDraftPath(points, nextPoint));
+}
+
+export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
+  return getDraftLoopClosureResult(points, nextPoint)?.committedLoop ?? null;
+}
+
+function getVertexDraftLoopClosureResult(nextDraftPath: Point[]): DraftLoopClosureResult | null {
   const loopEndpoint = nextDraftPath[nextDraftPath.length - 1];
   const validLoopStartIndices: number[] = [];
 
@@ -111,10 +130,7 @@ export function getDraftLoopClosureResultFromPath(
     if (!pointsEqual(nextDraftPath[index], loopEndpoint)) continue;
 
     const candidate = nextDraftPath.slice(index, -1);
-    if (candidate.length < 4) continue;
-    if (!isOrthogonalPointPath(candidate, { closed: true }) || !isSimplePolygon(candidate)) {
-      continue;
-    }
+    if (!isValidCommittedDraftLoop(candidate)) continue;
 
     validLoopStartIndices.push(index);
     if (validLoopStartIndices.length > 1) {
@@ -132,15 +148,89 @@ export function getDraftLoopClosureResultFromPath(
   };
 }
 
-export function getDraftLoopClosureResult(
-  points: Point[],
-  nextPoint: Point
+function getSegmentIntersectionDraftLoopClosureResult(
+  nextDraftPath: Point[]
 ): DraftLoopClosureResult | null {
-  return getDraftLoopClosureResultFromPath(applyCandidatePointToDraftPath(points, nextPoint));
+  const terminalStartIndex = nextDraftPath.length - 2;
+  const terminalStart = nextDraftPath[terminalStartIndex];
+  const terminalEnd = nextDraftPath[terminalStartIndex + 1];
+  const validClosures: DraftLoopClosureResult[] = [];
+
+  for (let segmentStartIndex = 0; segmentStartIndex < terminalStartIndex - 1; segmentStartIndex += 1) {
+    const segmentStart = nextDraftPath[segmentStartIndex];
+    const segmentEnd = nextDraftPath[segmentStartIndex + 1];
+    const intersectionPoint = getStrictOrthogonalSegmentIntersectionPoint(
+      segmentStart,
+      segmentEnd,
+      terminalStart,
+      terminalEnd
+    );
+    if (!intersectionPoint) continue;
+
+    const candidate = [intersectionPoint, ...nextDraftPath.slice(segmentStartIndex + 1, -1)];
+    if (!isValidCommittedDraftLoop(candidate)) continue;
+
+    validClosures.push({
+      nextDraftPath,
+      committedLoop: candidate,
+      discardedPrefix: nextDraftPath.slice(0, segmentStartIndex + 1),
+    });
+    if (validClosures.length > 1) {
+      return null;
+    }
+  }
+
+  return validClosures[0] ?? null;
 }
 
-export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
-  return getDraftLoopClosureResult(points, nextPoint)?.committedLoop ?? null;
+function isValidCommittedDraftLoop(points: Point[]): boolean {
+  if (points.length < 4) return false;
+  return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+}
+
+function getStrictOrthogonalSegmentIntersectionPoint(
+  aStart: Point,
+  aEnd: Point,
+  bStart: Point,
+  bEnd: Point
+): Point | null {
+  const aAxis = getOrthogonalSegmentAxis(aStart, aEnd);
+  const bAxis = getOrthogonalSegmentAxis(bStart, bEnd);
+  if (!aAxis || !bAxis || aAxis === bAxis) return null;
+
+  const horizontalSegment = aAxis === "horizontal" ? { start: aStart, end: aEnd } : { start: bStart, end: bEnd };
+  const verticalSegment = aAxis === "vertical" ? { start: aStart, end: aEnd } : { start: bStart, end: bEnd };
+  const intersectionPoint = {
+    x: verticalSegment.start.x,
+    y: horizontalSegment.start.y,
+  };
+
+  if (
+    !isPointStrictlyInsideOrthogonalSegment(intersectionPoint, aStart, aEnd) ||
+    !isPointStrictlyInsideOrthogonalSegment(intersectionPoint, bStart, bEnd)
+  ) {
+    return null;
+  }
+
+  return intersectionPoint;
+}
+
+function isPointStrictlyInsideOrthogonalSegment(point: Point, start: Point, end: Point): boolean {
+  if (!isOrthogonalSegment(start, end)) return false;
+
+  if (start.x === end.x) {
+    return (
+      point.x === start.x &&
+      point.y > Math.min(start.y, end.y) &&
+      point.y < Math.max(start.y, end.y)
+    );
+  }
+
+  return (
+    point.y === start.y &&
+    point.x > Math.min(start.x, end.x) &&
+    point.x < Math.max(start.x, end.x)
+  );
 }
 
 /**
