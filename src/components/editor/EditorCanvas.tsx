@@ -810,7 +810,7 @@ export default function EditorCanvas() {
         selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
         and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
-      <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4">
+      <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
           onExportPng={exportCurrentCanvasAsPng}
           isExportingPng={isExportingPng}
@@ -818,7 +818,7 @@ export default function EditorCanvas() {
           exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
         />
       </div>
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-1">
+      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
         <div className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
           <div
             ref={containerRef}
@@ -844,7 +844,7 @@ export default function EditorCanvas() {
             </aside>
           ) : null}
         </div>
-        <aside className="hidden min-h-0 lg:block" aria-label="Editor inspector">
+        <aside className="hidden min-h-0 lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
           {selectedRoomId ? (
             <SelectedRoomNamePanel className="h-full" />
           ) : (
@@ -852,11 +852,11 @@ export default function EditorCanvas() {
           )}
         </aside>
         {selectedRoomId ? (
-          <aside className="lg:hidden" aria-label="Editor inspector">
+          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
             <SelectedRoomNamePanel />
           </aside>
         ) : (
-          <aside className="lg:hidden" aria-label="Editor inspector">
+          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
             <EditorInspectorEmptyState />
           </aside>
         )}
