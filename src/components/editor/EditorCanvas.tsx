@@ -597,11 +597,14 @@ export default function EditorCanvas() {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey) return;
-      syncDimensionsOverride(true);
+      syncDimensionsOverride(event.getModifierState("Alt"));
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
+      syncDimensionsOverride(event.getModifierState("Alt"));
+    };
+
+    const onPointerEvent = (event: PointerEvent) => {
       syncDimensionsOverride(event.altKey);
     };
 
@@ -617,12 +620,18 @@ export default function EditorCanvas() {
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("pointerdown", onPointerEvent, true);
+    window.addEventListener("pointermove", onPointerEvent, true);
+    window.addEventListener("pointerup", onPointerEvent, true);
     window.addEventListener("blur", clearDimensionsOverride);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("pointerdown", onPointerEvent, true);
+      window.removeEventListener("pointermove", onPointerEvent, true);
+      window.removeEventListener("pointerup", onPointerEvent, true);
       window.removeEventListener("blur", clearDimensionsOverride);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clearDimensionsOverride();
@@ -908,6 +917,16 @@ function drawScene(
   );
   clearContainerChildren(dimensionOverlayContainer);
   if (showDimensions) {
+    drawSelectedWallDimensions(
+      dimensionOverlayContainer,
+      renderedLabelRooms,
+      state.selectedWall,
+      roomResizeUi,
+      state.camera,
+      state.viewport,
+      state.settings,
+      theme
+    );
     drawActiveResizeDimensions(
       dimensionOverlayContainer,
       renderedLabelRooms,
@@ -1689,6 +1708,54 @@ function drawActiveResizeDimensions(
   );
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
     labelSpecs,
+    roomLabelLayout,
+    viewport,
+    settings
+  );
+  drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
+}
+
+function drawSelectedWallDimensions(
+  labelContainer: Container,
+  rooms: Room[],
+  selectedWall: RoomWallSelection | null,
+  roomResizeUi: {
+    activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
+    activeRoomId: string | null;
+  },
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  if (!selectedWall) return;
+  if (roomResizeUi.activeRoomId || roomResizeUi.activeWall || roomResizeUi.activeCorner) return;
+
+  const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
+  if (!selectedRoom) return;
+
+  const bounds = getAxisAlignedRoomBounds(selectedRoom);
+  if (!bounds) return;
+
+  const wallLengthMillimetres = getWallResizeMeasurementMillimetres(selectedRoom, selectedWall.wall);
+  if (wallLengthMillimetres === null) return;
+
+  const roomLabelLayout = getRoomLabelLayout(selectedRoom, camera, viewport, settings, {
+    showArea: true,
+  });
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    [
+      createDimensionLabelSpecForWallMeasurement(
+        selectedWall.wall,
+        wallLengthMillimetres,
+        bounds,
+        camera,
+        viewport,
+        settings
+      ),
+    ],
     roomLabelLayout,
     viewport,
     settings
