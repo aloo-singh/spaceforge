@@ -44,9 +44,10 @@ import {
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
-import { cloneRoomOpenings } from "@/lib/editor/openings";
+import { cloneRoomOpenings, createCenteredRoomOpening } from "@/lib/editor/openings";
 import type {
   CameraState,
+  OpeningType,
   Point,
   Room,
   RoomWallSelection,
@@ -111,6 +112,8 @@ type EditorState = {
   cancelRoomRenameSession: () => void;
   deleteSelectedRoom: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  insertDefaultDoorOnSelectedWall: () => void;
+  insertDefaultWindowOnSelectedWall: () => void;
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -149,6 +152,14 @@ function createRoomId(): string {
   }
 
   return `room-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function createOpeningId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `opening-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 function updateRoomNameInDocument(document: DocumentState, roomId: string, name: string): DocumentState {
@@ -210,6 +221,48 @@ function getSelectedWallIfRoomExists(
   const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
   if (!room) return null;
   return isAxisAlignedRectangle(room.points) ? selectedWall : null;
+}
+
+function getSelectedWallHostRoom(
+  document: DocumentState,
+  selectedWall: RoomWallSelection | null
+): Room | null {
+  if (!selectedWall) return null;
+  const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
+  if (!room || !isAxisAlignedRectangle(room.points)) return null;
+  return room;
+}
+
+function insertOpeningOnSelectedWall(
+  state: Pick<EditorState, "document" | "selectedWall" | "history">,
+  type: OpeningType
+) {
+  const hostRoom = getSelectedWallHostRoom(state.document, state.selectedWall);
+  if (!hostRoom || !state.selectedWall) return null;
+
+  const opening = createCenteredRoomOpening(
+    hostRoom,
+    state.selectedWall.wall,
+    type,
+    createOpeningId()
+  );
+  if (!opening) return null;
+
+  const command: EditorCommand = {
+    type: "add-opening",
+    roomId: hostRoom.id,
+    opening,
+  };
+
+  return {
+    document: applyEditorCommand(state.document, command, "redo"),
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
 }
 
 function getSafePersistedHistorySnapshot(
@@ -674,6 +727,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canUndo: true,
         canRedo: false,
       };
+    }),
+  insertDefaultDoorOnSelectedWall: () =>
+    set((state) => {
+      const nextState = insertOpeningOnSelectedWall(state, "door");
+      return nextState ?? state;
+    }),
+  insertDefaultWindowOnSelectedWall: () =>
+    set((state) => {
+      const nextState = insertOpeningOnSelectedWall(state, "window");
+      return nextState ?? state;
     }),
   moveRoomByDelta: (roomId, delta) =>
     set((state) => {

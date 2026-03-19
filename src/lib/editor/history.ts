@@ -1,5 +1,5 @@
 import { cloneRoomOpenings } from "@/lib/editor/openings";
-import type { Room } from "@/lib/editor/types";
+import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type EditorDocumentState = {
   rooms: Room[];
@@ -32,6 +32,11 @@ export type EditorCommand =
       roomId: string;
       previousPoints: Room["points"];
       nextPoints: Room["points"];
+    }
+  | {
+      type: "add-opening";
+      roomId: string;
+      opening: RoomOpening;
     };
 
 export function applyEditorCommand(
@@ -97,6 +102,25 @@ export function applyEditorCommand(
             }
           : room
       ),
+    };
+  }
+
+  if (command.type === "add-opening") {
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings:
+            direction === "undo"
+              ? room.openings.filter((opening) => opening.id !== command.opening.id)
+              : [
+                  ...room.openings.filter((opening) => opening.id !== command.opening.id),
+                  { ...command.opening },
+                ],
+        };
+      }),
     };
   }
 

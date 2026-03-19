@@ -40,6 +40,7 @@ export function HistoryControls({
   const canRedo = useEditorStore((state) => state.canRedo);
   const exportSignatureText = useEditorStore((state) => state.settings.exportSignatureText);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
+  const selectedWall = useEditorStore((state) => state.selectedWall);
   const isCanvasEmpty = useEditorStore(
     (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
   );
@@ -47,10 +48,17 @@ export function HistoryControls({
   const redo = useEditorStore((state) => state.redo);
   const resetCamera = useEditorStore((state) => state.resetCamera);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
+  const insertDefaultDoorOnSelectedWall = useEditorStore(
+    (state) => state.insertDefaultDoorOnSelectedWall
+  );
+  const insertDefaultWindowOnSelectedWall = useEditorStore(
+    (state) => state.insertDefaultWindowOnSelectedWall
+  );
   const isResetCameraDisabled = !hasHydrated || !hasRooms;
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
+  const canInsertOpening = hasHydrated && selectedWall !== null;
   const normalizedSignature = normalizeEditorExportSignature(exportSignatureText);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
@@ -86,6 +94,30 @@ export function HistoryControls({
         )}
       >
         <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={insertDefaultDoorOnSelectedWall}
+            disabled={!canInsertOpening}
+            aria-label="Add centered door to selected wall"
+            title={canInsertOpening ? "Add centered door to selected wall" : "Select a wall to add a door"}
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+          >
+            <span>Door</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={insertDefaultWindowOnSelectedWall}
+            disabled={!canInsertOpening}
+            aria-label="Add centered window to selected wall"
+            title={canInsertOpening ? "Add centered window to selected wall" : "Select a wall to add a window"}
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+          >
+            <span>Window</span>
+          </Button>
           <Button
             type="button"
             variant="outline"

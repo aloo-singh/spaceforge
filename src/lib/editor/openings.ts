@@ -1,5 +1,8 @@
 import { getAxisAlignedRoomBounds, type RoomRectBounds } from "@/lib/editor/rectRoomResize";
-import type { Point, Room, RoomOpening, RoomWall } from "@/lib/editor/types";
+import type { OpeningType, Point, Room, RoomOpening, RoomWall } from "@/lib/editor/types";
+
+export const DEFAULT_DOOR_WIDTH_MM = 900;
+export const DEFAULT_WINDOW_WIDTH_MM = 1200;
 
 export type RoomWallSegment = {
   wall: RoomWall;
@@ -105,6 +108,30 @@ export function getResolvedRoomOpeningLayout(
   return getResolvedRoomOpeningLayoutFromBounds(bounds, opening);
 }
 
+export function createCenteredRoomOpening(
+  room: Room,
+  wall: RoomWall,
+  type: OpeningType,
+  id: string
+): RoomOpening | null {
+  const bounds = getAxisAlignedRoomBounds(room);
+  if (!bounds) return null;
+
+  const segment = getRoomWallSegment(bounds, wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const widthMm = Math.min(getDefaultOpeningWidth(type), segment.lengthMm);
+  if (widthMm <= 0) return null;
+
+  return {
+    id,
+    type,
+    wall,
+    offsetMm: segment.lengthMm / 2,
+    widthMm,
+  };
+}
+
 export function getResolvedRoomOpeningLayoutFromBounds(
   bounds: RoomRectBounds,
   opening: RoomOpening
@@ -142,6 +169,10 @@ function getWallPointAtOffset(segment: RoomWallSegment, offsetMm: number): Point
     x: segment.start.x,
     y: segment.start.y + offsetMm,
   };
+}
+
+function getDefaultOpeningWidth(type: OpeningType) {
+  return type === "door" ? DEFAULT_DOOR_WIDTH_MM : DEFAULT_WINDOW_WIDTH_MM;
 }
 
 function clamp(value: number, min: number, max: number) {

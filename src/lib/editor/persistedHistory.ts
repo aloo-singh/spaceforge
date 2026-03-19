@@ -1,6 +1,6 @@
 import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
 import { areRoomOpeningsEqual, cloneRoomOpenings } from "@/lib/editor/openings";
-import type { Room } from "@/lib/editor/types";
+import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
   historyStack: EditorDocumentState[];
@@ -64,7 +64,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
 
     const didNameChange = previousRoom.name !== room.name;
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
-    if (!didNameChange && !didPointsChange) continue;
+    const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings, room.openings);
+    if (!didNameChange && !didPointsChange && !didOpeningsChange) continue;
 
     changedRooms.push({
       previous: previousRoom,
@@ -113,6 +114,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const changedRoom = changedRooms[0];
   const didNameChange = changedRoom.previous.name !== changedRoom.next.name;
   const didPointsChange = !arePointListsEqual(changedRoom.previous.points, changedRoom.next.points);
+  const didOpeningsChange = !areRoomOpeningsEqual(
+    changedRoom.previous.openings,
+    changedRoom.next.openings
+  );
 
   if (didNameChange && !didPointsChange) {
     return {
@@ -133,7 +138,38 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     };
   }
 
+  if (!didNameChange && !didPointsChange && didOpeningsChange) {
+    const addedOpening = inferAddedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    if (!addedOpening) return null;
+
+    return {
+      type: "add-opening",
+      roomId: changedRoom.next.id,
+      opening: addedOpening,
+    };
+  }
+
   return null;
+}
+
+function inferAddedOpening(
+  previousOpenings: RoomOpening[],
+  nextOpenings: RoomOpening[]
+): RoomOpening | null {
+  if (nextOpenings.length !== previousOpenings.length + 1) return null;
+
+  const previousById = new Map(previousOpenings.map((opening) => [opening.id, opening]));
+  const addedOpenings = nextOpenings.filter((opening) => !previousById.has(opening.id));
+  if (addedOpenings.length !== 1) return null;
+
+  for (const opening of previousOpenings) {
+    const candidate = nextOpenings.find((nextOpening) => nextOpening.id === opening.id);
+    if (!candidate) return null;
+  }
+
+  return {
+    ...addedOpenings[0],
+  };
 }
 
 function findDocumentIndex(historyStack: EditorDocumentState[], document: EditorDocumentState): number | null {
