@@ -140,12 +140,24 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
 
   if (!didNameChange && !didPointsChange && didOpeningsChange) {
     const addedOpening = inferAddedOpening(changedRoom.previous.openings, changedRoom.next.openings);
-    if (!addedOpening) return null;
+    if (addedOpening) {
+      return {
+        type: "add-opening",
+        roomId: changedRoom.next.id,
+        opening: addedOpening,
+      };
+    }
+
+    const deletedOpening = inferDeletedOpening(
+      changedRoom.previous.openings,
+      changedRoom.next.openings
+    );
+    if (!deletedOpening) return null;
 
     return {
-      type: "add-opening",
+      type: "delete-opening",
       roomId: changedRoom.next.id,
-      opening: addedOpening,
+      opening: deletedOpening,
     };
   }
 
@@ -169,6 +181,26 @@ function inferAddedOpening(
 
   return {
     ...addedOpenings[0],
+  };
+}
+
+function inferDeletedOpening(
+  previousOpenings: RoomOpening[],
+  nextOpenings: RoomOpening[]
+): RoomOpening | null {
+  if (previousOpenings.length !== nextOpenings.length + 1) return null;
+
+  const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
+  const deletedOpenings = previousOpenings.filter((opening) => !nextById.has(opening.id));
+  if (deletedOpenings.length !== 1) return null;
+
+  for (const opening of nextOpenings) {
+    const candidate = previousOpenings.find((previousOpening) => previousOpening.id === opening.id);
+    if (!candidate) return null;
+  }
+
+  return {
+    ...deletedOpenings[0],
   };
 }
 

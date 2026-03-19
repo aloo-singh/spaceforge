@@ -73,6 +73,7 @@ import type {
   CameraState,
   Point,
   Room,
+  RoomOpeningSelection,
   RoomWallSelection,
   ScreenPoint,
   ViewportSize,
@@ -133,6 +134,8 @@ const DOOR_LEAF_LENGTH_SCALE = 0.72;
 const DOOR_LEAF_DEPTH_SCALE = 0.72;
 const WINDOW_LINE_INSET_PX = 5;
 const WINDOW_LINE_SEPARATION_PX = 4;
+const OPENING_SELECTION_HALO_PX = 6;
+const OPENING_SELECTION_STROKE_PX = 3;
 const TOTAL_ONBOARDING_STEPS = 6;
 
 function isDefaultRoomName(name: string) {
@@ -422,6 +425,7 @@ export default function EditorCanvas() {
     drawRooms(
       exportRoomGraphics,
       state.document.rooms,
+      null,
       null,
       EMPTY_ROOM_RESIZE_UI,
       state.roomDraft.points.length > 0,
@@ -915,6 +919,7 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
+    state.selectedOpening,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -1028,6 +1033,7 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
+  selectedOpening: RoomOpeningSelection | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -1109,7 +1115,7 @@ function drawRooms(
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9
     );
-    drawRoomOpenings(graphics, room, camera, viewport, theme);
+    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
@@ -1398,6 +1404,7 @@ function drawRoomShape(
 function drawRoomOpenings(
   graphics: Graphics,
   room: Room,
+  selectedOpening: RoomOpeningSelection | null,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -1415,6 +1422,20 @@ function drawRoomOpenings(
       y: layout.interiorNormal.y,
     };
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
+    const isSelected =
+      selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id;
+
+    if (isSelected) {
+      graphics.setStrokeStyle({
+        width: OPENING_CUTOUT_STROKE_PX + OPENING_SELECTION_HALO_PX,
+        color: theme.interactiveAccent,
+        alpha: 0.18,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
+      graphics.stroke();
+    }
 
     graphics.setStrokeStyle({
       width: OPENING_CUTOUT_STROKE_PX,
@@ -1431,9 +1452,9 @@ function drawRoomOpenings(
       const leafDepthPx = Math.min(20, Math.max(8, openingWidthPx * DOOR_LEAF_DEPTH_SCALE));
 
       graphics.setStrokeStyle({
-        width: OPENING_SYMBOL_STROKE_PX,
-        color: theme.roomOutline,
-        alpha: 0.96,
+        width: isSelected ? OPENING_SELECTION_STROKE_PX : OPENING_SYMBOL_STROKE_PX,
+        color: isSelected ? theme.interactiveAccent : theme.roomOutline,
+        alpha: isSelected ? 1 : 0.96,
         cap: "round",
       });
       graphics.moveTo(start.x, start.y);
@@ -1450,9 +1471,9 @@ function drawRoomOpenings(
 
     for (const offset of [-WINDOW_LINE_SEPARATION_PX / 2, WINDOW_LINE_SEPARATION_PX / 2]) {
       graphics.setStrokeStyle({
-        width: OPENING_SYMBOL_STROKE_PX,
-        color: theme.roomOutline,
-        alpha: 0.92,
+        width: isSelected ? OPENING_SELECTION_STROKE_PX : OPENING_SYMBOL_STROKE_PX,
+        color: isSelected ? theme.interactiveAccent : theme.roomOutline,
+        alpha: isSelected ? 1 : 0.92,
         cap: "round",
       });
       graphics.moveTo(

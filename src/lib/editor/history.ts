@@ -37,6 +37,11 @@ export type EditorCommand =
       type: "add-opening";
       roomId: string;
       opening: RoomOpening;
+    }
+  | {
+      type: "delete-opening";
+      roomId: string;
+      opening: RoomOpening;
     };
 
 export function applyEditorCommand(
@@ -119,6 +124,25 @@ export function applyEditorCommand(
                   ...room.openings.filter((opening) => opening.id !== command.opening.id),
                   { ...command.opening },
                 ],
+        };
+      }),
+    };
+  }
+
+  if (command.type === "delete-opening") {
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings:
+            direction === "undo"
+              ? [
+                  ...room.openings.filter((opening) => opening.id !== command.opening.id),
+                  { ...command.opening },
+                ]
+              : room.openings.filter((opening) => opening.id !== command.opening.id),
         };
       }),
     };

@@ -1,3 +1,4 @@
+import { findOpeningAtScreenPoint } from "@/lib/editor/openings";
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
@@ -32,11 +33,13 @@ type RoomDrawStoreState = {
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
   selectedWall: { roomId: string; wall: RectWall } | null;
+  selectedOpening: { roomId: string; openingId: string } | null;
   placeDraftPointFromCursor: (cursorWorld: Point) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RectWall) => void;
+  selectOpeningById: (roomId: string, openingId: string) => void;
   clearRoomSelection: () => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -94,6 +97,7 @@ export function attachRoomDrawInput(
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
   let hoveredSelectableWall: SelectableWallHit | null = null;
+  let hoveredOpening: { roomId: string; openingId: string } | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
@@ -178,7 +182,10 @@ export function attachRoomDrawInput(
       return;
     }
 
-    if (!isSpaceHeld && (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall)) {
+    if (
+      !isSpaceHeld &&
+      (hoveredRoomLabelId || hoveredSelectableRoomId || hoveredSelectableWall || hoveredOpening)
+    ) {
       setCursor("pointer");
       return;
     }
@@ -256,18 +263,26 @@ export function attachRoomDrawInput(
       );
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       if (!hoveredRoom) {
+        hoveredOpening = findOpeningAtScreenPoint(
+          state.document.rooms,
+          screenPoint,
+          state.camera,
+          state.viewport
+        );
         const hoveredWall = findSelectableWallAtScreenPoint(state, screenPoint, cursorWorld);
         setHoveredSelectableWall(hoveredWall);
         const hoveredBodyRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
         setHoveredSelectableRoomId(
-          hoveredWall ? hoveredWall.roomId : hoveredBodyRoom?.id ?? null
+          hoveredOpening?.roomId ?? hoveredWall?.roomId ?? hoveredBodyRoom?.id ?? null
         );
       } else {
+        hoveredOpening = null;
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
     } else {
       setHoveredRoomLabelId(null);
+      hoveredOpening = null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
@@ -279,6 +294,7 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
@@ -335,6 +351,22 @@ export function attachRoomDrawInput(
       if (didChangeSelection) {
         callbacks.onRoomLabelSelected?.(labelHitRoom.id);
       }
+      return;
+    }
+
+    const openingHit = findOpeningAtScreenPoint(
+      state.document.rooms,
+      screenPoint,
+      state.camera,
+      state.viewport
+    );
+    if (openingHit) {
+      event.preventDefault();
+      state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      hoveredOpening = openingHit;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(openingHit.roomId);
+      updateCursor();
       return;
     }
 
@@ -424,6 +456,10 @@ export function attachRoomDrawInput(
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+    hoveredOpening =
+      !isSpaceHeld && state.roomDraft.points.length === 0
+        ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+        : null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
@@ -439,6 +475,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     callbacks.requestRender();
@@ -472,6 +509,7 @@ export function attachRoomDrawInput(
         updateCursor();
       } else {
         state.clearRoomSelection();
+        hoveredOpening = null;
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
       }
@@ -506,6 +544,7 @@ export function attachRoomDrawInput(
     setTransformFeedback(null);
     stopLabelDragSession();
     setHoveredRoomLabelId(null);
+    hoveredOpening = null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();

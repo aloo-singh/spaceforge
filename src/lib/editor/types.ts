@@ -55,6 +55,11 @@ export type RoomWallSelection = {
   wall: RoomWall;
 };
 
+export type RoomOpeningSelection = {
+  roomId: string;
+  openingId: string;
+};
+
 export type Room = {
   id: string;
   name: string;

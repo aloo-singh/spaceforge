@@ -50,6 +50,7 @@ import type {
   OpeningType,
   Point,
   Room,
+  RoomOpeningSelection,
   RoomWallSelection,
   ScreenPoint,
   ViewportSize,
@@ -84,6 +85,7 @@ type EditorState = {
   roomDraft: RoomDraftState;
   selectedRoomId: string | null;
   selectedWall: RoomWallSelection | null;
+  selectedOpening: RoomOpeningSelection | null;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
@@ -103,6 +105,8 @@ type EditorState = {
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
+  selectOpeningById: (roomId: string, openingId: string) => void;
+  clearSelectedOpening: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
@@ -111,6 +115,7 @@ type EditorState = {
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
   deleteSelectedRoom: () => void;
+  deleteSelectedOpening: () => void;
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
@@ -221,6 +226,18 @@ function getSelectedWallIfRoomExists(
   const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
   if (!room) return null;
   return isAxisAlignedRectangle(room.points) ? selectedWall : null;
+}
+
+function getSelectedOpeningIfExists(
+  selectedOpening: RoomOpeningSelection | null,
+  document: DocumentState
+): RoomOpeningSelection | null {
+  if (!selectedOpening) return null;
+  const room = document.rooms.find((candidate) => candidate.id === selectedOpening.roomId);
+  if (!room) return null;
+  return room.openings.some((opening) => opening.id === selectedOpening.openingId)
+    ? selectedOpening
+    : null;
 }
 
 function getSelectedWallHostRoom(
@@ -356,6 +373,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   roomDraft: EMPTY_ROOM_DRAFT,
   selectedRoomId: null,
   selectedWall: null,
+  selectedOpening: null,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
@@ -491,11 +509,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectRoomById: (roomId) =>
     set((state) => {
-      if (state.selectedRoomId === roomId && state.selectedWall === null) return state;
+      if (
+        state.selectedRoomId === roomId &&
+        state.selectedWall === null &&
+        state.selectedOpening === null
+      ) {
+        return state;
+      }
 
       return {
         selectedRoomId: roomId,
         selectedWall: null,
+        selectedOpening: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -508,6 +533,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           selectedRoomId: roomId,
           selectedWall: null,
+          selectedOpening: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -524,8 +550,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
+        selectedOpening: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+      };
+    }),
+  selectOpeningById: (roomId, openingId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (!room.openings.some((opening) => opening.id === openingId)) return state;
+      if (
+        state.selectedRoomId === roomId &&
+        state.selectedOpening?.roomId === roomId &&
+        state.selectedOpening.openingId === openingId
+      ) {
+        return state;
+      }
+
+      return {
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: { roomId, openingId },
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+      };
+    }),
+  clearSelectedOpening: () =>
+    set((state) => {
+      if (state.selectedOpening === null) return state;
+      return {
+        selectedOpening: null,
       };
     }),
   clearSelectedWall: () =>
@@ -539,6 +594,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       selectedRoomId: null,
       selectedWall: null,
+      selectedOpening: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
     }),
@@ -589,7 +645,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!renameSession) {
         if (!state.selectedRoomId) return state;
         if (!deselectIfUnchanged) return state;
-        return { selectedRoomId: null, selectedWall: null };
+        return { selectedRoomId: null, selectedWall: null, selectedOpening: null };
       }
 
       const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
@@ -597,6 +653,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           selectedRoomId: null,
           selectedWall: null,
+          selectedOpening: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -612,6 +669,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           selectedRoomId: null,
           selectedWall: null,
+          selectedOpening: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -627,6 +685,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         selectedRoomId: null,
         selectedWall: null,
+        selectedOpening: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -645,6 +704,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           selectedRoomId: null,
           selectedWall: null,
+          selectedOpening: null,
           shouldFocusSelectedRoomNameInput: false,
         };
       }
@@ -659,6 +719,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedRoomId: null,
         selectedWall: null,
+        selectedOpening: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -673,6 +734,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           selectedRoomId: null,
           selectedWall: null,
+          selectedOpening: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -695,8 +757,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedRoomId: null,
         selectedWall: null,
+        selectedOpening: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  deleteSelectedOpening: () =>
+    set((state) => {
+      const selectedOpening = state.selectedOpening;
+      if (!selectedOpening) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === selectedOpening.roomId);
+      const opening = room?.openings.find((candidate) => candidate.id === selectedOpening.openingId);
+      if (!room || !opening) {
+        return {
+          selectedOpening: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "delete-opening",
+        roomId: room.id,
+        opening: { ...opening },
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedOpening: null,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -895,6 +989,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
       selectedRoomId: null,
       selectedWall: null,
+      selectedOpening: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       history: {
@@ -918,6 +1013,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -939,6 +1035,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -1075,6 +1172,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     },
     selectedRoomId: room.id,
     selectedWall: null,
+    selectedOpening: null,
     shouldFocusSelectedRoomNameInput: true,
     renameSession: null,
     history: {

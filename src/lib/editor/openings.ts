@@ -1,8 +1,20 @@
+import { worldToScreen } from "@/lib/editor/camera";
 import { getAxisAlignedRoomBounds, type RoomRectBounds } from "@/lib/editor/rectRoomResize";
-import type { OpeningType, Point, Room, RoomOpening, RoomWall } from "@/lib/editor/types";
+import type {
+  CameraState,
+  OpeningType,
+  Point,
+  Room,
+  RoomOpening,
+  RoomOpeningSelection,
+  RoomWall,
+  ViewportSize,
+} from "@/lib/editor/types";
 
 export const DEFAULT_DOOR_WIDTH_MM = 900;
 export const DEFAULT_WINDOW_WIDTH_MM = 1200;
+const OPENING_HIT_PADDING_PX = 10;
+const OPENING_HIT_DEPTH_PX = 18;
 
 export type RoomWallSegment = {
   wall: RoomWall;
@@ -130,6 +142,49 @@ export function createCenteredRoomOpening(
     offsetMm: segment.lengthMm / 2,
     widthMm,
   };
+}
+
+export function findOpeningAtScreenPoint(
+  rooms: Room[],
+  screenPoint: Point,
+  camera: CameraState,
+  viewport: ViewportSize
+): RoomOpeningSelection | null {
+  for (let roomIndex = rooms.length - 1; roomIndex >= 0; roomIndex -= 1) {
+    const room = rooms[roomIndex];
+
+    for (let openingIndex = room.openings.length - 1; openingIndex >= 0; openingIndex -= 1) {
+      const opening = room.openings[openingIndex];
+      const layout = getResolvedRoomOpeningLayout(room, opening);
+      if (!layout) continue;
+
+      const start = worldToScreen(layout.start, camera, viewport);
+      const end = worldToScreen(layout.end, camera, viewport);
+      const center = worldToScreen(layout.center, camera, viewport);
+
+      if (
+        layout.axis === "horizontal" &&
+        screenPoint.x >= Math.min(start.x, end.x) - OPENING_HIT_PADDING_PX &&
+        screenPoint.x <= Math.max(start.x, end.x) + OPENING_HIT_PADDING_PX &&
+        screenPoint.y >= center.y - OPENING_HIT_DEPTH_PX &&
+        screenPoint.y <= center.y + OPENING_HIT_DEPTH_PX
+      ) {
+        return { roomId: room.id, openingId: opening.id };
+      }
+
+      if (
+        layout.axis === "vertical" &&
+        screenPoint.y >= Math.min(start.y, end.y) - OPENING_HIT_PADDING_PX &&
+        screenPoint.y <= Math.max(start.y, end.y) + OPENING_HIT_PADDING_PX &&
+        screenPoint.x >= center.x - OPENING_HIT_DEPTH_PX &&
+        screenPoint.x <= center.x + OPENING_HIT_DEPTH_PX
+      ) {
+        return { roomId: room.id, openingId: opening.id };
+      }
+    }
+  }
+
+  return null;
 }
 
 export function getResolvedRoomOpeningLayoutFromBounds(
