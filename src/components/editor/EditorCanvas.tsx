@@ -30,7 +30,7 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
-import { isOrthogonalPointPath, isSimplePolygon } from "@/lib/editor/roomGeometry";
+import { isOrthogonalPointPath, isPointInPolygon, isSimplePolygon } from "@/lib/editor/roomGeometry";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
   type ActiveEditorOnboardingHint,
@@ -51,6 +51,7 @@ import {
 import {
   formatMetricWallDimension,
   getEdgeLengthMillimetres,
+  getRoomEdgeMeasurements,
   getRectResizeMeasurements,
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
@@ -917,9 +918,10 @@ function drawScene(
   );
   clearContainerChildren(dimensionOverlayContainer);
   if (showDimensions) {
-    drawSelectedWallDimensions(
+    drawSelectedRoomDimensions(
       dimensionOverlayContainer,
       renderedLabelRooms,
+      state.selectedRoomId,
       state.selectedWall,
       roomResizeUi,
       state.camera,
@@ -1715,9 +1717,10 @@ function drawActiveResizeDimensions(
   drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
 }
 
-function drawSelectedWallDimensions(
+function drawSelectedRoomDimensions(
   labelContainer: Container,
   rooms: Room[],
+  selectedRoomId: string | null,
   selectedWall: RoomWallSelection | null,
   roomResizeUi: {
     activeWall: RectWall | null;
@@ -1730,32 +1733,19 @@ function drawSelectedWallDimensions(
   settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
-  if (!selectedWall) return;
   if (roomResizeUi.activeRoomId || roomResizeUi.activeWall || roomResizeUi.activeCorner) return;
 
-  const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
+  const targetRoomId = selectedWall?.roomId ?? selectedRoomId;
+  if (!targetRoomId) return;
+
+  const selectedRoom = rooms.find((room) => room.id === targetRoomId);
   if (!selectedRoom) return;
-
-  const bounds = getAxisAlignedRoomBounds(selectedRoom);
-  if (!bounds) return;
-
-  const wallLengthMillimetres = getWallResizeMeasurementMillimetres(selectedRoom, selectedWall.wall);
-  if (wallLengthMillimetres === null) return;
 
   const roomLabelLayout = getRoomLabelLayout(selectedRoom, camera, viewport, settings, {
     showArea: true,
   });
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-    [
-      createDimensionLabelSpecForWallMeasurement(
-        selectedWall.wall,
-        wallLengthMillimetres,
-        bounds,
-        camera,
-        viewport,
-        settings
-      ),
-    ],
+    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport, settings),
     roomLabelLayout,
     viewport,
     settings
@@ -2036,6 +2026,125 @@ function getResizeDimensionAnchorForWall(
         wallLengthPx: verticalWallLengthPx,
       };
   }
+}
+
+function getSelectedRoomDimensionLabelSpecs(
+  room: Room,
+  selectedWall: RoomWallSelection | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">
+): ResizeDimensionLabelSpec[] {
+  if (selectedWall) {
+    const bounds = getAxisAlignedRoomBounds(room);
+    const wallLengthMillimetres = bounds
+      ? getWallResizeMeasurementMillimetres(room, selectedWall.wall)
+      : null;
+    if (!bounds || wallLengthMillimetres === null) return [];
+
+    return [
+      createDimensionLabelSpecForWallMeasurement(
+        selectedWall.wall,
+        wallLengthMillimetres,
+        bounds,
+        camera,
+        viewport,
+        settings
+      ),
+    ];
+  }
+
+  return getRoomEdgeMeasurements(room).flatMap((edge) => {
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(room, edge, camera, viewport);
+    return labelSpec ? [labelSpec] : [];
+  });
+}
+
+function createDimensionLabelSpecForEdgeMeasurement(
+  room: Room,
+  edge: { start: Point; end: Point; lengthMillimetres: number },
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec | null {
+  const midpoint = {
+    x: (edge.start.x + edge.end.x) / 2,
+    y: (edge.start.y + edge.end.y) / 2,
+  };
+  const outwardOffsetWorld = getOrthogonalEdgeOutwardOffsetWorld(room.points, edge.start, edge.end);
+  if (!outwardOffsetWorld) return null;
+
+  const startScreen = worldToScreen(edge.start, camera, viewport);
+  const endScreen = worldToScreen(edge.end, camera, viewport);
+  const midpointScreen = worldToScreen(midpoint, camera, viewport);
+  const outwardScreen = worldToScreen(
+    {
+      x: midpoint.x + outwardOffsetWorld.x,
+      y: midpoint.y + outwardOffsetWorld.y,
+    },
+    camera,
+    viewport
+  );
+  const tangentVector = {
+    x: endScreen.x - startScreen.x,
+    y: endScreen.y - startScreen.y,
+  };
+  const outwardVector = {
+    x: outwardScreen.x - midpointScreen.x,
+    y: outwardScreen.y - midpointScreen.y,
+  };
+
+  return {
+    text: formatMetricWallDimension(edge.lengthMillimetres),
+    wall: edge.start.y === edge.end.y ? "top" : "left",
+    axis: edge.start.y === edge.end.y ? "horizontal" : "vertical",
+    center: midpointScreen,
+    outwardDirection: normalizeAxisAlignedScreenDirection(outwardVector),
+    tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
+    wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
+  };
+}
+
+function getOrthogonalEdgeOutwardOffsetWorld(
+  polygonPoints: Point[],
+  start: Point,
+  end: Point
+): Point | null {
+  if (start.x === end.x) {
+    const midpoint = { x: start.x, y: (start.y + end.y) / 2 };
+    const negativeProbe = { x: midpoint.x - 1, y: midpoint.y };
+    const positiveProbe = { x: midpoint.x + 1, y: midpoint.y };
+
+    if (isPointInPolygon(negativeProbe, polygonPoints) && !isPointInPolygon(positiveProbe, polygonPoints)) {
+      return { x: 1, y: 0 };
+    }
+    if (isPointInPolygon(positiveProbe, polygonPoints) && !isPointInPolygon(negativeProbe, polygonPoints)) {
+      return { x: -1, y: 0 };
+    }
+    return null;
+  }
+
+  if (start.y === end.y) {
+    const midpoint = { x: (start.x + end.x) / 2, y: start.y };
+    const negativeProbe = { x: midpoint.x, y: midpoint.y - 1 };
+    const positiveProbe = { x: midpoint.x, y: midpoint.y + 1 };
+
+    if (isPointInPolygon(negativeProbe, polygonPoints) && !isPointInPolygon(positiveProbe, polygonPoints)) {
+      return { x: 0, y: 1 };
+    }
+    if (isPointInPolygon(positiveProbe, polygonPoints) && !isPointInPolygon(negativeProbe, polygonPoints)) {
+      return { x: 0, y: -1 };
+    }
+  }
+
+  return null;
+}
+
+function normalizeAxisAlignedScreenDirection(vector: ScreenPoint): ScreenPoint {
+  if (Math.abs(vector.x) >= Math.abs(vector.y)) {
+    return { x: vector.x >= 0 ? 1 : -1, y: 0 };
+  }
+
+  return { x: 0, y: vector.y >= 0 ? 1 : -1 };
 }
 
 function getResolvedResizeDimensionLabelLayouts(
