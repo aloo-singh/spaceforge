@@ -158,6 +158,7 @@ export default function EditorCanvas() {
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
   const roomRef = useRef<Graphics | null>(null);
+  const openingRef = useRef<Graphics | null>(null);
   const wallOverlayRef = useRef<Graphics | null>(null);
   const roomLabelRef = useRef<Container | null>(null);
   const draftRef = useRef<Graphics | null>(null);
@@ -223,15 +224,17 @@ export default function EditorCanvas() {
   const drawCurrentScene = useCallback(() => {
     const grid = gridRef.current;
     const rooms = roomRef.current;
+    const openings = openingRef.current;
     const wallOverlay = wallOverlayRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
     const dimensionOverlay = dimensionOverlayRef.current;
-    if (!grid || !rooms || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
+    if (!grid || !rooms || !openings || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
 
     drawScene(
       grid,
       rooms,
+      openings,
       wallOverlay,
       roomLabels,
       draft,
@@ -414,10 +417,12 @@ export default function EditorCanvas() {
     setIsExportingPng(true);
     const exportStage = new Container();
     const exportRoomGraphics = new Graphics();
+    const exportOpeningGraphics = new Graphics();
     const exportWallOverlayGraphics = new Graphics();
     const exportRoomLabels = new Container();
     const exportDraftGraphics = new Graphics();
     exportStage.addChild(exportRoomGraphics);
+    exportStage.addChild(exportOpeningGraphics);
     exportStage.addChild(exportWallOverlayGraphics);
     exportStage.addChild(exportRoomLabels);
     exportStage.addChild(exportDraftGraphics);
@@ -426,12 +431,19 @@ export default function EditorCanvas() {
       exportRoomGraphics,
       state.document.rooms,
       null,
-      null,
       EMPTY_ROOM_RESIZE_UI,
       state.roomDraft.points.length > 0,
       exportCamera,
       exportViewport,
       null,
+      editorThemeRef.current
+    );
+    drawOpenings(
+      exportOpeningGraphics,
+      state.document.rooms,
+      null,
+      exportCamera,
+      exportViewport,
       editorThemeRef.current
     );
     drawWallInteractionOverlay(
@@ -687,18 +699,21 @@ export default function EditorCanvas() {
 
       const grid = new Graphics();
       const rooms = new Graphics();
+      const openings = new Graphics();
       const wallOverlay = new Graphics();
       const roomLabels = new Container();
       const draft = new Graphics();
       const dimensionOverlay = new Container();
       gridRef.current = grid;
       roomRef.current = rooms;
+      openingRef.current = openings;
       wallOverlayRef.current = wallOverlay;
       roomLabelRef.current = roomLabels;
       draftRef.current = draft;
       dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
       app.stage.addChild(rooms);
+      app.stage.addChild(openings);
       app.stage.addChild(wallOverlay);
       app.stage.addChild(roomLabels);
       app.stage.addChild(draft);
@@ -774,6 +789,7 @@ export default function EditorCanvas() {
         setIsCanvasReadyForExport(false);
         gridRef.current = null;
         roomRef.current = null;
+        openingRef.current = null;
         wallOverlayRef.current = null;
         roomLabelRef.current = null;
         draftRef.current = null;
@@ -881,6 +897,7 @@ type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 function drawScene(
   gridGraphics: Graphics,
   roomGraphics: Graphics,
+  openingGraphics: Graphics,
   wallOverlayGraphics: Graphics,
   roomLabelContainer: Container,
   draftGraphics: Graphics,
@@ -919,12 +936,19 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
-    state.selectedOpening,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
     state.viewport,
     transformFeedback,
+    theme
+  );
+  drawOpenings(
+    openingGraphics,
+    renderedRooms,
+    state.selectedOpening,
+    state.camera,
+    state.viewport,
     theme
   );
   drawWallInteractionOverlay(
@@ -1033,7 +1057,6 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
-  selectedOpening: RoomOpeningSelection | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -1115,7 +1138,6 @@ function drawRooms(
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9
     );
-    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
@@ -1237,6 +1259,22 @@ function drawRooms(
       graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
       graphics.stroke();
     }
+  }
+}
+
+function drawOpenings(
+  graphics: Graphics,
+  rooms: Room[],
+  selectedOpening: RoomOpeningSelection | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  graphics.clear();
+
+  for (const room of rooms) {
+    if (room.points.length < 3) continue;
+    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
   }
 }
 
