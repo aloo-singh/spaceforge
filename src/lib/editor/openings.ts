@@ -22,6 +22,7 @@ export const DEFAULT_DOOR_HINGE_SIDE: DoorHingeSide = "start";
 export const MIN_OPENING_WIDTH_MM = 300;
 const OPENING_HIT_PADDING_PX = 10;
 const OPENING_HIT_DEPTH_PX = 18;
+const OPENING_WIDTH_HANDLE_HIT_RADIUS_PX = 10;
 
 export type RoomWallSegment = {
   wall: RoomWall;
@@ -44,6 +45,13 @@ export type ResolvedRoomOpeningLayout = {
   start: Point;
   end: Point;
   interiorNormal: Point;
+};
+
+export type OpeningWidthHandleHit = {
+  roomId: string;
+  openingId: string;
+  edge: "start" | "end";
+  axis: RoomWallSegment["axis"];
 };
 
 export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
@@ -262,6 +270,31 @@ export function getUpdatedOpeningForWidth(
   };
 }
 
+export function getSymmetricOpeningWidthForWorldPoint(
+  room: Room,
+  opening: RoomOpening,
+  worldPoint: Point,
+  options?: { gridSizeMm?: number }
+): number | null {
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
+  const pointerOffsetMm =
+    segment.axis === "horizontal" ? worldPoint.x - segment.start.x : worldPoint.y - segment.start.y;
+  const halfWidthMm = Math.abs(pointerOffsetMm - centerOffsetMm);
+  const maxHalfWidthMm = Math.min(centerOffsetMm, segment.lengthMm - centerOffsetMm);
+  if (maxHalfWidthMm <= 0) return 0;
+
+  const snappedHalfWidthMm =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(halfWidthMm, options.gridSizeMm / 2)
+      : halfWidthMm;
+  const nextWidthMm = snappedHalfWidthMm * 2;
+
+  return clamp(nextWidthMm, Math.min(MIN_OPENING_WIDTH_MM, maxHalfWidthMm * 2), maxHalfWidthMm * 2);
+}
+
 export function getResolvedRoomOpeningLayoutFromRoom(
   room: Room,
   opening: RoomOpening
@@ -319,6 +352,42 @@ export function findRoomWallAtScreenPoint(
   }
 
   return closestWall?.wall ?? null;
+}
+
+export function findSelectedOpeningWidthHandleAtScreenPoint(
+  rooms: Room[],
+  selectedOpening: RoomOpeningSelection | null,
+  screenPoint: Point,
+  camera: CameraState,
+  viewport: ViewportSize
+): OpeningWidthHandleHit | null {
+  if (!selectedOpening) return null;
+
+  const room = rooms.find((candidate) => candidate.id === selectedOpening.roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === selectedOpening.openingId);
+  if (!room || !opening) return null;
+
+  const layout = getResolvedRoomOpeningLayout(room, opening);
+  if (!layout) return null;
+
+  const handles = [
+    { edge: "start" as const, point: worldToScreen(layout.start, camera, viewport) },
+    { edge: "end" as const, point: worldToScreen(layout.end, camera, viewport) },
+  ];
+
+  for (const handle of handles) {
+    const distancePx = Math.hypot(screenPoint.x - handle.point.x, screenPoint.y - handle.point.y);
+    if (distancePx > OPENING_WIDTH_HANDLE_HIT_RADIUS_PX) continue;
+
+    return {
+      roomId: room.id,
+      openingId: opening.id,
+      edge: handle.edge,
+      axis: layout.axis,
+    };
+  }
+
+  return null;
 }
 
 export function getRoomWallMeasurement(room: Room, wall: RoomWall) {

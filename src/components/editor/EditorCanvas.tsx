@@ -138,6 +138,9 @@ const WINDOW_LINE_INSET_WORLD_MM = 44;
 const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
 const OPENING_SELECTION_HALO_WORLD_MM = 120;
 const OPENING_SELECTION_STROKE_WORLD_MM = 28;
+const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
+const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
+const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
 const TOTAL_ONBOARDING_STEPS = 6;
 
 function isDefaultRoomName(name: string) {
@@ -1533,35 +1536,83 @@ function drawRoomOpenings(
         hingePoint.y + hingeTangent.y * leafLengthPx + swingNormal.y * leafDepthPx
       );
       graphics.stroke();
-      continue;
+    } else {
+      const windowLineInsetPx = Math.max(camera.pixelsPerMm * WINDOW_LINE_INSET_WORLD_MM, 1.5);
+      const windowLineSeparationPx = Math.max(
+        camera.pixelsPerMm * WINDOW_LINE_SEPARATION_WORLD_MM,
+        2
+      );
+      const lineLengthPx = Math.max(openingWidthPx - windowLineInsetPx * 2, 0);
+      if (lineLengthPx > 0) {
+        for (const offset of [-windowLineSeparationPx / 2, windowLineSeparationPx / 2]) {
+          graphics.setStrokeStyle({
+            width: isSelected ? selectionStrokePx : symbolStrokePx,
+            color: isSelected ? selectionColor : theme.roomOutline,
+            alpha: isSelected ? 1 : 0.92,
+            cap: "round",
+          });
+          graphics.moveTo(
+            center.x - tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+            center.y - tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+          );
+          graphics.lineTo(
+            center.x + tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
+            center.y + tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
+          );
+          graphics.stroke();
+        }
+      }
     }
 
-    const windowLineInsetPx = Math.max(camera.pixelsPerMm * WINDOW_LINE_INSET_WORLD_MM, 1.5);
-    const windowLineSeparationPx = Math.max(
-      camera.pixelsPerMm * WINDOW_LINE_SEPARATION_WORLD_MM,
-      2
-    );
-    const lineLengthPx = Math.max(openingWidthPx - windowLineInsetPx * 2, 0);
-    if (lineLengthPx <= 0) continue;
+    if (!isSelected) continue;
 
-    for (const offset of [-windowLineSeparationPx / 2, windowLineSeparationPx / 2]) {
-      graphics.setStrokeStyle({
-        width: isSelected ? selectionStrokePx : symbolStrokePx,
-        color: isSelected ? selectionColor : theme.roomOutline,
-        alpha: isSelected ? 1 : 0.92,
-        cap: "round",
-      });
-      graphics.moveTo(
-        center.x - tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
-        center.y - tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
-      );
-      graphics.lineTo(
-        center.x + tangent.x * (lineLengthPx / 2) + interiorNormal.x * offset,
-        center.y + tangent.y * (lineLengthPx / 2) + interiorNormal.y * offset
-      );
-      graphics.stroke();
-    }
+    drawOpeningWidthHandle(graphics, start, selectionColor, theme);
+    drawOpeningWidthHandle(graphics, end, selectionColor, theme);
   }
+}
+
+function drawOpeningWidthHandle(
+  graphics: Graphics,
+  point: ScreenPoint,
+  color: number,
+  theme: EditorCanvasTheme
+) {
+  const outerHalf = OPENING_WIDTH_HANDLE_HALO_SIZE_PX / 2;
+  const innerHalf = OPENING_WIDTH_HANDLE_SIZE_PX / 2;
+
+  graphics.setFillStyle({ color: theme.canvasBackground, alpha: 0.98 });
+  graphics.roundRect(
+    point.x - outerHalf,
+    point.y - outerHalf,
+    OPENING_WIDTH_HANDLE_HALO_SIZE_PX,
+    OPENING_WIDTH_HANDLE_HALO_SIZE_PX,
+    3
+  );
+  graphics.fill();
+
+  graphics.setFillStyle({ color, alpha: 0.96 });
+  graphics.roundRect(
+    point.x - innerHalf,
+    point.y - innerHalf,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    2
+  );
+  graphics.fill();
+
+  graphics.setStrokeStyle({
+    width: OPENING_WIDTH_HANDLE_STROKE_PX,
+    color: theme.canvasBackground,
+    alpha: 0.9,
+  });
+  graphics.roundRect(
+    point.x - innerHalf,
+    point.y - innerHalf,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    OPENING_WIDTH_HANDLE_SIZE_PX,
+    2
+  );
+  graphics.stroke();
 }
 
 function drawTransformDestinationPreview(

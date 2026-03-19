@@ -49,6 +49,7 @@ import {
   cloneRoomOpenings,
   getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
+  getSymmetricOpeningWidthForWorldPoint,
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
@@ -132,6 +133,13 @@ type EditorState = {
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
+  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
+  commitOpeningResize: (
+    roomId: string,
+    openingId: string,
+    previousWidthMm: number,
+    nextWidthMm: number
+  ) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   commitOpeningMove: (
     roomId: string,
@@ -261,6 +269,31 @@ function updateRoomOpeningInDocument(
   };
 }
 
+function updateRoomOpeningWidthInDocument(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  nextWidthMm: number
+): DocumentState {
+  return {
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            openings: room.openings.map((opening) =>
+              opening.id === openingId
+                ? {
+                    ...cloneRoomOpening(opening),
+                    widthMm: nextWidthMm,
+                  }
+                : opening
+            ),
+          }
+        : room
+    ),
+  };
+}
+
 function arePointListsEqual(a: Point[], b: Point[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
@@ -365,6 +398,28 @@ function resolveOpeningMoveOffset(
     room,
     opening,
     nextOffsetMm,
+  };
+}
+
+function resolveOpeningResizeWidth(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  cursorWorld: Point
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingId);
+  if (!room || !opening) return null;
+
+  const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(room, opening, cursorWorld, {
+    gridSizeMm: GRID_SIZE_MM,
+  });
+  if (nextWidthMm === null) return null;
+
+  return {
+    room,
+    opening,
+    nextWidthMm,
   };
 }
 
@@ -983,6 +1038,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       return nextState ?? state;
     }),
+  previewOpeningResize: (roomId, openingId, nextWidthMm) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const opening = room?.openings.find((candidate) => candidate.id === openingId);
+      if (!room || !opening) return state;
+      if (opening.widthMm === nextWidthMm) return state;
+
+      return {
+        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+      };
+    }),
+  commitOpeningResize: (roomId, openingId, previousWidthMm, nextWidthMm) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const opening = room?.openings.find((candidate) => candidate.id === openingId);
+      if (!room || !opening) return state;
+      if (previousWidthMm === nextWidthMm) return state;
+
+      const command: EditorCommand = {
+        type: "update-opening",
+        roomId,
+        previousOpening: {
+          ...cloneRoomOpening(opening),
+          widthMm: previousWidthMm,
+        },
+        nextOpening: {
+          ...cloneRoomOpening(opening),
+          widthMm: nextWidthMm,
+        },
+      };
+
+      return {
+        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   previewOpeningMove: (roomId, openingId, nextOffsetMm) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -1377,6 +1473,14 @@ export function getOpeningMoveOffsetForCursor(
   cursorWorld: Point
 ) {
   return resolveOpeningMoveOffset(useEditorStore.getState().document, roomId, openingId, cursorWorld);
+}
+
+export function getOpeningResizeWidthForCursor(
+  roomId: string,
+  openingId: string,
+  cursorWorld: Point
+) {
+  return resolveOpeningResizeWidth(useEditorStore.getState().document, roomId, openingId, cursorWorld);
 }
 
 function isValidDraftPathProgression(
