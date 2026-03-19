@@ -1,4 +1,4 @@
-import { cloneRoomOpenings } from "@/lib/editor/openings";
+import { cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type EditorDocumentState = {
@@ -49,6 +49,12 @@ export type EditorCommand =
       openingId: string;
       previousOffsetMm: number;
       nextOffsetMm: number;
+    }
+  | {
+      type: "update-opening";
+      roomId: string;
+      previousOpening: RoomOpening;
+      nextOpening: RoomOpening;
     };
 
 export function applyEditorCommand(
@@ -129,7 +135,7 @@ export function applyEditorCommand(
               ? room.openings.filter((opening) => opening.id !== command.opening.id)
               : [
                   ...room.openings.filter((opening) => opening.id !== command.opening.id),
-                  { ...command.opening },
+                  cloneRoomOpening(command.opening),
                 ],
         };
       }),
@@ -147,7 +153,7 @@ export function applyEditorCommand(
             direction === "undo"
               ? [
                   ...room.openings.filter((opening) => opening.id !== command.opening.id),
-                  { ...command.opening },
+                  cloneRoomOpening(command.opening),
                 ]
               : room.openings.filter((opening) => opening.id !== command.opening.id),
         };
@@ -172,6 +178,24 @@ export function applyEditorCommand(
                   offsetMm: nextOffsetMm,
                 }
               : opening
+          ),
+        };
+      }),
+    };
+  }
+
+  if (command.type === "update-opening") {
+    const nextOpening =
+      direction === "undo" ? command.previousOpening : command.nextOpening;
+
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings: room.openings.map((opening) =>
+            opening.id === nextOpening.id ? cloneRoomOpening(nextOpening) : opening
           ),
         };
       }),

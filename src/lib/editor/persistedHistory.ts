@@ -1,5 +1,5 @@
 import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
-import { areRoomOpeningsEqual, cloneRoomOpenings } from "@/lib/editor/openings";
+import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
@@ -161,14 +161,24 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     }
 
     const movedOpening = inferMovedOpening(changedRoom.previous.openings, changedRoom.next.openings);
-    if (!movedOpening) return null;
+    if (movedOpening) {
+      return {
+        type: "move-opening",
+        roomId: changedRoom.next.id,
+        openingId: movedOpening.openingId,
+        previousOffsetMm: movedOpening.previousOffsetMm,
+        nextOffsetMm: movedOpening.nextOffsetMm,
+      };
+    }
+
+    const updatedOpening = inferUpdatedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    if (!updatedOpening) return null;
 
     return {
-      type: "move-opening",
+      type: "update-opening",
       roomId: changedRoom.next.id,
-      openingId: movedOpening.openingId,
-      previousOffsetMm: movedOpening.previousOffsetMm,
-      nextOffsetMm: movedOpening.nextOffsetMm,
+      previousOpening: updatedOpening.previousOpening,
+      nextOpening: updatedOpening.nextOpening,
     };
   }
 
@@ -231,7 +241,9 @@ function inferMovedOpening(
     const didNonOffsetFieldsChange =
       previousOpening.type !== nextOpening.type ||
       previousOpening.wall !== nextOpening.wall ||
-      previousOpening.widthMm !== nextOpening.widthMm;
+      previousOpening.widthMm !== nextOpening.widthMm ||
+      previousOpening.openingSide !== nextOpening.openingSide ||
+      previousOpening.hingeSide !== nextOpening.hingeSide;
     if (didNonOffsetFieldsChange) return null;
 
     if (previousOpening.offsetMm === nextOpening.offsetMm) continue;
@@ -245,6 +257,42 @@ function inferMovedOpening(
   }
 
   return movedOpening;
+}
+
+function inferUpdatedOpening(
+  previousOpenings: RoomOpening[],
+  nextOpenings: RoomOpening[]
+): { previousOpening: RoomOpening; nextOpening: RoomOpening } | null {
+  if (previousOpenings.length !== nextOpenings.length) return null;
+
+  const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
+  let updatedOpening: { previousOpening: RoomOpening; nextOpening: RoomOpening } | null = null;
+
+  for (const previousOpening of previousOpenings) {
+    const nextOpening = nextById.get(previousOpening.id);
+    if (!nextOpening) return null;
+    if (areOpeningsEqual(previousOpening, nextOpening)) continue;
+    if (updatedOpening) return null;
+
+    updatedOpening = {
+      previousOpening: cloneRoomOpening(previousOpening),
+      nextOpening: cloneRoomOpening(nextOpening),
+    };
+  }
+
+  return updatedOpening;
+}
+
+function areOpeningsEqual(a: RoomOpening, b: RoomOpening) {
+  return (
+    a.id === b.id &&
+    a.type === b.type &&
+    a.wall === b.wall &&
+    a.offsetMm === b.offsetMm &&
+    a.widthMm === b.widthMm &&
+    a.openingSide === b.openingSide &&
+    a.hingeSide === b.hingeSide
+  );
 }
 
 function findDocumentIndex(historyStack: EditorDocumentState[], document: EditorDocumentState): number | null {

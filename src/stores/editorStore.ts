@@ -44,16 +44,22 @@ import {
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
 import {
+  areRoomOpeningsEqual,
+  cloneRoomOpening,
   cloneRoomOpenings,
+  getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
 import type {
   CameraState,
+  DoorHingeSide,
+  DoorOpeningSide,
   OpeningType,
   Point,
   Room,
+  RoomOpening,
   RoomOpeningSelection,
   RoomWallSelection,
   ScreenPoint,
@@ -123,6 +129,9 @@ type EditorState = {
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
+  updateSelectedOpeningWidth: (widthMm: number) => void;
+  updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
+  updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   commitOpeningMove: (
     roomId: string,
@@ -222,10 +231,29 @@ function updateRoomOpeningOffsetInDocument(
             openings: room.openings.map((opening) =>
               opening.id === openingId
                 ? {
-                    ...opening,
+                    ...cloneRoomOpening(opening),
                     offsetMm: nextOffsetMm,
                   }
                 : opening
+            ),
+          }
+        : room
+    ),
+  };
+}
+
+function updateRoomOpeningInDocument(
+  document: DocumentState,
+  roomId: string,
+  nextOpening: RoomOpening
+): DocumentState {
+  return {
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            openings: room.openings.map((opening) =>
+              opening.id === nextOpening.id ? cloneRoomOpening(nextOpening) : opening
             ),
           }
         : room
@@ -337,6 +365,38 @@ function resolveOpeningMoveOffset(
     room,
     opening,
     nextOffsetMm,
+  };
+}
+
+function updateSelectedOpening(
+  state: Pick<EditorState, "document" | "selectedOpening" | "history">,
+  updater: (room: Room, opening: RoomOpening) => RoomOpening | null
+) {
+  const selectedOpening = state.selectedOpening;
+  if (!selectedOpening) return null;
+
+  const room = state.document.rooms.find((candidate) => candidate.id === selectedOpening.roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === selectedOpening.openingId);
+  if (!room || !opening) return null;
+
+  const nextOpening = updater(room, opening);
+  if (!nextOpening || areRoomOpeningsEqual([opening], [nextOpening])) return null;
+
+  const command: EditorCommand = {
+    type: "update-opening",
+    roomId: room.id,
+    previousOpening: cloneRoomOpening(opening),
+    nextOpening: cloneRoomOpening(nextOpening),
+  };
+
+  return {
+    document: updateRoomOpeningInDocument(state.document, room.id, nextOpening),
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
   };
 }
 
@@ -842,7 +902,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "delete-opening",
         roomId: room.id,
-        opening: { ...opening },
+        opening: cloneRoomOpening(opening),
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
@@ -888,6 +948,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   insertDefaultWindowOnSelectedWall: () =>
     set((state) => {
       const nextState = insertOpeningOnSelectedWall(state, "window");
+      return nextState ?? state;
+    }),
+  updateSelectedOpeningWidth: (widthMm) =>
+    set((state) => {
+      const nextState = updateSelectedOpening(state, (room, opening) =>
+        getUpdatedOpeningForWidth(room, opening, widthMm, {
+          gridSizeMm: GRID_SIZE_MM,
+        })
+      );
+      return nextState ?? state;
+    }),
+  updateSelectedDoorOpeningSide: (openingSide) =>
+    set((state) => {
+      const nextState = updateSelectedOpening(state, (_, opening) => {
+        if (opening.type !== "door" || opening.openingSide === openingSide) return null;
+
+        return {
+          ...cloneRoomOpening(opening),
+          openingSide,
+        };
+      });
+      return nextState ?? state;
+    }),
+  updateSelectedDoorHingeSide: (hingeSide) =>
+    set((state) => {
+      const nextState = updateSelectedOpening(state, (_, opening) => {
+        if (opening.type !== "door" || opening.hingeSide === hingeSide) return null;
+
+        return {
+          ...cloneRoomOpening(opening),
+          hingeSide,
+        };
+      });
       return nextState ?? state;
     }),
   previewOpeningMove: (roomId, openingId, nextOffsetMm) =>

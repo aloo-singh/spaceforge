@@ -29,6 +29,8 @@ export type RectangularRoomWall = "left" | "right" | "top" | "bottom";
 export type RoomWall = RectangularRoomWall | number;
 
 export type OpeningType = "door" | "window";
+export type DoorOpeningSide = "interior" | "exterior";
+export type DoorHingeSide = "start" | "end";
 
 export type RoomOpening = {
   id: string;
@@ -42,6 +44,16 @@ export type RoomOpening = {
    * Opening width in plan view, measured along the host wall.
    */
   widthMm: number;
+  /**
+   * Side of the host wall where the door leaf swings, relative to the host room.
+   * Windows currently ignore this field but preserve it for stable editing/history semantics.
+   */
+  openingSide: DoorOpeningSide;
+  /**
+   * Hinge anchor along the canonical host segment direction.
+   * "start" means the lower-x/lower-y end of the canonical segment, "end" the opposite.
+   */
+  hingeSide: DoorHingeSide;
 };
 
 export type Wall = {

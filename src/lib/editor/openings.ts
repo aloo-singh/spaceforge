@@ -3,6 +3,8 @@ import { snapToGrid } from "@/lib/editor/geometry";
 import { getAxisAlignedRoomBounds, type RoomRectBounds } from "@/lib/editor/rectRoomResize";
 import type {
   CameraState,
+  DoorHingeSide,
+  DoorOpeningSide,
   OpeningType,
   Point,
   RectangularRoomWall,
@@ -15,6 +17,9 @@ import type {
 
 export const DEFAULT_DOOR_WIDTH_MM = 900;
 export const DEFAULT_WINDOW_WIDTH_MM = 1200;
+export const DEFAULT_DOOR_OPENING_SIDE: DoorOpeningSide = "interior";
+export const DEFAULT_DOOR_HINGE_SIDE: DoorHingeSide = "start";
+export const MIN_OPENING_WIDTH_MM = 300;
 const OPENING_HIT_PADDING_PX = 10;
 const OPENING_HIT_DEPTH_PX = 18;
 
@@ -42,12 +47,16 @@ export type ResolvedRoomOpeningLayout = {
 };
 
 export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
+  const normalizedOpening = normalizeRoomOpening(opening);
+
   return {
-    id: opening.id,
-    type: opening.type,
-    wall: opening.wall,
-    offsetMm: opening.offsetMm,
-    widthMm: opening.widthMm,
+    id: normalizedOpening.id,
+    type: normalizedOpening.type,
+    wall: normalizedOpening.wall,
+    offsetMm: normalizedOpening.offsetMm,
+    widthMm: normalizedOpening.widthMm,
+    openingSide: normalizedOpening.openingSide,
+    hingeSide: normalizedOpening.hingeSide,
   };
 }
 
@@ -64,7 +73,9 @@ export function areRoomOpeningsEqual(a: RoomOpening[], b: RoomOpening[]): boolea
       a[i].type !== b[i].type ||
       a[i].wall !== b[i].wall ||
       a[i].offsetMm !== b[i].offsetMm ||
-      a[i].widthMm !== b[i].widthMm
+      a[i].widthMm !== b[i].widthMm ||
+      a[i].openingSide !== b[i].openingSide ||
+      a[i].hingeSide !== b[i].hingeSide
     ) {
       return false;
     }
@@ -134,6 +145,8 @@ export function createCenteredRoomOpening(
     wall,
     offsetMm: segment.lengthMm / 2,
     widthMm,
+    openingSide: DEFAULT_DOOR_OPENING_SIDE,
+    hingeSide: DEFAULT_DOOR_HINGE_SIDE,
   };
 }
 
@@ -212,6 +225,43 @@ export function constrainOpeningOffset(
   return clamp(snappedOffsetMm, minOffsetMm, maxOffsetMm);
 }
 
+export function constrainOpeningWidth(
+  widthMm: number,
+  wallLengthMm: number,
+  options?: { gridSizeMm?: number }
+) {
+  const snappedWidthMm =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(widthMm, options.gridSizeMm)
+      : widthMm;
+  const minWidthMm = Math.min(MIN_OPENING_WIDTH_MM, wallLengthMm);
+
+  return clamp(snappedWidthMm, minWidthMm, wallLengthMm);
+}
+
+export function getUpdatedOpeningForWidth(
+  room: Room,
+  opening: RoomOpening,
+  widthMm: number,
+  options?: { gridSizeMm?: number }
+): RoomOpening | null {
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const nextWidthMm = constrainOpeningWidth(widthMm, segment.lengthMm, options);
+  const nextOffsetMm = constrainOpeningOffset(
+    { widthMm: nextWidthMm },
+    opening.offsetMm,
+    segment.lengthMm
+  );
+
+  return {
+    ...normalizeRoomOpening(opening),
+    widthMm: nextWidthMm,
+    offsetMm: nextOffsetMm,
+  };
+}
+
 export function getResolvedRoomOpeningLayoutFromRoom(
   room: Room,
   opening: RoomOpening
@@ -286,30 +336,45 @@ export function normalizeRoomOpeningForSegmentAnchoring(
   room: Room,
   opening: RoomOpening
 ): RoomOpening {
-  if (typeof opening.wall !== "number") {
-    return cloneRoomOpening(opening);
+  const normalizedOpening = normalizeRoomOpening(opening);
+
+  if (typeof normalizedOpening.wall !== "number") {
+    return normalizedOpening;
   }
 
-  const segment = getRoomWallSegment(room, opening.wall);
+  const segment = getRoomWallSegment(room, normalizedOpening.wall);
   if (!segment) {
-    return cloneRoomOpening(opening);
+    return normalizedOpening;
   }
 
   const usesDescendingOriginalDirection =
     (segment.axis === "horizontal" && segment.originalStart.x > segment.originalEnd.x) ||
     (segment.axis === "vertical" && segment.originalStart.y > segment.originalEnd.y);
   if (!usesDescendingOriginalDirection) {
-    return cloneRoomOpening(opening);
+    return normalizedOpening;
   }
 
   return {
-    ...opening,
-    offsetMm: clamp(segment.lengthMm - opening.offsetMm, 0, segment.lengthMm),
+    ...normalizedOpening,
+    offsetMm: clamp(segment.lengthMm - normalizedOpening.offsetMm, 0, segment.lengthMm),
   };
 }
 
 export function normalizeRoomOpeningsForSegmentAnchoring(room: Room): Room["openings"] {
   return room.openings.map((opening) => normalizeRoomOpeningForSegmentAnchoring(room, opening));
+}
+
+export function normalizeRoomOpening(opening: RoomOpening): RoomOpening {
+  return {
+    id: opening.id,
+    type: opening.type,
+    wall: opening.wall,
+    offsetMm: opening.offsetMm,
+    widthMm: opening.widthMm,
+    openingSide:
+      opening.openingSide === "exterior" ? "exterior" : DEFAULT_DOOR_OPENING_SIDE,
+    hingeSide: opening.hingeSide === "end" ? "end" : DEFAULT_DOOR_HINGE_SIDE,
+  };
 }
 
 export function resolveRoomWallSegmentIndex(room: Room, wall: RoomWall): number | null {

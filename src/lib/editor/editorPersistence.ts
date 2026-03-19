@@ -21,10 +21,11 @@ import {
 // - v5 payloads restore layout + camera + bounded snapshot history + current editor settings.
 // - v6 payloads restore layout + camera + bounded snapshot history + current editor settings + room openings.
 // - v7 payloads also preserve canonical segment-local opening offsets for numeric wall hosts.
+// - v8 payloads also persist opening-side and hinge-side fields for inspector editing.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 7;
+export const EDITOR_PERSISTENCE_VERSION = 8;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -117,6 +118,17 @@ export type PersistedEditorPayloadV6 = {
 };
 
 export type PersistedEditorPayloadV7 = {
+  version: 7;
+  document: PersistedDocument;
+  camera: CameraState;
+  settings: EditorSettings;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV8 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -164,6 +176,17 @@ function isRoomOpening(value: unknown): value is Room["openings"][number] {
     value.wall === "bottom";
   const isSegmentIndex = typeof value.wall === "number" && Number.isInteger(value.wall) && value.wall >= 0;
   if (!isLegacyRectWall && !isSegmentIndex) {
+    return false;
+  }
+
+  if (
+    value.openingSide !== undefined &&
+    value.openingSide !== "interior" &&
+    value.openingSide !== "exterior"
+  ) {
+    return false;
+  }
+  if (value.hingeSide !== undefined && value.hingeSide !== "start" && value.hingeSide !== "end") {
     return false;
   }
 
@@ -313,6 +336,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 4 &&
         parsed.version !== 5 &&
         parsed.version !== 6 &&
+        parsed.version !== 7 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -371,7 +395,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV7 = {
+  const payload: PersistedEditorPayloadV8 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),

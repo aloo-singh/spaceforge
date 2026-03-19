@@ -1511,6 +1511,15 @@ function drawRoomOpenings(
     if (opening.type === "door") {
       const leafLengthPx = openingWidthPx * DOOR_LEAF_LENGTH_SCALE;
       const leafDepthPx = openingWidthPx * DOOR_LEAF_DEPTH_SCALE;
+      const hingePoint = opening.hingeSide === "end" ? end : start;
+      const hingeTangent =
+        opening.hingeSide === "end"
+          ? { x: -tangent.x, y: -tangent.y }
+          : tangent;
+      const swingNormal =
+        opening.openingSide === "exterior"
+          ? { x: -interiorNormal.x, y: -interiorNormal.y }
+          : interiorNormal;
 
       graphics.setStrokeStyle({
         width: isSelected ? selectionStrokePx : symbolStrokePx,
@@ -1518,10 +1527,10 @@ function drawRoomOpenings(
         alpha: isSelected ? 1 : 0.96,
         cap: "round",
       });
-      graphics.moveTo(start.x, start.y);
+      graphics.moveTo(hingePoint.x, hingePoint.y);
       graphics.lineTo(
-        start.x + tangent.x * leafLengthPx + interiorNormal.x * leafDepthPx,
-        start.y + tangent.y * leafLengthPx + interiorNormal.y * leafDepthPx
+        hingePoint.x + hingeTangent.x * leafLengthPx + swingNormal.x * leafDepthPx,
+        hingePoint.y + hingeTangent.y * leafLengthPx + swingNormal.y * leafDepthPx
       );
       graphics.stroke();
       continue;
