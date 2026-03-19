@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
-import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM } from "@/lib/editor/constants";
+import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
   getOrthogonalSnappedPoint,
   pointsEqual,
@@ -58,6 +58,7 @@ import {
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
+import { getActiveSnapStepMm, getScaleOverlayState } from "@/lib/editor/snapping";
 import {
   getMeasurementTextScale,
   shouldShowDimensions,
@@ -200,6 +201,7 @@ export default function EditorCanvas() {
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const camera = useEditorStore((state) => state.camera);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -481,6 +483,7 @@ export default function EditorCanvas() {
       cursorWorldRef.current,
       exportCamera,
       exportViewport,
+      getActiveSnapStepMm(exportCamera),
       editorThemeRef.current
     );
 
@@ -826,6 +829,18 @@ export default function EditorCanvas() {
     drawCurrentScene();
   }, [drawCurrentScene, editorTheme]);
 
+  const overlayCamera = useMemo(
+    () =>
+      hasHydratedClient
+        ? camera
+        : {
+            pixelsPerMm: INITIAL_PIXELS_PER_MM,
+          },
+    [camera, hasHydratedClient]
+  );
+  const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
+  const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
+
   return (
     <section
       aria-label="SpaceForge floor plan editor canvas"
@@ -857,6 +872,24 @@ export default function EditorCanvas() {
             tabIndex={-1}
             className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
+          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-white/10 bg-neutral-950/78 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.24)] backdrop-blur-sm sm:bottom-4 sm:left-4">
+            <div
+              className="text-[11px] font-medium tracking-[0.04em] text-white/72"
+              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+            >
+              {scaleOverlay.label}
+            </div>
+            <div
+              className="mt-1 h-2 border-x border-t border-white/70"
+              style={{ width: `${scaleOverlay.widthPx}px` }}
+            />
+            <div
+              className="mt-1 text-[11px] text-white/52"
+              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+            >
+              Snap {formatMetricWallDimension(activeSnapStepMm)}
+            </div>
+          </div>
           {displayedHint ? (
             <aside
               className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
@@ -927,6 +960,7 @@ function drawScene(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
+  const activeSnapStepMm = getActiveSnapStepMm(state.camera);
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
   const showDimensions = shouldShowDimensions(
     state.settings,
@@ -1008,11 +1042,20 @@ function drawScene(
       cursorWorld,
       state.camera,
       state.viewport,
+      activeSnapStepMm,
       state.settings,
       theme
     );
   }
-  drawDraft(draftGraphics, state.roomDraft.points, cursorWorld, state.camera, state.viewport, theme);
+  drawDraft(
+    draftGraphics,
+    state.roomDraft.points,
+    cursorWorld,
+    state.camera,
+    state.viewport,
+    activeSnapStepMm,
+    theme
+  );
 }
 
 function drawGrid(
@@ -2006,6 +2049,7 @@ function drawDraftDimensions(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
+  activeSnapStepMm: number,
   settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
@@ -2013,7 +2057,8 @@ function drawDraftDimensions(
     draftPoints,
     cursorWorld,
     camera,
-    viewport
+    viewport,
+    activeSnapStepMm
   );
   if (activeSegmentLabelSpec) {
     const labelLayouts = getResolvedResizeDimensionLabelLayouts(
@@ -2026,7 +2071,7 @@ function drawDraftDimensions(
     return;
   }
 
-  const draftPreviewRoom = getDraftPreviewRoom(draftPoints, cursorWorld);
+  const draftPreviewRoom = getDraftPreviewRoom(draftPoints, cursorWorld, activeSnapStepMm);
   if (!draftPreviewRoom) return;
 
   const bounds = getAxisAlignedRoomBounds(draftPreviewRoom);
@@ -2511,14 +2556,18 @@ function nudgeResizeDimensionLabel(
   };
 }
 
-function getDraftPreviewRoom(draftPoints: Point[], cursorWorld: Point | null): Room | null {
+function getDraftPreviewRoom(
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  activeSnapStepMm: number
+): Room | null {
   if (!cursorWorld) return null;
   if (draftPoints.length < 4) return null;
 
   const previewPoint = getOrthogonalSnappedPoint(
     draftPoints[draftPoints.length - 1],
     cursorWorld,
-    GRID_SIZE_MM
+    activeSnapStepMm
   );
   if (!pointsEqual(previewPoint, draftPoints[0])) return null;
   if (!isOrthogonalPointPath(draftPoints, { closed: true }) || !isSimplePolygon(draftPoints)) {
@@ -2564,12 +2613,13 @@ function getDraftActiveSegmentDimensionLabelSpec(
   draftPoints: Point[],
   cursorWorld: Point | null,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  activeSnapStepMm: number
 ): ResizeDimensionLabelSpec | null {
   if (!cursorWorld || draftPoints.length === 0) return null;
 
   const anchorPoint = draftPoints[draftPoints.length - 1];
-  const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, GRID_SIZE_MM);
+  const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, activeSnapStepMm);
   if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
   if (draftPoints.length >= 4 && pointsEqual(previewPoint, draftPoints[0])) return null;
 
@@ -2650,6 +2700,7 @@ function drawDraft(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
+  activeSnapStepMm: number,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
@@ -2674,7 +2725,7 @@ function drawDraft(
     const previewWorld = getOrthogonalSnappedPoint(
       draftPoints[draftPoints.length - 1],
       cursorWorld,
-      GRID_SIZE_MM
+      activeSnapStepMm
     );
     const previewScreen = worldToScreen(previewWorld, camera, viewport);
     const lastScreenPoint = screenDraftPoints[screenDraftPoints.length - 1];
@@ -2694,7 +2745,7 @@ function drawDraft(
 
   if (!cursorWorld) return;
 
-  const firstPointPreviewWorld = snapPointToGrid(cursorWorld, GRID_SIZE_MM);
+  const firstPointPreviewWorld = snapPointToGrid(cursorWorld, activeSnapStepMm);
   const firstPointPreviewScreen = worldToScreen(firstPointPreviewWorld, camera, viewport);
   drawSnapMarker(graphics, firstPointPreviewScreen, theme, "idle");
 }

@@ -10,6 +10,43 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.28.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added adaptive snap-step resolution so editing precision now scales with zoom level instead of staying fixed to one grid increment</li>
+                <li>Added a lightweight live scale overlay in the canvas with the current snap increment shown alongside the scale bar</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Room drawing, whole-room movement, rectangular resize, constrained vertex drag, and opening drag or resize now share one central active snap step</li>
+                <li>The snap tiers are tuned so 0.5 m remains the main working mode, 0.1 m activates earlier for detail work, and 1.0 m is reserved for genuinely far-out views</li>
+                <li>The scale overlay now avoids hydration mismatch by staying server and client stable until editor state hydration completes</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Adaptive snapping now feels more consistent across the editor&apos;s direct manipulation paths without adding new settings or heavy UI</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.27.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-19</span>
           </div>

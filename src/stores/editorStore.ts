@@ -53,6 +53,7 @@ import {
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
+import { getActiveSnapStepMm } from "@/lib/editor/snapping";
 import type {
   CameraState,
   DoorHingeSide,
@@ -383,14 +384,15 @@ function resolveOpeningMoveOffset(
   document: DocumentState,
   roomId: string,
   openingId: string,
-  cursorWorld: Point
+  cursorWorld: Point,
+  gridSizeMm: number
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
   const nextOffsetMm = getOpeningOffsetForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm: GRID_SIZE_MM,
+    gridSizeMm,
   });
   if (nextOffsetMm === null) return null;
 
@@ -405,14 +407,15 @@ function resolveOpeningResizeWidth(
   document: DocumentState,
   roomId: string,
   openingId: string,
-  cursorWorld: Point
+  cursorWorld: Point,
+  gridSizeMm: number
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
   const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm: GRID_SIZE_MM,
+    gridSizeMm,
   });
   if (nextWidthMm === null) return null;
 
@@ -615,18 +618,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
+      const activeSnapStepMm = getActiveSnapStepMm(state.camera);
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
-            points: [snapPointToGrid(cursorWorld, GRID_SIZE_MM)],
+            points: [snapPointToGrid(cursorWorld, activeSnapStepMm)],
             history: [],
           },
         };
       }
 
       const lastPoint = draftPoints[draftPoints.length - 1];
-      const nextPoint = getOrthogonalSnappedPoint(lastPoint, cursorWorld, GRID_SIZE_MM);
+      const nextPoint = getOrthogonalSnappedPoint(lastPoint, cursorWorld, activeSnapStepMm);
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
@@ -1472,7 +1476,14 @@ export function getOpeningMoveOffsetForCursor(
   openingId: string,
   cursorWorld: Point
 ) {
-  return resolveOpeningMoveOffset(useEditorStore.getState().document, roomId, openingId, cursorWorld);
+  const state = useEditorStore.getState();
+  return resolveOpeningMoveOffset(
+    state.document,
+    roomId,
+    openingId,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
 }
 
 export function getOpeningResizeWidthForCursor(
@@ -1480,7 +1491,14 @@ export function getOpeningResizeWidthForCursor(
   openingId: string,
   cursorWorld: Point
 ) {
-  return resolveOpeningResizeWidth(useEditorStore.getState().document, roomId, openingId, cursorWorld);
+  const state = useEditorStore.getState();
+  return resolveOpeningResizeWidth(
+    state.document,
+    roomId,
+    openingId,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
 }
 
 function isValidDraftPathProgression(

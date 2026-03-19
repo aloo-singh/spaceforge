@@ -1,7 +1,6 @@
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
-import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import {
   getConstrainedVertexAdjustmentResult,
   getConstrainedVertexHandleLayouts,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/editor/constrainedVertexAdjustments";
 import { snapPointToGrid } from "@/lib/editor/geometry";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
+import { getActiveSnapStepMm } from "@/lib/editor/snapping";
 import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
@@ -289,8 +289,9 @@ export function attachRoomResizeInput(
         selected?.state.camera ?? fallbackState.camera,
         selected?.state.viewport ?? fallbackState.viewport
       );
+      const activeSnapStepMm = getActiveSnapStepMm(selected?.state.camera ?? fallbackState.camera);
       if (activeSession.target.type === "vertex") {
-        const snappedCursor = snapPointToGrid(cursorWorld, GRID_SIZE_MM);
+        const snappedCursor = snapPointToGrid(cursorWorld, activeSnapStepMm);
         const nextPoints = getConstrainedVertexAdjustmentResult(
           activeSession.startPoints,
           activeSession.target.vertexIndex,
@@ -307,11 +308,11 @@ export function attachRoomResizeInput(
       const nextBounds =
         activeSession.target.type === "corner"
           ? resizeBoundsForCornerDrag(activeSession.startBounds, activeSession.target.corner, cursorWorld, {
-              gridSizeMm: GRID_SIZE_MM,
+              gridSizeMm: activeSnapStepMm,
               minRoomSizeMm: MIN_ROOM_SIZE_MM,
             })
           : resizeBoundsForWallDrag(activeSession.startBounds, activeSession.target.wall, cursorWorld, {
-              gridSizeMm: GRID_SIZE_MM,
+              gridSizeMm: activeSnapStepMm,
               minRoomSizeMm: MIN_ROOM_SIZE_MM,
             });
       const nextPoints = getRoomPointsFromBounds(nextBounds);
