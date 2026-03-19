@@ -4,8 +4,8 @@ import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openin
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
-import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
+import { getActiveSnapStepMm } from "@/lib/editor/snapping";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
@@ -323,10 +323,11 @@ export function attachRoomDrawInput(
         updateCursor();
       }
 
+      const activeSnapStepMm = getActiveSnapStepMm(state.camera);
       const delta = getSnappedRoomTranslationDelta(
         session.startWorldPoint,
         cursorWorld,
-        GRID_SIZE_MM
+        activeSnapStepMm
       );
 
       const nextPoints = translateRoomPoints(session.startPoints, delta);
