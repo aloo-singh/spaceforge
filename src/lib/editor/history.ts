@@ -42,6 +42,13 @@ export type EditorCommand =
       type: "delete-opening";
       roomId: string;
       opening: RoomOpening;
+    }
+  | {
+      type: "move-opening";
+      roomId: string;
+      openingId: string;
+      previousOffsetMm: number;
+      nextOffsetMm: number;
     };
 
 export function applyEditorCommand(
@@ -143,6 +150,29 @@ export function applyEditorCommand(
                   { ...command.opening },
                 ]
               : room.openings.filter((opening) => opening.id !== command.opening.id),
+        };
+      }),
+    };
+  }
+
+  if (command.type === "move-opening") {
+    const nextOffsetMm =
+      direction === "undo" ? command.previousOffsetMm : command.nextOffsetMm;
+
+    return {
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          openings: room.openings.map((opening) =>
+            opening.id === command.openingId
+              ? {
+                  ...opening,
+                  offsetMm: nextOffsetMm,
+                }
+              : opening
+          ),
         };
       }),
     };

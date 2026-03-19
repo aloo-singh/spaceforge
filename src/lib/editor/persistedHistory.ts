@@ -152,12 +152,23 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       changedRoom.previous.openings,
       changedRoom.next.openings
     );
-    if (!deletedOpening) return null;
+    if (deletedOpening) {
+      return {
+        type: "delete-opening",
+        roomId: changedRoom.next.id,
+        opening: deletedOpening,
+      };
+    }
+
+    const movedOpening = inferMovedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    if (!movedOpening) return null;
 
     return {
-      type: "delete-opening",
+      type: "move-opening",
       roomId: changedRoom.next.id,
-      opening: deletedOpening,
+      openingId: movedOpening.openingId,
+      previousOffsetMm: movedOpening.previousOffsetMm,
+      nextOffsetMm: movedOpening.nextOffsetMm,
     };
   }
 
@@ -202,6 +213,38 @@ function inferDeletedOpening(
   return {
     ...deletedOpenings[0],
   };
+}
+
+function inferMovedOpening(
+  previousOpenings: RoomOpening[],
+  nextOpenings: RoomOpening[]
+): { openingId: string; previousOffsetMm: number; nextOffsetMm: number } | null {
+  if (previousOpenings.length !== nextOpenings.length) return null;
+
+  const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
+  let movedOpening: { openingId: string; previousOffsetMm: number; nextOffsetMm: number } | null = null;
+
+  for (const previousOpening of previousOpenings) {
+    const nextOpening = nextById.get(previousOpening.id);
+    if (!nextOpening) return null;
+
+    const didNonOffsetFieldsChange =
+      previousOpening.type !== nextOpening.type ||
+      previousOpening.wall !== nextOpening.wall ||
+      previousOpening.widthMm !== nextOpening.widthMm;
+    if (didNonOffsetFieldsChange) return null;
+
+    if (previousOpening.offsetMm === nextOpening.offsetMm) continue;
+    if (movedOpening) return null;
+
+    movedOpening = {
+      openingId: previousOpening.id,
+      previousOffsetMm: previousOpening.offsetMm,
+      nextOffsetMm: nextOpening.offsetMm,
+    };
+  }
+
+  return movedOpening;
 }
 
 function findDocumentIndex(historyStack: EditorDocumentState[], document: EditorDocumentState): number | null {

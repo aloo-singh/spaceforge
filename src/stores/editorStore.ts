@@ -44,7 +44,11 @@ import {
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
 } from "@/lib/editor/persistedHistory";
-import { cloneRoomOpenings, createCenteredRoomOpening } from "@/lib/editor/openings";
+import {
+  cloneRoomOpenings,
+  createCenteredRoomOpening,
+  getOpeningOffsetForWorldPoint,
+} from "@/lib/editor/openings";
 import type {
   CameraState,
   OpeningType,
@@ -119,6 +123,13 @@ type EditorState = {
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
+  previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
+  commitOpeningMove: (
+    roomId: string,
+    openingId: string,
+    previousOffsetMm: number,
+    nextOffsetMm: number
+  ) => void;
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -191,6 +202,31 @@ function updateRoomPointsInDocument(
         ? {
             ...room,
             points: nextPoints.map((point) => ({ ...point })),
+          }
+        : room
+    ),
+  };
+}
+
+function updateRoomOpeningOffsetInDocument(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  nextOffsetMm: number
+): DocumentState {
+  return {
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            openings: room.openings.map((opening) =>
+              opening.id === openingId
+                ? {
+                    ...opening,
+                    offsetMm: nextOffsetMm,
+                  }
+                : opening
+            ),
           }
         : room
     ),
@@ -279,6 +315,28 @@ function insertOpeningOnSelectedWall(
     },
     canUndo: true,
     canRedo: false,
+  };
+}
+
+function resolveOpeningMoveOffset(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  cursorWorld: Point
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingId);
+  if (!room || !opening) return null;
+
+  const nextOffsetMm = getOpeningOffsetForWorldPoint(room, opening, cursorWorld, {
+    gridSizeMm: GRID_SIZE_MM,
+  });
+  if (nextOffsetMm === null) return null;
+
+  return {
+    room,
+    opening,
+    nextOffsetMm,
   };
 }
 
@@ -832,6 +890,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextState = insertOpeningOnSelectedWall(state, "window");
       return nextState ?? state;
     }),
+  previewOpeningMove: (roomId, openingId, nextOffsetMm) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const opening = room?.openings.find((candidate) => candidate.id === openingId);
+      if (!room || !opening) return state;
+      if (opening.offsetMm === nextOffsetMm) return state;
+
+      return {
+        document: updateRoomOpeningOffsetInDocument(state.document, roomId, openingId, nextOffsetMm),
+      };
+    }),
+  commitOpeningMove: (roomId, openingId, previousOffsetMm, nextOffsetMm) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const opening = room?.openings.find((candidate) => candidate.id === openingId);
+      if (!room || !opening) return state;
+      if (previousOffsetMm === nextOffsetMm) return state;
+
+      const command: EditorCommand = {
+        type: "move-opening",
+        roomId,
+        openingId,
+        previousOffsetMm,
+        nextOffsetMm,
+      };
+
+      return {
+        document: updateRoomOpeningOffsetInDocument(state.document, roomId, openingId, nextOffsetMm),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   moveRoomByDelta: (roomId, delta) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -1182,6 +1276,14 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     canUndo: true,
     canRedo: false,
   };
+}
+
+export function getOpeningMoveOffsetForCursor(
+  roomId: string,
+  openingId: string,
+  cursorWorld: Point
+) {
+  return resolveOpeningMoveOffset(useEditorStore.getState().document, roomId, openingId, cursorWorld);
 }
 
 function isValidDraftPathProgression(

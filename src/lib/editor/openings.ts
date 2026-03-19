@@ -1,4 +1,5 @@
 import { worldToScreen } from "@/lib/editor/camera";
+import { snapToGrid } from "@/lib/editor/geometry";
 import { getAxisAlignedRoomBounds, type RoomRectBounds } from "@/lib/editor/rectRoomResize";
 import type {
   CameraState,
@@ -185,6 +186,41 @@ export function findOpeningAtScreenPoint(
   }
 
   return null;
+}
+
+export function getOpeningOffsetForWorldPoint(
+  room: Room,
+  opening: RoomOpening,
+  worldPoint: Point,
+  options?: { gridSizeMm?: number }
+): number | null {
+  const bounds = getAxisAlignedRoomBounds(room);
+  if (!bounds) return null;
+
+  const segment = getRoomWallSegment(bounds, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const rawOffsetMm =
+    segment.axis === "horizontal" ? worldPoint.x - segment.start.x : worldPoint.y - segment.start.y;
+
+  return constrainOpeningOffset(opening, rawOffsetMm, segment.lengthMm, options);
+}
+
+export function constrainOpeningOffset(
+  opening: Pick<RoomOpening, "widthMm">,
+  offsetMm: number,
+  wallLengthMm: number,
+  options?: { gridSizeMm?: number }
+) {
+  const snappedOffsetMm =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(offsetMm, options.gridSizeMm)
+      : offsetMm;
+  const halfWidthMm = opening.widthMm / 2;
+  const minOffsetMm = halfWidthMm;
+  const maxOffsetMm = Math.max(halfWidthMm, wallLengthMm - halfWidthMm);
+
+  return clamp(snappedOffsetMm, minOffsetMm, maxOffsetMm);
 }
 
 export function getResolvedRoomOpeningLayoutFromBounds(

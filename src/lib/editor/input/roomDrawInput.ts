@@ -19,6 +19,7 @@ import {
   translateRoomPoints,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
+import { getOpeningMoveOffsetForCursor } from "@/stores/editorStore";
 import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
@@ -41,6 +42,13 @@ type RoomDrawStoreState = {
   selectWallByRoomId: (roomId: string, wall: RectWall) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
   clearRoomSelection: () => void;
+  previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
+  commitOpeningMove: (
+    roomId: string,
+    openingId: string,
+    previousOffsetMm: number,
+    nextOffsetMm: number
+  ) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
 };
@@ -65,6 +73,16 @@ type LabelDragSession = {
   startWorldPoint: Point;
   startPoints: Point[];
   latestPoints: Point[] | null;
+  didDrag: boolean;
+};
+
+type OpeningDragSession = {
+  pointerId: number;
+  roomId: string;
+  openingId: string;
+  startScreenPoint: Point;
+  startOffsetMm: number;
+  latestOffsetMm: number | null;
   didDrag: boolean;
 };
 
@@ -100,7 +118,9 @@ export function attachRoomDrawInput(
   let hoveredOpening: { roomId: string; openingId: string } | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
+  let activeOpeningDragSession: OpeningDragSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
+  const commitOpeningMove = store.getState().commitOpeningMove;
   let clearTransformFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const toCanvasPoint = (event: PointerEvent) => {
@@ -176,6 +196,11 @@ export function attachRoomDrawInput(
       return;
     }
 
+    if (activeOpeningDragSession?.didDrag) {
+      setCursor("grabbing");
+      return;
+    }
+
     const isDrawingModeActive = store.getState().roomDraft.points.length > 0;
     if (!isSpaceHeld && isDrawingModeActive) {
       setCursor("crosshair");
@@ -201,6 +226,16 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeLabelDragSession = null;
+    updateCursor();
+  };
+
+  const stopOpeningDragSession = () => {
+    if (!activeOpeningDragSession) return;
+    const pointerId = activeOpeningDragSession.pointerId;
+    if (canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+    activeOpeningDragSession = null;
     updateCursor();
   };
 
@@ -254,6 +289,32 @@ export function attachRoomDrawInput(
       return;
     }
 
+    if (activeOpeningDragSession) {
+      const session = activeOpeningDragSession;
+      if (event.pointerId !== session.pointerId) return;
+
+      const dragThresholdSquared = ROOM_LABEL_DRAG_THRESHOLD_PX * ROOM_LABEL_DRAG_THRESHOLD_PX;
+      const dx = screenPoint.x - session.startScreenPoint.x;
+      const dy = screenPoint.y - session.startScreenPoint.y;
+      if (!session.didDrag && dx * dx + dy * dy < dragThresholdSquared) {
+        callbacks.requestRender();
+        return;
+      }
+
+      const moveTarget = getOpeningMoveOffsetForCursor(session.roomId, session.openingId, cursorWorld);
+      if (!moveTarget) {
+        callbacks.requestRender();
+        return;
+      }
+
+      session.didDrag = true;
+      session.latestOffsetMm = moveTarget.nextOffsetMm;
+      store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
+      updateCursor();
+      callbacks.requestRender();
+      return;
+    }
+
     if (!isSpaceHeld && state.roomDraft.points.length === 0) {
       const hoveredRoom = findRoomLabelAtScreenPoint(
         state.document.rooms,
@@ -291,7 +352,7 @@ export function attachRoomDrawInput(
   };
 
   const onPointerLeave = () => {
-    if (activeLabelDragSession) return;
+    if (activeLabelDragSession || activeOpeningDragSession) return;
     callbacks.onCursorWorldChange(null);
     setHoveredRoomLabelId(null);
     hoveredOpening = null;
@@ -366,6 +427,20 @@ export function attachRoomDrawInput(
       hoveredOpening = openingHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(openingHit.roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === openingHit.roomId) ?? null;
+      const opening = room?.openings.find((candidate) => candidate.id === openingHit.openingId) ?? null;
+      if (room && opening) {
+        canvas.setPointerCapture(event.pointerId);
+        activeOpeningDragSession = {
+          pointerId: event.pointerId,
+          roomId: openingHit.roomId,
+          openingId: openingHit.openingId,
+          startScreenPoint: screenPoint,
+          startOffsetMm: opening.offsetMm,
+          latestOffsetMm: null,
+          didDrag: false,
+        };
+      }
       updateCursor();
       return;
     }
@@ -424,6 +499,39 @@ export function attachRoomDrawInput(
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    const screenPoint = toCanvasPoint(event);
+
+    if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
+      const session = activeOpeningDragSession;
+      if (session.didDrag) {
+        const nextOffsetMm = session.latestOffsetMm ?? session.startOffsetMm;
+        if (nextOffsetMm !== session.startOffsetMm) {
+          commitOpeningMove(
+            session.roomId,
+            session.openingId,
+            session.startOffsetMm,
+            nextOffsetMm
+          );
+        }
+      }
+      stopOpeningDragSession();
+
+      const state = store.getState();
+      const hoveredRoom =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredRoomLabelId(hoveredRoom?.id ?? null);
+      hoveredOpening =
+        !isSpaceHeld && state.roomDraft.points.length === 0
+          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          : null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     const session = activeLabelDragSession;
@@ -450,7 +558,6 @@ export function attachRoomDrawInput(
     stopLabelDragSession();
 
     const state = store.getState();
-    const screenPoint = toCanvasPoint(event);
     const hoveredRoom =
       !isSpaceHeld && state.roomDraft.points.length === 0
         ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
@@ -466,6 +573,26 @@ export function attachRoomDrawInput(
   };
 
   const onPointerCancel = (event: PointerEvent) => {
+    if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
+      if (activeOpeningDragSession.didDrag) {
+        store
+          .getState()
+          .previewOpeningMove(
+            activeOpeningDragSession.roomId,
+            activeOpeningDragSession.openingId,
+            activeOpeningDragSession.startOffsetMm
+          );
+      }
+
+      stopOpeningDragSession();
+      setHoveredRoomLabelId(null);
+      hoveredOpening = null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      callbacks.requestRender();
+      return;
+    }
+
     if (!activeLabelDragSession || event.pointerId !== activeLabelDragSession.pointerId) return;
 
     if (activeLabelDragSession.didDrag) {
@@ -541,8 +668,18 @@ export function attachRoomDrawInput(
     if (activeLabelDragSession?.didDrag) {
       clearPendingTransformFeedbackTimeout();
     }
+    if (activeOpeningDragSession?.didDrag) {
+      store
+        .getState()
+        .previewOpeningMove(
+          activeOpeningDragSession.roomId,
+          activeOpeningDragSession.openingId,
+          activeOpeningDragSession.startOffsetMm
+        );
+    }
     setTransformFeedback(null);
     stopLabelDragSession();
+    stopOpeningDragSession();
     setHoveredRoomLabelId(null);
     hoveredOpening = null;
     setHoveredSelectableWall(null);
