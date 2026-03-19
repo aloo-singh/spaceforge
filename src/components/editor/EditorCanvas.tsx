@@ -1527,7 +1527,9 @@ function drawRoomLabels(
   const areaFontSizePx = getScaledMeasurementPx(ROOM_LABEL_AREA_FONT_SIZE_PX, settings);
 
   for (const room of rooms) {
-    const layout = getRoomLabelLayout(room, camera, viewport, settings);
+    const layout = getRoomLabelLayout(room, camera, viewport, settings, {
+      showArea: showDimensions,
+    });
     if (!layout) continue;
     const textResolution = getTextResolution();
     const left = snapToPixel(layout.left, textResolution);
@@ -1592,7 +1594,7 @@ function drawRoomLabels(
     nameText.alpha = layout.isPlaceholderName ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
     labelContainer.addChild(nameText);
 
-    if (showDimensions && layout.areaText && areaCenterY !== null) {
+    if (layout.areaText && areaCenterY !== null) {
       const areaText = new Text({
         text: layout.areaText,
         resolution: textResolution,
@@ -1673,7 +1675,9 @@ function drawActiveResizeDimensions(
   const bounds = getAxisAlignedRoomBounds(activeRoom);
   if (!bounds) return;
 
-  const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport, settings);
+  const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport, settings, {
+    showArea: true,
+  });
   const labelSpecs = getResizeDimensionLabelSpecs(
     activeRoom,
     bounds,

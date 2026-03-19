@@ -14,7 +14,7 @@ import {
 } from "@/lib/editor/cameraTransition";
 import {
   applyCandidatePointToDraftPath,
-  getDraftLoopCandidate,
+  getDraftLoopClosureResult,
   getOrthogonalSegmentAxis,
   getOrthogonalSnappedPoint,
   normalizeDraftPointChain,
@@ -391,9 +391,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return completeDraftRoom(state, draftPoints);
       }
 
-      const loopCandidate = getDraftLoopCandidate(draftPoints, nextPoint);
-      if (loopCandidate && !pointsEqual(nextPoint, startPoint)) {
-        return completeDraftRoom(state, loopCandidate);
+      const loopClosure = getDraftLoopClosureResult(draftPoints, nextPoint);
+      if (loopClosure && !pointsEqual(nextPoint, startPoint)) {
+        return completeDraftRoom(state, loopClosure.committedLoop);
       }
 
       const nextDraftPoints = applyCandidatePointToDraftPath(draftPoints, nextPoint);

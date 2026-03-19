@@ -93,12 +93,21 @@ export function applyCandidatePointToDraftPath(points: Point[], nextPoint: Point
   return normalizeDraftPointChain([...normalizedPoints, nextPoint]);
 }
 
-export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
+export type DraftLoopClosureResult = {
+  nextDraftPath: Point[];
+  committedLoop: Point[];
+  discardedPrefix: Point[];
+};
+
+export function getDraftLoopClosureResult(
+  points: Point[],
+  nextPoint: Point
+): DraftLoopClosureResult | null {
   const nextDraftPath = applyCandidatePointToDraftPath(points, nextPoint);
   if (nextDraftPath.length < 5) return null;
 
   const loopEndpoint = nextDraftPath[nextDraftPath.length - 1];
-  const validCandidates: Point[][] = [];
+  const validLoopStartIndices: number[] = [];
 
   for (let index = 0; index < nextDraftPath.length - 1; index += 1) {
     if (!pointsEqual(nextDraftPath[index], loopEndpoint)) continue;
@@ -109,13 +118,24 @@ export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[
       continue;
     }
 
-    validCandidates.push(candidate);
-    if (validCandidates.length > 1) {
+    validLoopStartIndices.push(index);
+    if (validLoopStartIndices.length > 1) {
       return null;
     }
   }
 
-  return validCandidates[0] ?? null;
+  const loopStartIndex = validLoopStartIndices[0];
+  if (loopStartIndex === undefined) return null;
+
+  return {
+    nextDraftPath,
+    committedLoop: nextDraftPath.slice(loopStartIndex, -1),
+    discardedPrefix: nextDraftPath.slice(0, loopStartIndex),
+  };
+}
+
+export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
+  return getDraftLoopClosureResult(points, nextPoint)?.committedLoop ?? null;
 }
 
 /**
