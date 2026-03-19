@@ -94,20 +94,28 @@ export function applyCandidatePointToDraftPath(points: Point[], nextPoint: Point
 }
 
 export function getDraftLoopCandidate(points: Point[], nextPoint: Point): Point[] | null {
-  const normalizedPoints = normalizeDraftPointChain(points);
-  const loopStartIndex = normalizedPoints.findIndex((point, index) => {
-    if (index === normalizedPoints.length - 1) return false;
-    return pointsEqual(point, nextPoint);
-  });
-  if (loopStartIndex < 0) return null;
+  const nextDraftPath = applyCandidatePointToDraftPath(points, nextPoint);
+  if (nextDraftPath.length < 5) return null;
 
-  const candidate = normalizedPoints.slice(loopStartIndex);
-  if (candidate.length < 4) return null;
-  if (!isOrthogonalPointPath(candidate, { closed: true }) || !isSimplePolygon(candidate)) {
-    return null;
+  const loopEndpoint = nextDraftPath[nextDraftPath.length - 1];
+  const validCandidates: Point[][] = [];
+
+  for (let index = 0; index < nextDraftPath.length - 1; index += 1) {
+    if (!pointsEqual(nextDraftPath[index], loopEndpoint)) continue;
+
+    const candidate = nextDraftPath.slice(index, -1);
+    if (candidate.length < 4) continue;
+    if (!isOrthogonalPointPath(candidate, { closed: true }) || !isSimplePolygon(candidate)) {
+      continue;
+    }
+
+    validCandidates.push(candidate);
+    if (validCandidates.length > 1) {
+      return null;
+    }
   }
 
-  return candidate;
+  return validCandidates[0] ?? null;
 }
 
 /**

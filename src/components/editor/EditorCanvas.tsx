@@ -50,6 +50,7 @@ import {
 } from "@/lib/editor/rectRoomResize";
 import {
   formatMetricWallDimension,
+  getEdgeLengthMillimetres,
   getRectResizeMeasurements,
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
@@ -439,6 +440,7 @@ export default function EditorCanvas() {
       exportCamera,
       exportViewport,
       state.settings,
+      shouldShowDimensions(state.settings, state.isDimensionsVisibilityOverrideActive),
       null,
       editorThemeRef.current
     );
@@ -900,6 +902,7 @@ function drawScene(
     state.camera,
     state.viewport,
     state.settings,
+    showDimensions,
     transformFeedback,
     theme
   );
@@ -1515,6 +1518,7 @@ function drawRoomLabels(
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize">,
+  showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme
 ) {
@@ -1588,7 +1592,7 @@ function drawRoomLabels(
     nameText.alpha = layout.isPlaceholderName ? 0.72 : isHovered || isSelected ? 0.98 : 0.92;
     labelContainer.addChild(nameText);
 
-    if (layout.areaText && areaCenterY !== null) {
+    if (showDimensions && layout.areaText && areaCenterY !== null) {
       const areaText = new Text({
         text: layout.areaText,
         resolution: textResolution,
@@ -1697,15 +1701,15 @@ function drawDraftDimensions(
   settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
-  const firstSegmentLabelSpec = getDraftFirstSegmentDimensionLabelSpec(
+  const activeSegmentLabelSpec = getDraftActiveSegmentDimensionLabelSpec(
     draftPoints,
     cursorWorld,
     camera,
     viewport
   );
-  if (firstSegmentLabelSpec) {
+  if (activeSegmentLabelSpec) {
     const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-      [firstSegmentLabelSpec],
+      [activeSegmentLabelSpec],
       null,
       viewport,
       settings
@@ -2125,17 +2129,18 @@ function clearContainerChildren(container: Container) {
   staleChildren.forEach((child) => child.destroy());
 }
 
-function getDraftFirstSegmentDimensionLabelSpec(
+function getDraftActiveSegmentDimensionLabelSpec(
   draftPoints: Point[],
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize
 ): ResizeDimensionLabelSpec | null {
-  if (!cursorWorld || draftPoints.length !== 1) return null;
+  if (!cursorWorld || draftPoints.length === 0) return null;
 
-  const anchorPoint = draftPoints[0];
+  const anchorPoint = draftPoints[draftPoints.length - 1];
   const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, GRID_SIZE_MM);
   if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
+  if (draftPoints.length >= 4 && pointsEqual(previewPoint, draftPoints[0])) return null;
 
   const startScreen = worldToScreen(anchorPoint, camera, viewport);
   const endScreen = worldToScreen(previewPoint, camera, viewport);
@@ -2150,7 +2155,7 @@ function getDraftFirstSegmentDimensionLabelSpec(
         : "left";
 
   return {
-    text: formatMetricWallDimension(getRectSegmentLengthMillimetres(anchorPoint, previewPoint)),
+    text: formatMetricWallDimension(getEdgeLengthMillimetres(anchorPoint, previewPoint)),
     wall,
     axis: isHorizontal ? "horizontal" : "vertical",
     center: {
@@ -2161,12 +2166,10 @@ function getDraftFirstSegmentDimensionLabelSpec(
       ? { x: 0, y: wall === "bottom" ? 1 : -1 }
       : { x: wall === "right" ? 1 : -1, y: 0 },
     tangentDirection: isHorizontal ? { x: 1, y: 0 } : { x: 0, y: 1 },
-    wallLengthPx: isHorizontal ? Math.abs(endScreen.x - startScreen.x) : Math.abs(endScreen.y - startScreen.y),
+    wallLengthPx: isHorizontal
+      ? Math.abs(endScreen.x - startScreen.x)
+      : Math.abs(endScreen.y - startScreen.y),
   };
-}
-
-function getRectSegmentLengthMillimetres(start: Point, end: Point) {
-  return Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
 }
 
 function clampResizeDimensionLabelCenter(
