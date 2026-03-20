@@ -53,8 +53,14 @@ export default function RootLayout({
             </Link>
             <nav className="flex items-center text-sm">
               <Link
-                href="/editor"
+                href="/projects"
                 className="text-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
+              >
+                Projects
+              </Link>
+              <Link
+                href="/editor"
+                className="ml-4 text-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
               >
                 Editor
               </Link>
