@@ -30,9 +30,19 @@ function getDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
 type EditorProjectBootstrapProps = {
   projectId?: string;
   onProjectResolved?: (project: Pick<ProjectRecord, "id" | "name">) => void;
+  onBootstrapStateChange?: (
+    state:
+      | { status: "loading" }
+      | { status: "ready" }
+      | { status: "error"; message: string }
+  ) => void;
 };
 
-export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorProjectBootstrapProps) {
+export function EditorProjectBootstrap({
+  projectId,
+  onProjectResolved,
+  onBootstrapStateChange,
+}: EditorProjectBootstrapProps) {
   const router = useRouter();
   const document = useEditorStore((state) => state.document);
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
@@ -41,13 +51,20 @@ export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorP
   const lastSyncedSignatureRef = useRef<string | null>(null);
   const isBootstrappingRef = useRef(true);
   const onProjectResolvedRef = useRef(onProjectResolved);
+  const onBootstrapStateChangeRef = useRef(onBootstrapStateChange);
 
   useEffect(() => {
     onProjectResolvedRef.current = onProjectResolved;
   }, [onProjectResolved]);
 
   useEffect(() => {
+    onBootstrapStateChangeRef.current = onBootstrapStateChange;
+  }, [onBootstrapStateChange]);
+
+  useEffect(() => {
     let isCancelled = false;
+    isBootstrappingRef.current = true;
+    onBootstrapStateChangeRef.current?.({ status: "loading" });
 
     const bootstrap = async () => {
       try {
@@ -75,6 +92,7 @@ export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorP
                 router.replace("/projects");
               }
               isBootstrappingRef.current = false;
+              onBootstrapStateChangeRef.current?.({ status: "ready" });
               return;
             }
             if (isCancelled) return;
@@ -93,6 +111,7 @@ export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorP
             lastSyncedSignatureRef.current = getDocumentSignature(fallbackDocument);
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
+            onBootstrapStateChangeRef.current?.({ status: "ready" });
             if (projectId && projectId !== fallbackProject.id) {
               router.replace(`/editor/${fallbackProject.id}`);
             }
@@ -114,6 +133,7 @@ export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorP
           lastSyncedSignatureRef.current = getDocumentSignature(project.document);
           setActiveProjectId(project.id);
           isBootstrappingRef.current = false;
+          onBootstrapStateChangeRef.current?.({ status: "ready" });
           if (projectId && projectId !== project.id) {
             router.replace(`/editor/${project.id}`);
           }
@@ -138,14 +158,24 @@ export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorP
         lastSyncedSignatureRef.current = getDocumentSignature(nextDocument);
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
+        onBootstrapStateChangeRef.current?.({ status: "ready" });
       } catch (error) {
         if (error instanceof ProjectApiError && error.status === 404) {
           clearActiveProjectId();
           if (projectId) {
             router.replace("/projects");
           }
+          onBootstrapStateChangeRef.current?.({
+            status: "error",
+            message: "This project could not be found.",
+          });
         } else {
           console.error("Failed to bootstrap editor project.", error);
+          onBootstrapStateChangeRef.current?.({
+            status: "error",
+            message:
+              error instanceof Error ? error.message : "Failed to load the current project.",
+          });
         }
         if (isCancelled) return;
         isBootstrappingRef.current = false;

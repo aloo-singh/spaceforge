@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FolderOpenDot, Plus } from "lucide-react";
+import { AlertCircle, ArrowRight, FolderOpenDot, Plus, RefreshCcw } from "lucide-react";
 import { createOrFetchAnonymousUser, createProject, fetchProjects, updateProject } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
 import { createEmptyProjectDocument, DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
@@ -20,27 +20,36 @@ export function ProjectsPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const didLoadProjectsRef = useRef(false);
+
+  const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
+    if (showLoadingState) {
+      setIsLoading(true);
+    }
+
+    try {
+      const clientToken = getOrCreateAnonymousClientToken();
+      await createOrFetchAnonymousUser(clientToken);
+      const loadedProjects = await fetchProjects(clientToken);
+
+      setProjects(sortProjectsByUpdatedAt(loadedProjects));
+      setErrorMessage(null);
+      didLoadProjectsRef.current = true;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load projects.");
+    } finally {
+      if (showLoadingState) {
+        setIsLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
     let isCancelled = false;
 
     const load = async () => {
-      try {
-        const clientToken = getOrCreateAnonymousClientToken();
-        await createOrFetchAnonymousUser(clientToken);
-        const loadedProjects = await fetchProjects(clientToken);
         if (isCancelled) return;
-
-        setProjects(sortProjectsByUpdatedAt(loadedProjects));
-        setErrorMessage(null);
-      } catch (error) {
-        if (isCancelled) return;
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load projects.");
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
+        await loadProjects({ showLoadingState: true });
     };
 
     void load();
@@ -51,9 +60,12 @@ export function ProjectsPageClient() {
   }, []);
 
   const handleCreateProject = () => {
+    if (isCreatingProject || renamingProjectId !== null) return;
+
     startCreateProjectTransition(() => {
       void (async () => {
         try {
+          setErrorMessage(null);
           const clientToken = getOrCreateAnonymousClientToken();
           await createOrFetchAnonymousUser(clientToken);
 
@@ -72,9 +84,12 @@ export function ProjectsPageClient() {
   };
 
   const handleRenameProject = async (projectId: string, name: string) => {
+    if (isCreatingProject || renamingProjectId !== null) return;
+
     setRenamingProjectId(projectId);
 
     try {
+      setErrorMessage(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const project = await updateProject(clientToken, projectId, { name });
       setProjects((currentProjects) => mergeProjectIntoList(currentProjects, project));
@@ -118,15 +133,36 @@ export function ProjectsPageClient() {
         </div>
 
         {errorMessage ? (
-          <Empty className="min-h-52">
-            <EmptyHeader>
-              <EmptyTitle>Projects unavailable</EmptyTitle>
-              <EmptyDescription className="max-w-xl">{errorMessage}</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-foreground/55" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  {didLoadProjectsRef.current ? "Projects update failed" : "Projects unavailable"}
+                </p>
+                <p className="text-sm text-muted-foreground">{errorMessage}</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void loadProjects({ showLoadingState: !didLoadProjectsRef.current });
+              }}
+              disabled={isLoading || isCreatingProject || renamingProjectId !== null}
+            >
+              <RefreshCcw className="size-4" />
+              Retry
+            </Button>
+          </div>
         ) : null}
 
-        {!errorMessage && isLoading ? (
+        {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <div
@@ -137,24 +173,39 @@ export function ProjectsPageClient() {
           </div>
         ) : null}
 
-        {!errorMessage && !isLoading && projects.length === 0 ? (
+        {!isLoading && projects.length === 0 ? (
           <Empty className="min-h-60">
             <EmptyHeader>
-              <EmptyTitle>No projects yet</EmptyTitle>
+              <EmptyTitle>{errorMessage ? "Projects unavailable" : "No projects yet"}</EmptyTitle>
               <EmptyDescription className="max-w-md">
-                Create your first project to start sketching a new layout with a clean document.
+                {errorMessage
+                  ? "Retry loading or create a fresh project to continue with a clean document."
+                  : "Create your first project to start sketching a new layout with a clean document."}
               </EmptyDescription>
             </EmptyHeader>
             <div className="mt-6 flex items-center gap-3">
               <Button
                 type="button"
                 onClick={handleCreateProject}
-                disabled={isCreatingProject}
+                disabled={isCreatingProject || renamingProjectId !== null}
                 className="bg-blue-500 text-white hover:bg-blue-500/90"
               >
                 <Plus className="size-4" />
                 {isCreatingProject ? "Creating project..." : "New project"}
               </Button>
+              {errorMessage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void loadProjects({ showLoadingState: true });
+                  }}
+                  disabled={isLoading || isCreatingProject || renamingProjectId !== null}
+                >
+                  <RefreshCcw className="size-4" />
+                  Retry
+                </Button>
+              ) : null}
               <Button asChild variant="outline">
                 <Link href="/editor">
                   Open editor
@@ -165,7 +216,7 @@ export function ProjectsPageClient() {
           </Empty>
         ) : null}
 
-        {!errorMessage && !isLoading && projects.length > 0 ? (
+        {!isLoading && projects.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard
@@ -173,12 +224,13 @@ export function ProjectsPageClient() {
                 project={project}
                 onRename={handleRenameProject}
                 isRenaming={renamingProjectId === project.id}
+                isInteractionDisabled={isCreatingProject}
               />
             ))}
           </div>
         ) : null}
 
-        {!errorMessage && !isLoading && projects.length > 0 ? (
+        {!isLoading && projects.length > 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FolderOpenDot className="size-4" />
             <span>Projects open in the editor without changing the document structure.</span>

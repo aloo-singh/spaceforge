@@ -13,12 +13,19 @@ type ProjectCardProps = {
   project: ProjectListItem;
   onRename: (projectId: string, name: string) => Promise<void>;
   isRenaming: boolean;
+  isInteractionDisabled?: boolean;
 };
 
-export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  onRename,
+  isRenaming,
+  isInteractionDisabled = false,
+}: ProjectCardProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(project.name);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const isSubmittingRenameRef = useRef(false);
 
   useEffect(() => {
     if (!isEditingName) return;
@@ -27,6 +34,8 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
   }, [isEditingName]);
 
   const finishRename = async () => {
+    if (isSubmittingRenameRef.current || isInteractionDisabled) return;
+
     const nextName = draftName.trim();
     if (!nextName) {
       setDraftName(project.name);
@@ -40,14 +49,18 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
     }
 
     try {
+      isSubmittingRenameRef.current = true;
       await onRename(project.id, nextName);
       setIsEditingName(false);
     } catch {
       inputRef.current?.focus();
+    } finally {
+      isSubmittingRenameRef.current = false;
     }
   };
 
   const cancelRename = () => {
+    if (isRenaming) return;
     setDraftName(project.name);
     setIsEditingName(false);
   };
@@ -77,7 +90,7 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
                     onBlur={() => {
                       void finishRename();
                     }}
-                    disabled={isRenaming}
+                    disabled={isRenaming || isInteractionDisabled}
                     className="h-9"
                     aria-label={`Rename ${project.name}`}
                   />
@@ -104,7 +117,7 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
                     onClick={() => {
                       void finishRename();
                     }}
-                    disabled={isRenaming}
+                    disabled={isRenaming || isInteractionDisabled}
                     aria-label={`Save ${project.name} name`}
                   >
                     <Check className="size-4" />
@@ -115,7 +128,7 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
                     size="icon-sm"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={cancelRename}
-                    disabled={isRenaming}
+                    disabled={isRenaming || isInteractionDisabled}
                     aria-label={`Cancel renaming ${project.name}`}
                   >
                     <X className="size-4" />
@@ -127,9 +140,11 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
                   variant="ghost"
                   size="sm"
                   onClick={() => {
+                    if (isInteractionDisabled) return;
                     setDraftName(project.name);
                     setIsEditingName(true);
                   }}
+                  disabled={isInteractionDisabled}
                   aria-label={`Rename ${project.name}`}
                 >
                   <PencilLine className="size-4" />
@@ -148,6 +163,7 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
                 ? "pointer-events-none text-foreground/35"
                 : "text-foreground/70 hover:text-foreground"
             }`}
+            aria-disabled={isEditingName || isRenaming || isInteractionDisabled}
           >
             Open project
           </Link>
@@ -155,7 +171,7 @@ export function ProjectCard({ project, onRename, isRenaming }: ProjectCardProps)
             asChild
             size="sm"
             className="bg-blue-500 text-white hover:bg-blue-500/90"
-            disabled={isEditingName || isRenaming}
+            disabled={isEditingName || isRenaming || isInteractionDisabled}
           >
             <Link href={`/editor/${project.id}`}>
               Open
