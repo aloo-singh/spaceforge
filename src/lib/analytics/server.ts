@@ -1,18 +1,8 @@
 import type { AnalyticsEvent } from "@/lib/analytics/types";
-
-function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    return null;
-  }
-
-  return { url, serviceRoleKey };
-}
+import { getSupabaseServerConfig } from "@/lib/supabase/server";
 
 export async function persistAnalyticsEvent(event: AnalyticsEvent) {
-  const supabaseConfig = getSupabaseConfig();
+  const supabaseConfig = getSupabaseServerConfig();
   if (!supabaseConfig) {
     return { persisted: false as const, reason: "missing_supabase_config" as const };
   }

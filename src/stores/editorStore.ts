@@ -42,6 +42,8 @@ import {
   buildPersistedHistorySnapshot,
   type PersistedHistorySnapshot,
   hydrateCommandHistoryFromSnapshots,
+  areDocumentsEqual,
+  cloneDocumentState,
 } from "@/lib/editor/persistedHistory";
 import {
   areRoomOpeningsEqual,
@@ -157,6 +159,7 @@ type EditorState = {
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
+  loadProjectDocument: (document: DocumentState) => void;
 };
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
@@ -1331,6 +1334,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
         canUndo: true,
         canRedo: remainingFuture.length > 0,
+      };
+    }),
+  loadProjectDocument: (document) =>
+    set((state) => {
+      const nextDocument = cloneDocumentState(document);
+      if (areDocumentsEqual(state.document, nextDocument)) {
+        return state;
+      }
+
+      stopResetCameraAnimation();
+
+      return {
+        document: nextDocument,
+        camera: getCameraFitTarget({
+          rooms: nextDocument.rooms,
+          viewport: state.viewport,
+          emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+        }).camera,
+        roomDraft: EMPTY_ROOM_DRAFT,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        history: {
+          past: [],
+          future: [],
+        },
+        canUndo: false,
+        canRedo: false,
       };
     }),
 }));

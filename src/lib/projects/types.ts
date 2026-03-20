@@ -1,0 +1,83 @@
+import type { EditorDocumentState } from "@/lib/editor/history";
+import { cloneDocumentState } from "@/lib/editor/persistedHistory";
+
+export type AppUser = {
+  id: string;
+  clientToken: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectRecord = {
+  id: string;
+  userId: string;
+  name: string;
+  document: EditorDocumentState;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectListItem = Omit<ProjectRecord, "document">;
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isPoint(value: unknown): value is { x: number; y: number } {
+  if (!isObject(value)) return false;
+  return isFiniteNumber(value.x) && isFiniteNumber(value.y);
+}
+
+function isOpeningType(value: unknown): value is "door" | "window" {
+  return value === "door" || value === "window";
+}
+
+function isRoomOpening(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (!isOpeningType(value.type)) return false;
+
+  const isLegacyRectWall =
+    value.wall === "left" ||
+    value.wall === "right" ||
+    value.wall === "top" ||
+    value.wall === "bottom";
+  const isSegmentIndex = typeof value.wall === "number" && Number.isInteger(value.wall) && value.wall >= 0;
+  if (!isLegacyRectWall && !isSegmentIndex) return false;
+
+  if (value.openingSide !== undefined && value.openingSide !== "interior" && value.openingSide !== "exterior") {
+    return false;
+  }
+  if (value.hingeSide !== undefined && value.hingeSide !== "start" && value.hingeSide !== "end") {
+    return false;
+  }
+
+  return isFiniteNumber(value.offsetMm) && isFiniteNumber(value.widthMm) && value.widthMm > 0;
+}
+
+function isRoom(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (typeof value.name !== "string") return false;
+  if (!Array.isArray(value.points) || value.points.length < 3) return false;
+  if (!value.points.every(isPoint)) return false;
+  if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
+    return false;
+  }
+
+  return true;
+}
+
+export function isProjectDocument(value: unknown): value is EditorDocumentState {
+  if (!isObject(value)) return false;
+  if (!Array.isArray(value.rooms)) return false;
+  return value.rooms.every(isRoom);
+}
+
+export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {
+  return cloneDocumentState(document);
+}

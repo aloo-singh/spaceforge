@@ -10,27 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.28.0</h2>
-            <span className="text-sm text-muted-foreground">2026-03-19</span>
+            <h2 className="text-2xl font-semibold">v0.29.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-20</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Added adaptive snap-step resolution so editing precision now scales with zoom level instead of staying fixed to one grid increment</li>
-                <li>Added a lightweight live scale overlay in the canvas with the current snap increment shown alongside the scale bar</li>
+                <li>Anonymous user identity system for persistent project storage</li>
+                <li>Projects model with create, list, fetch, and update support</li>
+                <li><code>/projects</code> page for browsing and opening saved work</li>
+                <li>Multi-project support with automatic persistence</li>
+                <li>Inline project renaming on the projects page</li>
+                <li>Inline project renaming directly in the editor</li>
+                <li>Background syncing of editor document to backend</li>
               </ul>
             </div>
 
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
-                Behaviour
+                Changed
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Room drawing, whole-room movement, rectangular resize, constrained vertex drag, and opening drag or resize now share one central active snap step</li>
-                <li>The snap tiers are tuned so 0.5 m remains the main working mode, 0.1 m activates earlier for detail work, and 1.0 m is reserved for genuinely far-out views</li>
-                <li>The scale overlay now avoids hydration mismatch by staying server and client stable until editor state hydration completes</li>
+                <li>Editor now loads and persists work per project instead of a single local canvas</li>
+                <li>Project context is integrated into the editor top bar</li>
+                <li>Navigation between editor and projects is now explicit and reversible</li>
+                <li>Project list is sorted by most recently updated</li>
               </ul>
             </div>
 
@@ -39,7 +45,28 @@ export default function ChangelogPage() {
                 Improvements
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Adaptive snapping now feels more consistent across the editor&apos;s direct manipulation paths without adding new settings or heavy UI</li>
+                <li>Removed redundant open actions on project cards</li>
+                <li>Simplified projects page UI and removed confusing helper copy</li>
+                <li>Streamlined project naming flow with inline editing</li>
+                <li>Editor/project interaction now feels continuous and low-friction</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Restored missing editor controls after UI regression</li>
+                <li>Removed invalid cursor state on project name</li>
+                <li>Removed redundant navigation elements in editor</li>
+                <li>Cleaned up duplicate divider lines in editor shell</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Existing local editor persistence remains intact as a fallback</li>
+                <li>No account/auth system introduced yet (anonymous users only)</li>
               </ul>
             </div>
           </div>

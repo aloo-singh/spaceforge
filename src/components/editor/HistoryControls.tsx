@@ -19,6 +19,7 @@ type HistoryControlsProps = {
   exportDisabled?: boolean;
   exportDisabledReason?: string;
   className?: string;
+  leadingContent?: React.ReactNode;
 };
 
 export function HistoryControls({
@@ -27,6 +28,7 @@ export function HistoryControls({
   exportDisabled = false,
   exportDisabledReason,
   className,
+  leadingContent,
 }: HistoryControlsProps) {
   const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -93,7 +95,9 @@ export function HistoryControls({
           className
         )}
       >
-        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+        <div className="flex min-w-0 items-center gap-2 sm:flex-1">
+          {leadingContent ? <div className="shrink-0">{leadingContent}</div> : null}
+          <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
           <Button
             type="button"
             variant="outline"
@@ -172,6 +176,7 @@ export function HistoryControls({
           >
             <RotateCcw />
           </Button>
+        </div>
         </div>
 
         <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
