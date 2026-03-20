@@ -7,7 +7,8 @@ import {
   createOrFetchAnonymousUser,
   createProject,
   fetchProjectSafely,
-  fetchProjectsSafely,
+  fetchProjects,
+  ProjectApiError,
   updateProject,
 } from "@/lib/projects/clientApi";
 import {
@@ -17,6 +18,7 @@ import {
   saveActiveProjectId,
 } from "@/lib/projects/clientIdentity";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
+import type { ProjectRecord } from "@/lib/projects/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
@@ -27,9 +29,10 @@ function getDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
 
 type EditorProjectBootstrapProps = {
   projectId?: string;
+  onProjectResolved?: (project: Pick<ProjectRecord, "id" | "name">) => void;
 };
 
-export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProps) {
+export function EditorProjectBootstrap({ projectId, onProjectResolved }: EditorProjectBootstrapProps) {
   const router = useRouter();
   const document = useEditorStore((state) => state.document);
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
@@ -37,6 +40,11 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
   const clientTokenRef = useRef<string | null>(null);
   const lastSyncedSignatureRef = useRef<string | null>(null);
   const isBootstrappingRef = useRef(true);
+  const onProjectResolvedRef = useRef(onProjectResolved);
+
+  useEffect(() => {
+    onProjectResolvedRef.current = onProjectResolved;
+  }, [onProjectResolved]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -54,7 +62,7 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
             : null;
 
         if (!selectedProject) {
-          const projects = await fetchProjectsSafely(clientToken);
+          const projects = await fetchProjects(clientToken);
           const fallbackProjectId = loadActiveProjectId();
           const selectedProjectListItem =
             projects.find((project) => project.id === fallbackProjectId) ?? projects[0] ?? null;
@@ -78,6 +86,10 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
             }
 
             saveActiveProjectId(fallbackProject.id);
+            onProjectResolvedRef.current?.({
+              id: fallbackProject.id,
+              name: fallbackProject.name,
+            });
             lastSyncedSignatureRef.current = getDocumentSignature(fallbackDocument);
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
@@ -95,6 +107,10 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
           if (isCancelled) return;
 
           saveActiveProjectId(project.id);
+          onProjectResolvedRef.current?.({
+            id: project.id,
+            name: project.name,
+          });
           lastSyncedSignatureRef.current = getDocumentSignature(project.document);
           setActiveProjectId(project.id);
           isBootstrappingRef.current = false;
@@ -115,11 +131,22 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
         }
 
         saveActiveProjectId(selectedProject.id);
+        onProjectResolvedRef.current?.({
+          id: selectedProject.id,
+          name: selectedProject.name,
+        });
         lastSyncedSignatureRef.current = getDocumentSignature(nextDocument);
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
       } catch (error) {
-        console.error("Failed to bootstrap editor project.", error);
+        if (error instanceof ProjectApiError && error.status === 404) {
+          clearActiveProjectId();
+          if (projectId) {
+            router.replace("/projects");
+          }
+        } else {
+          console.error("Failed to bootstrap editor project.", error);
+        }
         if (isCancelled) return;
         isBootstrappingRef.current = false;
       }

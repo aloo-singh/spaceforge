@@ -46,18 +46,6 @@ export async function fetchProjects(clientToken: string) {
   return payload.projects;
 }
 
-export async function fetchProjectsSafely(clientToken: string) {
-  try {
-    return await fetchProjects(clientToken);
-  } catch (error) {
-    if (error instanceof ProjectApiError && error.status === 404) {
-      return [];
-    }
-
-    throw error;
-  }
-}
-
 export async function createProject(
   clientToken: string,
   input: {

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FolderOpenDot, Plus } from "lucide-react";
-import { createOrFetchAnonymousUser, createProject, fetchProjects } from "@/lib/projects/clientApi";
+import { createOrFetchAnonymousUser, createProject, fetchProjects, updateProject } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
 import { createEmptyProjectDocument, DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
 import type { ProjectListItem } from "@/lib/projects/types";
+import { mergeProjectIntoList, sortProjectsByUpdatedAt } from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -18,6 +19,7 @@ export function ProjectsPageClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -29,7 +31,7 @@ export function ProjectsPageClient() {
         const loadedProjects = await fetchProjects(clientToken);
         if (isCancelled) return;
 
-        setProjects(loadedProjects);
+        setProjects(sortProjectsByUpdatedAt(loadedProjects));
         setErrorMessage(null);
       } catch (error) {
         if (isCancelled) return;
@@ -67,6 +69,22 @@ export function ProjectsPageClient() {
         }
       })();
     });
+  };
+
+  const handleRenameProject = async (projectId: string, name: string) => {
+    setRenamingProjectId(projectId);
+
+    try {
+      const clientToken = getOrCreateAnonymousClientToken();
+      const project = await updateProject(clientToken, projectId, { name });
+      setProjects((currentProjects) => mergeProjectIntoList(currentProjects, project));
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to rename project.");
+      throw error;
+    } finally {
+      setRenamingProjectId(null);
+    }
   };
 
   return (
@@ -150,7 +168,12 @@ export function ProjectsPageClient() {
         {!errorMessage && !isLoading && projects.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onRename={handleRenameProject}
+                isRenaming={renamingProjectId === project.id}
+              />
             ))}
           </div>
         ) : null}
