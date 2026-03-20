@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, FolderOpenDot, Plus, RefreshCcw } from "lucide-react";
+import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "lucide-react";
 import {
   createOrFetchAnonymousUser,
   createProject,
@@ -56,8 +56,8 @@ export function ProjectsPageClient() {
     let isCancelled = false;
 
     const load = async () => {
-        if (isCancelled) return;
-        await loadProjects({ showLoadingState: true });
+      if (isCancelled) return;
+      await loadProjects({ showLoadingState: true });
     };
 
     void load();
@@ -242,13 +242,6 @@ export function ProjectsPageClient() {
                 isInteractionDisabled={isCreatingProject || isProjectsApiUnavailable}
               />
             ))}
-          </div>
-        ) : null}
-
-        {!isLoading && projects.length > 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <FolderOpenDot className="size-4" />
-            <span>Projects open in the editor without changing the document structure.</span>
           </div>
         ) : null}
       </section>

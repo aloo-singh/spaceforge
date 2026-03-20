@@ -66,7 +66,7 @@ export function ProjectCard({
   };
 
   return (
-    <Card className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card">
+    <Card className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card/95">
       <CardContent className="flex h-full flex-col gap-5 p-5">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -155,18 +155,7 @@ export function ProjectCard({
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <Link
-            href={`/editor/${project.id}`}
-            className={`text-sm transition-colors focus-visible:text-foreground ${
-              isEditingName || isRenaming
-                ? "pointer-events-none text-foreground/35"
-                : "text-foreground/70 hover:text-foreground"
-            }`}
-            aria-disabled={isEditingName || isRenaming || isInteractionDisabled}
-          >
-            Open project
-          </Link>
+        <div className="mt-auto flex items-center justify-end">
           <Button
             asChild
             size="sm"
@@ -174,7 +163,7 @@ export function ProjectCard({
             disabled={isEditingName || isRenaming || isInteractionDisabled}
           >
             <Link href={`/editor/${project.id}`}>
-              Open
+              Open project
               <ArrowUpRight className="size-4" />
             </Link>
           </Button>
