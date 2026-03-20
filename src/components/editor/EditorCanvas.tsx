@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
@@ -159,7 +159,11 @@ function getScaledMeasurementPx(
   return value * getMeasurementTextScale(settings);
 }
 
-export default function EditorCanvas() {
+type EditorCanvasProps = {
+  topBarLeadingContent?: ReactNode;
+};
+
+export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
@@ -859,6 +863,7 @@ export default function EditorCanvas() {
       </p>
       <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
+          leadingContent={topBarLeadingContent}
           onExportPng={exportCurrentCanvasAsPng}
           isExportingPng={isExportingPng}
           exportDisabled={!isCanvasReadyForExport || !hasRooms}
