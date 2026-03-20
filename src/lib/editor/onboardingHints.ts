@@ -3,8 +3,9 @@ export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding
 
 export type EditorOnboardingHintId =
   | "empty-canvas-draw"
-  | "project-name-and-autosave"
-  | "projects-list-awareness"
+  | "close-shape-to-make-room"
+  | "project-ownership"
+  | "project-name"
   | "resize-room-by-dragging-edges"
   | "undo-last-action"
   | "export-as-png"
@@ -19,6 +20,7 @@ type EditorOnboardingHint = {
 
 type EditorOnboardingHintContext = {
   roomCount: number;
+  roomDraftPointCount: number;
   hasResolvedProject: boolean;
   isMacPlatform: boolean;
   dismissedHintIds: ReadonlySet<EditorOnboardingHintId>;
@@ -35,33 +37,50 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
   {
     id: "empty-canvas-draw",
     message: "Click to start drawing",
-    shouldShow: ({ roomCount }) => roomCount === 0,
+    shouldShow: ({ roomCount, roomDraftPointCount }) => roomCount === 0 && roomDraftPointCount === 0,
   },
   {
-    id: "project-name-and-autosave",
-    message: "This project saves automatically. Click its name to rename it.",
-    shouldShow: ({ roomCount, hasResolvedProject }) => roomCount > 0 && hasResolvedProject,
-    autoCompleteAfterMs: 3600,
+    id: "close-shape-to-make-room",
+    message: "Close the shape to make a room",
+    shouldShow: ({ roomCount, roomDraftPointCount, completedHintIds }) =>
+      roomCount === 0 &&
+      roomDraftPointCount >= 3 &&
+      completedHintIds.has("empty-canvas-draw"),
   },
   {
-    id: "projects-list-awareness",
-    message: "Find your layouts any time in Projects.",
+    id: "project-ownership",
+    message: "This is your project. It saves automatically.",
     shouldShow: ({ roomCount, hasResolvedProject, completedHintIds }) =>
       roomCount > 0 &&
       hasResolvedProject &&
-      completedHintIds.has("project-name-and-autosave"),
-    autoCompleteAfterMs: 2800,
+      completedHintIds.has("close-shape-to-make-room"),
+    autoCompleteAfterMs: 2600,
+  },
+  {
+    id: "project-name",
+    message: "Give it a name so you can find it later in Projects.",
+    shouldShow: ({ roomCount, hasResolvedProject, completedHintIds }) =>
+      roomCount > 0 &&
+      hasResolvedProject &&
+      completedHintIds.has("project-ownership"),
+    autoCompleteAfterMs: 4200,
   },
   {
     id: "resize-room-by-dragging-edges",
     message: "Select a room, then drag an edge to resize",
     shouldShow: ({ roomCount, completedHintIds }) =>
-      roomCount > 0 && completedHintIds.has("projects-list-awareness"),
+      roomCount > 0 && completedHintIds.has("undo-last-action"),
   },
   {
     id: "undo-last-action",
     message: ({ isMacPlatform }) =>
       isMacPlatform ? "Press ⌘Z to undo" : "Press Ctrl+Z to undo",
+    shouldShow: ({ roomCount, completedHintIds }) =>
+      roomCount > 0 && completedHintIds.has("project-name"),
+  },
+  {
+    id: "pan-canvas",
+    message: "Hold SPACE and drag to pan, or middle mouse drag",
     shouldShow: ({ roomCount, completedHintIds }) =>
       roomCount > 0 && completedHintIds.has("resize-room-by-dragging-edges"),
   },
@@ -69,13 +88,7 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
     id: "export-as-png",
     message: "Export as PNG when you're ready",
     shouldShow: ({ roomCount, completedHintIds }) =>
-      roomCount > 0 && completedHintIds.has("undo-last-action"),
-  },
-  {
-    id: "pan-canvas",
-    message: "Hold SPACE and drag to pan, or middle mouse drag",
-    shouldShow: ({ roomCount, completedHintIds }) =>
-      roomCount > 0 && completedHintIds.has("export-as-png"),
+      roomCount > 0 && completedHintIds.has("pan-canvas"),
   },
 ];
 
@@ -152,8 +165,9 @@ function saveEditorHintIdsToStorage(storageKey: string, hintIds: EditorOnboardin
 function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
   return (
     value === "empty-canvas-draw" ||
-    value === "project-name-and-autosave" ||
-    value === "projects-list-awareness" ||
+    value === "close-shape-to-make-room" ||
+    value === "project-ownership" ||
+    value === "project-name" ||
     value === "resize-room-by-dragging-edges" ||
     value === "undo-last-action" ||
     value === "export-as-png" ||

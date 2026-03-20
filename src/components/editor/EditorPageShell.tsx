@@ -6,6 +6,7 @@ import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
 import { Button } from "@/components/ui/button";
+import type { EditorOnboardingHintId } from "@/lib/editor/onboardingHints";
 
 type EditorPageShellProps = {
   projectId?: string;
@@ -16,6 +17,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     id: string;
     name: string;
   } | null>(null);
+  const [activeHintId, setActiveHintId] = useState<EditorOnboardingHintId | null>(null);
   const [projectRenameSessionCount, setProjectRenameSessionCount] = useState(0);
   const [bootstrapState, setBootstrapState] = useState<
     | { status: "loading" }
@@ -53,12 +55,14 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
       ) : null}
       <EditorCanvas
         hasResolvedProject={activeProject !== null}
+        onDisplayedHintChange={setActiveHintId}
         projectRenameSessionCount={projectRenameSessionCount}
         topBarLeadingContent={
           <EditorProjectChrome
             projectId={activeProject?.id ?? null}
             projectName={activeProject?.name ?? null}
             isLoading={bootstrapState.status === "loading"}
+            isNameHighlighted={activeHintId === "project-name"}
             onProjectRenameStart={() => {
               setProjectRenameSessionCount((currentCount) => currentCount + 1);
             }}

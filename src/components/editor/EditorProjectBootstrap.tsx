@@ -19,7 +19,7 @@ import {
   loadActiveProjectId,
   saveActiveProjectId,
 } from "@/lib/projects/clientIdentity";
-import { DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
+import { getDefaultProjectName } from "@/lib/projects/defaults";
 import type { ProjectRecord } from "@/lib/projects/types";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -123,7 +123,7 @@ export function EditorProjectBootstrap({
 
           const localDocument = cloneDocumentState(useEditorStore.getState().document);
           const project = await createProject(clientToken, {
-            name: DEFAULT_PROJECT_NAME,
+            name: getDefaultProjectName({ isFirstProject: true }),
             document: localDocument,
           });
           if (isCancelled) return;

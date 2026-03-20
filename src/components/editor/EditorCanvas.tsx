@@ -161,12 +161,14 @@ function getScaledMeasurementPx(
 type EditorCanvasProps = {
   hasResolvedProject?: boolean;
   projectRenameSessionCount?: number;
+  onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
   topBarLeadingContent?: ReactNode;
 };
 
 export default function EditorCanvas({
   hasResolvedProject = false,
   projectRenameSessionCount = 0,
+  onDisplayedHintChange,
   topBarLeadingContent,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -209,6 +211,7 @@ export default function EditorCanvas({
     () => false
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const camera = useEditorStore((state) => state.camera);
   const hasRooms = hasHydratedClient && roomCount > 0;
@@ -232,12 +235,21 @@ export default function EditorCanvas({
 
     return getActiveEditorOnboardingHint({
       roomCount,
+      roomDraftPointCount,
       hasResolvedProject,
       isMacPlatform,
       dismissedHintIds: new Set(dismissedHintIds),
       completedHintIds: new Set(completedHintIds),
     });
-  }, [completedHintIds, dismissedHintIds, hasHydratedHints, hasResolvedProject, isMacPlatform, roomCount]);
+  }, [
+    completedHintIds,
+    dismissedHintIds,
+    hasHydratedHints,
+    hasResolvedProject,
+    isMacPlatform,
+    roomCount,
+    roomDraftPointCount,
+  ]);
 
   const drawCurrentScene = useCallback(() => {
     const grid = gridRef.current;
@@ -413,7 +425,7 @@ export default function EditorCanvas({
 
   useEffect(() => {
     if (projectRenameSessionCount <= 0) return;
-    completeHint("project-name-and-autosave");
+    completeHint("project-name");
   }, [completeHint, projectRenameSessionCount]);
 
   useEffect(() => {
@@ -593,6 +605,10 @@ export default function EditorCanvas({
   }, [displayedHint]);
 
   useEffect(() => {
+    onDisplayedHintChange?.(displayedHint?.id ?? null);
+  }, [displayedHint, onDisplayedHintChange]);
+
+  useEffect(() => {
     setIsMacPlatform(detectMacPlatform());
     setDismissedHintIds(loadDismissedEditorHintIds());
     setCompletedHintIds(loadCompletedEditorHintIds());
@@ -636,10 +652,22 @@ export default function EditorCanvas({
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe((state, previousState) => {
       if (activeHintIdRef.current !== "empty-canvas-draw") return;
+      const didStartFirstDraft =
+        previousState.roomDraft.points.length === 0 && state.roomDraft.points.length > 0;
+      if (!didStartFirstDraft) return;
+      completeHint("empty-canvas-draw");
+    });
+
+    return unsubscribe;
+  }, [completeHint]);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, previousState) => {
+      if (activeHintIdRef.current !== "close-shape-to-make-room") return;
       const didCreateFirstRoom =
         previousState.document.rooms.length === 0 && state.document.rooms.length > 0;
       if (!didCreateFirstRoom) return;
-      completeHint("empty-canvas-draw");
+      completeHint("close-shape-to-make-room");
     });
 
     return unsubscribe;
