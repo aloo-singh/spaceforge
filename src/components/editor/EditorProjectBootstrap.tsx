@@ -123,7 +123,7 @@ export function EditorProjectBootstrap({
 
           const localDocument = cloneDocumentState(useEditorStore.getState().document);
           const project = await createProject(clientToken, {
-            name: getDefaultProjectName({ isFirstProject: true }),
+            name: getDefaultProjectName({ existingProjectCount: 0 }),
             document: localDocument,
           });
           if (isCancelled) return;

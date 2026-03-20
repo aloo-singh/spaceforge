@@ -83,7 +83,7 @@ export function ProjectsPageClient() {
           await createOrFetchAnonymousUser(clientToken);
 
           const project = await createProject(clientToken, {
-            name: getDefaultProjectName({ isFirstProject: projects.length === 0 }),
+            name: getDefaultProjectName({ existingProjectCount: projects.length }),
             document: createEmptyProjectDocument(),
           });
 

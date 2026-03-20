@@ -15,27 +15,16 @@ const DEFAULT_PROJECT_NAME_OPTIONS = [
 
 export const DEFAULT_PROJECT_NAME = DEFAULT_PROJECT_NAME_OPTIONS[0];
 
-export function getDefaultProjectName({ isFirstProject = false }: { isFirstProject?: boolean } = {}) {
-  if (isFirstProject) return DEFAULT_PROJECT_NAME;
+export function getDefaultProjectName({ existingProjectCount = 0 }: { existingProjectCount?: number } = {}) {
+  if (existingProjectCount <= 0) return DEFAULT_PROJECT_NAME;
 
-  const randomIndex = getRandomProjectNameIndex(DEFAULT_PROJECT_NAME_OPTIONS.length);
-  return DEFAULT_PROJECT_NAME_OPTIONS[randomIndex];
+  const secondaryNames = DEFAULT_PROJECT_NAME_OPTIONS.slice(1);
+  const nextIndex = (existingProjectCount - 1) % secondaryNames.length;
+  return secondaryNames[nextIndex];
 }
 
 export function createEmptyProjectDocument(): EditorDocumentState {
   return {
     rooms: [],
   };
-}
-
-function getRandomProjectNameIndex(optionCount: number) {
-  if (optionCount <= 1) return 0;
-
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const values = new Uint32Array(1);
-    crypto.getRandomValues(values);
-    return values[0] % optionCount;
-  }
-
-  return Math.floor(Math.random() * optionCount);
 }

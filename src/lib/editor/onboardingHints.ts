@@ -73,8 +73,7 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
   },
   {
     id: "undo-last-action",
-    message: ({ isMacPlatform }) =>
-      isMacPlatform ? "Press ⌘Z to undo" : "Press Ctrl+Z to undo",
+    message: "You can always undo if you want to try again",
     shouldShow: ({ roomCount, completedHintIds }) =>
       roomCount > 0 && completedHintIds.has("project-name"),
   },
