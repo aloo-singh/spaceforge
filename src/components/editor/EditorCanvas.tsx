@@ -42,6 +42,7 @@ import {
   saveCompletedEditorHintIds,
   saveDismissedEditorHintIds,
   type EditorOnboardingHintId,
+  TOTAL_EDITOR_ONBOARDING_STEPS,
 } from "@/lib/editor/onboardingHints";
 import {
   getAxisAlignedRoomBounds,
@@ -142,8 +143,6 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
-const TOTAL_ONBOARDING_STEPS = 6;
-
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
 }
@@ -160,10 +159,16 @@ function getScaledMeasurementPx(
 }
 
 type EditorCanvasProps = {
+  hasResolvedProject?: boolean;
+  projectRenameSessionCount?: number;
   topBarLeadingContent?: ReactNode;
 };
 
-export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps) {
+export default function EditorCanvas({
+  hasResolvedProject = false,
+  projectRenameSessionCount = 0,
+  topBarLeadingContent,
+}: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
@@ -217,6 +222,7 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
   const [completedHintIds, setCompletedHintIds] = useState<EditorOnboardingHintId[]>([]);
   const hintTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintAutoCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintTransitionCycleRef = useRef(0);
   const latestEligibleHintRef = useRef<ActiveEditorOnboardingHint | null>(null);
   const editorThemeRef = useRef(editorTheme);
@@ -226,11 +232,12 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
 
     return getActiveEditorOnboardingHint({
       roomCount,
+      hasResolvedProject,
       isMacPlatform,
       dismissedHintIds: new Set(dismissedHintIds),
       completedHintIds: new Set(completedHintIds),
     });
-  }, [completedHintIds, dismissedHintIds, hasHydratedHints, isMacPlatform, roomCount]);
+  }, [completedHintIds, dismissedHintIds, hasHydratedHints, hasResolvedProject, isMacPlatform, roomCount]);
 
   const drawCurrentScene = useCallback(() => {
     const grid = gridRef.current;
@@ -313,6 +320,9 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
       if (hintHandoffTimeoutRef.current) {
         clearTimeout(hintHandoffTimeoutRef.current);
       }
+      if (hintAutoCompleteTimeoutRef.current) {
+        clearTimeout(hintAutoCompleteTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -325,6 +335,10 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
       if (hintHandoffTimeoutRef.current) {
         clearTimeout(hintHandoffTimeoutRef.current);
         hintHandoffTimeoutRef.current = null;
+      }
+      if (hintAutoCompleteTimeoutRef.current) {
+        clearTimeout(hintAutoCompleteTimeoutRef.current);
+        hintAutoCompleteTimeoutRef.current = null;
       }
     };
 
@@ -388,7 +402,7 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
       if (previous.includes(hintId)) return previous;
       const next = [...previous, hintId];
       saveCompletedEditorHintIds(next);
-      if (next.length === TOTAL_ONBOARDING_STEPS) {
+      if (next.length === TOTAL_EDITOR_ONBOARDING_STEPS) {
         trackOncePerSession(ANALYTICS_EVENTS.onboardingCompleted, {
           stepsCompleted: next.length,
         });
@@ -396,6 +410,27 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    if (projectRenameSessionCount <= 0) return;
+    completeHint("project-name-and-autosave");
+  }, [completeHint, projectRenameSessionCount]);
+
+  useEffect(() => {
+    if (!displayedHint?.autoCompleteAfterMs) return;
+
+    hintAutoCompleteTimeoutRef.current = setTimeout(() => {
+      completeHint(displayedHint.id);
+      hintAutoCompleteTimeoutRef.current = null;
+    }, displayedHint.autoCompleteAfterMs);
+
+    return () => {
+      if (hintAutoCompleteTimeoutRef.current) {
+        clearTimeout(hintAutoCompleteTimeoutRef.current);
+        hintAutoCompleteTimeoutRef.current = null;
+      }
+    };
+  }, [completeHint, displayedHint]);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -781,10 +816,6 @@ export default function EditorCanvas({ topBarLeadingContent }: EditorCanvasProps
         },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
-        },
-        onRoomLabelSelected: () => {
-          if (activeHintIdRef.current !== "select-room-by-name") return;
-          completeHint("select-room-by-name");
         },
         requestRender: () => {
           drawCurrentScene();

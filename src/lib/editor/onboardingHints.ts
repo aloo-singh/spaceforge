@@ -3,7 +3,8 @@ export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding
 
 export type EditorOnboardingHintId =
   | "empty-canvas-draw"
-  | "select-room-by-name"
+  | "project-name-and-autosave"
+  | "projects-list-awareness"
   | "resize-room-by-dragging-edges"
   | "undo-last-action"
   | "export-as-png"
@@ -13,10 +14,12 @@ type EditorOnboardingHint = {
   id: EditorOnboardingHintId;
   message: string | ((context: EditorOnboardingHintContext) => string);
   shouldShow: (context: EditorOnboardingHintContext) => boolean;
+  autoCompleteAfterMs?: number;
 };
 
 type EditorOnboardingHintContext = {
   roomCount: number;
+  hasResolvedProject: boolean;
   isMacPlatform: boolean;
   dismissedHintIds: ReadonlySet<EditorOnboardingHintId>;
   completedHintIds: ReadonlySet<EditorOnboardingHintId>;
@@ -25,6 +28,7 @@ type EditorOnboardingHintContext = {
 export type ActiveEditorOnboardingHint = {
   id: EditorOnboardingHintId;
   message: string;
+  autoCompleteAfterMs?: number;
 };
 
 const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
@@ -34,15 +38,25 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
     shouldShow: ({ roomCount }) => roomCount === 0,
   },
   {
-    id: "select-room-by-name",
-    message: "Click the room name to select it",
-    shouldShow: ({ roomCount }) => roomCount > 0,
+    id: "project-name-and-autosave",
+    message: "This project saves automatically. Click its name to rename it.",
+    shouldShow: ({ roomCount, hasResolvedProject }) => roomCount > 0 && hasResolvedProject,
+    autoCompleteAfterMs: 3600,
+  },
+  {
+    id: "projects-list-awareness",
+    message: "Find your layouts any time in Projects.",
+    shouldShow: ({ roomCount, hasResolvedProject, completedHintIds }) =>
+      roomCount > 0 &&
+      hasResolvedProject &&
+      completedHintIds.has("project-name-and-autosave"),
+    autoCompleteAfterMs: 2800,
   },
   {
     id: "resize-room-by-dragging-edges",
-    message: "Drag edges to resize",
+    message: "Select a room, then drag an edge to resize",
     shouldShow: ({ roomCount, completedHintIds }) =>
-      roomCount > 0 && completedHintIds.has("select-room-by-name"),
+      roomCount > 0 && completedHintIds.has("projects-list-awareness"),
   },
   {
     id: "undo-last-action",
@@ -76,11 +90,14 @@ export function getActiveEditorOnboardingHint(
     return {
       id: hint.id,
       message: typeof hint.message === "function" ? hint.message(context) : hint.message,
+      autoCompleteAfterMs: hint.autoCompleteAfterMs,
     };
   }
 
   return null;
 }
+
+export const TOTAL_EDITOR_ONBOARDING_STEPS = EDITOR_ONBOARDING_HINTS.length;
 
 export function loadDismissedEditorHintIds(): EditorOnboardingHintId[] {
   return loadEditorHintIdsFromStorage(EDITOR_HINT_DISMISSALS_STORAGE_KEY);
@@ -96,6 +113,12 @@ export function loadCompletedEditorHintIds(): EditorOnboardingHintId[] {
 
 export function saveCompletedEditorHintIds(completedHintIds: EditorOnboardingHintId[]): boolean {
   return saveEditorHintIdsToStorage(EDITOR_HINT_COMPLETIONS_STORAGE_KEY, completedHintIds);
+}
+
+export function completeEditorOnboardingHint(hintId: EditorOnboardingHintId): boolean {
+  const completedHintIds = loadCompletedEditorHintIds();
+  if (completedHintIds.includes(hintId)) return true;
+  return saveCompletedEditorHintIds([...completedHintIds, hintId]);
 }
 
 function loadEditorHintIdsFromStorage(storageKey: string): EditorOnboardingHintId[] {
@@ -129,7 +152,8 @@ function saveEditorHintIdsToStorage(storageKey: string, hintIds: EditorOnboardin
 function isEditorHintId(value: unknown): value is EditorOnboardingHintId {
   return (
     value === "empty-canvas-draw" ||
-    value === "select-room-by-name" ||
+    value === "project-name-and-autosave" ||
+    value === "projects-list-awareness" ||
     value === "resize-room-by-dragging-edges" ||
     value === "undo-last-action" ||
     value === "export-as-png" ||

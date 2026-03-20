@@ -16,6 +16,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     id: string;
     name: string;
   } | null>(null);
+  const [projectRenameSessionCount, setProjectRenameSessionCount] = useState(0);
   const [bootstrapState, setBootstrapState] = useState<
     | { status: "loading" }
     | { status: "ready" }
@@ -51,11 +52,16 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
         </div>
       ) : null}
       <EditorCanvas
+        hasResolvedProject={activeProject !== null}
+        projectRenameSessionCount={projectRenameSessionCount}
         topBarLeadingContent={
           <EditorProjectChrome
             projectId={activeProject?.id ?? null}
             projectName={activeProject?.name ?? null}
             isLoading={bootstrapState.status === "loading"}
+            onProjectRenameStart={() => {
+              setProjectRenameSessionCount((currentCount) => currentCount + 1);
+            }}
             onProjectNameChange={(name) => {
               setActiveProject((currentProject) =>
                 currentProject

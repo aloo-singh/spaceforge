@@ -12,6 +12,7 @@ import {
 } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
 import { createEmptyProjectDocument, DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
+import { completeEditorOnboardingHint } from "@/lib/editor/onboardingHints";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { mergeProjectIntoList, sortProjectsByUpdatedAt } from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -67,6 +68,11 @@ export function ProjectsPageClient() {
     };
   }, []);
 
+  useEffect(() => {
+    if (projects.length === 0) return;
+    completeEditorOnboardingHint("projects-list-awareness");
+  }, [projects]);
+
   const isProjectsApiUnavailable = errorStatus === 404 && errorMessage === "Projects API unavailable.";
   const canCreateProject = !isCreatingProject && renamingProjectId === null && !isProjectsApiUnavailable;
 
@@ -106,6 +112,7 @@ export function ProjectsPageClient() {
       setErrorStatus(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const project = await updateProject(clientToken, projectId, { name });
+      completeEditorOnboardingHint("project-name-and-autosave");
       setProjects((currentProjects) => mergeProjectIntoList(currentProjects, project));
       setErrorMessage(null);
     } catch (error) {

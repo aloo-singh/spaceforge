@@ -12,6 +12,7 @@ type EditorProjectChromeProps = {
   projectId: string | null;
   projectName: string | null;
   isLoading: boolean;
+  onProjectRenameStart?: () => void;
   onProjectNameChange: (name: string) => void;
 };
 
@@ -19,6 +20,7 @@ export function EditorProjectChrome({
   projectId,
   projectName,
   isLoading,
+  onProjectRenameStart,
   onProjectNameChange,
 }: EditorProjectChromeProps) {
   const [isEditingName, setIsEditingName] = useState(false);
@@ -105,7 +107,10 @@ export function EditorProjectChrome({
       ) : projectName ? (
         <button
           type="button"
-          onClick={() => setIsEditingName(true)}
+          onClick={() => {
+            onProjectRenameStart?.();
+            setIsEditingName(true);
+          }}
           className="min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           aria-label={`Rename project ${projectName}`}
           title="Rename project"
