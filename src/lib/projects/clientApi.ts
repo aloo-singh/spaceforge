@@ -15,8 +15,18 @@ export class ProjectApiError extends Error {
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new ProjectApiError(payload?.error ?? `Request failed with status ${response.status}.`, response.status);
+    const contentType = response.headers.get("content-type") ?? "";
+    const payload = contentType.includes("application/json")
+      ? ((await response.json().catch(() => null)) as { error?: string } | null)
+      : null;
+
+    throw new ProjectApiError(
+      payload?.error ??
+        (response.status === 404
+          ? "Projects API unavailable."
+          : `Request failed with status ${response.status}.`),
+      response.status
+    );
   }
 
   return (await response.json()) as T;
@@ -84,7 +94,7 @@ export async function fetchProjectSafely(clientToken: string, projectId: string)
   try {
     return await fetchProject(clientToken, projectId);
   } catch (error) {
-    if (error instanceof ProjectApiError && error.status === 404) {
+    if (isSpecificProjectNotFoundError(error)) {
       return null;
     }
 
@@ -115,4 +125,12 @@ export async function updateProject(
   });
   const payload = await readJson<{ project: ProjectRecord }>(response);
   return payload.project;
+}
+
+export function isProjectsApiUnavailableError(error: unknown) {
+  return error instanceof ProjectApiError && error.status === 404 && error.message === "Projects API unavailable.";
+}
+
+export function isSpecificProjectNotFoundError(error: unknown) {
+  return error instanceof ProjectApiError && error.status === 404 && error.message === "Project not found.";
 }

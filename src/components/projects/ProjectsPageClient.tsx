@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, FolderOpenDot, Plus, RefreshCcw } from "lucide-react";
-import { createOrFetchAnonymousUser, createProject, fetchProjects, updateProject } from "@/lib/projects/clientApi";
+import {
+  createOrFetchAnonymousUser,
+  createProject,
+  fetchProjects,
+  updateProject,
+} from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
 import { createEmptyProjectDocument, DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
 import type { ProjectListItem } from "@/lib/projects/types";
@@ -18,6 +23,7 @@ export function ProjectsPageClient() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const didLoadProjectsRef = useRef(false);
@@ -34,9 +40,11 @@ export function ProjectsPageClient() {
 
       setProjects(sortProjectsByUpdatedAt(loadedProjects));
       setErrorMessage(null);
+      setErrorStatus(null);
       didLoadProjectsRef.current = true;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load projects.");
+      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
     } finally {
       if (showLoadingState) {
         setIsLoading(false);
@@ -59,13 +67,17 @@ export function ProjectsPageClient() {
     };
   }, []);
 
+  const isProjectsApiUnavailable = errorStatus === 404 && errorMessage === "Projects API unavailable.";
+  const canCreateProject = !isCreatingProject && renamingProjectId === null && !isProjectsApiUnavailable;
+
   const handleCreateProject = () => {
-    if (isCreatingProject || renamingProjectId !== null) return;
+    if (!canCreateProject) return;
 
     startCreateProjectTransition(() => {
       void (async () => {
         try {
           setErrorMessage(null);
+          setErrorStatus(null);
           const clientToken = getOrCreateAnonymousClientToken();
           await createOrFetchAnonymousUser(clientToken);
 
@@ -78,6 +90,7 @@ export function ProjectsPageClient() {
           router.push(`/editor/${project.id}`);
         } catch (error) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to create project.");
+          setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
         }
       })();
     });
@@ -90,12 +103,14 @@ export function ProjectsPageClient() {
 
     try {
       setErrorMessage(null);
+      setErrorStatus(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const project = await updateProject(clientToken, projectId, { name });
       setProjects((currentProjects) => mergeProjectIntoList(currentProjects, project));
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to rename project.");
+      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
       throw error;
     } finally {
       setRenamingProjectId(null);
@@ -187,7 +202,7 @@ export function ProjectsPageClient() {
               <Button
                 type="button"
                 onClick={handleCreateProject}
-                disabled={isCreatingProject || renamingProjectId !== null}
+                disabled={!canCreateProject}
                 className="bg-blue-500 text-white hover:bg-blue-500/90"
               >
                 <Plus className="size-4" />
@@ -224,7 +239,7 @@ export function ProjectsPageClient() {
                 project={project}
                 onRename={handleRenameProject}
                 isRenaming={renamingProjectId === project.id}
-                isInteractionDisabled={isCreatingProject}
+                isInteractionDisabled={isCreatingProject || isProjectsApiUnavailable}
               />
             ))}
           </div>

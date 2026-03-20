@@ -8,7 +8,9 @@ import {
   createProject,
   fetchProjectSafely,
   fetchProjects,
+  isProjectsApiUnavailableError,
   ProjectApiError,
+  isSpecificProjectNotFoundError,
   updateProject,
 } from "@/lib/projects/clientApi";
 import {
@@ -46,6 +48,7 @@ export function EditorProjectBootstrap({
   const router = useRouter();
   const document = useEditorStore((state) => state.document);
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
+  const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const clientTokenRef = useRef<string | null>(null);
   const lastSyncedSignatureRef = useRef<string | null>(null);
@@ -160,15 +163,28 @@ export function EditorProjectBootstrap({
         isBootstrappingRef.current = false;
         onBootstrapStateChangeRef.current?.({ status: "ready" });
       } catch (error) {
-        if (error instanceof ProjectApiError && error.status === 404) {
-          clearActiveProjectId();
-          if (projectId) {
-            router.replace("/projects");
-          }
+        clearActiveProjectId();
+        setActiveProjectId(null);
+        resetCanvas();
+
+        if (isSpecificProjectNotFoundError(error)) {
           onBootstrapStateChangeRef.current?.({
             status: "error",
             message: "This project could not be found.",
           });
+          if (projectId) {
+            router.replace("/projects");
+          }
+        } else if (isProjectsApiUnavailableError(error)) {
+          onBootstrapStateChangeRef.current?.({
+            status: "error",
+            message: "Projects are unavailable right now. Retry after the projects API is available.",
+          });
+        } else if (error instanceof ProjectApiError && error.status === 404) {
+          clearActiveProjectId();
+          if (projectId) {
+            router.replace("/projects");
+          }
         } else {
           console.error("Failed to bootstrap editor project.", error);
           onBootstrapStateChangeRef.current?.({
@@ -187,7 +203,7 @@ export function EditorProjectBootstrap({
     return () => {
       isCancelled = true;
     };
-  }, [loadProjectDocument, projectId, router]);
+  }, [loadProjectDocument, projectId, resetCanvas, router]);
 
   useEffect(() => {
     const clientToken = clientTokenRef.current;
