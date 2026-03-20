@@ -2,11 +2,22 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Safari } from "@/components/ui/safari";
 import { Button } from "@/components/ui/button";
+import { GridPattern } from "@/components/ui/grid-pattern";
 
 export default function HomePage() {
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] bg-background text-foreground">
-      <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-7xl flex-col justify-center gap-10 px-6 py-16 sm:px-10 lg:gap-14 lg:py-18">
+    <main className="relative min-h-[calc(100vh-3.5rem)] overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <GridPattern
+          width={20}
+          height={20}
+          x={-1}
+          y={-1}
+          className="[mask-image:linear-gradient(to_bottom_right,white_0%,white_14%,transparent_28%)] opacity-60"
+        />
+      </div>
+
+      <section className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-7xl flex-col justify-center gap-10 px-6 py-16 sm:px-10 lg:gap-14 lg:py-18">
         <div className="max-w-5xl">
           <h1 className="text-[2.2rem] leading-[1.02] font-semibold tracking-tight sm:text-5xl md:text-[3.5rem] lg:text-[4.8rem]">
             <span className="block whitespace-nowrap">Sketch home layouts</span>
