@@ -38,3 +38,9 @@ export function saveActiveProjectId(projectId: string) {
   if (!storage) return;
   storage.setItem(ACTIVE_PROJECT_ID_STORAGE_KEY, projectId);
 }
+
+export function clearActiveProjectId() {
+  const storage = getBrowserStorage();
+  if (!storage) return;
+  storage.removeItem(ACTIVE_PROJECT_ID_STORAGE_KEY);
+}

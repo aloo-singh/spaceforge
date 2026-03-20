@@ -3,10 +3,20 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { cloneProjectDocument, type AppUser, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
 
+export class ProjectApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ProjectApiError";
+    this.status = status;
+  }
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? `Request failed with status ${response.status}.`);
+    throw new ProjectApiError(payload?.error ?? `Request failed with status ${response.status}.`, response.status);
   }
 
   return (await response.json()) as T;
@@ -34,6 +44,18 @@ export async function fetchProjects(clientToken: string) {
   });
   const payload = await readJson<{ projects: ProjectListItem[] }>(response);
   return payload.projects;
+}
+
+export async function fetchProjectsSafely(clientToken: string) {
+  try {
+    return await fetchProjects(clientToken);
+  } catch (error) {
+    if (error instanceof ProjectApiError && error.status === 404) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function createProject(
@@ -68,6 +90,18 @@ export async function fetchProject(clientToken: string, projectId: string) {
   });
   const payload = await readJson<{ project: ProjectRecord }>(response);
   return payload.project;
+}
+
+export async function fetchProjectSafely(clientToken: string, projectId: string) {
+  try {
+    return await fetchProject(clientToken, projectId);
+  } catch (error) {
+    if (error instanceof ProjectApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function updateProject(

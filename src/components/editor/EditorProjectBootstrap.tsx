@@ -3,8 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { areDocumentsEqual, cloneDocumentState } from "@/lib/editor/persistedHistory";
-import { createOrFetchAnonymousUser, createProject, fetchProject, fetchProjects, updateProject } from "@/lib/projects/clientApi";
-import { getOrCreateAnonymousClientToken, loadActiveProjectId, saveActiveProjectId } from "@/lib/projects/clientIdentity";
+import {
+  createOrFetchAnonymousUser,
+  createProject,
+  fetchProjectSafely,
+  fetchProjectsSafely,
+  updateProject,
+} from "@/lib/projects/clientApi";
+import {
+  clearActiveProjectId,
+  getOrCreateAnonymousClientToken,
+  loadActiveProjectId,
+  saveActiveProjectId,
+} from "@/lib/projects/clientIdentity";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -39,22 +50,25 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
         const selectedProjectId = projectId ?? loadActiveProjectId();
         const selectedProject =
           selectedProjectId !== null
-            ? await fetchProject(clientToken, selectedProjectId).catch((error) => {
-                if (projectId) {
-                  throw error;
-                }
-                return null;
-              })
+            ? await fetchProjectSafely(clientToken, selectedProjectId)
             : null;
 
         if (!selectedProject) {
-          const projects = await fetchProjects(clientToken);
+          const projects = await fetchProjectsSafely(clientToken);
           const fallbackProjectId = loadActiveProjectId();
           const selectedProjectListItem =
             projects.find((project) => project.id === fallbackProjectId) ?? projects[0] ?? null;
 
           if (selectedProjectListItem) {
-            const fallbackProject = await fetchProject(clientToken, selectedProjectListItem.id);
+            const fallbackProject = await fetchProjectSafely(clientToken, selectedProjectListItem.id);
+            if (!fallbackProject) {
+              clearActiveProjectId();
+              if (projectId) {
+                router.replace("/projects");
+              }
+              isBootstrappingRef.current = false;
+              return;
+            }
             if (isCancelled) return;
 
             const fallbackDocument = cloneDocumentState(fallbackProject.document);
@@ -88,6 +102,10 @@ export function EditorProjectBootstrap({ projectId }: EditorProjectBootstrapProp
             router.replace(`/editor/${project.id}`);
           }
           return;
+        }
+
+        if (projectId && selectedProject.id !== projectId) {
+          router.replace(`/editor/${selectedProject.id}`);
         }
 
         const nextDocument = cloneDocumentState(selectedProject.document);
