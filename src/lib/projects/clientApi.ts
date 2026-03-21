@@ -127,6 +127,20 @@ export async function updateProject(
   return payload.project;
 }
 
+export async function deleteProject(clientToken: string, projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      clientToken,
+    }),
+  });
+  const payload = await readJson<{ project: ProjectRecord }>(response);
+  return payload.project;
+}
+
 export function isProjectsApiUnavailableError(error: unknown) {
   return error instanceof ProjectApiError && error.status === 404 && error.message === "Projects API unavailable.";
 }

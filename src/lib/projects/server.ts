@@ -234,3 +234,28 @@ export async function updateProjectForClientToken(
   const row = rows[0];
   return row ? mapProjectRecord(row) : null;
 }
+
+export async function deleteProjectForClientToken(
+  clientToken: string,
+  projectId: string
+): Promise<ProjectRecord | null> {
+  const user = await getOrCreateAppUserByClientToken(clientToken);
+  const searchParams = new URLSearchParams({
+    id: `eq.${projectId}`,
+    user_id: `eq.${user.id}`,
+    select: "id,user_id,name,document,created_at,updated_at",
+  });
+  const response = await supabaseRequest(
+    "projects",
+    {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=representation",
+      },
+    },
+    searchParams
+  );
+  const rows = (await response.json()) as SupabaseProjectRow[];
+  const row = rows[0];
+  return row ? mapProjectRecord(row) : null;
+}

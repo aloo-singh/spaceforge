@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EditorDocumentState } from "@/lib/editor/history";
-import { fetchProjectForClientToken, updateProjectForClientToken } from "@/lib/projects/server";
+import {
+  deleteProjectForClientToken,
+  fetchProjectForClientToken,
+  updateProjectForClientToken,
+} from "@/lib/projects/server";
 import { isProjectDocument } from "@/lib/projects/types";
 
 type ProjectRouteContext = {
@@ -13,6 +17,10 @@ type UpdateProjectRequestBody = {
   clientToken?: unknown;
   name?: unknown;
   document?: unknown;
+};
+
+type DeleteProjectRequestBody = {
+  clientToken?: unknown;
 };
 
 function getClientTokenFromSearchParams(request: NextRequest) {
@@ -77,6 +85,28 @@ export async function PATCH(request: NextRequest, context: ProjectRouteContext) 
     return NextResponse.json({ project }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update project.";
+    const status = message.includes("Missing Supabase server configuration.") ? 503 : 500;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
+export async function DELETE(request: NextRequest, context: ProjectRouteContext) {
+  try {
+    const body = (await request.json()) as DeleteProjectRequestBody;
+    const clientToken = typeof body.clientToken === "string" ? body.clientToken.trim() : "";
+    if (!clientToken) {
+      return NextResponse.json({ error: "clientToken is required." }, { status: 400 });
+    }
+
+    const { projectId } = await context.params;
+    const project = await deleteProjectForClientToken(clientToken, projectId);
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete project.";
     const status = message.includes("Missing Supabase server configuration.") ? 503 : 500;
     return NextResponse.json({ error: message }, { status });
   }

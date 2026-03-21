@@ -24,3 +24,7 @@ export function mergeProjectIntoList(
 
   return sortProjectsByUpdatedAt(nextProjects);
 }
+
+export function removeProjectFromList(projects: ProjectListItem[], projectId: string) {
+  return projects.filter((project) => project.id !== projectId);
+}
