@@ -113,8 +113,14 @@ const EMPTY_HOVERED_SELECTABLE_WALL = null as {
   roomId: string;
   wall: RoomWall;
 } | null;
+const PROJECT_NAME_HINT_ANCHOR_SELECTOR = "[data-editor-project-name-anchor]";
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
+const HINT_VIEWPORT_MARGIN_PX = 12;
+const ANCHORED_HINT_MAX_WIDTH_PX = 352;
+const ANCHORED_HINT_OFFSET_PX = 10;
+const ANCHORED_HINT_ARROW_SIZE_PX = 12;
+const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -158,19 +164,24 @@ function getScaledMeasurementPx(
   return value * getMeasurementTextScale(settings);
 }
 
+function clampValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 type EditorCanvasProps = {
   hasResolvedProject?: boolean;
-  projectRenameSessionCount?: number;
+  projectRenameCompletionCount?: number;
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
   topBarLeadingContent?: ReactNode;
 };
 
 export default function EditorCanvas({
   hasResolvedProject = false,
-  projectRenameSessionCount = 0,
+  projectRenameCompletionCount = 0,
   onDisplayedHintChange,
   topBarLeadingContent,
 }: EditorCanvasProps) {
+  const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
@@ -226,12 +237,22 @@ export default function EditorCanvas({
   const hintTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintAutoCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintPauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousRenameCompletionCountRef = useRef(projectRenameCompletionCount);
   const hintTransitionCycleRef = useRef(0);
   const latestEligibleHintRef = useRef<ActiveEditorOnboardingHint | null>(null);
   const editorThemeRef = useRef(editorTheme);
   const activeHintIdRef = useRef<EditorOnboardingHintId | null>(null);
+  const [hintPauseUntilMs, setHintPauseUntilMs] = useState(0);
+  const [anchoredProjectNameHintPosition, setAnchoredProjectNameHintPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    arrowLeft: number;
+  } | null>(null);
+  const isHintFlowPaused = hintPauseUntilMs > Date.now();
   const activeHint = useMemo(() => {
-    if (!hasHydratedHints) return null;
+    if (!hasHydratedHints || isHintFlowPaused) return null;
 
     return getActiveEditorOnboardingHint({
       roomCount,
@@ -246,6 +267,7 @@ export default function EditorCanvas({
     dismissedHintIds,
     hasHydratedHints,
     hasResolvedProject,
+    isHintFlowPaused,
     isMacPlatform,
     roomCount,
     roomDraftPointCount,
@@ -335,8 +357,33 @@ export default function EditorCanvas({
       if (hintAutoCompleteTimeoutRef.current) {
         clearTimeout(hintAutoCompleteTimeoutRef.current);
       }
+      if (hintPauseTimeoutRef.current) {
+        clearTimeout(hintPauseTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!isHintFlowPaused) {
+      if (hintPauseTimeoutRef.current) {
+        clearTimeout(hintPauseTimeoutRef.current);
+        hintPauseTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    hintPauseTimeoutRef.current = setTimeout(() => {
+      setHintPauseUntilMs(0);
+      hintPauseTimeoutRef.current = null;
+    }, Math.max(0, hintPauseUntilMs - Date.now()));
+
+    return () => {
+      if (hintPauseTimeoutRef.current) {
+        clearTimeout(hintPauseTimeoutRef.current);
+        hintPauseTimeoutRef.current = null;
+      }
+    };
+  }, [hintPauseUntilMs, isHintFlowPaused]);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -424,9 +471,15 @@ export default function EditorCanvas({
   }, []);
 
   useEffect(() => {
-    if (projectRenameSessionCount <= 0) return;
+    if (projectRenameCompletionCount <= previousRenameCompletionCountRef.current) {
+      previousRenameCompletionCountRef.current = projectRenameCompletionCount;
+      return;
+    }
+
+    previousRenameCompletionCountRef.current = projectRenameCompletionCount;
     completeHint("project-name");
-  }, [completeHint, projectRenameSessionCount]);
+    setHintPauseUntilMs(Date.now() + PROJECT_RENAME_HINT_PAUSE_MS);
+  }, [completeHint, projectRenameCompletionCount]);
 
   useEffect(() => {
     if (!displayedHint?.autoCompleteAfterMs) return;
@@ -443,6 +496,70 @@ export default function EditorCanvas({
       }
     };
   }, [completeHint, displayedHint]);
+
+  const updateAnchoredProjectNameHintPosition = useCallback(() => {
+    const section = sectionRef.current;
+    const anchor = document.querySelector<HTMLElement>(PROJECT_NAME_HINT_ANCHOR_SELECTOR);
+    if (!section || !anchor) {
+      setAnchoredProjectNameHintPosition(null);
+      return;
+    }
+
+    const sectionRect = section.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    const availableWidth = Math.max(0, sectionRect.width - HINT_VIEWPORT_MARGIN_PX * 2);
+    const width = Math.min(ANCHORED_HINT_MAX_WIDTH_PX, availableWidth);
+    if (width <= 0) {
+      setAnchoredProjectNameHintPosition(null);
+      return;
+    }
+
+    const unclampedLeft = anchorRect.left - sectionRect.left - 6;
+    const left = clampValue(
+      unclampedLeft,
+      HINT_VIEWPORT_MARGIN_PX,
+      Math.max(HINT_VIEWPORT_MARGIN_PX, sectionRect.width - width - HINT_VIEWPORT_MARGIN_PX)
+    );
+    const anchorCenterX = anchorRect.left - sectionRect.left + anchorRect.width / 2;
+    const arrowLeft = clampValue(
+      anchorCenterX - left - ANCHORED_HINT_ARROW_SIZE_PX / 2,
+      18,
+      width - 18
+    );
+
+    setAnchoredProjectNameHintPosition({
+      top: anchorRect.bottom - sectionRect.top + ANCHORED_HINT_OFFSET_PX,
+      left,
+      width,
+      arrowLeft,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (displayedHint?.id !== "project-name") {
+      setAnchoredProjectNameHintPosition(null);
+      return;
+    }
+
+    updateAnchoredProjectNameHintPosition();
+
+    const section = sectionRef.current;
+    const anchor = document.querySelector<HTMLElement>(PROJECT_NAME_HINT_ANCHOR_SELECTOR);
+    if (!section || !anchor) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateAnchoredProjectNameHintPosition();
+    });
+    resizeObserver.observe(section);
+    resizeObserver.observe(anchor);
+
+    window.addEventListener("resize", updateAnchoredProjectNameHintPosition);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateAnchoredProjectNameHintPosition);
+    };
+  }, [displayedHint?.id, updateAnchoredProjectNameHintPosition]);
 
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
     const app = appRef.current;
@@ -906,10 +1023,11 @@ export default function EditorCanvas({
 
   return (
     <section
+      ref={sectionRef}
       aria-label="SpaceForge floor plan editor canvas"
       aria-describedby={instructionsId}
       role="region"
-      className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)]"
+      className="relative grid h-full w-full grid-rows-[auto_minmax(0,1fr)]"
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
@@ -954,7 +1072,7 @@ export default function EditorCanvas({
               Snap {formatMetricWallDimension(activeSnapStepMm)}
             </div>
           </div>
-          {displayedHint ? (
+          {displayedHint && displayedHint.id !== "project-name" ? (
             <aside
               className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
                 hintMotionState === "visible"
@@ -990,6 +1108,37 @@ export default function EditorCanvas({
           </aside>
         )}
       </div>
+      {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
+        <aside
+          className={`pointer-events-none absolute z-30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
+            hintMotionState === "visible"
+              ? "translate-y-0 opacity-100"
+              : hintMotionState === "entering"
+                ? "translate-y-2 opacity-0"
+                : "-translate-y-1.5 opacity-0"
+          }`}
+          style={{
+            top: anchoredProjectNameHintPosition.top,
+            left: anchoredProjectNameHintPosition.left,
+            width: anchoredProjectNameHintPosition.width,
+            transitionDuration: `${HINT_TRANSITION_MS}ms`,
+          }}
+        >
+          <div className="relative pt-3">
+            <div
+              aria-hidden="true"
+              className="absolute top-[3px] size-3 rotate-45 border border-slate-700/90 bg-slate-900/94 shadow-black/40"
+              style={{ left: anchoredProjectNameHintPosition.arrowLeft }}
+            />
+            <OnboardingHintCard
+              message={displayedHint.message}
+              invertedTheme={editorThemeMode === "light" ? "dark" : "light"}
+              onDismiss={() => dismissHint(displayedHint.id)}
+              className="relative"
+            />
+          </div>
+        </aside>
+      ) : null}
     </section>
   );
 }
