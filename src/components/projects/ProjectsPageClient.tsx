@@ -25,6 +25,7 @@ import {
   sortProjectsByUpdatedAt,
 } from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ProjectDeleteDialog } from "@/components/projects/ProjectDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
@@ -37,6 +38,7 @@ export function ProjectsPageClient() {
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const didLoadProjectsRef = useRef(false);
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
@@ -146,6 +148,9 @@ export function ProjectsPageClient() {
 
       clearActiveProjectIdIfMatches(deletedProject.id);
       setProjects((currentProjects) => removeProjectFromList(currentProjects, deletedProject.id));
+      setProjectPendingDelete((currentProject) =>
+        currentProject?.id === deletedProject.id ? null : currentProject
+      );
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
@@ -287,7 +292,7 @@ export function ProjectsPageClient() {
                 key={project.id}
                 project={project}
                 onRename={handleRenameProject}
-                onDelete={handleDeleteProject}
+                onDeleteRequest={setProjectPendingDelete}
                 isRenaming={renamingProjectId === project.id}
                 isDeleting={deletingProjectId === project.id}
                 isInteractionDisabled={
@@ -299,6 +304,21 @@ export function ProjectsPageClient() {
             ))}
           </div>
         ) : null}
+
+        <ProjectDeleteDialog
+          project={projectPendingDelete}
+          open={projectPendingDelete !== null}
+          isDeleting={deletingProjectId === projectPendingDelete?.id}
+          onOpenChange={(open) => {
+            if (!open && deletingProjectId === null) {
+              setProjectPendingDelete(null);
+            }
+          }}
+          onConfirmDelete={() => {
+            if (!projectPendingDelete) return;
+            void handleDeleteProject(projectPendingDelete.id);
+          }}
+        />
       </section>
     </main>
   );

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 type ProjectCardProps = {
   project: ProjectListItem;
   onRename: (projectId: string, name: string) => Promise<void>;
-  onDelete: (projectId: string) => Promise<void>;
+  onDeleteRequest: (project: ProjectListItem) => void;
   isRenaming: boolean;
   isDeleting: boolean;
   isInteractionDisabled?: boolean;
@@ -21,17 +21,15 @@ type ProjectCardProps = {
 export function ProjectCard({
   project,
   onRename,
-  onDelete,
+  onDeleteRequest,
   isRenaming,
   isDeleting,
   isInteractionDisabled = false,
 }: ProjectCardProps) {
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [draftName, setDraftName] = useState(project.name);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isSubmittingRenameRef = useRef(false);
-  const isDeletingProject = isDeleting || isInteractionDisabled;
 
   useEffect(() => {
     if (isEditingName) return;
@@ -50,7 +48,7 @@ export function ProjectCard({
   }, [isDeleting]);
 
   const finishRename = async () => {
-    if (isSubmittingRenameRef.current || isInteractionDisabled || isConfirmingDelete) return;
+    if (isSubmittingRenameRef.current || isInteractionDisabled) return;
 
     const nextName = draftName.trim();
     if (!nextName) {
@@ -81,28 +79,6 @@ export function ProjectCard({
     setIsEditingName(false);
   };
 
-  const startDeleteConfirmation = () => {
-    if (isInteractionDisabled || isRenaming || isDeleting) return;
-    setDraftName(project.name);
-    setIsEditingName(false);
-    setIsConfirmingDelete(true);
-  };
-
-  const cancelDeleteConfirmation = () => {
-    if (isDeleting) return;
-    setIsConfirmingDelete(false);
-  };
-
-  const confirmDelete = async () => {
-    if (isDeletingProject) return;
-
-    try {
-      await onDelete(project.id);
-    } catch {
-      setIsConfirmingDelete(true);
-    }
-  };
-
   return (
     <Card className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card/95">
       <CardContent className="flex h-full flex-col gap-5 p-5">
@@ -128,7 +104,7 @@ export function ProjectCard({
                     onBlur={() => {
                       void finishRename();
                     }}
-                    disabled={isRenaming || isInteractionDisabled || isConfirmingDelete}
+                    disabled={isRenaming || isInteractionDisabled}
                     className="h-9"
                     aria-label={`Rename ${project.name}`}
                   />
@@ -155,7 +131,7 @@ export function ProjectCard({
                     onClick={() => {
                       void finishRename();
                     }}
-                    disabled={isRenaming || isInteractionDisabled || isConfirmingDelete}
+                    disabled={isRenaming || isInteractionDisabled}
                     aria-label={`Save ${project.name} name`}
                   >
                     <Check className="size-4" />
@@ -166,7 +142,7 @@ export function ProjectCard({
                     size="icon-sm"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={cancelRename}
-                    disabled={isRenaming || isInteractionDisabled || isConfirmingDelete}
+                    disabled={isRenaming || isInteractionDisabled}
                     aria-label={`Cancel renaming ${project.name}`}
                   >
                     <X className="size-4" />
@@ -177,66 +153,40 @@ export function ProjectCard({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
                     onClick={() => {
-                      if (isInteractionDisabled || isConfirmingDelete) return;
+                      if (isInteractionDisabled) return;
                       setDraftName(project.name);
                       setIsEditingName(true);
                     }}
-                    disabled={isInteractionDisabled || isConfirmingDelete}
+                    disabled={isInteractionDisabled}
                     aria-label={`Rename ${project.name}`}
+                    title="Rename project"
+                    className="text-foreground/64 hover:bg-muted hover:text-foreground"
                   >
                     <PencilLine className="size-4" />
-                    Rename
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    onClick={startDeleteConfirmation}
+                    size="icon-sm"
+                    onClick={() => {
+                      if (isInteractionDisabled) return;
+                      setDraftName(project.name);
+                      setIsEditingName(false);
+                      onDeleteRequest(project);
+                    }}
                     disabled={isInteractionDisabled}
                     aria-label={`Delete ${project.name}`}
-                    className="text-foreground/64 hover:text-destructive"
+                    title="Delete project"
+                    className="text-foreground/64 hover:bg-muted hover:text-destructive"
                   >
                     <Trash2 className="size-4" />
-                    Delete
                   </Button>
                 </>
               )}
             </div>
           </div>
-
-          {isConfirmingDelete ? (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-              <p className="text-sm font-medium text-foreground">Delete this project?</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                This removes it permanently. There is no undo.
-              </p>
-              <div className="mt-3 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={cancelDeleteConfirmation}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    void confirmDelete();
-                  }}
-                  disabled={isDeletingProject}
-                >
-                  <Trash2 className="size-4" />
-                  {isDeleting ? "Deleting..." : "Delete project"}
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="mt-auto flex items-center justify-end">
@@ -244,7 +194,7 @@ export function ProjectCard({
             asChild
             size="sm"
             className="bg-blue-500 text-white hover:bg-blue-500/90"
-            disabled={isEditingName || isRenaming || isInteractionDisabled || isConfirmingDelete}
+            disabled={isEditingName || isRenaming || isInteractionDisabled}
           >
             <Link href={`/editor/${project.id}`}>
               Open project
