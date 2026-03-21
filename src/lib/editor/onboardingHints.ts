@@ -1,5 +1,9 @@
 export const EDITOR_HINT_DISMISSALS_STORAGE_KEY = "spaceforge.editor.onboarding.dismissed-hints.v3";
 export const EDITOR_HINT_COMPLETIONS_STORAGE_KEY = "spaceforge.editor.onboarding.completed-hints.v7";
+export const EDITOR_ONBOARDING_AUTO_COMPLETE_MS = {
+  projectOwnership: 3600,
+  projectName: 5600,
+} as const;
 
 export type EditorOnboardingHintId =
   | "empty-canvas-draw"
@@ -54,7 +58,7 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
       roomCount > 0 &&
       hasResolvedProject &&
       completedHintIds.has("close-shape-to-make-room"),
-    autoCompleteAfterMs: 2600,
+    autoCompleteAfterMs: EDITOR_ONBOARDING_AUTO_COMPLETE_MS.projectOwnership,
   },
   {
     id: "project-name",
@@ -63,7 +67,7 @@ const EDITOR_ONBOARDING_HINTS: EditorOnboardingHint[] = [
       roomCount > 0 &&
       hasResolvedProject &&
       completedHintIds.has("project-ownership"),
-    autoCompleteAfterMs: 4200,
+    autoCompleteAfterMs: EDITOR_ONBOARDING_AUTO_COMPLETE_MS.projectName,
   },
   {
     id: "resize-room-by-dragging-edges",
