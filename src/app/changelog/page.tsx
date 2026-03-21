@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.31.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-21</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Slowed onboarding hint pacing to feel calmer and more readable</li>
+                <li>Added short pause after project rename so the moment can register</li>
+                <li>Anchored the rename hint to the project name in the editor</li>
+                <li>Improved visual connection between hint and target</li>
+                <li>Made onboarding flow feel less rushed and more intentional</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Changed
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Increased dwell time for project ownership and naming hints</li>
+                <li>Introduced explicit timing constants for easier tuning</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hint system remains lightweight and non-blocking</li>
+                <li>No full coachmark system introduced at this stage</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.30.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-21</span>
           </div>
