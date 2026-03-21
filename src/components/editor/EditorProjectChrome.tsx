@@ -7,11 +7,14 @@ import { updateProject } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type EditorProjectChromeProps = {
   projectId: string | null;
   projectName: string | null;
   isLoading: boolean;
+  isNameHighlighted?: boolean;
+  onProjectRenameStart?: () => void;
   onProjectNameChange: (name: string) => void;
 };
 
@@ -19,6 +22,8 @@ export function EditorProjectChrome({
   projectId,
   projectName,
   isLoading,
+  isNameHighlighted = false,
+  onProjectRenameStart,
   onProjectNameChange,
 }: EditorProjectChromeProps) {
   const [isEditingName, setIsEditingName] = useState(false);
@@ -100,13 +105,22 @@ export function EditorProjectChrome({
           }}
           disabled={isSavingName}
           aria-label="Rename project"
-          className="h-8 w-[min(18rem,50vw)] bg-background/90"
+          className={cn(
+            "h-8 w-[min(18rem,50vw)] bg-background/90",
+            isNameHighlighted && "border-blue-500/50 bg-blue-500/10 ring-[3px] ring-blue-500/20"
+          )}
         />
       ) : projectName ? (
         <button
           type="button"
-          onClick={() => setIsEditingName(true)}
-          className="min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          onClick={() => {
+            onProjectRenameStart?.();
+            setIsEditingName(true);
+          }}
+          className={cn(
+            "min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            isNameHighlighted && "bg-blue-500/10 text-white ring-1 ring-blue-500/40"
+          )}
           aria-label={`Rename project ${projectName}`}
           title="Rename project"
         >

@@ -11,7 +11,8 @@ import {
   updateProject,
 } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
-import { createEmptyProjectDocument, DEFAULT_PROJECT_NAME } from "@/lib/projects/defaults";
+import { createEmptyProjectDocument, getDefaultProjectName } from "@/lib/projects/defaults";
+import { completeEditorOnboardingHint } from "@/lib/editor/onboardingHints";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { mergeProjectIntoList, sortProjectsByUpdatedAt } from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -82,7 +83,7 @@ export function ProjectsPageClient() {
           await createOrFetchAnonymousUser(clientToken);
 
           const project = await createProject(clientToken, {
-            name: DEFAULT_PROJECT_NAME,
+            name: getDefaultProjectName({ existingProjectCount: projects.length }),
             document: createEmptyProjectDocument(),
           });
 
@@ -106,6 +107,7 @@ export function ProjectsPageClient() {
       setErrorStatus(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const project = await updateProject(clientToken, projectId, { name });
+      completeEditorOnboardingHint("project-name");
       setProjects((currentProjects) => mergeProjectIntoList(currentProjects, project));
       setErrorMessage(null);
     } catch (error) {

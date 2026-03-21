@@ -10,6 +10,55 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.30.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-21</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Explicit &ldquo;close the shape to make a room&rdquo; onboarding step</li>
+                <li>Project ownership onboarding moment after first room creation</li>
+                <li>Naming-focused onboarding moment encouraging project naming</li>
+                <li>Curated default project names replacing &ldquo;Untitled project&rdquo;</li>
+                <li>First project now defaults to &ldquo;My first layout&rdquo;</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Changed
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Onboarding sequence now prioritises accomplishment, ownership, naming, safety, and then tools</li>
+                <li>Undo is introduced earlier as a safety signal</li>
+                <li>Projects awareness is now integrated into naming guidance</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Onboarding copy is more human and less instructional</li>
+                <li>First-use experience better communicates that work is saved automatically</li>
+                <li>Project naming now feels more natural and intentional</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Removed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>&ldquo;Click the room name to select it&rdquo; onboarding step</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.29.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-20</span>
           </div>
