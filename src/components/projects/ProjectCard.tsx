@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Check, Clock3, PencilLine, X } from "lucide-react";
+import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "lucide-react";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,14 +12,18 @@ import { Input } from "@/components/ui/input";
 type ProjectCardProps = {
   project: ProjectListItem;
   onRename: (projectId: string, name: string) => Promise<void>;
+  onDeleteRequest: (project: ProjectListItem) => void;
   isRenaming: boolean;
+  isDeleting: boolean;
   isInteractionDisabled?: boolean;
 };
 
 export function ProjectCard({
   project,
   onRename,
+  onDeleteRequest,
   isRenaming,
+  isDeleting,
   isInteractionDisabled = false,
 }: ProjectCardProps) {
   const [isEditingName, setIsEditingName] = useState(false);
@@ -28,10 +32,20 @@ export function ProjectCard({
   const isSubmittingRenameRef = useRef(false);
 
   useEffect(() => {
+    if (isEditingName) return;
+    setDraftName(project.name);
+  }, [isEditingName, project.name]);
+
+  useEffect(() => {
     if (!isEditingName) return;
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [isEditingName]);
+
+  useEffect(() => {
+    if (!isDeleting) return;
+    setIsEditingName(false);
+  }, [isDeleting]);
 
   const finishRename = async () => {
     if (isSubmittingRenameRef.current || isInteractionDisabled) return;
@@ -60,7 +74,7 @@ export function ProjectCard({
   };
 
   const cancelRename = () => {
-    if (isRenaming) return;
+    if (isRenaming || isDeleting) return;
     setDraftName(project.name);
     setIsEditingName(false);
   };
@@ -135,21 +149,41 @@ export function ProjectCard({
                   </Button>
                 </>
               ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (isInteractionDisabled) return;
-                    setDraftName(project.name);
-                    setIsEditingName(true);
-                  }}
-                  disabled={isInteractionDisabled}
-                  aria-label={`Rename ${project.name}`}
-                >
-                  <PencilLine className="size-4" />
-                  Rename
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      if (isInteractionDisabled) return;
+                      setDraftName(project.name);
+                      setIsEditingName(true);
+                    }}
+                    disabled={isInteractionDisabled}
+                    aria-label={`Rename ${project.name}`}
+                    title="Rename project"
+                    className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                  >
+                    <PencilLine className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      if (isInteractionDisabled) return;
+                      setDraftName(project.name);
+                      setIsEditingName(false);
+                      onDeleteRequest(project);
+                    }}
+                    disabled={isInteractionDisabled}
+                    aria-label={`Delete ${project.name}`}
+                    title="Delete project"
+                    className="text-foreground/64 hover:bg-muted hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </>
               )}
             </div>
           </div>

@@ -44,3 +44,12 @@ export function clearActiveProjectId() {
   if (!storage) return;
   storage.removeItem(ACTIVE_PROJECT_ID_STORAGE_KEY);
 }
+
+export function clearActiveProjectIdIfMatches(projectId: string) {
+  const storage = getBrowserStorage();
+  if (!storage) return;
+
+  if (storage.getItem(ACTIVE_PROJECT_ID_STORAGE_KEY) === projectId) {
+    storage.removeItem(ACTIVE_PROJECT_ID_STORAGE_KEY);
+  }
+}

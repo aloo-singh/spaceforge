@@ -7,15 +7,25 @@ import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "lucide-react";
 import {
   createOrFetchAnonymousUser,
   createProject,
+  deleteProject,
   fetchProjects,
   updateProject,
 } from "@/lib/projects/clientApi";
-import { getOrCreateAnonymousClientToken, saveActiveProjectId } from "@/lib/projects/clientIdentity";
+import {
+  clearActiveProjectIdIfMatches,
+  getOrCreateAnonymousClientToken,
+  saveActiveProjectId,
+} from "@/lib/projects/clientIdentity";
 import { createEmptyProjectDocument, getDefaultProjectName } from "@/lib/projects/defaults";
 import { completeEditorOnboardingHint } from "@/lib/editor/onboardingHints";
 import type { ProjectListItem } from "@/lib/projects/types";
-import { mergeProjectIntoList, sortProjectsByUpdatedAt } from "@/lib/projects/listState";
+import {
+  mergeProjectIntoList,
+  removeProjectFromList,
+  sortProjectsByUpdatedAt,
+} from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ProjectDeleteDialog } from "@/components/projects/ProjectDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
@@ -27,6 +37,8 @@ export function ProjectsPageClient() {
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const didLoadProjectsRef = useRef(false);
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
@@ -69,7 +81,11 @@ export function ProjectsPageClient() {
   }, []);
 
   const isProjectsApiUnavailable = errorStatus === 404 && errorMessage === "Projects API unavailable.";
-  const canCreateProject = !isCreatingProject && renamingProjectId === null && !isProjectsApiUnavailable;
+  const canCreateProject =
+    !isCreatingProject &&
+    renamingProjectId === null &&
+    deletingProjectId === null &&
+    !isProjectsApiUnavailable;
 
   const handleCreateProject = () => {
     if (!canCreateProject) return;
@@ -98,7 +114,7 @@ export function ProjectsPageClient() {
   };
 
   const handleRenameProject = async (projectId: string, name: string) => {
-    if (isCreatingProject || renamingProjectId !== null) return;
+    if (isCreatingProject || renamingProjectId !== null || deletingProjectId !== null) return;
 
     setRenamingProjectId(projectId);
 
@@ -116,6 +132,32 @@ export function ProjectsPageClient() {
       throw error;
     } finally {
       setRenamingProjectId(null);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (isCreatingProject || renamingProjectId !== null || deletingProjectId !== null) return;
+
+    setDeletingProjectId(projectId);
+
+    try {
+      setErrorMessage(null);
+      setErrorStatus(null);
+      const clientToken = getOrCreateAnonymousClientToken();
+      const deletedProject = await deleteProject(clientToken, projectId);
+
+      clearActiveProjectIdIfMatches(deletedProject.id);
+      setProjects((currentProjects) => removeProjectFromList(currentProjects, deletedProject.id));
+      setProjectPendingDelete((currentProject) =>
+        currentProject?.id === deletedProject.id ? null : currentProject
+      );
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
+      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
+      throw error;
+    } finally {
+      setDeletingProjectId(null);
     }
   };
 
@@ -171,7 +213,12 @@ export function ProjectsPageClient() {
               onClick={() => {
                 void loadProjects({ showLoadingState: !didLoadProjectsRef.current });
               }}
-              disabled={isLoading || isCreatingProject || renamingProjectId !== null}
+              disabled={
+                isLoading ||
+                isCreatingProject ||
+                renamingProjectId !== null ||
+                deletingProjectId !== null
+              }
             >
               <RefreshCcw className="size-4" />
               Retry
@@ -217,7 +264,12 @@ export function ProjectsPageClient() {
                   onClick={() => {
                     void loadProjects({ showLoadingState: true });
                   }}
-                  disabled={isLoading || isCreatingProject || renamingProjectId !== null}
+                  disabled={
+                    isLoading ||
+                    isCreatingProject ||
+                    renamingProjectId !== null ||
+                    deletingProjectId !== null
+                  }
                 >
                   <RefreshCcw className="size-4" />
                   Retry
@@ -240,12 +292,33 @@ export function ProjectsPageClient() {
                 key={project.id}
                 project={project}
                 onRename={handleRenameProject}
+                onDeleteRequest={setProjectPendingDelete}
                 isRenaming={renamingProjectId === project.id}
-                isInteractionDisabled={isCreatingProject || isProjectsApiUnavailable}
+                isDeleting={deletingProjectId === project.id}
+                isInteractionDisabled={
+                  isCreatingProject ||
+                  isProjectsApiUnavailable ||
+                  (deletingProjectId !== null && deletingProjectId !== project.id)
+                }
               />
             ))}
           </div>
         ) : null}
+
+        <ProjectDeleteDialog
+          project={projectPendingDelete}
+          open={projectPendingDelete !== null}
+          isDeleting={deletingProjectId === projectPendingDelete?.id}
+          onOpenChange={(open) => {
+            if (!open && deletingProjectId === null) {
+              setProjectPendingDelete(null);
+            }
+          }}
+          onConfirmDelete={() => {
+            if (!projectPendingDelete) return;
+            void handleDeleteProject(projectPendingDelete.id);
+          }}
+        />
       </section>
     </main>
   );

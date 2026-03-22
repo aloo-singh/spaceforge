@@ -10,6 +10,54 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.32.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-22</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project deletion from <code>/projects</code></li>
+                <li>Explicit delete confirmation flow</li>
+                <li>Responsive delete confirmation surface with a dialog on desktop and a drawer on mobile</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project card actions now use compact icon controls</li>
+                <li>Delete flow no longer disrupts project card height or grid layout</li>
+                <li>Deletion interaction feels tidier and more deliberate</li>
+                <li>Accessibility improved for icon-only project actions with labels and hover hints</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Changed
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>If the deleted project was the active one, stale local active-project state is cleared</li>
+                <li>Deleting the last remaining project now falls through cleanly to the existing empty state</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Deletion remains confined to <code>/projects</code></li>
+                <li>No trash, archive, or undo-delete system was introduced</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.31.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-21</span>
           </div>
