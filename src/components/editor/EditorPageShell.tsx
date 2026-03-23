@@ -24,6 +24,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     | { status: "ready" }
     | { status: "error"; message: string }
   >({ status: "loading" });
+  const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status === "loading";
 
   return (
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
@@ -39,6 +40,13 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           }
         }}
       />
+      {shouldHideCanvasDuringBootstrap ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-neutral-950">
+          <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/72 backdrop-blur">
+            Loading project...
+          </div>
+        </div>
+      ) : null}
       {bootstrapState.status === "error" ? (
         <div className="absolute top-4 left-4 z-10 max-w-sm rounded-2xl border border-white/12 bg-black/60 p-4 shadow-lg backdrop-blur">
           <p className="text-sm font-medium text-white">Project unavailable</p>
@@ -53,32 +61,34 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           </div>
         </div>
       ) : null}
-      <EditorCanvas
-        hasResolvedProject={activeProject !== null}
-        onDisplayedHintChange={setActiveHintId}
-        projectRenameCompletionCount={projectRenameCompletionCount}
-        topBarLeadingContent={
-          <EditorProjectChrome
-            projectId={activeProject?.id ?? null}
-            projectName={activeProject?.name ?? null}
-            isLoading={bootstrapState.status === "loading"}
-            isNameHighlighted={activeHintId === "project-name"}
-            onProjectRenameCommitted={() => {
-              setProjectRenameCompletionCount((currentCount) => currentCount + 1);
-            }}
-            onProjectNameChange={(name) => {
-              setActiveProject((currentProject) =>
-                currentProject
-                  ? {
-                      ...currentProject,
-                      name,
-                    }
-                  : currentProject
-              );
-            }}
-          />
-        }
-      />
+      {!shouldHideCanvasDuringBootstrap ? (
+        <EditorCanvas
+          hasResolvedProject={activeProject !== null}
+          onDisplayedHintChange={setActiveHintId}
+          projectRenameCompletionCount={projectRenameCompletionCount}
+          topBarLeadingContent={
+            <EditorProjectChrome
+              projectId={activeProject?.id ?? null}
+              projectName={activeProject?.name ?? null}
+              isLoading={bootstrapState.status === "loading"}
+              isNameHighlighted={activeHintId === "project-name"}
+              onProjectRenameCommitted={() => {
+                setProjectRenameCompletionCount((currentCount) => currentCount + 1);
+              }}
+              onProjectNameChange={(name) => {
+                setActiveProject((currentProject) =>
+                  currentProject
+                    ? {
+                        ...currentProject,
+                        name,
+                      }
+                    : currentProject
+                );
+              }}
+            />
+          }
+        />
+      ) : null}
     </main>
   );
 }

@@ -18,12 +18,20 @@ export function getOrCreateAnonymousClientToken() {
   const storage = getBrowserStorage();
   if (!storage) return createClientToken();
 
-  const existing = storage.getItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY)?.trim() ?? "";
+  const existing = getAnonymousClientToken();
   if (existing) return existing;
 
   const nextToken = createClientToken();
   storage.setItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY, nextToken);
   return nextToken;
+}
+
+export function getAnonymousClientToken() {
+  const storage = getBrowserStorage();
+  if (!storage) return null;
+
+  const existing = storage.getItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY)?.trim() ?? "";
+  return existing || null;
 }
 
 export function loadActiveProjectId() {

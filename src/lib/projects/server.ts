@@ -91,17 +91,22 @@ function mapProjectListItem(row: Omit<SupabaseProjectRow, "document">): ProjectL
   };
 }
 
-export async function getOrCreateAppUserByClientToken(clientToken: string): Promise<AppUser> {
+async function fetchAppUserByClientToken(clientToken: string): Promise<AppUser | null> {
   const searchParams = new URLSearchParams({
     select: "id,client_token,created_at,updated_at",
     client_token: `eq.${clientToken}`,
     limit: "1",
   });
-  const existingResponse = await supabaseRequest("app_users", { method: "GET" }, searchParams);
-  const existingRows = (await existingResponse.json()) as SupabaseAppUserRow[];
-  const existingUser = existingRows[0];
+  const response = await supabaseRequest("app_users", { method: "GET" }, searchParams);
+  const rows = (await response.json()) as SupabaseAppUserRow[];
+  const row = rows[0];
+  return row ? mapAppUser(row) : null;
+}
+
+export async function getOrCreateAppUserByClientToken(clientToken: string): Promise<AppUser> {
+  const existingUser = await fetchAppUserByClientToken(clientToken);
   if (existingUser) {
-    return mapAppUser(existingUser);
+    return existingUser;
   }
 
   try {
@@ -126,14 +131,12 @@ export async function getOrCreateAppUserByClientToken(clientToken: string): Prom
       throw error;
     }
 
-    const retryResponse = await supabaseRequest("app_users", { method: "GET" }, searchParams);
-    const retryRows = (await retryResponse.json()) as SupabaseAppUserRow[];
-    const retryUser = retryRows[0];
+    const retryUser = await fetchAppUserByClientToken(clientToken);
     if (!retryUser) {
       throw error;
     }
 
-    return mapAppUser(retryUser);
+    return retryUser;
   }
 }
 
@@ -175,6 +178,22 @@ export async function fetchProjectsForClientToken(clientToken: string): Promise<
   const response = await supabaseRequest("projects", { method: "GET" }, searchParams);
   const rows = (await response.json()) as Array<Omit<SupabaseProjectRow, "document">>;
   return rows.map(mapProjectListItem);
+}
+
+export async function existingClientTokenHasProjects(clientToken: string): Promise<boolean> {
+  const user = await fetchAppUserByClientToken(clientToken);
+  if (!user) {
+    return false;
+  }
+
+  const searchParams = new URLSearchParams({
+    select: "id",
+    user_id: `eq.${user.id}`,
+    limit: "1",
+  });
+  const response = await supabaseRequest("projects", { method: "GET" }, searchParams);
+  const rows = (await response.json()) as Array<Pick<SupabaseProjectRow, "id">>;
+  return rows.length > 0;
 }
 
 export async function fetchProjectForClientToken(
