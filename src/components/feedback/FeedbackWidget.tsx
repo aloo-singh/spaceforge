@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -38,6 +39,20 @@ type FeedbackWidgetProps = {
   promptVariant?: string | null;
   surface?: "light" | "dark";
   getMetadata?: () => FeedbackMetadata | null;
+};
+
+type FeedbackPanelContentProps = {
+  canSubmit: boolean;
+  errorMessage: string | null;
+  freeText: string;
+  isDarkSurface: boolean;
+  onClose: () => void;
+  onFreeTextChange: (value: string) => void;
+  onGoBack: () => void;
+  onSelectSentiment: (nextSentiment: FeedbackSentiment) => void;
+  onSubmit: () => void;
+  sentiment: FeedbackSentiment | null;
+  status: FeedbackViewState["status"];
 };
 
 function getSessionStorage() {
@@ -97,6 +112,193 @@ function createInitialViewState(): FeedbackViewState {
   };
 }
 
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  const focusableSelectors = [
+    "button:not([disabled])",
+    "[href]",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+  ];
+
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors.join(","))).filter(
+    (element) => !element.hasAttribute("aria-hidden")
+  );
+}
+
+function FeedbackPanelContent({
+  canSubmit,
+  errorMessage,
+  freeText,
+  isDarkSurface,
+  onClose,
+  onFreeTextChange,
+  onGoBack,
+  onSelectSentiment,
+  onSubmit,
+  sentiment,
+  status,
+}: FeedbackPanelContentProps) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <p
+            className={cn(
+              "font-measurement text-[11px] font-semibold tracking-[0.18em] uppercase",
+              isDarkSurface ? "text-white/50" : "text-foreground/45"
+            )}
+          >
+            Quick 2-question check...
+          </p>
+          {status === "submitted" ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2
+                  className={cn(
+                    "size-4 transition-all duration-200",
+                    isDarkSurface ? "text-emerald-300" : "text-emerald-600"
+                  )}
+                />
+                <p className="text-sm font-medium">Thanks. That genuinely helps.</p>
+              </div>
+              <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
+                You can leave another note anytime from the feedback button.
+              </p>
+            </div>
+          ) : sentiment === null ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium leading-6">Was that easier than you expected?</p>
+              <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
+                Small gut check, nothing formal.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-medium leading-6">
+                {sentiment === "positive" ? "Nice. What made it feel easy?" : "What slowed you down?"}
+              </p>
+              <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
+                A short note is enough.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={status === "submitting"}
+          className={cn(
+            "rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
+            isDarkSurface ? "text-white/56 hover:bg-white/10 hover:text-white" : "text-foreground/48 hover:bg-muted hover:text-foreground"
+          )}
+          aria-label="Close feedback"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {status === "submitted" ? (
+        <div className="mt-5 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className={cn(isDarkSurface ? "border-white/14 bg-transparent text-white hover:bg-white/8" : "")}
+          >
+            Close
+          </Button>
+        </div>
+      ) : sentiment === null ? (
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onSelectSentiment("positive")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
+              isDarkSurface
+                ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
+                : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
+            )}
+          >
+            <ThumbsUp className="size-4" />
+            Yes
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelectSentiment("negative")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
+              isDarkSurface
+                ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
+                : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
+            )}
+          >
+            <ThumbsDown className="size-4" />
+            Not really
+          </button>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-3.5">
+          <textarea
+            value={freeText}
+            onChange={(event) => onFreeTextChange(event.target.value)}
+            rows={4}
+            placeholder={
+              sentiment === "positive"
+                ? "What felt smooth or clear?"
+                : "What felt awkward, slow, or unclear?"
+            }
+            className={cn(
+              "w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none transition-colors",
+              "focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/15",
+              isDarkSurface
+                ? "border-white/12 bg-white/6 text-white placeholder:text-white/36"
+                : "border-border/70 bg-background text-foreground placeholder:text-muted-foreground"
+            )}
+          />
+
+          {errorMessage ? (
+            <p className={cn("text-sm", isDarkSurface ? "text-red-300" : "text-red-600")}>
+              {errorMessage}
+            </p>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onGoBack}
+              disabled={status === "submitting"}
+              className={cn(isDarkSurface ? "text-white/72 hover:bg-white/10 hover:text-white" : "")}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onSubmit}
+              disabled={!canSubmit}
+              className="bg-blue-500 text-white hover:bg-blue-500/90"
+            >
+              {status === "submitting" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+              {status === "submitting" ? "Sending..." : "Send"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function FeedbackWidget({
   pageContext,
   projectId = null,
@@ -109,11 +311,14 @@ export function FeedbackWidget({
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
+  const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
   const [promptSessionState, setPromptSessionState] = useState<FeedbackPromptSessionState>(() =>
     loadPromptSessionState(pageContext)
   );
+  const [isMobile, setIsMobile] = useState(false);
   const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
   const activeSource = viewState.activeSource;
   const sentiment = viewState.sentiment;
@@ -124,6 +329,24 @@ export function FeedbackWidget({
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const updateMatch = () => {
+      setIsMobile(mediaQuery.matches);
+    };
+
+    updateMatch();
+    mediaQuery.addEventListener("change", updateMatch);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateMatch);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -160,6 +383,7 @@ export function FeedbackWidget({
         savePromptSessionState(pageContext, nextState);
         return nextState;
       });
+
       setViewState({
         activeSource: "prompt",
         sentiment: null,
@@ -197,7 +421,7 @@ export function FeedbackWidget({
   const canSubmit = freeText.trim().length > 0 && sentiment !== null && status !== "submitting";
   const isPanelVisible = panelState !== "closed";
 
-  const closePanel = () => {
+  const closePanel = useCallback(() => {
     if (status === "submitting") {
       return;
     }
@@ -221,7 +445,50 @@ export function FeedbackWidget({
       setViewState(createInitialViewState());
       closeTimeoutRef.current = null;
     }, FEEDBACK_EXIT_DURATION_MS);
-  };
+  }, [activeSource, pageContext, promptSessionState, status]);
+
+  useEffect(() => {
+    if (!isMobile || !isOpen) {
+      return;
+    }
+
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const drawerElement = mobileDrawerRef.current;
+      if (!drawerElement) {
+        return;
+      }
+
+      const firstFocusableElement = getFocusableElements(drawerElement)[0];
+      if (firstFocusableElement) {
+        firstFocusableElement.focus();
+        return;
+      }
+
+      drawerElement.focus();
+    });
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closePanel();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      previouslyFocusedElementRef.current?.focus();
+      previouslyFocusedElementRef.current = null;
+    };
+  }, [closePanel, isMobile, isOpen]);
 
   const openManualFlow = () => {
     if (status === "submitting") {
@@ -270,6 +537,7 @@ export function FeedbackWidget({
         promptVariant,
         metadata: getMetadata?.() ?? null,
       });
+
       if (activeSource === "prompt") {
         const nextState = {
           ...promptSessionState,
@@ -278,6 +546,7 @@ export function FeedbackWidget({
         setPromptSessionState(nextState);
         savePromptSessionState(pageContext, nextState);
       }
+
       setViewState((currentState) => ({
         ...currentState,
         status: "submitted",
@@ -291,227 +560,127 @@ export function FeedbackWidget({
     }
   };
 
+  const panelContent = (
+    <FeedbackPanelContent
+      canSubmit={canSubmit}
+      errorMessage={errorMessage}
+      freeText={freeText}
+      isDarkSurface={isDarkSurface}
+      onClose={closePanel}
+      onFreeTextChange={(nextFreeText) =>
+        setViewState((currentState) => ({
+          ...currentState,
+          freeText: nextFreeText,
+        }))
+      }
+      onGoBack={() =>
+        setViewState((currentState) => ({
+          ...currentState,
+          sentiment: null,
+          freeText: "",
+          errorMessage: null,
+        }))
+      }
+      onSelectSentiment={(nextSentiment) =>
+        setViewState((currentState) => ({
+          ...currentState,
+          sentiment: nextSentiment,
+        }))
+      }
+      onSubmit={() => {
+        void handleSubmit();
+      }}
+      sentiment={sentiment}
+      status={status}
+    />
+  );
+
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex w-[min(22rem,calc(100vw-2rem))] flex-col items-end gap-3 sm:right-6 sm:bottom-6">
-      <div
-        className={cn(
-          "pointer-events-auto w-full origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-200 sm:px-5 sm:py-5",
-          isPanelVisible ? "" : "pointer-events-none",
-          panelState === "open"
-            ? "translate-x-0 translate-y-0 scale-100 opacity-100"
-            : panelState === "opening"
-              ? isPromptSurface
-                ? "translate-x-10 translate-y-0 scale-[0.985] opacity-0"
-                : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
-              : panelState === "closing"
-                ? isPromptSurface
-                  ? "translate-x-4 translate-y-0 scale-[0.99] opacity-0"
-                  : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
-                : isPromptSurface
-                  ? "translate-x-10 translate-y-0 scale-[0.985] opacity-0"
-                  : "translate-x-0 translate-y-3 scale-[0.985] opacity-0",
-          isDarkSurface
-            ? "border-white/12 bg-black/72 text-white shadow-black/30"
-            : "border-border/70 bg-background/92 text-foreground shadow-black/8",
-          isPromptSurface && status !== "submitted" ? "ring-1 ring-blue-500/20" : ""
-        )}
-        aria-hidden={!isPanelVisible}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <p
-              className={cn(
-                "font-measurement text-[11px] font-semibold tracking-[0.18em] uppercase",
-                isDarkSurface ? "text-white/50" : "text-foreground/45"
-              )}
-            >
-              Quick 2-question check...
-            </p>
-            {status === "submitted" ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2
-                    className={cn(
-                      "size-4 transition-all duration-200",
-                      "translate-y-0 scale-100 opacity-100",
-                      isDarkSurface ? "text-emerald-300" : "text-emerald-600"
-                    )}
-                  />
-                  <p className="text-sm font-medium">Thanks. That genuinely helps.</p>
-                </div>
-                <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
-                  You can leave another note anytime from the feedback button.
-                </p>
-              </div>
-            ) : sentiment === null ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium leading-6">Was that easier than you expected?</p>
-                <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
-                  Small gut check, nothing formal.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm font-medium leading-6">
-                  {sentiment === "positive" ? "Nice. What made it feel easy?" : "What slowed you down?"}
-                </p>
-                <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
-                  A short note is enough.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={closePanel}
-            disabled={status === "submitting"}
+    <>
+      <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
+        {!isMobile ? (
+          <div
             className={cn(
-              "rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
-              isDarkSurface ? "text-white/56 hover:bg-white/10 hover:text-white" : "text-foreground/48 hover:bg-muted hover:text-foreground"
+              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-300 sm:px-5 sm:py-5",
+              isPanelVisible ? "" : "pointer-events-none",
+              panelState === "open"
+                ? "translate-x-0 translate-y-0 scale-100 opacity-100"
+                : panelState === "opening"
+                  ? isPromptSurface
+                    ? "translate-x-[110%] translate-y-0 scale-[0.985] opacity-0"
+                    : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
+                  : panelState === "closing"
+                    ? isPromptSurface
+                      ? "translate-x-10 translate-y-0 scale-[0.99] opacity-0"
+                      : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
+                    : isPromptSurface
+                      ? "translate-x-[110%] translate-y-0 scale-[0.985] opacity-0"
+                      : "translate-x-0 translate-y-3 scale-[0.985] opacity-0",
+              isDarkSurface
+                ? "border-white/12 bg-black/72 text-white shadow-black/30"
+                : "border-border/70 bg-background/92 text-foreground shadow-black/8",
+              isPromptSurface && status !== "submitted" ? "ring-1 ring-blue-500/20" : ""
             )}
-            aria-label="Close feedback"
+            aria-hidden={!isPanelVisible}
           >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        {status === "submitted" ? (
-          <div className="mt-5 flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={closePanel}
-              className={cn(
-                isDarkSurface ? "border-white/14 bg-transparent text-white hover:bg-white/8" : ""
-              )}
-            >
-              Close
-            </Button>
+            {panelContent}
           </div>
-        ) : sentiment === null ? (
-          <div className="mt-5 grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() =>
-                setViewState((currentState) => ({
-                  ...currentState,
-                  sentiment: "positive",
-                }))
-              }
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
-                isDarkSurface
-                  ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
-                  : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
-              )}
-            >
-              <ThumbsUp className="size-4" />
-              Yes
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setViewState((currentState) => ({
-                  ...currentState,
-                  sentiment: "negative",
-                }))
-              }
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
-                isDarkSurface
-                  ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
-                  : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
-              )}
-            >
-              <ThumbsDown className="size-4" />
-              Not really
-            </button>
-          </div>
-        ) : (
-          <div className="mt-5 space-y-3.5">
-            <textarea
-              value={freeText}
-              onChange={(event) =>
-                setViewState((currentState) => ({
-                  ...currentState,
-                  freeText: event.target.value,
-                }))
-              }
-              rows={4}
-              placeholder={
-                sentiment === "positive"
-                  ? "What felt smooth or clear?"
-                  : "What felt awkward, slow, or unclear?"
-              }
-              className={cn(
-                "w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none transition-colors",
-                "focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/15",
-                isDarkSurface
-                  ? "border-white/12 bg-white/6 text-white placeholder:text-white/36"
-                  : "border-border/70 bg-background text-foreground placeholder:text-muted-foreground"
-              )}
-            />
+        ) : null}
 
-            {errorMessage ? (
-              <p className={cn("text-sm", isDarkSurface ? "text-red-300" : "text-red-600")}>
-                {errorMessage}
-              </p>
-            ) : null}
-
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setViewState((currentState) => ({
-                    ...currentState,
-                    sentiment: null,
-                    freeText: "",
-                    errorMessage: null,
-                  }));
-                }}
-                disabled={status === "submitting"}
-                className={cn(isDarkSurface ? "text-white/72 hover:bg-white/10 hover:text-white" : "")}
-              >
-                Back
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  void handleSubmit();
-                }}
-                disabled={!canSubmit}
-                className="bg-blue-500 text-white hover:bg-blue-500/90"
-              >
-                {status === "submitting" ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Send className="size-4" />
-                )}
-                {status === "submitting" ? "Sending..." : "Send"}
-              </Button>
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={openManualFlow}
+          className={cn(
+            "pointer-events-auto inline-flex size-12 shrink-0 items-center justify-center rounded-full border shadow-lg transition-[colors,box-shadow,opacity,transform] duration-75 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+            isDarkSurface
+              ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
+              : "border-border/70 bg-background/94 text-foreground hover:bg-background",
+            isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
+          )}
+          aria-label="Open feedback"
+        >
+          <MessageSquare className="size-5" />
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={openManualFlow}
-        className={cn(
-          "pointer-events-auto inline-flex size-12 shrink-0 items-center justify-center rounded-full border shadow-lg transition-[colors,box-shadow,opacity,transform] duration-75 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
-          isDarkSurface
-            ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
-            : "border-border/70 bg-background/94 text-foreground hover:bg-background"
-        )}
-        aria-label="Open feedback"
-      >
-        <MessageSquare className="size-5" />
-      </button>
-    </div>
+      {isMobile && isPanelVisible && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-40 sm:hidden">
+              <button
+                type="button"
+                aria-label="Close feedback"
+                onClick={closePanel}
+                className={cn(
+                  "absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-200",
+                  panelState === "open" ? "opacity-100" : "opacity-0"
+                )}
+              />
+              <div
+                ref={mobileDrawerRef}
+                role="dialog"
+                aria-modal="true"
+                tabIndex={-1}
+                className={cn(
+                  "absolute inset-x-0 bottom-0 max-h-[min(85vh,calc(100vh-0.75rem))] overflow-y-auto rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl outline-none transition-[transform,opacity] duration-300",
+                  panelState === "open"
+                    ? "translate-y-0 opacity-100"
+                    : panelState === "closing"
+                      ? "translate-y-6 opacity-0"
+                      : "translate-y-full opacity-0",
+                  isDarkSurface
+                    ? "border-white/12 bg-neutral-950 text-white"
+                    : "border-border/70 bg-card text-card-foreground"
+                )}
+              >
+                <div className="mb-4 flex justify-center" aria-hidden="true">
+                  <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
+                </div>
+                {panelContent}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
