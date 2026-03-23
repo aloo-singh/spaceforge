@@ -48,8 +48,14 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-black/10 bg-background/95 px-4 backdrop-blur sm:px-6">
-            <Link href="/" aria-label="SpaceForge home" className="flex items-center">
+            <Link href="/" aria-label="SpaceForge home" className="flex items-center gap-2">
               <BrandWordmark />
+              <Badge
+                variant="outline"
+                className="rounded-md border-foreground/10 bg-foreground/[0.03] px-1.5 py-0.5 font-measurement text-[10px] font-semibold tracking-[0.18em] text-foreground/55 uppercase"
+              >
+                Preview
+              </Badge>
             </Link>
             <nav className="flex items-center text-sm">
               <Link
