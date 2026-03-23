@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { areDocumentsEqual, cloneDocumentState } from "@/lib/editor/persistedHistory";
 import {
   createOrFetchAnonymousUser,
-  createProject,
-  fetchProjectSafely,
-  fetchProjects,
   isProjectsApiUnavailableError,
   ProjectApiError,
   isSpecificProjectNotFoundError,
   updateProject,
+  fetchProjectSafely,
+  fetchProjects,
 } from "@/lib/projects/clientApi";
 import {
   clearActiveProjectId,
@@ -19,7 +18,7 @@ import {
   loadActiveProjectId,
   saveActiveProjectId,
 } from "@/lib/projects/clientIdentity";
-import { getDefaultProjectName } from "@/lib/projects/defaults";
+import { ensureFirstProject } from "@/lib/projects/bootstrap";
 import type { ProjectRecord } from "@/lib/projects/types";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -153,10 +152,7 @@ export function EditorProjectBootstrap({
           }
 
           const localDocument = cloneDocumentState(useEditorStore.getState().document);
-          const project = await createProject(clientToken, {
-            name: getDefaultProjectName({ existingProjectCount: 0 }),
-            document: localDocument,
-          });
+          const project = await ensureFirstProject(clientToken, localDocument);
           if (isCancelled) return;
 
           saveActiveProjectId(project.id);
