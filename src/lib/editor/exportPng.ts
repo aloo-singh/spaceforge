@@ -90,6 +90,13 @@ function composeExportCanvas(
   return composedCanvas;
 }
 
+export function renderPixiCanvasToCanvas(
+  source: PixiPngExportSource,
+  options: PixiPngExportOptions = {}
+): HTMLCanvasElement {
+  return composeExportCanvas(extractSourceCanvas(source), options);
+}
+
 function drawExportGrid(
   context: CanvasRenderingContext2D,
   width: number,
@@ -207,7 +214,7 @@ export async function exportPixiCanvasToPngDataUrl(
   source: PixiPngExportSource,
   options: PixiPngExportOptions = {}
 ): Promise<string> {
-  const composedCanvas = composeExportCanvas(extractSourceCanvas(source), options);
+  const composedCanvas = renderPixiCanvasToCanvas(source, options);
   const toDataUrl = composedCanvas.toDataURL;
 
   if (!toDataUrl) {
@@ -221,6 +228,6 @@ export async function exportPixiCanvasToPngBlob(
   source: PixiPngExportSource,
   options: PixiPngExportOptions = {}
 ): Promise<Blob> {
-  const composedCanvas = composeExportCanvas(extractSourceCanvas(source), options);
+  const composedCanvas = renderPixiCanvasToCanvas(source, options);
   return canvasToPngBlob(composedCanvas);
 }

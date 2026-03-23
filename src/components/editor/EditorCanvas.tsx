@@ -32,6 +32,7 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
+import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import { isOrthogonalPointPath, isPointInPolygon, isSimplePolygon } from "@/lib/editor/roomGeometry";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
@@ -172,6 +173,7 @@ type EditorCanvasProps = {
   hasResolvedProject?: boolean;
   projectRenameCompletionCount?: number;
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
+  onThumbnailGeneratorChange?: (generateThumbnailDataUrl: (() => Promise<string | null>) | null) => void;
   topBarLeadingContent?: ReactNode;
 };
 
@@ -179,6 +181,7 @@ export default function EditorCanvas({
   hasResolvedProject = false,
   projectRenameCompletionCount = 0,
   onDisplayedHintChange,
+  onThumbnailGeneratorChange,
   topBarLeadingContent,
 }: EditorCanvasProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -561,122 +564,155 @@ export default function EditorCanvas({
     };
   }, [displayedHint?.id, updateAnchoredProjectNameHintPosition]);
 
+  const createCanvasExportSnapshot = useCallback(
+    ({
+      innerPaddingPx,
+      paddingPx,
+      signatureText,
+    }: {
+      innerPaddingPx: number;
+      paddingPx: number;
+      signatureText?: string;
+    }) => {
+      const app = appRef.current;
+      if (!app) return null;
+
+      const state = useEditorStore.getState();
+      const layoutBounds = getLayoutBoundsFromDocument(state.document);
+      const exportFraming = getAutoFitExportFraming({
+        layoutBounds,
+        viewport: state.viewport,
+        fallbackCamera: state.camera,
+        innerPaddingPx,
+      });
+      const exportCamera = exportFraming.camera;
+      const exportViewport = exportFraming.viewport;
+      const minorGridSpacingPx = GRID_MINOR_SIZE_MM * exportCamera.pixelsPerMm;
+      const majorGridSpacingPx = GRID_SIZE_MM * exportCamera.pixelsPerMm;
+      const exportGridSpacingPx = minorGridSpacingPx >= 8 ? minorGridSpacingPx : majorGridSpacingPx;
+      const exportGridOriginXPx =
+        (0 - exportCamera.xMm) * exportCamera.pixelsPerMm + exportViewport.width / 2;
+      const exportGridOriginYPx =
+        (0 - exportCamera.yMm) * exportCamera.pixelsPerMm + exportViewport.height / 2;
+      const exportStage = new Container();
+      const exportRoomGraphics = new Graphics();
+      const exportOpeningGraphics = new Graphics();
+      const exportWallOverlayGraphics = new Graphics();
+      const exportRoomLabels = new Container();
+      const exportDraftGraphics = new Graphics();
+      exportStage.addChild(exportRoomGraphics);
+      exportStage.addChild(exportOpeningGraphics);
+      exportStage.addChild(exportWallOverlayGraphics);
+      exportStage.addChild(exportRoomLabels);
+      exportStage.addChild(exportDraftGraphics);
+
+      drawRooms(
+        exportRoomGraphics,
+        state.document.rooms,
+        null,
+        EMPTY_ROOM_RESIZE_UI,
+        state.roomDraft.points.length > 0,
+        exportCamera,
+        exportViewport,
+        null,
+        editorThemeRef.current
+      );
+      drawOpenings(
+        exportOpeningGraphics,
+        state.document.rooms,
+        null,
+        exportCamera,
+        exportViewport,
+        editorThemeRef.current
+      );
+      drawWallInteractionOverlay(
+        exportWallOverlayGraphics,
+        state.document.rooms,
+        null,
+        null,
+        EMPTY_ROOM_RESIZE_UI,
+        state.roomDraft.points.length > 0,
+        exportCamera,
+        exportViewport,
+        null,
+        editorThemeRef.current
+      );
+      drawRoomLabels(
+        exportRoomLabels,
+        state.document.rooms,
+        null,
+        null,
+        exportCamera,
+        exportViewport,
+        state.settings,
+        shouldShowDimensions(state.settings, state.isDimensionsVisibilityOverrideActive),
+        null,
+        editorThemeRef.current
+      );
+      drawDraft(
+        exportDraftGraphics,
+        state.roomDraft.points,
+        null,
+        exportCamera,
+        exportViewport,
+        getActiveSnapStepMm(exportCamera),
+        editorThemeRef.current
+      );
+
+      return {
+        renderer: app.renderer,
+        stage: exportStage,
+        options: {
+          backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
+          paddingPx,
+          grid: {
+            spacingPx: exportGridSpacingPx,
+            originXPx: exportGridOriginXPx,
+            originYPx: exportGridOriginYPx,
+            color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
+            alpha: editorThemeMode === "light" ? 0.08 : 0.1,
+          },
+          signature: signatureText
+            ? {
+                text: signatureText,
+                color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
+                alpha: editorThemeMode === "light" ? 0.72 : 0.7,
+              }
+            : undefined,
+        },
+        destroy: () => {
+          exportStage.destroy({ children: true });
+        },
+      };
+    },
+    [editorThemeMode]
+  );
+
   const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
-    const app = appRef.current;
-    if (!app || isExportingPng) return;
+    if (isExportingPng) return;
 
     track(ANALYTICS_EVENTS.exportStarted, {
       exportType: "png",
     });
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
 
-    const state = useEditorStore.getState();
     const hasSignature = Boolean(signatureText?.trim());
-    const layoutBounds = getLayoutBoundsFromDocument(state.document);
-    const exportFraming = getAutoFitExportFraming({
-      layoutBounds,
-      viewport: state.viewport,
-      fallbackCamera: state.camera,
+    const exportSnapshot = createCanvasExportSnapshot({
       innerPaddingPx: hasSignature ? 88 : 72,
+      paddingPx: 48,
+      signatureText,
     });
-    const exportCamera = exportFraming.camera;
-    const exportViewport = exportFraming.viewport;
-    const minorGridSpacingPx = GRID_MINOR_SIZE_MM * exportCamera.pixelsPerMm;
-    const majorGridSpacingPx = GRID_SIZE_MM * exportCamera.pixelsPerMm;
-    const exportGridSpacingPx = minorGridSpacingPx >= 8 ? minorGridSpacingPx : majorGridSpacingPx;
-    const exportGridOriginXPx =
-      (0 - exportCamera.xMm) * exportCamera.pixelsPerMm + exportViewport.width / 2;
-    const exportGridOriginYPx =
-      (0 - exportCamera.yMm) * exportCamera.pixelsPerMm + exportViewport.height / 2;
+    if (!exportSnapshot) {
+      return;
+    }
 
     setIsExportingPng(true);
-    const exportStage = new Container();
-    const exportRoomGraphics = new Graphics();
-    const exportOpeningGraphics = new Graphics();
-    const exportWallOverlayGraphics = new Graphics();
-    const exportRoomLabels = new Container();
-    const exportDraftGraphics = new Graphics();
-    exportStage.addChild(exportRoomGraphics);
-    exportStage.addChild(exportOpeningGraphics);
-    exportStage.addChild(exportWallOverlayGraphics);
-    exportStage.addChild(exportRoomLabels);
-    exportStage.addChild(exportDraftGraphics);
-
-    drawRooms(
-      exportRoomGraphics,
-      state.document.rooms,
-      null,
-      EMPTY_ROOM_RESIZE_UI,
-      state.roomDraft.points.length > 0,
-      exportCamera,
-      exportViewport,
-      null,
-      editorThemeRef.current
-    );
-    drawOpenings(
-      exportOpeningGraphics,
-      state.document.rooms,
-      null,
-      exportCamera,
-      exportViewport,
-      editorThemeRef.current
-    );
-    drawWallInteractionOverlay(
-      exportWallOverlayGraphics,
-      state.document.rooms,
-      null,
-      null,
-      EMPTY_ROOM_RESIZE_UI,
-      state.roomDraft.points.length > 0,
-      exportCamera,
-      exportViewport,
-      null,
-      editorThemeRef.current
-    );
-    drawRoomLabels(
-      exportRoomLabels,
-      state.document.rooms,
-      null,
-      null,
-      exportCamera,
-      exportViewport,
-      state.settings,
-      shouldShowDimensions(state.settings, state.isDimensionsVisibilityOverrideActive),
-      null,
-      editorThemeRef.current
-    );
-    drawDraft(
-      exportDraftGraphics,
-      state.roomDraft.points,
-      cursorWorldRef.current,
-      exportCamera,
-      exportViewport,
-      getActiveSnapStepMm(exportCamera),
-      editorThemeRef.current
-    );
 
     try {
       const blob = await exportPixiCanvasToPngBlob({
-        renderer: app.renderer,
-        stage: exportStage,
-      }, {
-        backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
-        paddingPx: 48,
-        grid: {
-          spacingPx: exportGridSpacingPx,
-          originXPx: exportGridOriginXPx,
-          originYPx: exportGridOriginYPx,
-          color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
-          alpha: editorThemeMode === "light" ? 0.08 : 0.1,
-        },
-        signature: signatureText
-          ? {
-              text: signatureText,
-              color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
-              alpha: editorThemeMode === "light" ? 0.72 : 0.7,
-            }
-          : undefined,
-      });
+        renderer: exportSnapshot.renderer,
+        stage: exportSnapshot.stage,
+      }, exportSnapshot.options);
       const downloadUrl = URL.createObjectURL(blob);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const link = document.createElement("a");
@@ -694,10 +730,29 @@ export default function EditorCanvas({
     } catch (error) {
       console.error("PNG export failed.", error);
     } finally {
-      exportStage.destroy({ children: true });
+      exportSnapshot.destroy();
       setIsExportingPng(false);
     }
-  }, [completeHint, editorThemeMode, isExportingPng]);
+  }, [completeHint, createCanvasExportSnapshot, isExportingPng]);
+
+  const generateThumbnailDataUrl = useCallback(async () => {
+    const exportSnapshot = createCanvasExportSnapshot({
+      innerPaddingPx: 56,
+      paddingPx: 24,
+    });
+    if (!exportSnapshot) {
+      return null;
+    }
+
+    try {
+      return await exportPixiCanvasToThumbnailDataUrl({
+        renderer: exportSnapshot.renderer,
+        stage: exportSnapshot.stage,
+      }, exportSnapshot.options);
+    } finally {
+      exportSnapshot.destroy();
+    }
+  }, [createCanvasExportSnapshot]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;
@@ -724,6 +779,14 @@ export default function EditorCanvas({
   useEffect(() => {
     onDisplayedHintChange?.(displayedHint?.id ?? null);
   }, [displayedHint, onDisplayedHintChange]);
+
+  useEffect(() => {
+    onThumbnailGeneratorChange?.(generateThumbnailDataUrl);
+
+    return () => {
+      onThumbnailGeneratorChange?.(null);
+    };
+  }, [generateThumbnailDataUrl, onThumbnailGeneratorChange]);
 
   useEffect(() => {
     setIsMacPlatform(detectMacPlatform());
@@ -1038,7 +1101,7 @@ export default function EditorCanvas({
         selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
         and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
-      <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
+      <div className="border-b border-border/70 bg-background/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
           leadingContent={topBarLeadingContent}
           onExportPng={exportCurrentCanvasAsPng}

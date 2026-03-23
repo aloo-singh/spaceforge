@@ -10,6 +10,50 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.34.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-23</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Visual thumbnails for projects on the <code>/projects</code> page</li>
+                <li>Automatic thumbnail generation from the canvas</li>
+                <li>Lightweight thumbnail storage on each project</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Projects page now shows visual previews instead of text-only cards</li>
+                <li>Easier recognition and recall of projects</li>
+                <li>Projects page feels more alive and personal</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Thumbnails are generated after meaningful document changes</li>
+                <li>Thumbnail updates are debounced and run off the main interaction path</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Thumbnails reuse the existing export rendering pipeline</li>
+                <li>Fallback placeholder is shown for empty or missing thumbnails</li>
+                <li>No external storage introduced at this stage</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.33.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-23</span>
           </div>

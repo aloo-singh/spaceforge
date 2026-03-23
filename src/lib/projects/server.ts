@@ -1,5 +1,12 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
-import { cloneProjectDocument, isProjectDocument, type AppUser, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
+import {
+  cloneProjectDocument,
+  isProjectDocument,
+  isProjectThumbnailDataUrl,
+  type AppUser,
+  type ProjectListItem,
+  type ProjectRecord,
+} from "@/lib/projects/types";
 import { getSupabaseServerConfig } from "@/lib/supabase/server";
 
 type SupabaseAppUserRow = {
@@ -14,6 +21,7 @@ type SupabaseProjectRow = {
   user_id: string;
   name: string;
   document: unknown;
+  thumbnail_data_url: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -70,22 +78,31 @@ function mapProjectRecord(row: SupabaseProjectRow): ProjectRecord {
   if (!isProjectDocument(row.document)) {
     throw new Error(`Project ${row.id} has an invalid document payload.`);
   }
+  if (!isProjectThumbnailDataUrl(row.thumbnail_data_url)) {
+    throw new Error(`Project ${row.id} has an invalid thumbnail payload.`);
+  }
 
   return {
     id: row.id,
     userId: row.user_id,
     name: row.name,
     document: cloneProjectDocument(row.document),
+    thumbnailDataUrl: row.thumbnail_data_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 function mapProjectListItem(row: Omit<SupabaseProjectRow, "document">): ProjectListItem {
+  if (!isProjectThumbnailDataUrl(row.thumbnail_data_url)) {
+    throw new Error(`Project ${row.id} has an invalid thumbnail payload.`);
+  }
+
   return {
     id: row.id,
     userId: row.user_id,
     name: row.name,
+    thumbnailDataUrl: row.thumbnail_data_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -171,7 +188,7 @@ export async function createProjectForClientToken(
 export async function fetchProjectsForClientToken(clientToken: string): Promise<ProjectListItem[]> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
   const searchParams = new URLSearchParams({
-    select: "id,user_id,name,created_at,updated_at",
+    select: "id,user_id,name,thumbnail_data_url,created_at,updated_at",
     user_id: `eq.${user.id}`,
     order: "updated_at.desc",
   });
@@ -202,7 +219,7 @@ export async function fetchProjectForClientToken(
 ): Promise<ProjectRecord | null> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
   const searchParams = new URLSearchParams({
-    select: "id,user_id,name,document,created_at,updated_at",
+    select: "id,user_id,name,document,thumbnail_data_url,created_at,updated_at",
     id: `eq.${projectId}`,
     user_id: `eq.${user.id}`,
     limit: "1",
@@ -219,6 +236,7 @@ export async function updateProjectForClientToken(
   input: {
     name?: string;
     document?: EditorDocumentState;
+    thumbnailDataUrl?: string | null;
   }
 ): Promise<ProjectRecord | null> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
@@ -232,11 +250,14 @@ export async function updateProjectForClientToken(
   if (input.document !== undefined) {
     updates.document = cloneProjectDocument(input.document);
   }
+  if (input.thumbnailDataUrl !== undefined) {
+    updates.thumbnail_data_url = input.thumbnailDataUrl;
+  }
 
   const searchParams = new URLSearchParams({
     id: `eq.${projectId}`,
     user_id: `eq.${user.id}`,
-    select: "id,user_id,name,document,created_at,updated_at",
+    select: "id,user_id,name,document,thumbnail_data_url,created_at,updated_at",
   });
   const response = await supabaseRequest(
     "projects",
@@ -262,7 +283,7 @@ export async function deleteProjectForClientToken(
   const searchParams = new URLSearchParams({
     id: `eq.${projectId}`,
     user_id: `eq.${user.id}`,
-    select: "id,user_id,name,document,created_at,updated_at",
+    select: "id,user_id,name,document,thumbnail_data_url,created_at,updated_at",
   });
   const response = await supabaseRequest(
     "projects",

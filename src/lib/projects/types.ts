@@ -13,11 +13,14 @@ export type ProjectRecord = {
   userId: string;
   name: string;
   document: EditorDocumentState;
+  thumbnailDataUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type ProjectListItem = Omit<ProjectRecord, "document">;
+
+export const MAX_PROJECT_THUMBNAIL_DATA_URL_LENGTH = 400_000;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -76,6 +79,22 @@ export function isProjectDocument(value: unknown): value is EditorDocumentState 
   if (!isObject(value)) return false;
   if (!Array.isArray(value.rooms)) return false;
   return value.rooms.every(isRoom);
+}
+
+export function isProjectThumbnailDataUrl(value: unknown): value is string | null {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  if (value.length === 0 || value.length > MAX_PROJECT_THUMBNAIL_DATA_URL_LENGTH) {
+    return false;
+  }
+
+  return /^data:image\/(png|webp|jpeg);base64,/u.test(value);
 }
 
 export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {
