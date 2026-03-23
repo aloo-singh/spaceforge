@@ -26,6 +26,9 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     | { status: "error"; message: string }
   >({ status: "loading" });
   const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status === "loading";
+  const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
+    setGenerateThumbnailDataUrl(() => nextGenerator);
+  };
 
   return (
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
@@ -67,7 +70,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
         <EditorCanvas
           hasResolvedProject={activeProject !== null}
           onDisplayedHintChange={setActiveHintId}
-          onThumbnailGeneratorChange={setGenerateThumbnailDataUrl}
+          onThumbnailGeneratorChange={handleThumbnailGeneratorChange}
           projectRenameCompletionCount={projectRenameCompletionCount}
           topBarLeadingContent={
             <EditorProjectChrome
