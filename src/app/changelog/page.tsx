@@ -10,6 +10,41 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.36.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-23</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Prevented duplicate first-project creation during initial bootstrap</li>
+                <li>Coordinated competing first-project creation paths across <code>/editor</code> and <code>/projects</code></li>
+                <li>Stabilised active project resolution immediately after first project creation</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>First-project bootstrap now uses one canonical guarded path</li>
+                <li>Competing first-project creation attempts now reuse in-flight work or wait and re-check instead of creating again</li>
+                <li>Refreshes and overlapping entry flows are handled more safely during initial project creation</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Existing users with projects continue to follow normal open/create flows</li>
+                <li>Homepage and returning-user routing behaviour remain unchanged</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.35.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-23</span>
           </div>

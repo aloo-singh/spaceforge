@@ -12,6 +12,7 @@ import {
   fetchProjects,
   updateProject,
 } from "@/lib/projects/clientApi";
+import { ensureFirstProject } from "@/lib/projects/bootstrap";
 import {
   clearActiveProjectIdIfMatches,
   getOrCreateAnonymousClientToken,
@@ -120,10 +121,13 @@ export function ProjectsPageClient() {
           const clientToken = getOrCreateAnonymousClientToken();
           await createOrFetchAnonymousUser(clientToken);
 
-          const project = await createProject(clientToken, {
-            name: getDefaultProjectName({ existingProjectCount: projects.length }),
-            document: createEmptyProjectDocument(),
-          });
+          const project =
+            projects.length === 0
+              ? await ensureFirstProject(clientToken, createEmptyProjectDocument())
+              : await createProject(clientToken, {
+                  name: getDefaultProjectName({ existingProjectCount: projects.length }),
+                  document: createEmptyProjectDocument(),
+                });
 
           saveActiveProjectId(project.id);
           router.push(`/editor/${project.id}`);
