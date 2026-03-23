@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 import type { ReactNode } from "react";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
 type ResponsiveDialogProps = {
@@ -49,26 +50,10 @@ export function ResponsiveDialog({
   const fallbackContentId = useId();
   const mobileTitleId = useId();
   const mobileDescriptionId = useId();
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useMobile();
   const resolvedContentId = contentId ?? fallbackContentId;
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const updateMatch = () => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateMatch();
-    mediaQuery.addEventListener("change", updateMatch);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMatch);
-    };
-  }, []);
 
   if (isDrawer) {
     return (

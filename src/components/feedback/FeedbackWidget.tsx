@@ -14,6 +14,7 @@ import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
@@ -112,21 +113,6 @@ function createInitialViewState(): FeedbackViewState {
     status: "idle",
     errorMessage: null,
   };
-}
-
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  const focusableSelectors = [
-    "button:not([disabled])",
-    "[href]",
-    "input:not([disabled])",
-    "select:not([disabled])",
-    "textarea:not([disabled])",
-    "[tabindex]:not([tabindex='-1'])",
-  ];
-
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors.join(","))).filter(
-    (element) => !element.hasAttribute("aria-hidden")
-  );
 }
 
 function FeedbackPanelContent({
@@ -317,13 +303,12 @@ export function FeedbackWidget({
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopPanelAnimationRef = useRef<Animation | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
   const [promptSessionState, setPromptSessionState] = useState<FeedbackPromptSessionState>(() =>
     loadPromptSessionState(pageContext)
   );
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useMobile();
   const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
   const activeSource = viewState.activeSource;
   const sentiment = viewState.sentiment;
@@ -334,24 +319,6 @@ export function FeedbackWidget({
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const updateMatch = () => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateMatch();
-    mediaQuery.addEventListener("change", updateMatch);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMatch);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -468,6 +435,15 @@ export function FeedbackWidget({
     }
   }, [activeSource, isMobile, pageContext, promptSessionState, status]);
 
+  const handleMobileDrawerOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        closePanel();
+      }
+    },
+    [closePanel]
+  );
+
   useEffect(() => {
     if (isMobile || !desktopPanelRef.current) {
       return;
@@ -548,49 +524,6 @@ export function FeedbackWidget({
       };
     }
   }, [isMobile, isPromptSurface, panelState]);
-
-  useEffect(() => {
-    if (!isMobile || !isOpen) {
-      return;
-    }
-
-    previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const focusFrame = window.requestAnimationFrame(() => {
-      const drawerElement = mobileDrawerRef.current;
-      if (!drawerElement) {
-        return;
-      }
-
-      const firstFocusableElement = getFocusableElements(drawerElement)[0];
-      if (firstFocusableElement) {
-        firstFocusableElement.focus();
-        return;
-      }
-
-      drawerElement.focus();
-    });
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closePanel();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-      previouslyFocusedElementRef.current?.focus();
-      previouslyFocusedElementRef.current = null;
-    };
-  }, [closePanel, isMobile, isOpen]);
 
   const openManualFlow = () => {
     if (status === "submitting") {
@@ -745,18 +678,14 @@ export function FeedbackWidget({
 
       <ResponsiveDialog
         open={isMobile && isPanelVisible}
-        onOpenChange={(open) => {
-          if (!open) {
-            closePanel();
-          }
-        }}
+        onOpenChange={handleMobileDrawerOpenChange}
         title="Feedback"
         hideHeader
         surfaceOverride="drawer"
         motionState={panelState === "closed" ? undefined : panelState}
         panelRef={mobileDrawerRef}
         className={cn(
-          "rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl will-change-transform",
+          "rounded-t-3xl border shadow-xl",
           isDarkSurface
             ? "border-white/12 bg-neutral-950 text-white"
             : "border-border/70 bg-card text-card-foreground"

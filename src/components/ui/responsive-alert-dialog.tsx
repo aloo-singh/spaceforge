@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertDialog,
@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
 type ResponsiveAlertDialogProps = {
@@ -40,27 +41,9 @@ export function ResponsiveAlertDialog({
 }: ResponsiveAlertDialogProps) {
   const mobileTitleId = useState(() => `mobile-alert-title-${Math.random().toString(36).slice(2)}`)[0];
   const mobileDescriptionId = useState(() => `mobile-alert-description-${Math.random().toString(36).slice(2)}`)[0];
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useMobile();
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const updateMatch = () => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateMatch();
-    mediaQuery.addEventListener("change", updateMatch);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMatch);
-    };
-  }, []);
 
   if (isDrawer) {
     return (
