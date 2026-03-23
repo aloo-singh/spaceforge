@@ -10,6 +10,53 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.35.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-23</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Permanent feedback button on both <code>/editor</code> and <code>/projects</code></li>
+                <li>Shared two-step feedback flow for both manual entry and prompted feedback</li>
+                <li>Feedback persistence through Supabase with page context, source, sentiment, free text, timing, and metadata</li>
+                <li>First responsive mobile drawer system for feedback and shared dialog surfaces</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Projects delete confirmation and editor reset confirmation now use shared shadcn-aligned dialog primitives</li>
+                <li>Editor settings and feedback mobile presentation now route through shared responsive dialog infrastructure</li>
+                <li>Mobile drawers now use a calmer bottom-sheet motion pattern instead of ad hoc per-surface behavior</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Feedback flow feels more human and less survey-like, with calmer spacing, submit feedback, and a clearer thank-you state</li>
+                <li>Auto-prompt and manual feedback entry now feel more distinct on desktop while still sharing the same question flow</li>
+                <li>Button press behavior and drawer interaction now align more closely with the rest of the product interaction language</li>
+                <li>Mobile dialog and drawer accessibility wiring is now consistent across feedback, settings, and destructive confirms</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Prompted feedback is session-scoped and avoids repeated re-showing after dismissal or submission</li>
+                <li>No admin UI, feedback inbox, or AI summarisation has been added yet</li>
+                <li>This release establishes the first complete feedback capture loop while also standardising shared dialog foundations for later work</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.34.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-23</span>
           </div>

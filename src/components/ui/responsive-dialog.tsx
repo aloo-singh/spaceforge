@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
-import { createPortal } from "react-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
 import { cn } from "@/lib/utils";
 
 type ResponsiveDialogProps = {
@@ -14,6 +24,11 @@ type ResponsiveDialogProps = {
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  contentClassName?: string;
+  hideHeader?: boolean;
+  motionState?: "opening" | "open" | "closing";
+  surfaceOverride?: "dialog" | "drawer";
+  panelRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 export function ResponsiveDialog({
@@ -25,14 +40,19 @@ export function ResponsiveDialog({
   children,
   footer,
   className,
+  contentClassName,
+  hideHeader = false,
+  motionState = "open",
+  surfaceOverride,
+  panelRef,
 }: ResponsiveDialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
   const fallbackContentId = useId();
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const mobileTitleId = useId();
+  const mobileDescriptionId = useId();
   const [isMobile, setIsMobile] = useState(false);
   const resolvedContentId = contentId ?? fallbackContentId;
+  const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
+  const isDrawer = resolvedSurface === "drawer";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,137 +70,80 @@ export function ResponsiveDialog({
     };
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const focusPanel = () => {
-      const panelElement = panelRef.current;
-      if (!panelElement) return;
-
-      const firstFocusableElement = getFocusableElements(panelElement)[0];
-      if (firstFocusableElement) {
-        firstFocusableElement.focus();
-        return;
-      }
-
-      panelElement.focus();
-    };
-
-    const focusFrame = window.requestAnimationFrame(focusPanel);
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-      const panelElement = panelRef.current;
-      if (!panelElement) return;
-
-      const focusableElements = getFocusableElements(panelElement);
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        panelElement.focus();
-        return;
-      }
-
-      const firstFocusableElement = focusableElements[0];
-      const lastFocusableElement = focusableElements[focusableElements.length - 1];
-      const activeElement = document.activeElement;
-
-      if (event.shiftKey && activeElement === firstFocusableElement) {
-        event.preventDefault();
-        lastFocusableElement.focus();
-        return;
-      }
-
-      if (!event.shiftKey && activeElement === lastFocusableElement) {
-        event.preventDefault();
-        firstFocusableElement.focus();
-      }
-    };
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-      previouslyFocusedElementRef.current?.focus();
-      previouslyFocusedElementRef.current = null;
-    };
-  }, [open, onOpenChange]);
-
-  if (!open || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className={cn(
-        "pointer-events-auto fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]",
-        isMobile ? "flex items-end justify-stretch" : "flex items-center justify-center p-4"
-      )}
-      onClick={() => onOpenChange(false)}
-    >
-      <div
-        id={resolvedContentId}
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        tabIndex={-1}
-        data-surface={isMobile ? "drawer" : "dialog"}
-        className={cn(
-          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none overflow-y-auto",
-          isMobile
-            ? "w-full max-h-[min(85vh,calc(100vh-0.75rem))] rounded-t-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
-            : "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] rounded-xl p-5",
-          className
-        )}
-        onClick={(event) => event.stopPropagation()}
+  if (isDrawer) {
+    return (
+      <MobileDrawerShell
+        open={open}
+        onOpenChange={onOpenChange}
+        panelRef={panelRef}
+        className={className}
+        titleId={mobileTitleId}
+        descriptionId={description ? mobileDescriptionId : undefined}
       >
-        {isMobile ? (
-          <div className="mb-3 flex justify-center" aria-hidden="true">
-            <span className="h-1.5 w-12 rounded-full bg-border/80" />
+        {hideHeader ? (
+          <div className="sr-only">
+            <h2 id={mobileTitleId} className="text-base font-semibold">
+              {title}
+            </h2>
+            {description ? (
+              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
           </div>
-        ) : null}
-        <h2 id={titleId} className="text-base font-semibold">
-          {title}
-        </h2>
-        {description ? (
-          <p id={descriptionId} className="mt-2 text-sm text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
-        {children ? <div className="mt-5">{children}</div> : null}
-        {footer ? (
-          <div className={cn("mt-6 flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
-            {footer}
+        ) : (
+          <div className="flex flex-col gap-2 text-left">
+            <h2 id={mobileTitleId} className="text-base font-semibold">
+              {title}
+            </h2>
+            {description ? (
+              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
           </div>
-        ) : null}
-      </div>
-    </div>,
-    document.body
-  );
-}
+        )}
+        {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
+        {footer ? <div className="mt-6 flex flex-col-reverse gap-2">{footer}</div> : null}
+      </MobileDrawerShell>
+    );
+  }
 
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  const focusableSelectors = [
-    "button:not([disabled])",
-    "[href]",
-    "input:not([disabled])",
-    "select:not([disabled])",
-    "textarea:not([disabled])",
-    "[tabindex]:not([tabindex='-1'])",
-  ];
-
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors.join(","))).filter(
-    (element) => !element.hasAttribute("aria-hidden")
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPortal>
+        <DialogOverlay
+          className={cn(
+            motionState === "opening" && "animate-in fade-in-0 duration-300",
+            motionState === "closing" && "animate-out fade-out-0 duration-200"
+          )}
+        />
+        <DialogContent
+          id={resolvedContentId}
+          ref={panelRef}
+          hideClose
+          className={cn(
+            "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] overflow-y-auto p-5",
+            motionState === "opening" && "animate-in zoom-in-95 fade-in-0 duration-200",
+            motionState === "closing" && "animate-out zoom-out-95 fade-out-0 duration-150",
+            className
+          )}
+        >
+          {hideHeader ? (
+            <DialogHeader className="sr-only">
+              <DialogTitle>{title}</DialogTitle>
+              {description ? <DialogDescription>{description}</DialogDescription> : null}
+            </DialogHeader>
+          ) : (
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              {description ? <DialogDescription>{description}</DialogDescription> : null}
+            </DialogHeader>
+          )}
+          {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
+          {footer ? <DialogFooter className="mt-6 sm:justify-end">{footer}</DialogFooter> : null}
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
   );
 }

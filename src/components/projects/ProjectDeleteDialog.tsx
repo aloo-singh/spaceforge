@@ -1,8 +1,8 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import type { ProjectListItem } from "@/lib/projects/types";
 
 type ProjectDeleteDialogProps = {
@@ -21,7 +21,7 @@ export function ProjectDeleteDialog({
   onConfirmDelete,
 }: ProjectDeleteDialogProps) {
   return (
-    <ResponsiveDialog
+    <ResponsiveAlertDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Delete project?"
