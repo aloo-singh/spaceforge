@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertDialog,
@@ -37,8 +37,6 @@ export function ResponsiveAlertDialog({
   contentClassName,
   surfaceOverride,
 }: ResponsiveAlertDialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
   const [isMobile, setIsMobile] = useState(false);
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
 
@@ -62,11 +60,9 @@ export function ResponsiveAlertDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogPortal forceMount>
+      <AlertDialogPortal>
         <AlertDialogOverlay />
         <AlertDialogContent
-          aria-labelledby={titleId}
-          aria-describedby={description ? descriptionId : undefined}
           className={cn(
             resolvedSurface === "drawer"
               ? "top-auto right-0 bottom-0 left-0 max-w-none translate-x-0 translate-y-0 rounded-t-2xl rounded-b-none px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
@@ -80,10 +76,8 @@ export function ResponsiveAlertDialog({
             </div>
           ) : null}
           <AlertDialogHeader>
-            <AlertDialogTitle id={titleId}>{title}</AlertDialogTitle>
-            {description ? (
-              <AlertDialogDescription id={descriptionId}>{description}</AlertDialogDescription>
-            ) : null}
+            <AlertDialogTitle>{title}</AlertDialogTitle>
+            {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
           </AlertDialogHeader>
           {children ? <div className={cn(contentClassName)}>{children}</div> : null}
           {footer ? (

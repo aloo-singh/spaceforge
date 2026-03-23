@@ -45,8 +45,6 @@ export function ResponsiveDialog({
   surfaceOverride,
   panelRef,
 }: ResponsiveDialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
   const fallbackContentId = useId();
   const [isMobile, setIsMobile] = useState(false);
   const resolvedContentId = contentId ?? fallbackContentId;
@@ -70,7 +68,7 @@ export function ResponsiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPortal forceMount>
+      <DialogPortal>
         <DialogOverlay
           className={cn(
             motionState === "opening" && "animate-in fade-in-0 duration-300",
@@ -81,8 +79,6 @@ export function ResponsiveDialog({
           id={resolvedContentId}
           ref={panelRef}
           hideClose
-          aria-labelledby={titleId}
-          aria-describedby={description ? descriptionId : undefined}
           className={cn(
             resolvedSurface === "drawer"
               ? "top-auto right-0 bottom-0 left-0 max-h-[calc(100vh-0.75rem)] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-t-2xl rounded-b-none px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
@@ -99,14 +95,17 @@ export function ResponsiveDialog({
               <span className="h-1.5 w-12 rounded-full bg-border/80" />
             </div>
           ) : null}
-          {!hideHeader ? (
-            <DialogHeader>
-              <DialogTitle id={titleId}>{title}</DialogTitle>
-              {description ? (
-                <DialogDescription id={descriptionId}>{description}</DialogDescription>
-              ) : null}
+          {hideHeader ? (
+            <DialogHeader className="sr-only">
+              <DialogTitle>{title}</DialogTitle>
+              {description ? <DialogDescription>{description}</DialogDescription> : null}
             </DialogHeader>
-          ) : null}
+          ) : (
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              {description ? <DialogDescription>{description}</DialogDescription> : null}
+            </DialogHeader>
+          )}
           {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
           {footer ? (
             <DialogFooter className={cn("mt-6", resolvedSurface === "drawer" ? "" : "sm:justify-end")}>
