@@ -151,10 +151,10 @@ export function ResponsiveDialog({
         tabIndex={-1}
         data-surface={resolvedSurface}
         className={cn(
-          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none overflow-y-auto",
+          "border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
           resolvedSurface === "drawer"
-            ? "w-full max-h-[min(85vh,calc(100vh-0.75rem))] rounded-t-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
-            : "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] rounded-xl p-5",
+            ? "w-full max-h-[calc(100vh-0.75rem)] overflow-hidden rounded-t-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+            : "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl p-5",
           resolvedSurface === "drawer" && motionState === "opening" && "animate-in slide-in-from-bottom-8 duration-300",
           resolvedSurface === "drawer" && motionState === "closing" && "animate-out slide-out-to-bottom-8 duration-200",
           resolvedSurface === "dialog" && motionState === "opening" && "animate-in zoom-in-95 duration-200",

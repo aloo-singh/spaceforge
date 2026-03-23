@@ -570,11 +570,12 @@ export function FeedbackWidget({
     }
 
     const drawerElement = mobileDrawerRef.current;
-    const contentElement = mobileDrawerContentRef.current;
-    const nextHeight = contentElement.offsetHeight;
+    const drawerViewportMaxHeight = window.innerHeight - 12;
+    const nextHeight = Math.min(Math.ceil(drawerElement.scrollHeight), drawerViewportMaxHeight);
     const previousHeight = Number.parseFloat(drawerElement.dataset.contentHeight ?? "0");
 
     drawerElement.dataset.contentHeight = String(nextHeight);
+    drawerElement.style.overflowY = nextHeight >= drawerViewportMaxHeight ? "auto" : "hidden";
 
     if (previousHeight <= 0 || previousHeight === nextHeight) {
       drawerElement.style.height = `${nextHeight}px`;
@@ -810,9 +811,6 @@ export function FeedbackWidget({
         )}
       >
         <div ref={mobileDrawerContentRef}>
-          <div className="mb-4 flex justify-center" aria-hidden="true">
-            <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
-          </div>
           {panelContent}
         </div>
       </ResponsiveDialog>
