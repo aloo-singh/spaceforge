@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
 const FEEDBACK_ENTER_DURATION_MS = 320;
 const FEEDBACK_EXIT_DURATION_MS = 180;
-const FEEDBACK_DRAWER_RESIZE_DURATION_MS = 180;
 
 type FeedbackViewState = {
   activeSource: FeedbackSource | null;
@@ -318,8 +317,6 @@ export function FeedbackWidget({
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopPanelAnimationRef = useRef<Animation | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
-  const mobileDrawerContentRef = useRef<HTMLDivElement | null>(null);
-  const mobileDrawerResizeAnimationRef = useRef<Animation | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
@@ -368,7 +365,6 @@ export function FeedbackWidget({
         window.clearTimeout(openTimeoutRef.current);
       }
       desktopPanelAnimationRef.current?.cancel();
-      mobileDrawerResizeAnimationRef.current?.cancel();
     };
   }, []);
 
@@ -439,16 +435,6 @@ export function FeedbackWidget({
   const isDarkSurface = surface === "dark";
   const canSubmit = freeText.trim().length > 0 && sentiment !== null && status !== "submitting";
   const isPanelVisible = panelState !== "closed";
-  const mobileContentStage = useMemo(() => {
-    if (status === "submitted") {
-      return "submitted";
-    }
-    if (sentiment === null) {
-      return "question-1";
-    }
-    return "question-2";
-  }, [sentiment, status]);
-
   const closePanel = useCallback(() => {
     if (status === "submitting") {
       return;
@@ -464,7 +450,6 @@ export function FeedbackWidget({
     }
 
     desktopPanelAnimationRef.current?.cancel();
-    mobileDrawerResizeAnimationRef.current?.cancel();
     if (openTimeoutRef.current !== null) {
       window.clearTimeout(openTimeoutRef.current);
       openTimeoutRef.current = null;
@@ -563,39 +548,6 @@ export function FeedbackWidget({
       };
     }
   }, [isMobile, isPromptSurface, panelState]);
-
-  useEffect(() => {
-    if (!isMobile || !isOpen || !mobileDrawerRef.current || !mobileDrawerContentRef.current) {
-      return;
-    }
-
-    const drawerElement = mobileDrawerRef.current;
-    const drawerViewportMaxHeight = window.innerHeight - 12;
-    const nextHeight = Math.min(Math.ceil(drawerElement.scrollHeight), drawerViewportMaxHeight);
-    const previousHeight = Number.parseFloat(drawerElement.dataset.contentHeight ?? "0");
-
-    drawerElement.dataset.contentHeight = String(nextHeight);
-    drawerElement.style.overflowY = nextHeight >= drawerViewportMaxHeight ? "auto" : "hidden";
-
-    if (previousHeight <= 0 || previousHeight === nextHeight) {
-      drawerElement.style.height = `${nextHeight}px`;
-      return;
-    }
-
-    mobileDrawerResizeAnimationRef.current?.cancel();
-    mobileDrawerResizeAnimationRef.current = drawerElement.animate(
-      [{ height: `${previousHeight}px` }, { height: `${nextHeight}px` }],
-      {
-        duration: FEEDBACK_DRAWER_RESIZE_DURATION_MS,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-        fill: "forwards",
-      }
-    );
-    mobileDrawerResizeAnimationRef.current.onfinish = () => {
-      drawerElement.style.height = `${nextHeight}px`;
-      mobileDrawerResizeAnimationRef.current = null;
-    };
-  }, [isMobile, isOpen, mobileContentStage]);
 
   useEffect(() => {
     if (!isMobile || !isOpen) {
@@ -810,9 +762,7 @@ export function FeedbackWidget({
             : "border-border/70 bg-card text-card-foreground"
         )}
       >
-        <div ref={mobileDrawerContentRef}>
-          {panelContent}
-        </div>
+        {panelContent}
       </ResponsiveDialog>
     </>
   );

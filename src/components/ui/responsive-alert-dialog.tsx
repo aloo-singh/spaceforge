@@ -12,6 +12,7 @@ import {
   AlertDialogPortal,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
 import { cn } from "@/lib/utils";
 
 type ResponsiveAlertDialogProps = {
@@ -37,31 +38,11 @@ export function ResponsiveAlertDialog({
   contentClassName,
   surfaceOverride,
 }: ResponsiveAlertDialogProps) {
+  const mobileTitleId = useState(() => `mobile-alert-title-${Math.random().toString(36).slice(2)}`)[0];
+  const mobileDescriptionId = useState(() => `mobile-alert-description-${Math.random().toString(36).slice(2)}`)[0];
   const [isMobile, setIsMobile] = useState(false);
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
-  const overlayClassName = isDrawer
-    ? cn(
-        "transition-opacity duration-[320ms] ease-out motion-reduce:transition-none",
-        "data-[state=open]:opacity-100 data-[state=closed]:pointer-events-none data-[state=closed]:opacity-0"
-      )
-    : cn(
-        "transition-opacity duration-200 ease-out motion-reduce:transition-none",
-        "data-[state=open]:opacity-100 data-[state=closed]:pointer-events-none data-[state=closed]:opacity-0"
-      );
-  const contentClassNames = isDrawer
-    ? cn(
-        "top-auto right-0 bottom-0 left-0 max-w-none rounded-t-2xl rounded-b-none px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]",
-        "translate-x-0 will-change-[transform,opacity] transition-[transform,opacity] duration-[520ms] motion-reduce:transition-none",
-        "ease-[cubic-bezier(0.16,1,0.3,1)]",
-        "data-[state=open]:translate-y-0 data-[state=open]:opacity-100",
-        "data-[state=closed]:pointer-events-none data-[state=closed]:translate-y-[calc(100%+1rem)] data-[state=closed]:opacity-0"
-      )
-    : cn(
-        "w-[min(100%,28rem)] transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none",
-        "data-[state=open]:translate-y-[-50%] data-[state=open]:scale-100 data-[state=open]:opacity-100",
-        "data-[state=closed]:pointer-events-none data-[state=closed]:translate-y-[calc(-50%+0.5rem)] data-[state=closed]:scale-[0.98] data-[state=closed]:opacity-0"
-      );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -81,31 +62,48 @@ export function ResponsiveAlertDialog({
     };
   }, []);
 
+  if (isDrawer) {
+    return (
+      <MobileDrawerShell
+        open={open}
+        onOpenChange={onOpenChange}
+        className={className}
+        dismissible={false}
+        titleId={mobileTitleId}
+        descriptionId={description ? mobileDescriptionId : undefined}
+      >
+        <div className="flex flex-col gap-2 text-left">
+          <h2 id={mobileTitleId} className="text-base font-semibold">
+            {title}
+          </h2>
+          {description ? (
+            <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {children ? <div className={cn(contentClassName)}>{children}</div> : null}
+        {footer ? <div className="mt-6 flex flex-col-reverse gap-2">{footer}</div> : null}
+      </MobileDrawerShell>
+    );
+  }
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPortal>
-        <AlertDialogOverlay className={overlayClassName} />
+        <AlertDialogOverlay />
         <AlertDialogContent
           className={cn(
-            contentClassNames,
+            "w-[min(100%,28rem)] animate-in zoom-in-95 fade-in-0 duration-200",
             className
           )}
         >
-          {isDrawer ? (
-            <div className="mb-3 flex justify-center" aria-hidden="true">
-              <span className="h-1.5 w-12 rounded-full bg-border/80" />
-            </div>
-          ) : null}
           <AlertDialogHeader>
             <AlertDialogTitle>{title}</AlertDialogTitle>
             {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
           </AlertDialogHeader>
           {children ? <div className={cn(contentClassName)}>{children}</div> : null}
-          {footer ? (
-            <AlertDialogFooter className={isDrawer ? "mt-6" : "mt-2"}>
-              {footer}
-            </AlertDialogFooter>
-          ) : null}
+          {footer ? <AlertDialogFooter className="mt-2">{footer}</AlertDialogFooter> : null}
         </AlertDialogContent>
       </AlertDialogPortal>
     </AlertDialog>
