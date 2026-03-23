@@ -1101,7 +1101,7 @@ export default function EditorCanvas({
         selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
         and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
-      <div className="border-b border-white/10 bg-neutral-950/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
+      <div className="border-b border-border/70 bg-background/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
           leadingContent={topBarLeadingContent}
           onExportPng={exportCurrentCanvasAsPng}
