@@ -622,11 +622,9 @@ export function FeedbackWidget({
         @keyframes feedbackPromptEnter {
           from {
             transform: translateX(calc(100% + 1.5rem)) scale(0.985);
-            opacity: 0;
           }
           to {
             transform: translateX(0) scale(1);
-            opacity: 1;
           }
         }
 
@@ -644,11 +642,9 @@ export function FeedbackWidget({
         @keyframes feedbackPromptExit {
           from {
             transform: translateX(0) scale(1);
-            opacity: 1;
           }
           to {
             transform: translateX(2.5rem) scale(0.99);
-            opacity: 0;
           }
         }
 
@@ -674,14 +670,14 @@ export function FeedbackWidget({
                 ? "translate-x-0 translate-y-0 scale-100 opacity-100"
                 : panelState === "opening"
                   ? isPromptSurface
-                    ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-0"
+                    ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-100"
                     : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
                 : panelState === "closing"
                   ? isPromptSurface
-                      ? "translate-x-10 translate-y-0 scale-[0.99] opacity-0"
+                      ? "translate-x-10 translate-y-0 scale-[0.99] opacity-100"
                       : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
                     : isPromptSurface
-                      ? "translate-x-[110%] translate-y-0 scale-[0.985] opacity-0"
+                      ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-100"
                       : "translate-x-0 translate-y-3 scale-[0.985] opacity-0",
               isDarkSurface
                 ? "border-white/12 bg-black/72 text-white shadow-black/30"
