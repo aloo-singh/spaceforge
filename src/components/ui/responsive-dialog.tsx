@@ -50,8 +50,12 @@ export function ResponsiveDialog({
   const fallbackContentId = useId();
   const mobileTitleId = useId();
   const mobileDescriptionId = useId();
-  const isMobile = useMobile();
+  const { isMobile, isReady: isMobileReady } = useMobile();
   const resolvedContentId = contentId ?? fallbackContentId;
+  if (!surfaceOverride && open && !isMobileReady) {
+    return null;
+  }
+
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
 

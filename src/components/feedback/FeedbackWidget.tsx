@@ -131,7 +131,7 @@ function FeedbackPanelContent({
   return (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <p
             className={cn(
               "font-measurement text-[11px] font-semibold tracking-[0.18em] uppercase",
@@ -179,7 +179,7 @@ function FeedbackPanelContent({
           onClick={onClose}
           disabled={status === "submitting"}
           className={cn(
-            "rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
+            "shrink-0 rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
             isDarkSurface ? "text-white/56 hover:bg-white/10 hover:text-white" : "text-foreground/48 hover:bg-muted hover:text-foreground"
           )}
           aria-label="Close feedback"
@@ -308,7 +308,7 @@ export function FeedbackWidget({
   const [promptSessionState, setPromptSessionState] = useState<FeedbackPromptSessionState>(() =>
     loadPromptSessionState(pageContext)
   );
-  const isMobile = useMobile();
+  const { isMobile, isReady: isMobileReady } = useMobile();
   const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
   const activeSource = viewState.activeSource;
   const sentiment = viewState.sentiment;
@@ -640,7 +640,7 @@ export function FeedbackWidget({
   return (
     <>
       <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
-        {!isMobile ? (
+        {isMobileReady && !isMobile ? (
           <Card
             ref={desktopPanelRef}
             style={desktopPanelStyle}
@@ -668,7 +668,7 @@ export function FeedbackWidget({
             isDarkSurface
               ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
               : "border-border/70 bg-background/94 text-foreground hover:bg-background",
-            isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
+            isMobileReady && isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
           )}
           aria-label="Open feedback"
         >

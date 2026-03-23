@@ -41,7 +41,11 @@ export function ResponsiveAlertDialog({
 }: ResponsiveAlertDialogProps) {
   const mobileTitleId = useState(() => `mobile-alert-title-${Math.random().toString(36).slice(2)}`)[0];
   const mobileDescriptionId = useState(() => `mobile-alert-description-${Math.random().toString(36).slice(2)}`)[0];
-  const isMobile = useMobile();
+  const { isMobile, isReady: isMobileReady } = useMobile();
+  if (!surfaceOverride && open && !isMobileReady) {
+    return null;
+  }
+
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
 

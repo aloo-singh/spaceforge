@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 
 const MOBILE_DRAWER_EXIT_MS = 360;
 const MOBILE_DRAWER_MAX_HEIGHT = "calc(100dvh - 0.5rem)";
-const MOBILE_DRAWER_HIDDEN_TRANSLATE = "translateY(calc(100dvh + 2rem))";
+const MOBILE_DRAWER_SIDE_INSET_LEFT = "max(1rem, calc(env(safe-area-inset-left) + 0.25rem))";
+const MOBILE_DRAWER_SIDE_INSET_RIGHT = "max(1rem, calc(env(safe-area-inset-right) + 0.25rem))";
 
 type MobileDrawerShellProps = {
   open: boolean;
@@ -52,6 +53,7 @@ export function MobileDrawerShell({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
+  const enterFrameRef = useRef<number | null>(null);
   const latestOnOpenChangeRef = useRef(onOpenChange);
   const hasFocusedOnOpenRef = useRef(false);
   const activePanelRef = panelRef ?? internalPanelRef;
@@ -65,11 +67,18 @@ export function MobileDrawerShell({
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current);
       }
+      if (enterFrameRef.current !== null) {
+        window.cancelAnimationFrame(enterFrameRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
     if (open) {
+      if (enterFrameRef.current !== null) {
+        window.cancelAnimationFrame(enterFrameRef.current);
+        enterFrameRef.current = null;
+      }
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current);
         closeTimeoutRef.current = null;
@@ -82,10 +91,18 @@ export function MobileDrawerShell({
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
         setIsMounted(true);
+        enterFrameRef.current = window.requestAnimationFrame(() => {
+          setIsVisible(true);
+          enterFrameRef.current = null;
+        });
       }, 0);
 
       return () => {
         window.clearTimeout(openTimer);
+        if (enterFrameRef.current !== null) {
+          window.cancelAnimationFrame(enterFrameRef.current);
+          enterFrameRef.current = null;
+        }
       };
     }
 
@@ -96,7 +113,7 @@ export function MobileDrawerShell({
     const closeFrame = window.requestAnimationFrame(() => {
       setIsVisible(false);
     });
-    closeTimeoutRef.current = window.setTimeout(() => {
+    const exitTimeout = window.setTimeout(() => {
       setIsMounted(false);
       setContentHeight(null);
       hasFocusedOnOpenRef.current = false;
@@ -105,28 +122,12 @@ export function MobileDrawerShell({
       previouslyFocusedElementRef.current = null;
     }, MOBILE_DRAWER_EXIT_MS);
 
+    closeTimeoutRef.current = exitTimeout;
+
     return () => {
       window.cancelAnimationFrame(closeFrame);
-      if (closeTimeoutRef.current !== null) {
-        window.clearTimeout(closeTimeoutRef.current);
-        closeTimeoutRef.current = null;
-      }
-    };
-  }, [isMounted, open]);
-
-  useEffect(() => {
-    if (!isMounted || !open) {
-      return;
-    }
-
-    const enterFrame = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        setIsVisible(true);
-      });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(enterFrame);
+      window.clearTimeout(exitTimeout);
+      closeTimeoutRef.current = null;
     };
   }, [isMounted, open]);
 
@@ -154,15 +155,14 @@ export function MobileDrawerShell({
     }
 
     const updateHeight = () => {
-      setContentHeight(contentElement.scrollHeight);
+      setContentHeight(Math.ceil(contentElement.getBoundingClientRect().height));
     };
-
-    updateHeight();
 
     const resizeObserver = new ResizeObserver(() => {
       updateHeight();
     });
 
+    updateHeight();
     resizeObserver.observe(contentElement);
 
     return () => {
@@ -220,7 +220,7 @@ export function MobileDrawerShell({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-end justify-stretch">
+    <div className="fixed inset-0 z-40 overflow-x-hidden">
       <button
         type="button"
         aria-label="Close drawer"
@@ -237,14 +237,12 @@ export function MobileDrawerShell({
       />
       <div
         className={cn(
-          "relative z-10 w-full transform-gpu will-change-transform transition-transform motion-reduce:transition-none",
+          "absolute right-0 bottom-0 left-0 z-10 transform-gpu will-change-transform transition-transform motion-reduce:transition-none",
           isVisible
             ? "translate-y-0 duration-[440ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-            : "duration-[320ms] ease-[cubic-bezier(0.4,0,1,1)]"
+            : "translate-y-full duration-[320ms] ease-[cubic-bezier(0.4,0,1,1)]"
         )}
-        style={{
-          transform: isVisible ? "translateY(0)" : MOBILE_DRAWER_HIDDEN_TRANSLATE,
-        }}
+        style={{ paddingLeft: MOBILE_DRAWER_SIDE_INSET_LEFT, paddingRight: MOBILE_DRAWER_SIDE_INSET_RIGHT }}
       >
         <div
           ref={activePanelRef}
@@ -254,8 +252,8 @@ export function MobileDrawerShell({
           aria-describedby={descriptionId}
           tabIndex={-1}
           className={cn(
-            "relative w-full overflow-y-auto overscroll-contain rounded-t-2xl border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
-            "transition-[height] motion-reduce:transition-none",
+            "relative w-full max-w-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-2xl border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
+            isVisible ? "transition-[height] motion-reduce:transition-none" : "",
             className
           )}
           style={{
@@ -265,7 +263,7 @@ export function MobileDrawerShell({
         >
           <div
             ref={contentRef}
-            className="px-4 pt-3 pb-[max(2.75rem,calc(env(safe-area-inset-bottom)+1.25rem))]"
+            className="min-w-0 px-4 pt-3 pb-[max(2.75rem,calc(env(safe-area-inset-bottom)+1.25rem))]"
           >
             <div className="mb-3 flex justify-center" aria-hidden="true">
               <span className="h-1.5 w-12 rounded-full bg-border/80" />
