@@ -652,7 +652,7 @@ export default function EditorCanvas({
       drawDraft(
         exportDraftGraphics,
         state.roomDraft.points,
-        cursorWorldRef.current,
+        null,
         exportCamera,
         exportViewport,
         getActiveSnapStepMm(exportCamera),
