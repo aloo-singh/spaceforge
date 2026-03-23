@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
   FEEDBACK_PROMPT_VARIANT,
@@ -15,6 +15,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
+const FEEDBACK_EXIT_DURATION_MS = 180;
+
+type FeedbackViewState = {
+  activeSource: FeedbackSource | null;
+  sentiment: FeedbackSentiment | null;
+  freeText: string;
+  status: "idle" | "submitting" | "submitted";
+  errorMessage: string | null;
+};
 
 type FeedbackPromptSessionState = {
   autoOpened: boolean;
@@ -78,6 +87,16 @@ function savePromptSessionState(
   storage.setItem(getPromptStateStorageKey(pageContext), JSON.stringify(nextState));
 }
 
+function createInitialViewState(): FeedbackViewState {
+  return {
+    activeSource: null,
+    sentiment: null,
+    freeText: "",
+    status: "idle",
+    errorMessage: null,
+  };
+}
+
 export function FeedbackWidget({
   pageContext,
   projectId = null,
@@ -89,19 +108,33 @@ export function FeedbackWidget({
   const [openedAtMs] = useState(() => Date.now());
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeSource, setActiveSource] = useState<FeedbackSource | null>(null);
-  const [sentiment, setSentiment] = useState<FeedbackSentiment | null>(null);
-  const [freeText, setFreeText] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "submitted">("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
+  const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
   const [promptSessionState, setPromptSessionState] = useState<FeedbackPromptSessionState>(() =>
     loadPromptSessionState(pageContext)
   );
+  const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
+  const activeSource = viewState.activeSource;
+  const sentiment = viewState.sentiment;
+  const freeText = viewState.freeText;
+  const status = viewState.status;
+  const errorMessage = viewState.errorMessage;
 
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (promptTimerRef.current !== null) {
+        window.clearTimeout(promptTimerRef.current);
+      }
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!promptEligible || promptSessionState.autoOpened || isOpen) {
@@ -127,12 +160,14 @@ export function FeedbackWidget({
         savePromptSessionState(pageContext, nextState);
         return nextState;
       });
-      setActiveSource("prompt");
-      setSentiment(null);
-      setFreeText("");
-      setErrorMessage(null);
-      setStatus("idle");
-      setIsOpen(true);
+      setViewState({
+        activeSource: "prompt",
+        sentiment: null,
+        freeText: "",
+        errorMessage: null,
+        status: "idle",
+      });
+      setPanelState("opening");
     }, remainingDelayMs);
 
     return () => {
@@ -143,16 +178,24 @@ export function FeedbackWidget({
     };
   }, [isOpen, openedAtMs, pageContext, promptEligible, promptSessionState.autoOpened]);
 
+  useEffect(() => {
+    if (panelState !== "opening") {
+      return;
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      setPanelState("open");
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [panelState]);
+
   const isPromptSurface = activeSource === "prompt";
   const isDarkSurface = surface === "dark";
   const canSubmit = freeText.trim().length > 0 && sentiment !== null && status !== "submitting";
-
-  const resetFlow = () => {
-    setSentiment(null);
-    setFreeText("");
-    setErrorMessage(null);
-    setStatus("idle");
-  };
+  const isPanelVisible = panelState !== "closed";
 
   const closePanel = () => {
     if (status === "submitting") {
@@ -168,9 +211,16 @@ export function FeedbackWidget({
       savePromptSessionState(pageContext, nextState);
     }
 
-    setIsOpen(false);
-    setActiveSource(null);
-    resetFlow();
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    setPanelState("closing");
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setPanelState("closed");
+      setViewState(createInitialViewState());
+      closeTimeoutRef.current = null;
+    }, FEEDBACK_EXIT_DURATION_MS);
   };
 
   const openManualFlow = () => {
@@ -183,9 +233,19 @@ export function FeedbackWidget({
       return;
     }
 
-    setActiveSource("manual_button");
-    setIsOpen(true);
-    resetFlow();
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setViewState({
+      activeSource: "manual_button",
+      sentiment: null,
+      freeText: "",
+      errorMessage: null,
+      status: "idle",
+    });
+    setPanelState("opening");
   };
 
   const handleSubmit = async () => {
@@ -194,8 +254,11 @@ export function FeedbackWidget({
     }
 
     try {
-      setStatus("submitting");
-      setErrorMessage(null);
+      setViewState((currentState) => ({
+        ...currentState,
+        status: "submitting",
+        errorMessage: null,
+      }));
       await submitFeedback({
         clientToken: getOrCreateAnonymousClientToken(),
         projectId,
@@ -215,10 +278,16 @@ export function FeedbackWidget({
         setPromptSessionState(nextState);
         savePromptSessionState(pageContext, nextState);
       }
-      setStatus("submitted");
+      setViewState((currentState) => ({
+        ...currentState,
+        status: "submitted",
+      }));
     } catch (error) {
-      setStatus("idle");
-      setErrorMessage(error instanceof Error ? error.message : "Could not send feedback just now.");
+      setViewState((currentState) => ({
+        ...currentState,
+        status: "idle",
+        errorMessage: error instanceof Error ? error.message : "Could not send feedback just now.",
+      }));
     }
   };
 
@@ -226,19 +295,30 @@ export function FeedbackWidget({
     <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex w-[min(22rem,calc(100vw-2rem))] flex-col items-end gap-3 sm:right-6 sm:bottom-6">
       <div
         className={cn(
-          "pointer-events-auto w-full origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-all duration-200",
-          isOpen
-            ? "translate-y-0 scale-100 opacity-100"
-            : "pointer-events-none translate-y-4 scale-[0.98] opacity-0",
+          "pointer-events-auto w-full origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-200 sm:px-5 sm:py-5",
+          isPanelVisible ? "" : "pointer-events-none",
+          panelState === "open"
+            ? "translate-x-0 translate-y-0 scale-100 opacity-100"
+            : panelState === "opening"
+              ? isPromptSurface
+                ? "translate-x-10 translate-y-0 scale-[0.985] opacity-0"
+                : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
+              : panelState === "closing"
+                ? isPromptSurface
+                  ? "translate-x-4 translate-y-0 scale-[0.99] opacity-0"
+                  : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
+                : isPromptSurface
+                  ? "translate-x-10 translate-y-0 scale-[0.985] opacity-0"
+                  : "translate-x-0 translate-y-3 scale-[0.985] opacity-0",
           isDarkSurface
             ? "border-white/12 bg-black/72 text-white shadow-black/30"
             : "border-border/70 bg-background/92 text-foreground shadow-black/8",
           isPromptSurface && status !== "submitted" ? "ring-1 ring-blue-500/20" : ""
         )}
-        aria-hidden={!isOpen}
+        aria-hidden={!isPanelVisible}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <p
               className={cn(
                 "font-measurement text-[11px] font-semibold tracking-[0.18em] uppercase",
@@ -248,22 +328,31 @@ export function FeedbackWidget({
               Quick 2-question check...
             </p>
             {status === "submitted" ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Thanks. That helps.</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2
+                    className={cn(
+                      "size-4 transition-all duration-200",
+                      "translate-y-0 scale-100 opacity-100",
+                      isDarkSurface ? "text-emerald-300" : "text-emerald-600"
+                    )}
+                  />
+                  <p className="text-sm font-medium">Thanks. That genuinely helps.</p>
+                </div>
                 <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
-                  You can reopen this anytime from the feedback button.
+                  You can leave another note anytime from the feedback button.
                 </p>
               </div>
             ) : sentiment === null ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Was that easier than you expected?</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium leading-6">Was that easier than you expected?</p>
                 <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
                   Small gut check, nothing formal.
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                <p className="text-sm font-medium">
+              <div className="space-y-2">
+                <p className="text-sm font-medium leading-6">
                   {sentiment === "positive" ? "Nice. What made it feel easy?" : "What slowed you down?"}
                 </p>
                 <p className={cn("text-sm leading-6", isDarkSurface ? "text-white/68" : "text-muted-foreground")}>
@@ -278,7 +367,7 @@ export function FeedbackWidget({
             onClick={closePanel}
             disabled={status === "submitting"}
             className={cn(
-              "rounded-full p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+              "rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
               isDarkSurface ? "text-white/56 hover:bg-white/10 hover:text-white" : "text-foreground/48 hover:bg-muted hover:text-foreground"
             )}
             aria-label="Close feedback"
@@ -288,7 +377,7 @@ export function FeedbackWidget({
         </div>
 
         {status === "submitted" ? (
-          <div className="mt-4 flex justify-end">
+          <div className="mt-5 flex justify-end">
             <Button
               type="button"
               variant="outline"
@@ -302,12 +391,17 @@ export function FeedbackWidget({
             </Button>
           </div>
         ) : sentiment === null ? (
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-5 grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={() => setSentiment("positive")}
+              onClick={() =>
+                setViewState((currentState) => ({
+                  ...currentState,
+                  sentiment: "positive",
+                }))
+              }
               className={cn(
-                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-colors",
+                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
                 isDarkSurface
                   ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
                   : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
@@ -318,9 +412,14 @@ export function FeedbackWidget({
             </button>
             <button
               type="button"
-              onClick={() => setSentiment("negative")}
+              onClick={() =>
+                setViewState((currentState) => ({
+                  ...currentState,
+                  sentiment: "negative",
+                }))
+              }
               className={cn(
-                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-colors",
+                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-[transform,colors] duration-75 ease-out active:scale-[0.97]",
                 isDarkSurface
                   ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
                   : "border-border/70 bg-card/70 text-foreground hover:bg-muted/70"
@@ -331,10 +430,15 @@ export function FeedbackWidget({
             </button>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
+          <div className="mt-5 space-y-3.5">
             <textarea
               value={freeText}
-              onChange={(event) => setFreeText(event.target.value)}
+              onChange={(event) =>
+                setViewState((currentState) => ({
+                  ...currentState,
+                  freeText: event.target.value,
+                }))
+              }
               rows={4}
               placeholder={
                 sentiment === "positive"
@@ -362,9 +466,12 @@ export function FeedbackWidget({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setSentiment(null);
-                  setFreeText("");
-                  setErrorMessage(null);
+                  setViewState((currentState) => ({
+                    ...currentState,
+                    sentiment: null,
+                    freeText: "",
+                    errorMessage: null,
+                  }));
                 }}
                 disabled={status === "submitting"}
                 className={cn(isDarkSurface ? "text-white/72 hover:bg-white/10 hover:text-white" : "")}
@@ -380,7 +487,11 @@ export function FeedbackWidget({
                 disabled={!canSubmit}
                 className="bg-blue-500 text-white hover:bg-blue-500/90"
               >
-                <Send className="size-4" />
+                {status === "submitting" ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
                 {status === "submitting" ? "Sending..." : "Send"}
               </Button>
             </div>
@@ -392,7 +503,7 @@ export function FeedbackWidget({
         type="button"
         onClick={openManualFlow}
         className={cn(
-          "pointer-events-auto flex size-12 items-center justify-center rounded-full border shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+          "pointer-events-auto inline-flex size-12 shrink-0 items-center justify-center rounded-full border shadow-lg transition-[colors,box-shadow,opacity,transform] duration-75 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
           isDarkSurface
             ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
             : "border-border/70 bg-background/94 text-foreground hover:bg-background"
