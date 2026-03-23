@@ -8,7 +8,7 @@ export function sortProjectsByUpdatedAt<T extends Pick<ProjectListItem, "updated
 
 export function mergeProjectIntoList(
   projects: ProjectListItem[],
-  project: Pick<ProjectRecord, "id" | "name" | "updatedAt" | "createdAt" | "userId">
+  project: Pick<ProjectRecord, "id" | "name" | "updatedAt" | "createdAt" | "userId" | "thumbnailDataUrl">
 ) {
   const nextProjects = projects.some((candidate) => candidate.id === project.id)
     ? projects.map((candidate) =>
@@ -16,6 +16,7 @@ export function mergeProjectIntoList(
           ? {
               ...candidate,
               name: project.name,
+              thumbnailDataUrl: project.thumbnailDataUrl,
               updatedAt: project.updatedAt,
             }
           : candidate

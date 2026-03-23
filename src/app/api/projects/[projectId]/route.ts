@@ -5,7 +5,7 @@ import {
   fetchProjectForClientToken,
   updateProjectForClientToken,
 } from "@/lib/projects/server";
-import { isProjectDocument } from "@/lib/projects/types";
+import { isProjectDocument, isProjectThumbnailDataUrl } from "@/lib/projects/types";
 
 type ProjectRouteContext = {
   params: Promise<{
@@ -17,6 +17,7 @@ type UpdateProjectRequestBody = {
   clientToken?: unknown;
   name?: unknown;
   document?: unknown;
+  thumbnailDataUrl?: unknown;
 };
 
 type DeleteProjectRequestBody = {
@@ -59,6 +60,7 @@ export async function PATCH(request: NextRequest, context: ProjectRouteContext) 
     const updates: {
       name?: string;
       document?: EditorDocumentState;
+      thumbnailDataUrl?: string | null;
     } = {};
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || body.name.trim().length === 0) {
@@ -72,7 +74,17 @@ export async function PATCH(request: NextRequest, context: ProjectRouteContext) 
       }
       updates.document = body.document;
     }
-    if (updates.name === undefined && updates.document === undefined) {
+    if (body.thumbnailDataUrl !== undefined) {
+      if (!isProjectThumbnailDataUrl(body.thumbnailDataUrl)) {
+        return NextResponse.json({ error: "thumbnailDataUrl is invalid." }, { status: 400 });
+      }
+      updates.thumbnailDataUrl = body.thumbnailDataUrl ?? null;
+    }
+    if (
+      updates.name === undefined &&
+      updates.document === undefined &&
+      updates.thumbnailDataUrl === undefined
+    ) {
       return NextResponse.json({ error: "No project updates were provided." }, { status: 400 });
     }
 

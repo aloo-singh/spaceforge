@@ -121,6 +121,7 @@ export async function updateProject(
   updates: {
     name?: string;
     document?: EditorDocumentState;
+    thumbnailDataUrl?: string | null;
   }
 ) {
   const response = await fetch(`/api/projects/${projectId}`, {
@@ -133,6 +134,9 @@ export async function updateProject(
       ...(updates.name !== undefined ? { name: updates.name } : {}),
       ...(updates.document !== undefined
         ? { document: cloneProjectDocument(updates.document) }
+        : {}),
+      ...(updates.thumbnailDataUrl !== undefined
+        ? { thumbnailDataUrl: updates.thumbnailDataUrl }
         : {}),
     }),
   });

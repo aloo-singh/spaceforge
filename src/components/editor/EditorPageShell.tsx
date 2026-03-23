@@ -19,6 +19,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
   } | null>(null);
   const [activeHintId, setActiveHintId] = useState<EditorOnboardingHintId | null>(null);
   const [projectRenameCompletionCount, setProjectRenameCompletionCount] = useState(0);
+  const [generateThumbnailDataUrl, setGenerateThumbnailDataUrl] = useState<(() => Promise<string | null>) | null>(null);
   const [bootstrapState, setBootstrapState] = useState<
     | { status: "loading" }
     | { status: "ready" }
@@ -30,6 +31,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
       <EditorProjectBootstrap
         projectId={projectId}
+        generateThumbnailDataUrl={generateThumbnailDataUrl}
         onProjectResolved={(project) => {
           setActiveProject(project);
         }}
@@ -65,6 +67,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
         <EditorCanvas
           hasResolvedProject={activeProject !== null}
           onDisplayedHintChange={setActiveHintId}
+          onThumbnailGeneratorChange={setGenerateThumbnailDataUrl}
           projectRenameCompletionCount={projectRenameCompletionCount}
           topBarLeadingContent={
             <EditorProjectChrome

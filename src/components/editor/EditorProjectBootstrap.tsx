@@ -24,13 +24,33 @@ import type { ProjectRecord } from "@/lib/projects/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
+const PROJECT_THUMBNAIL_DEBOUNCE_MS = 1400;
+const PROJECT_THUMBNAIL_IDLE_TIMEOUT_MS = 1200;
 
 function getDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
   return JSON.stringify(document);
 }
 
+function scheduleIdleTask(callback: () => void) {
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    const idleCallbackId = window.requestIdleCallback(callback, {
+      timeout: PROJECT_THUMBNAIL_IDLE_TIMEOUT_MS,
+    });
+
+    return () => {
+      window.cancelIdleCallback(idleCallbackId);
+    };
+  }
+
+  const timeoutId = globalThis.setTimeout(callback, 0);
+  return () => {
+    globalThis.clearTimeout(timeoutId);
+  };
+}
+
 type EditorProjectBootstrapProps = {
   projectId?: string;
+  generateThumbnailDataUrl?: (() => Promise<string | null>) | null;
   onProjectResolved?: (project: Pick<ProjectRecord, "id" | "name">) => void;
   onBootstrapStateChange?: (
     state:
@@ -42,6 +62,7 @@ type EditorProjectBootstrapProps = {
 
 export function EditorProjectBootstrap({
   projectId,
+  generateThumbnailDataUrl = null,
   onProjectResolved,
   onBootstrapStateChange,
 }: EditorProjectBootstrapProps) {
@@ -52,9 +73,15 @@ export function EditorProjectBootstrap({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const clientTokenRef = useRef<string | null>(null);
   const lastSyncedSignatureRef = useRef<string | null>(null);
+  const lastSyncedThumbnailSignatureRef = useRef<string | null>(null);
   const isBootstrappingRef = useRef(true);
+  const generateThumbnailDataUrlRef = useRef(generateThumbnailDataUrl);
   const onProjectResolvedRef = useRef(onProjectResolved);
   const onBootstrapStateChangeRef = useRef(onBootstrapStateChange);
+
+  useEffect(() => {
+    generateThumbnailDataUrlRef.current = generateThumbnailDataUrl;
+  }, [generateThumbnailDataUrl]);
 
   useEffect(() => {
     onProjectResolvedRef.current = onProjectResolved;
@@ -112,6 +139,10 @@ export function EditorProjectBootstrap({
               name: fallbackProject.name,
             });
             lastSyncedSignatureRef.current = getDocumentSignature(fallbackDocument);
+            lastSyncedThumbnailSignatureRef.current =
+              fallbackProject.thumbnailDataUrl || fallbackDocument.rooms.length === 0
+                ? getDocumentSignature(fallbackDocument)
+                : null;
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
             onBootstrapStateChangeRef.current?.({ status: "ready" });
@@ -134,6 +165,10 @@ export function EditorProjectBootstrap({
             name: project.name,
           });
           lastSyncedSignatureRef.current = getDocumentSignature(project.document);
+          lastSyncedThumbnailSignatureRef.current =
+            project.thumbnailDataUrl || project.document.rooms.length === 0
+              ? getDocumentSignature(project.document)
+              : null;
           setActiveProjectId(project.id);
           isBootstrappingRef.current = false;
           onBootstrapStateChangeRef.current?.({ status: "ready" });
@@ -159,6 +194,10 @@ export function EditorProjectBootstrap({
           name: selectedProject.name,
         });
         lastSyncedSignatureRef.current = getDocumentSignature(nextDocument);
+        lastSyncedThumbnailSignatureRef.current =
+          selectedProject.thumbnailDataUrl || nextDocument.rooms.length === 0
+            ? getDocumentSignature(nextDocument)
+            : null;
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
         onBootstrapStateChangeRef.current?.({ status: "ready" });
@@ -231,6 +270,63 @@ export function EditorProjectBootstrap({
 
     return () => {
       window.clearTimeout(timeoutId);
+    };
+  }, [activeProjectId, document, generateThumbnailDataUrl]);
+
+  useEffect(() => {
+    const clientToken = clientTokenRef.current;
+    if (!clientToken || !activeProjectId || isBootstrappingRef.current) {
+      return;
+    }
+
+    const nextDocument = cloneDocumentState(document);
+    const nextSignature = getDocumentSignature(nextDocument);
+    if (nextSignature === lastSyncedThumbnailSignatureRef.current) {
+      return;
+    }
+
+    let isCancelled = false;
+    let cancelIdleTask: (() => void) | null = null;
+    const timeoutId = window.setTimeout(() => {
+      cancelIdleTask = scheduleIdleTask(() => {
+        void (async () => {
+          const generator = generateThumbnailDataUrlRef.current;
+          if (isCancelled) return;
+
+          let thumbnailDataUrl: string | null = null;
+          if (nextDocument.rooms.length > 0) {
+            if (!generator) {
+              return;
+            }
+
+            try {
+              thumbnailDataUrl = await generator();
+            } catch (error) {
+              console.error("Failed to generate project thumbnail.", error);
+              return;
+            }
+          }
+
+          if (isCancelled) return;
+
+          void updateProject(clientToken, activeProjectId, {
+            thumbnailDataUrl,
+          })
+            .then((project) => {
+              if (isCancelled) return;
+              lastSyncedThumbnailSignatureRef.current = getDocumentSignature(project.document);
+            })
+            .catch((error) => {
+              console.error("Failed to sync project thumbnail.", error);
+            });
+        })();
+      });
+    }, PROJECT_THUMBNAIL_DEBOUNCE_MS);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+      cancelIdleTask?.();
     };
   }, [activeProjectId, document]);
 

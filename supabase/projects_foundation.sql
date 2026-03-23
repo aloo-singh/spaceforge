@@ -18,6 +18,7 @@ create table if not exists public.projects (
   user_id uuid not null references public.app_users(id) on delete cascade,
   name text not null,
   document jsonb not null,
+  thumbnail_data_url text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -27,6 +28,7 @@ comment on column public.projects.id is 'Stable primary key for the saved projec
 comment on column public.projects.user_id is 'Owning application user for this project.';
 comment on column public.projects.name is 'User-visible project name.';
 comment on column public.projects.document is 'Current editor document payload stored without changing the editor document structure.';
+comment on column public.projects.thumbnail_data_url is 'Small data URL thumbnail preview for quick project recognition in the projects grid.';
 comment on column public.projects.created_at is 'UTC timestamp when the project was created.';
 comment on column public.projects.updated_at is 'UTC timestamp when the project was last updated.';
 
