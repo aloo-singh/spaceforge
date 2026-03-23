@@ -311,6 +311,7 @@ export function FeedbackWidget({
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
+  const openAnimationFrameRef = useRef<number | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
@@ -356,7 +357,29 @@ export function FeedbackWidget({
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current);
       }
+      if (openAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(openAnimationFrameRef.current);
+      }
     };
+  }, []);
+
+  const beginPanelOpen = useCallback(() => {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (openAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(openAnimationFrameRef.current);
+      openAnimationFrameRef.current = null;
+    }
+
+    setPanelState("opening");
+    openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        setPanelState("open");
+        openAnimationFrameRef.current = null;
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -391,7 +414,7 @@ export function FeedbackWidget({
         errorMessage: null,
         status: "idle",
       });
-      setPanelState("opening");
+      beginPanelOpen();
     }, remainingDelayMs);
 
     return () => {
@@ -400,21 +423,7 @@ export function FeedbackWidget({
         promptTimerRef.current = null;
       }
     };
-  }, [isOpen, openedAtMs, pageContext, promptEligible, promptSessionState.autoOpened]);
-
-  useEffect(() => {
-    if (panelState !== "opening") {
-      return;
-    }
-
-    const animationFrameId = window.requestAnimationFrame(() => {
-      setPanelState("open");
-    });
-
-    return () => {
-      window.cancelAnimationFrame(animationFrameId);
-    };
-  }, [panelState]);
+  }, [beginPanelOpen, isOpen, openedAtMs, pageContext, promptEligible, promptSessionState.autoOpened]);
 
   const isPromptSurface = activeSource === "prompt";
   const isDarkSurface = surface === "dark";
@@ -437,6 +446,10 @@ export function FeedbackWidget({
 
     if (closeTimeoutRef.current !== null) {
       window.clearTimeout(closeTimeoutRef.current);
+    }
+    if (openAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(openAnimationFrameRef.current);
+      openAnimationFrameRef.current = null;
     }
 
     setPanelState("closing");
@@ -500,11 +513,6 @@ export function FeedbackWidget({
       return;
     }
 
-    if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-
     setViewState({
       activeSource: "manual_button",
       sentiment: null,
@@ -512,7 +520,7 @@ export function FeedbackWidget({
       errorMessage: null,
       status: "idle",
     });
-    setPanelState("opening");
+    beginPanelOpen();
   };
 
   const handleSubmit = async () => {
@@ -601,7 +609,7 @@ export function FeedbackWidget({
         {!isMobile ? (
           <div
             className={cn(
-              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-300 sm:px-5 sm:py-5",
+              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:px-5 sm:py-5",
               isPanelVisible ? "" : "pointer-events-none",
               panelState === "open"
                 ? "translate-x-0 translate-y-0 scale-100 opacity-100"
