@@ -56,6 +56,19 @@ export async function fetchProjects(clientToken: string) {
   return payload.projects;
 }
 
+export async function fetchProjectPresence(clientToken: string) {
+  const searchParams = new URLSearchParams({
+    clientToken,
+    mode: "presence",
+  });
+  const response = await fetch(`/api/projects?${searchParams.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const payload = await readJson<{ hasProjects: boolean }>(response);
+  return payload.hasProjects;
+}
+
 export async function createProject(
   clientToken: string,
   input: {

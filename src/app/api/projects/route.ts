@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createProjectForClientToken, fetchProjectsForClientToken } from "@/lib/projects/server";
+import {
+  createProjectForClientToken,
+  existingClientTokenHasProjects,
+  fetchProjectsForClientToken,
+} from "@/lib/projects/server";
 import { isProjectDocument } from "@/lib/projects/types";
 
 type CreateProjectRequestBody = {
@@ -12,11 +16,20 @@ function getClientTokenFromSearchParams(request: NextRequest) {
   return request.nextUrl.searchParams.get("clientToken")?.trim() ?? "";
 }
 
+function shouldCheckProjectPresence(request: NextRequest) {
+  return request.nextUrl.searchParams.get("mode") === "presence";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const clientToken = getClientTokenFromSearchParams(request);
     if (!clientToken) {
       return NextResponse.json({ error: "clientToken is required." }, { status: 400 });
+    }
+
+    if (shouldCheckProjectPresence(request)) {
+      const hasProjects = await existingClientTokenHasProjects(clientToken);
+      return NextResponse.json({ hasProjects }, { status: 200 });
     }
 
     const projects = await fetchProjectsForClientToken(clientToken);
