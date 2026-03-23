@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "lucide-react";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
   createProject,
@@ -31,6 +32,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 
 export function ProjectsPageClient() {
   const router = useRouter();
+  const interactionSectionRef = useRef<HTMLElement | null>(null);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function ProjectsPageClient() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const didLoadProjectsRef = useRef(false);
+  const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
@@ -79,6 +82,25 @@ export function ProjectsPageClient() {
       isCancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const interactionSectionElement = interactionSectionRef.current;
+    if (!interactionSectionElement || isLoading || errorMessage) {
+      return;
+    }
+
+    const markInteraction = () => {
+      setHasMeaningfulProjectsInteraction(true);
+    };
+
+    interactionSectionElement.addEventListener("pointerdown", markInteraction, { once: true });
+    interactionSectionElement.addEventListener("keydown", markInteraction, { once: true });
+
+    return () => {
+      interactionSectionElement.removeEventListener("pointerdown", markInteraction);
+      interactionSectionElement.removeEventListener("keydown", markInteraction);
+    };
+  }, [errorMessage, isLoading]);
 
   const isProjectsApiUnavailable = errorStatus === 404 && errorMessage === "Projects API unavailable.";
   const canCreateProject =
@@ -163,7 +185,11 @@ export function ProjectsPageClient() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background text-foreground">
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 sm:px-8 sm:py-12">
+      <section
+        ref={interactionSectionRef}
+        className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 sm:px-8 sm:py-12"
+        tabIndex={-1}
+      >
         <div className="flex flex-col gap-5 border-b border-border/70 pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-2xl space-y-3">
             <div className="font-measurement text-xs font-semibold tracking-[0.18em] text-foreground/45 uppercase">
@@ -320,6 +346,15 @@ export function ProjectsPageClient() {
           }}
         />
       </section>
+      <FeedbackWidget
+        pageContext="projects"
+        promptEligible={hasMeaningfulProjectsInteraction && didLoadProjectsRef.current && !errorMessage}
+        surface="light"
+        getMetadata={() => ({
+          projectCount: projects.length,
+          trigger: "projects-page-interaction",
+        })}
+      />
     </main>
   );
 }

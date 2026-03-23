@@ -5,8 +5,10 @@ import { useState } from "react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { Button } from "@/components/ui/button";
 import type { EditorOnboardingHintId } from "@/lib/editor/onboardingHints";
+import { useEditorStore } from "@/stores/editorStore";
 
 type EditorPageShellProps = {
   projectId?: string;
@@ -25,10 +27,14 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     | { status: "ready" }
     | { status: "error"; message: string }
   >({ status: "loading" });
+  const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
   const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status === "loading";
   const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
     setGenerateThumbnailDataUrl(() => nextGenerator);
   };
+  const hasMeaningfulEditorInteraction =
+    bootstrapState.status === "ready" && baselineRoomCount !== null && roomCount > baselineRoomCount;
 
   return (
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
@@ -42,6 +48,13 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           setBootstrapState(state);
           if (state.status === "loading") {
             setActiveProject(null);
+            setBaselineRoomCount(null);
+          }
+          if (state.status === "error") {
+            setBaselineRoomCount(null);
+          }
+          if (state.status === "ready") {
+            setBaselineRoomCount(useEditorStore.getState().document.rooms.length);
           }
         }}
       />
@@ -95,6 +108,17 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           }
         />
       ) : null}
+      <FeedbackWidget
+        pageContext="editor"
+        projectId={activeProject?.id ?? null}
+        promptEligible={bootstrapState.status === "ready" && hasMeaningfulEditorInteraction}
+        surface="dark"
+        getMetadata={() => ({
+          roomCount,
+          bootstrapStatus: bootstrapState.status,
+          trigger: "first-room-created",
+        })}
+      />
     </main>
   );
 }
