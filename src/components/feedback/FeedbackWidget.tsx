@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
+const FEEDBACK_ENTER_DURATION_MS = 320;
 const FEEDBACK_EXIT_DURATION_MS = 180;
 
 type FeedbackViewState = {
@@ -311,7 +312,7 @@ export function FeedbackWidget({
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
-  const openAnimationFrameRef = useRef<number | null>(null);
+  const openTimeoutRef = useRef<number | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
@@ -357,8 +358,8 @@ export function FeedbackWidget({
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current);
       }
-      if (openAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(openAnimationFrameRef.current);
+      if (openTimeoutRef.current !== null) {
+        window.clearTimeout(openTimeoutRef.current);
       }
     };
   }, []);
@@ -368,18 +369,16 @@ export function FeedbackWidget({
       window.clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
-    if (openAnimationFrameRef.current !== null) {
-      window.cancelAnimationFrame(openAnimationFrameRef.current);
-      openAnimationFrameRef.current = null;
+    if (openTimeoutRef.current !== null) {
+      window.clearTimeout(openTimeoutRef.current);
+      openTimeoutRef.current = null;
     }
 
     setPanelState("opening");
-    openAnimationFrameRef.current = window.requestAnimationFrame(() => {
-      openAnimationFrameRef.current = window.requestAnimationFrame(() => {
-        setPanelState("open");
-        openAnimationFrameRef.current = null;
-      });
-    });
+    openTimeoutRef.current = window.setTimeout(() => {
+      setPanelState("open");
+      openTimeoutRef.current = null;
+    }, FEEDBACK_ENTER_DURATION_MS);
   }, []);
 
   useEffect(() => {
@@ -447,9 +446,9 @@ export function FeedbackWidget({
     if (closeTimeoutRef.current !== null) {
       window.clearTimeout(closeTimeoutRef.current);
     }
-    if (openAnimationFrameRef.current !== null) {
-      window.cancelAnimationFrame(openAnimationFrameRef.current);
-      openAnimationFrameRef.current = null;
+    if (openTimeoutRef.current !== null) {
+      window.clearTimeout(openTimeoutRef.current);
+      openTimeoutRef.current = null;
     }
 
     setPanelState("closing");
@@ -602,23 +601,83 @@ export function FeedbackWidget({
       status={status}
     />
   );
+  const desktopPanelAnimationStyle =
+    panelState === "opening"
+      ? {
+          animation: `${
+            isPromptSurface ? "feedbackPromptEnter" : "feedbackManualEnter"
+          } ${FEEDBACK_ENTER_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1) forwards`,
+        }
+      : panelState === "closing"
+        ? {
+            animation: `${
+              isPromptSurface ? "feedbackPromptExit" : "feedbackManualExit"
+            } ${FEEDBACK_EXIT_DURATION_MS}ms cubic-bezier(0.4, 0, 1, 1) forwards`,
+          }
+        : undefined;
 
   return (
     <>
+      <style jsx global>{`
+        @keyframes feedbackPromptEnter {
+          from {
+            transform: translateX(calc(100% + 1.5rem)) scale(0.985);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes feedbackManualEnter {
+          from {
+            transform: translateY(0.75rem) scale(0.985);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes feedbackPromptExit {
+          from {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(2.5rem) scale(0.99);
+            opacity: 0;
+          }
+        }
+
+        @keyframes feedbackManualExit {
+          from {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+          to {
+            transform: translateY(0.5rem) scale(0.985);
+            opacity: 0;
+          }
+        }
+      `}</style>
       <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
         {!isMobile ? (
           <div
+            style={desktopPanelAnimationStyle}
             className={cn(
-              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur transition-[transform,opacity,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:px-5 sm:py-5",
+              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur sm:px-5 sm:py-5",
               isPanelVisible ? "" : "pointer-events-none",
               panelState === "open"
                 ? "translate-x-0 translate-y-0 scale-100 opacity-100"
                 : panelState === "opening"
                   ? isPromptSurface
-                    ? "translate-x-[110%] translate-y-0 scale-[0.985] opacity-0"
+                    ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-0"
                     : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
-                  : panelState === "closing"
-                    ? isPromptSurface
+                : panelState === "closing"
+                  ? isPromptSurface
                       ? "translate-x-10 translate-y-0 scale-[0.99] opacity-0"
                       : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
                     : isPromptSurface
