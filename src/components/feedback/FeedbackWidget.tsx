@@ -313,6 +313,8 @@ export function FeedbackWidget({
   const promptTimerRef = useRef<number | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
   const openTimeoutRef = useRef<number | null>(null);
+  const desktopPanelRef = useRef<HTMLDivElement | null>(null);
+  const desktopPanelAnimationRef = useRef<Animation | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
@@ -361,10 +363,12 @@ export function FeedbackWidget({
       if (openTimeoutRef.current !== null) {
         window.clearTimeout(openTimeoutRef.current);
       }
+      desktopPanelAnimationRef.current?.cancel();
     };
   }, []);
 
   const beginPanelOpen = useCallback(() => {
+    desktopPanelAnimationRef.current?.cancel();
     if (closeTimeoutRef.current !== null) {
       window.clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
@@ -375,11 +379,13 @@ export function FeedbackWidget({
     }
 
     setPanelState("opening");
-    openTimeoutRef.current = window.setTimeout(() => {
-      setPanelState("open");
-      openTimeoutRef.current = null;
-    }, FEEDBACK_ENTER_DURATION_MS);
-  }, []);
+    if (isMobile) {
+      openTimeoutRef.current = window.setTimeout(() => {
+        setPanelState("open");
+        openTimeoutRef.current = null;
+      }, FEEDBACK_ENTER_DURATION_MS);
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     if (!promptEligible || promptSessionState.autoOpened || isOpen) {
@@ -450,14 +456,98 @@ export function FeedbackWidget({
       window.clearTimeout(openTimeoutRef.current);
       openTimeoutRef.current = null;
     }
+    desktopPanelAnimationRef.current?.cancel();
 
     setPanelState("closing");
-    closeTimeoutRef.current = window.setTimeout(() => {
-      setPanelState("closed");
-      setViewState(createInitialViewState());
-      closeTimeoutRef.current = null;
-    }, FEEDBACK_EXIT_DURATION_MS);
-  }, [activeSource, pageContext, promptSessionState, status]);
+    if (isMobile) {
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setPanelState("closed");
+        setViewState(createInitialViewState());
+        closeTimeoutRef.current = null;
+      }, FEEDBACK_EXIT_DURATION_MS);
+    }
+  }, [activeSource, isMobile, pageContext, promptSessionState, status]);
+
+  useEffect(() => {
+    if (isMobile || !desktopPanelRef.current) {
+      return;
+    }
+
+    const panelElement = desktopPanelRef.current;
+    desktopPanelAnimationRef.current?.cancel();
+
+    if (panelState === "opening") {
+      desktopPanelAnimationRef.current = panelElement.animate(
+        isPromptSurface
+          ? [
+              {
+                transform: "translateX(calc(100% + 1.5rem)) scale(0.985)",
+                opacity: 1,
+              },
+              {
+                transform: "translateX(0) scale(1)",
+                opacity: 1,
+              },
+            ]
+          : [
+              {
+                transform: "translateY(0.75rem) scale(0.985)",
+                opacity: 0,
+              },
+              {
+                transform: "translateY(0) scale(1)",
+                opacity: 1,
+              },
+            ],
+        {
+          duration: FEEDBACK_ENTER_DURATION_MS,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          fill: "forwards",
+        }
+      );
+      desktopPanelAnimationRef.current.onfinish = () => {
+        setPanelState("open");
+        desktopPanelAnimationRef.current = null;
+      };
+      return;
+    }
+
+    if (panelState === "closing") {
+      desktopPanelAnimationRef.current = panelElement.animate(
+        isPromptSurface
+          ? [
+              {
+                transform: "translateX(0) scale(1)",
+                opacity: 1,
+              },
+              {
+                transform: "translateX(calc(100% + 1.5rem)) scale(0.99)",
+                opacity: 1,
+              },
+            ]
+          : [
+              {
+                transform: "translateY(0) scale(1)",
+                opacity: 1,
+              },
+              {
+                transform: "translateY(0.5rem) scale(0.985)",
+                opacity: 0,
+              },
+            ],
+        {
+          duration: FEEDBACK_EXIT_DURATION_MS,
+          easing: "cubic-bezier(0.4, 0, 1, 1)",
+          fill: "forwards",
+        }
+      );
+      desktopPanelAnimationRef.current.onfinish = () => {
+        setPanelState("closed");
+        setViewState(createInitialViewState());
+        desktopPanelAnimationRef.current = null;
+      };
+    }
+  }, [isMobile, isPromptSurface, panelState]);
 
   useEffect(() => {
     if (!isMobile || !isOpen) {
@@ -601,84 +691,29 @@ export function FeedbackWidget({
       status={status}
     />
   );
-  const desktopPanelAnimationStyle =
+  const desktopPanelStyle =
     panelState === "opening"
-      ? {
-          animation: `${
-            isPromptSurface ? "feedbackPromptEnter" : "feedbackManualEnter"
-          } ${FEEDBACK_ENTER_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1) forwards`,
-        }
-      : panelState === "closing"
-        ? {
-            animation: `${
-              isPromptSurface ? "feedbackPromptExit" : "feedbackManualExit"
-            } ${FEEDBACK_EXIT_DURATION_MS}ms cubic-bezier(0.4, 0, 1, 1) forwards`,
-          }
-        : undefined;
+      ? isPromptSurface
+        ? { transform: "translateX(calc(100% + 1.5rem)) scale(0.985)", opacity: 1 }
+        : { transform: "translateY(0.75rem) scale(0.985)", opacity: 0 }
+      : panelState === "open"
+        ? { transform: "translateX(0) translateY(0) scale(1)", opacity: 1 }
+        : panelState === "closing"
+          ? { transform: "translateX(0) translateY(0) scale(1)", opacity: 1 }
+          : isPromptSurface
+            ? { transform: "translateX(calc(100% + 1.5rem)) scale(0.985)", opacity: 1 }
+            : { transform: "translateY(0.75rem) scale(0.985)", opacity: 0 };
 
   return (
     <>
-      <style jsx global>{`
-        @keyframes feedbackPromptEnter {
-          from {
-            transform: translateX(calc(100% + 1.5rem)) scale(0.985);
-          }
-          to {
-            transform: translateX(0) scale(1);
-          }
-        }
-
-        @keyframes feedbackManualEnter {
-          from {
-            transform: translateY(0.75rem) scale(0.985);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-        }
-
-        @keyframes feedbackPromptExit {
-          from {
-            transform: translateX(0) scale(1);
-          }
-          to {
-            transform: translateX(2.5rem) scale(0.99);
-          }
-        }
-
-        @keyframes feedbackManualExit {
-          from {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-          to {
-            transform: translateY(0.5rem) scale(0.985);
-            opacity: 0;
-          }
-        }
-      `}</style>
       <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
         {!isMobile ? (
           <div
-            style={desktopPanelAnimationStyle}
+            ref={desktopPanelRef}
+            style={desktopPanelStyle}
             className={cn(
               "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur sm:px-5 sm:py-5",
               isPanelVisible ? "" : "pointer-events-none",
-              panelState === "open"
-                ? "translate-x-0 translate-y-0 scale-100 opacity-100"
-                : panelState === "opening"
-                  ? isPromptSurface
-                    ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-100"
-                    : "translate-x-0 translate-y-3 scale-[0.985] opacity-0"
-                : panelState === "closing"
-                  ? isPromptSurface
-                      ? "translate-x-10 translate-y-0 scale-[0.99] opacity-100"
-                      : "translate-x-0 translate-y-2 scale-[0.985] opacity-0"
-                    : isPromptSurface
-                      ? "translate-x-[calc(100%+1.5rem)] translate-y-0 scale-[0.985] opacity-100"
-                      : "translate-x-0 translate-y-3 scale-[0.985] opacity-0",
               isDarkSurface
                 ? "border-white/12 bg-black/72 text-white shadow-black/30"
                 : "border-border/70 bg-background/92 text-foreground shadow-black/8",
