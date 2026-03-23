@@ -98,7 +98,7 @@ export function ResponsiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPortal forceMount>
+      <DialogPortal>
         <DialogOverlay
           className={cn(
             isDrawer ? drawerOverlayClassName : dialogOverlayClassName

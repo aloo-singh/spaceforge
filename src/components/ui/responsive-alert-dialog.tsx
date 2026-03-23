@@ -83,7 +83,7 @@ export function ResponsiveAlertDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogPortal forceMount>
+      <AlertDialogPortal>
         <AlertDialogOverlay className={overlayClassName} />
         <AlertDialogContent
           className={cn(
