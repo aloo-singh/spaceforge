@@ -112,74 +112,6 @@ export function ProjectCard({
               </div>
             )}
           </div>
-          <div className="absolute top-3 right-3 flex items-center gap-2">
-            {isEditingName ? (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    void finishRename();
-                  }}
-                  disabled={isRenaming || isInteractionDisabled}
-                  aria-label={`Save ${project.name} name`}
-                  className="bg-background/82 backdrop-blur hover:bg-background"
-                >
-                  <Check className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={cancelRename}
-                  disabled={isRenaming || isInteractionDisabled}
-                  aria-label={`Cancel renaming ${project.name}`}
-                  className="bg-background/82 backdrop-blur hover:bg-background"
-                >
-                  <X className="size-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => {
-                    if (isInteractionDisabled) return;
-                    setDraftName(project.name);
-                    setIsEditingName(true);
-                  }}
-                  disabled={isInteractionDisabled}
-                  aria-label={`Rename ${project.name}`}
-                  title="Rename project"
-                  className="bg-background/82 text-foreground/64 backdrop-blur hover:bg-background hover:text-foreground"
-                >
-                  <PencilLine className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => {
-                    if (isInteractionDisabled) return;
-                    setDraftName(project.name);
-                    setIsEditingName(false);
-                    onDeleteRequest(project);
-                  }}
-                  disabled={isInteractionDisabled}
-                  aria-label={`Delete ${project.name}`}
-                  title="Delete project"
-                  className="bg-background/82 text-foreground/64 backdrop-blur hover:bg-background hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </>
-            )}
-          </div>
         </div>
 
         <div className="space-y-3">
@@ -223,7 +155,75 @@ export function ProjectCard({
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-end">
+        <div className="mt-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {isEditingName ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    void finishRename();
+                  }}
+                  disabled={isRenaming || isInteractionDisabled}
+                  aria-label={`Save ${project.name} name`}
+                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                >
+                  <Check className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={cancelRename}
+                  disabled={isRenaming || isInteractionDisabled}
+                  aria-label={`Cancel renaming ${project.name}`}
+                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    if (isInteractionDisabled) return;
+                    setDraftName(project.name);
+                    setIsEditingName(true);
+                  }}
+                  disabled={isInteractionDisabled}
+                  aria-label={`Rename ${project.name}`}
+                  title="Rename project"
+                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                >
+                  <PencilLine className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    if (isInteractionDisabled) return;
+                    setDraftName(project.name);
+                    setIsEditingName(false);
+                    onDeleteRequest(project);
+                  }}
+                  disabled={isInteractionDisabled}
+                  aria-label={`Delete ${project.name}`}
+                  title="Delete project"
+                  className="text-foreground/64 hover:bg-muted hover:text-destructive"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </>
+            )}
+          </div>
           <Button
             asChild
             size="sm"
