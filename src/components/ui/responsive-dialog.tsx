@@ -14,6 +14,11 @@ type ResponsiveDialogProps = {
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  contentClassName?: string;
+  hideHeader?: boolean;
+  motionState?: "opening" | "open" | "closing";
+  surfaceOverride?: "dialog" | "drawer";
+  panelRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 export function ResponsiveDialog({
@@ -25,14 +30,21 @@ export function ResponsiveDialog({
   children,
   footer,
   className,
+  contentClassName,
+  hideHeader = false,
+  motionState = "open",
+  surfaceOverride,
+  panelRef,
 }: ResponsiveDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const fallbackContentId = useId();
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const internalPanelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const resolvedContentId = contentId ?? fallbackContentId;
+  const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
+  const activePanelRef = panelRef ?? internalPanelRef;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -57,7 +69,7 @@ export function ResponsiveDialog({
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusPanel = () => {
-      const panelElement = panelRef.current;
+      const panelElement = activePanelRef.current;
       if (!panelElement) return;
 
       const firstFocusableElement = getFocusableElements(panelElement)[0];
@@ -78,7 +90,7 @@ export function ResponsiveDialog({
       }
 
       if (event.key !== "Tab") return;
-      const panelElement = panelRef.current;
+      const panelElement = activePanelRef.current;
       if (!panelElement) return;
 
       const focusableElements = getFocusableElements(panelElement);
@@ -115,7 +127,7 @@ export function ResponsiveDialog({
       previouslyFocusedElementRef.current?.focus();
       previouslyFocusedElementRef.current = null;
     };
-  }, [open, onOpenChange]);
+  }, [activePanelRef, open, onOpenChange]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -123,44 +135,58 @@ export function ResponsiveDialog({
     <div
       className={cn(
         "pointer-events-auto fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]",
-        isMobile ? "flex items-end justify-stretch" : "flex items-center justify-center p-4"
+        resolvedSurface === "drawer" ? "flex items-end justify-stretch" : "flex items-center justify-center p-4",
+        motionState === "opening" && "animate-in fade-in-0 duration-300",
+        motionState === "closing" && "animate-out fade-out-0 duration-200"
       )}
       onClick={() => onOpenChange(false)}
     >
       <div
         id={resolvedContentId}
-        ref={panelRef}
+        ref={activePanelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        data-surface={isMobile ? "drawer" : "dialog"}
+        data-surface={resolvedSurface}
         className={cn(
           "border border-border/70 bg-card text-card-foreground shadow-xl outline-none overflow-y-auto",
-          isMobile
+          resolvedSurface === "drawer"
             ? "w-full max-h-[min(85vh,calc(100vh-0.75rem))] rounded-t-2xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
             : "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] rounded-xl p-5",
+          resolvedSurface === "drawer" && motionState === "opening" && "animate-in slide-in-from-bottom-8 duration-300",
+          resolvedSurface === "drawer" && motionState === "closing" && "animate-out slide-out-to-bottom-8 duration-200",
+          resolvedSurface === "dialog" && motionState === "opening" && "animate-in zoom-in-95 duration-200",
+          resolvedSurface === "dialog" && motionState === "closing" && "animate-out zoom-out-95 duration-150",
           className
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        {isMobile ? (
+        {resolvedSurface === "drawer" ? (
           <div className="mb-3 flex justify-center" aria-hidden="true">
             <span className="h-1.5 w-12 rounded-full bg-border/80" />
           </div>
         ) : null}
-        <h2 id={titleId} className="text-base font-semibold">
-          {title}
-        </h2>
-        {description ? (
-          <p id={descriptionId} className="mt-2 text-sm text-muted-foreground">
-            {description}
-          </p>
+        {!hideHeader ? (
+          <>
+            <h2 id={titleId} className="text-base font-semibold">
+              {title}
+            </h2>
+            {description ? (
+              <p id={descriptionId} className="mt-2 text-sm text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+          </>
         ) : null}
-        {children ? <div className="mt-5">{children}</div> : null}
+        {children ? (
+          <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>
+            {children}
+          </div>
+        ) : null}
         {footer ? (
-          <div className={cn("mt-6 flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
+          <div className={cn("mt-6 flex gap-2", resolvedSurface === "drawer" ? "flex-col-reverse" : "justify-end")}>
             {footer}
           </div>
         ) : null}

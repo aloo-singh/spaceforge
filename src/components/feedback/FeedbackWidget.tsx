@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -13,6 +12,8 @@ import {
 } from "@/lib/feedback/types";
 import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { cn } from "@/lib/utils";
 
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
@@ -312,13 +313,12 @@ export function FeedbackWidget({
   const [openedAtMs] = useState(() => Date.now());
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const openTimeoutRef = useRef<number | null>(null);
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopPanelAnimationRef = useRef<Animation | null>(null);
-  const mobileBackdropRef = useRef<HTMLButtonElement | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
   const mobileDrawerContentRef = useRef<HTMLDivElement | null>(null);
-  const mobileDrawerMotionAnimationRef = useRef<Animation | null>(null);
-  const mobileBackdropAnimationRef = useRef<Animation | null>(null);
   const mobileDrawerResizeAnimationRef = useRef<Animation | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
@@ -361,20 +361,36 @@ export function FeedbackWidget({
       if (promptTimerRef.current !== null) {
         window.clearTimeout(promptTimerRef.current);
       }
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+      if (openTimeoutRef.current !== null) {
+        window.clearTimeout(openTimeoutRef.current);
+      }
       desktopPanelAnimationRef.current?.cancel();
-      mobileDrawerMotionAnimationRef.current?.cancel();
-      mobileBackdropAnimationRef.current?.cancel();
       mobileDrawerResizeAnimationRef.current?.cancel();
     };
   }, []);
 
   const beginPanelOpen = useCallback(() => {
     desktopPanelAnimationRef.current?.cancel();
-    mobileDrawerMotionAnimationRef.current?.cancel();
-    mobileBackdropAnimationRef.current?.cancel();
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (openTimeoutRef.current !== null) {
+      window.clearTimeout(openTimeoutRef.current);
+      openTimeoutRef.current = null;
+    }
 
     setPanelState("opening");
-  }, []);
+    if (isMobile) {
+      openTimeoutRef.current = window.setTimeout(() => {
+        setPanelState("open");
+        openTimeoutRef.current = null;
+      }, FEEDBACK_ENTER_DURATION_MS);
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     if (!promptEligible || promptSessionState.autoOpened || isOpen) {
@@ -448,12 +464,24 @@ export function FeedbackWidget({
     }
 
     desktopPanelAnimationRef.current?.cancel();
-    mobileDrawerMotionAnimationRef.current?.cancel();
-    mobileBackdropAnimationRef.current?.cancel();
     mobileDrawerResizeAnimationRef.current?.cancel();
+    if (openTimeoutRef.current !== null) {
+      window.clearTimeout(openTimeoutRef.current);
+      openTimeoutRef.current = null;
+    }
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
 
     setPanelState("closing");
-  }, [activeSource, pageContext, promptSessionState, status]);
+    if (isMobile) {
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setPanelState("closed");
+        setViewState(createInitialViewState());
+        closeTimeoutRef.current = null;
+      }, FEEDBACK_EXIT_DURATION_MS);
+    }
+  }, [activeSource, isMobile, pageContext, promptSessionState, status]);
 
   useEffect(() => {
     if (isMobile || !desktopPanelRef.current) {
@@ -535,71 +563,6 @@ export function FeedbackWidget({
       };
     }
   }, [isMobile, isPromptSurface, panelState]);
-
-  useEffect(() => {
-    if (!isMobile || !mobileDrawerRef.current || !mobileBackdropRef.current) {
-      return;
-    }
-
-    const drawerElement = mobileDrawerRef.current;
-    const backdropElement = mobileBackdropRef.current;
-    mobileDrawerMotionAnimationRef.current?.cancel();
-    mobileBackdropAnimationRef.current?.cancel();
-
-    if (panelState === "opening") {
-      mobileBackdropAnimationRef.current = backdropElement.animate(
-        [{ opacity: 0 }, { opacity: 1 }],
-        {
-          duration: FEEDBACK_ENTER_DURATION_MS,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-          fill: "forwards",
-        }
-      );
-      mobileDrawerMotionAnimationRef.current = drawerElement.animate(
-        [
-          { transform: "translateY(calc(100% + 1rem))", opacity: 0.98 },
-          { transform: "translateY(0)", opacity: 1 },
-        ],
-        {
-          duration: FEEDBACK_ENTER_DURATION_MS,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-          fill: "forwards",
-        }
-      );
-      mobileDrawerMotionAnimationRef.current.onfinish = () => {
-        setPanelState("open");
-        mobileDrawerMotionAnimationRef.current = null;
-      };
-      return;
-    }
-
-    if (panelState === "closing") {
-      mobileBackdropAnimationRef.current = backdropElement.animate(
-        [{ opacity: 1 }, { opacity: 0 }],
-        {
-          duration: FEEDBACK_EXIT_DURATION_MS,
-          easing: "cubic-bezier(0.4, 0, 1, 1)",
-          fill: "forwards",
-        }
-      );
-      mobileDrawerMotionAnimationRef.current = drawerElement.animate(
-        [
-          { transform: "translateY(0)", opacity: 1 },
-          { transform: "translateY(calc(100% + 1rem))", opacity: 0.98 },
-        ],
-        {
-          duration: FEEDBACK_EXIT_DURATION_MS,
-          easing: "cubic-bezier(0.4, 0, 1, 1)",
-          fill: "forwards",
-        }
-      );
-      mobileDrawerMotionAnimationRef.current.onfinish = () => {
-        setPanelState("closed");
-        setViewState(createInitialViewState());
-        mobileDrawerMotionAnimationRef.current = null;
-      };
-    }
-  }, [isMobile, panelState]);
 
   useEffect(() => {
     if (!isMobile || !isOpen || !mobileDrawerRef.current || !mobileDrawerContentRef.current) {
@@ -792,11 +755,11 @@ export function FeedbackWidget({
     <>
       <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
         {!isMobile ? (
-          <div
+          <Card
             ref={desktopPanelRef}
             style={desktopPanelStyle}
             className={cn(
-              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right rounded-2xl border px-4 py-4 shadow-lg backdrop-blur sm:px-5 sm:py-5",
+              "pointer-events-auto w-[min(22rem,calc(100vw-2rem))] origin-bottom-right backdrop-blur",
               isPanelVisible ? "" : "pointer-events-none",
               isDarkSurface
                 ? "border-white/12 bg-black/72 text-white shadow-black/30"
@@ -805,8 +768,10 @@ export function FeedbackWidget({
             )}
             aria-hidden={!isPanelVisible}
           >
-            {panelContent}
-          </div>
+            <CardContent className="px-4 py-4 sm:px-5 sm:py-5">
+              {panelContent}
+            </CardContent>
+          </Card>
         ) : null}
 
         <button
@@ -825,46 +790,32 @@ export function FeedbackWidget({
         </button>
       </div>
 
-      {isMobile && isPanelVisible && typeof document !== "undefined"
-        ? createPortal(
-            <div className="fixed inset-0 z-40 sm:hidden">
-              <button
-                ref={mobileBackdropRef}
-                type="button"
-                aria-label="Close feedback"
-                onClick={closePanel}
-                className={cn(
-                  "absolute inset-0 bg-black/45 opacity-0 backdrop-blur-[2px]"
-                )}
-              />
-              <div
-                ref={mobileDrawerRef}
-                role="dialog"
-                aria-modal="true"
-                tabIndex={-1}
-                style={{
-                  transform:
-                    panelState === "open" ? "translateY(0)" : "translateY(calc(100% + 1rem))",
-                  opacity: panelState === "open" ? 1 : 0.98,
-                }}
-                className={cn(
-                  "absolute inset-x-0 bottom-0 max-h-[min(85vh,calc(100vh-0.75rem))] overflow-y-auto rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl outline-none will-change-transform",
-                  isDarkSurface
-                    ? "border-white/12 bg-neutral-950 text-white"
-                    : "border-border/70 bg-card text-card-foreground"
-                )}
-              >
-                <div ref={mobileDrawerContentRef}>
-                  <div className="mb-4 flex justify-center" aria-hidden="true">
-                    <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
-                  </div>
-                  {panelContent}
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      <ResponsiveDialog
+        open={isMobile && isPanelVisible}
+        onOpenChange={(open) => {
+          if (!open) {
+            closePanel();
+          }
+        }}
+        title="Feedback"
+        hideHeader
+        surfaceOverride="drawer"
+        motionState={panelState === "closed" ? undefined : panelState}
+        panelRef={mobileDrawerRef}
+        className={cn(
+          "rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl will-change-transform",
+          isDarkSurface
+            ? "border-white/12 bg-neutral-950 text-white"
+            : "border-border/70 bg-card text-card-foreground"
+        )}
+      >
+        <div ref={mobileDrawerContentRef}>
+          <div className="mb-4 flex justify-center" aria-hidden="true">
+            <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
+          </div>
+          {panelContent}
+        </div>
+      </ResponsiveDialog>
     </>
   );
 }
