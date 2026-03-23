@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
 const FEEDBACK_ENTER_DURATION_MS = 320;
 const FEEDBACK_EXIT_DURATION_MS = 180;
+const FEEDBACK_DRAWER_RESIZE_DURATION_MS = 180;
 
 type FeedbackViewState = {
   activeSource: FeedbackSource | null;
@@ -311,11 +312,14 @@ export function FeedbackWidget({
   const [openedAtMs] = useState(() => Date.now());
   const isOpenRef = useRef(false);
   const promptTimerRef = useRef<number | null>(null);
-  const closeTimeoutRef = useRef<number | null>(null);
-  const openTimeoutRef = useRef<number | null>(null);
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopPanelAnimationRef = useRef<Animation | null>(null);
+  const mobileBackdropRef = useRef<HTMLButtonElement | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
+  const mobileDrawerContentRef = useRef<HTMLDivElement | null>(null);
+  const mobileDrawerMotionAnimationRef = useRef<Animation | null>(null);
+  const mobileBackdropAnimationRef = useRef<Animation | null>(null);
+  const mobileDrawerResizeAnimationRef = useRef<Animation | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
@@ -357,35 +361,20 @@ export function FeedbackWidget({
       if (promptTimerRef.current !== null) {
         window.clearTimeout(promptTimerRef.current);
       }
-      if (closeTimeoutRef.current !== null) {
-        window.clearTimeout(closeTimeoutRef.current);
-      }
-      if (openTimeoutRef.current !== null) {
-        window.clearTimeout(openTimeoutRef.current);
-      }
       desktopPanelAnimationRef.current?.cancel();
+      mobileDrawerMotionAnimationRef.current?.cancel();
+      mobileBackdropAnimationRef.current?.cancel();
+      mobileDrawerResizeAnimationRef.current?.cancel();
     };
   }, []);
 
   const beginPanelOpen = useCallback(() => {
     desktopPanelAnimationRef.current?.cancel();
-    if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    if (openTimeoutRef.current !== null) {
-      window.clearTimeout(openTimeoutRef.current);
-      openTimeoutRef.current = null;
-    }
+    mobileDrawerMotionAnimationRef.current?.cancel();
+    mobileBackdropAnimationRef.current?.cancel();
 
     setPanelState("opening");
-    if (isMobile) {
-      openTimeoutRef.current = window.setTimeout(() => {
-        setPanelState("open");
-        openTimeoutRef.current = null;
-      }, FEEDBACK_ENTER_DURATION_MS);
-    }
-  }, [isMobile]);
+  }, []);
 
   useEffect(() => {
     if (!promptEligible || promptSessionState.autoOpened || isOpen) {
@@ -434,6 +423,15 @@ export function FeedbackWidget({
   const isDarkSurface = surface === "dark";
   const canSubmit = freeText.trim().length > 0 && sentiment !== null && status !== "submitting";
   const isPanelVisible = panelState !== "closed";
+  const mobileContentStage = useMemo(() => {
+    if (status === "submitted") {
+      return "submitted";
+    }
+    if (sentiment === null) {
+      return "question-1";
+    }
+    return "question-2";
+  }, [sentiment, status]);
 
   const closePanel = useCallback(() => {
     if (status === "submitting") {
@@ -449,24 +447,13 @@ export function FeedbackWidget({
       savePromptSessionState(pageContext, nextState);
     }
 
-    if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
-    }
-    if (openTimeoutRef.current !== null) {
-      window.clearTimeout(openTimeoutRef.current);
-      openTimeoutRef.current = null;
-    }
     desktopPanelAnimationRef.current?.cancel();
+    mobileDrawerMotionAnimationRef.current?.cancel();
+    mobileBackdropAnimationRef.current?.cancel();
+    mobileDrawerResizeAnimationRef.current?.cancel();
 
     setPanelState("closing");
-    if (isMobile) {
-      closeTimeoutRef.current = window.setTimeout(() => {
-        setPanelState("closed");
-        setViewState(createInitialViewState());
-        closeTimeoutRef.current = null;
-      }, FEEDBACK_EXIT_DURATION_MS);
-    }
-  }, [activeSource, isMobile, pageContext, promptSessionState, status]);
+  }, [activeSource, pageContext, promptSessionState, status]);
 
   useEffect(() => {
     if (isMobile || !desktopPanelRef.current) {
@@ -548,6 +535,103 @@ export function FeedbackWidget({
       };
     }
   }, [isMobile, isPromptSurface, panelState]);
+
+  useEffect(() => {
+    if (!isMobile || !mobileDrawerRef.current || !mobileBackdropRef.current) {
+      return;
+    }
+
+    const drawerElement = mobileDrawerRef.current;
+    const backdropElement = mobileBackdropRef.current;
+    mobileDrawerMotionAnimationRef.current?.cancel();
+    mobileBackdropAnimationRef.current?.cancel();
+
+    if (panelState === "opening") {
+      mobileBackdropAnimationRef.current = backdropElement.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        {
+          duration: FEEDBACK_ENTER_DURATION_MS,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          fill: "forwards",
+        }
+      );
+      mobileDrawerMotionAnimationRef.current = drawerElement.animate(
+        [
+          { transform: "translateY(calc(100% + 1rem))", opacity: 0.98 },
+          { transform: "translateY(0)", opacity: 1 },
+        ],
+        {
+          duration: FEEDBACK_ENTER_DURATION_MS,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          fill: "forwards",
+        }
+      );
+      mobileDrawerMotionAnimationRef.current.onfinish = () => {
+        setPanelState("open");
+        mobileDrawerMotionAnimationRef.current = null;
+      };
+      return;
+    }
+
+    if (panelState === "closing") {
+      mobileBackdropAnimationRef.current = backdropElement.animate(
+        [{ opacity: 1 }, { opacity: 0 }],
+        {
+          duration: FEEDBACK_EXIT_DURATION_MS,
+          easing: "cubic-bezier(0.4, 0, 1, 1)",
+          fill: "forwards",
+        }
+      );
+      mobileDrawerMotionAnimationRef.current = drawerElement.animate(
+        [
+          { transform: "translateY(0)", opacity: 1 },
+          { transform: "translateY(calc(100% + 1rem))", opacity: 0.98 },
+        ],
+        {
+          duration: FEEDBACK_EXIT_DURATION_MS,
+          easing: "cubic-bezier(0.4, 0, 1, 1)",
+          fill: "forwards",
+        }
+      );
+      mobileDrawerMotionAnimationRef.current.onfinish = () => {
+        setPanelState("closed");
+        setViewState(createInitialViewState());
+        mobileDrawerMotionAnimationRef.current = null;
+      };
+    }
+  }, [isMobile, panelState]);
+
+  useEffect(() => {
+    if (!isMobile || !isOpen || !mobileDrawerRef.current || !mobileDrawerContentRef.current) {
+      return;
+    }
+
+    const drawerElement = mobileDrawerRef.current;
+    const contentElement = mobileDrawerContentRef.current;
+    const nextHeight = contentElement.offsetHeight;
+    const previousHeight = Number.parseFloat(drawerElement.dataset.contentHeight ?? "0");
+
+    drawerElement.dataset.contentHeight = String(nextHeight);
+
+    if (previousHeight <= 0 || previousHeight === nextHeight) {
+      drawerElement.style.height = `${nextHeight}px`;
+      return;
+    }
+
+    mobileDrawerResizeAnimationRef.current?.cancel();
+    mobileDrawerResizeAnimationRef.current = drawerElement.animate(
+      [{ height: `${previousHeight}px` }, { height: `${nextHeight}px` }],
+      {
+        duration: FEEDBACK_DRAWER_RESIZE_DURATION_MS,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "forwards",
+      }
+    );
+    mobileDrawerResizeAnimationRef.current.onfinish = () => {
+      drawerElement.style.height = `${nextHeight}px`;
+      mobileDrawerResizeAnimationRef.current = null;
+    };
+  }, [isMobile, isOpen, mobileContentStage]);
 
   useEffect(() => {
     if (!isMobile || !isOpen) {
@@ -745,12 +829,12 @@ export function FeedbackWidget({
         ? createPortal(
             <div className="fixed inset-0 z-40 sm:hidden">
               <button
+                ref={mobileBackdropRef}
                 type="button"
                 aria-label="Close feedback"
                 onClick={closePanel}
                 className={cn(
-                  "absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-200",
-                  panelState === "open" ? "opacity-100" : "opacity-0"
+                  "absolute inset-0 bg-black/45 opacity-0 backdrop-blur-[2px]"
                 )}
               />
               <div
@@ -758,22 +842,24 @@ export function FeedbackWidget({
                 role="dialog"
                 aria-modal="true"
                 tabIndex={-1}
+                style={{
+                  transform:
+                    panelState === "open" ? "translateY(0)" : "translateY(calc(100% + 1rem))",
+                  opacity: panelState === "open" ? 1 : 0.98,
+                }}
                 className={cn(
-                  "absolute inset-x-0 bottom-0 max-h-[min(85vh,calc(100vh-0.75rem))] overflow-y-auto rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl outline-none transition-[transform,opacity] duration-300",
-                  panelState === "open"
-                    ? "translate-y-0 opacity-100"
-                    : panelState === "closing"
-                      ? "translate-y-6 opacity-0"
-                      : "translate-y-full opacity-0",
+                  "absolute inset-x-0 bottom-0 max-h-[min(85vh,calc(100vh-0.75rem))] overflow-y-auto rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl outline-none will-change-transform",
                   isDarkSurface
                     ? "border-white/12 bg-neutral-950 text-white"
                     : "border-border/70 bg-card text-card-foreground"
                 )}
               >
-                <div className="mb-4 flex justify-center" aria-hidden="true">
-                  <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
+                <div ref={mobileDrawerContentRef}>
+                  <div className="mb-4 flex justify-center" aria-hidden="true">
+                    <span className={cn("h-1.5 w-12 rounded-full", isDarkSurface ? "bg-white/16" : "bg-border/80")} />
+                  </div>
+                  {panelContent}
                 </div>
-                {panelContent}
               </div>
             </div>,
             document.body
