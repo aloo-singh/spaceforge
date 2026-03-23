@@ -118,7 +118,7 @@ export function ProjectCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
               {isEditingName ? (
-                <div className="space-y-2">
+                <div>
                   <Input
                     ref={inputRef}
                     value={draftName}
@@ -140,17 +140,20 @@ export function ProjectCard({
                     className="h-9"
                     aria-label={`Rename ${project.name}`}
                   />
-                  <p className="text-xs text-muted-foreground">Enter saves. Escape cancels.</p>
                 </div>
               ) : (
                 <p className="truncate text-base font-medium tracking-tight text-foreground">
                   {project.name}
                 </p>
               )}
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock3 className="size-3.5" />
-                <span>{formatProjectUpdatedAt(project.updatedAt)}</span>
-              </p>
+              {isEditingName ? (
+                <p className="text-sm text-muted-foreground">Enter saves. Escape cancels.</p>
+              ) : (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock3 className="size-3.5" />
+                  <span>{formatProjectUpdatedAt(project.updatedAt)}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>
