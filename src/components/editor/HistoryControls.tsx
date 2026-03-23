@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
-import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
@@ -219,7 +219,7 @@ export function HistoryControls({
         </div>
       </aside>
 
-      <ResponsiveDialog
+      <ResponsiveAlertDialog
         open={isResetDialogOpen}
         onOpenChange={setIsResetDialogOpen}
         title="Reset canvas?"
