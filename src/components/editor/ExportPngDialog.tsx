@@ -101,7 +101,7 @@ export function ExportPngDialog({
 
         <ExportToggleCard
           title="Export theme"
-          description={`Match the current editor theme or choose a fixed look (${currentThemeLabel}).`}
+          description={`Follow the editor or choose Light or Dark (${currentThemeLabel}).`}
           value={theme === "system" ? `System (${currentThemeLabel})` : theme === "light" ? "Light" : "Dark"}
         >
           <div
@@ -164,7 +164,7 @@ function ExportToggleCard({ title, description, value, children }: ExportToggleC
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs leading-relaxed whitespace-nowrap text-muted-foreground">{description}</p>
         </div>
         <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
           {value}
