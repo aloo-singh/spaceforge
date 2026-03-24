@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
+import { EarlyExplorerBadge } from "@/components/ui/EarlyExplorerBadge";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
@@ -179,7 +180,9 @@ export function HistoryControls({
         </div>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5">
+          <EarlyExplorerBadge />
+          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
           <Button
             type="button"
             variant="outline"
@@ -216,6 +219,7 @@ export function HistoryControls({
               ⇧⌘Z
             </Keycap>
           </Button>
+          </div>
         </div>
       </aside>
 

@@ -19,7 +19,9 @@ export function EarlyExplorerBadge() {
       )}
     >
       <span>You found this early</span>
-      <span aria-hidden="true" className="size-1.5 rounded-[1px] bg-brand" />
+      <span aria-hidden="true" className="text-brand">
+        🌀
+      </span>
     </span>
   );
 }
