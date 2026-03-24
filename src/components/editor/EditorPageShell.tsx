@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
@@ -9,6 +9,7 @@ import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { Button } from "@/components/ui/button";
 import type { EditorOnboardingHintId } from "@/lib/editor/onboardingHints";
 import { useEditorStore } from "@/stores/editorStore";
+import { useGamificationStore } from "@/stores/useGamificationStore";
 
 type EditorPageShellProps = {
   projectId?: string;
@@ -28,6 +29,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     | { status: "error"; message: string }
   >({ status: "loading" });
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const hydrateEarlyExplorer = useGamificationStore((state) => state.hydrateEarlyExplorer);
   const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
   const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status === "loading";
   const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
@@ -35,6 +37,10 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
   };
   const hasMeaningfulEditorInteraction =
     bootstrapState.status === "ready" && baselineRoomCount !== null && roomCount > baselineRoomCount;
+
+  useEffect(() => {
+    hydrateEarlyExplorer();
+  }, [hydrateEarlyExplorer]);
 
   return (
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
