@@ -1,4 +1,5 @@
 import type { Container, ICanvas, Renderer } from "pixi.js";
+import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 
 export type PixiPngExportSource =
   | Renderer
@@ -11,7 +12,7 @@ export type PixiPngExportOptions = {
   backgroundColor?: string;
   paddingPx?: number;
   signature?: {
-    text: string;
+    lines: string[];
     color: string;
     alpha?: number;
   };
@@ -149,22 +150,32 @@ function drawExportSignature(
   paddingPx: number
 ) {
   if (!signature) return;
-  const trimmedText = signature.text.trim();
-  if (!trimmedText) return;
+  const lines = signature.lines.map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) return;
 
-  const label = `Designed by ${trimmedText}`;
   const alpha = typeof signature.alpha === "number" ? Math.max(0, Math.min(1, signature.alpha)) : 0.7;
   const horizontalInset = Math.max(12, Math.floor(paddingPx * 0.33));
-  const baselineInset = Math.max(10, Math.floor(paddingPx * 0.28));
-  const fontSizePx = Math.max(11, Math.min(14, Math.floor(paddingPx * 0.28)));
+  const baselineInset = Math.max(10, Math.floor(paddingPx * 0.24));
+  const primaryFontSizePx = Math.max(11, Math.min(14, Math.floor(paddingPx * 0.24)));
+  const secondaryFontSizePx = Math.max(10, primaryFontSizePx - 1);
+  const lineGapPx = 4;
 
   context.save();
   context.textAlign = "right";
   context.textBaseline = "alphabetic";
-  context.font = `500 ${fontSizePx}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
   context.fillStyle = signature.color;
   context.globalAlpha = alpha;
-  context.fillText(label, width - horizontalInset, height - baselineInset);
+
+  let y = height - baselineInset;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const isBrandLine = index === lines.length - 2 && lines.length > 1;
+    const fontSizePx = isBrandLine ? primaryFontSizePx : secondaryFontSizePx;
+    const fontWeight = isBrandLine ? 600 : 500;
+    context.font = `${fontWeight} ${fontSizePx}px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+    context.fillText(lines[index], width - horizontalInset, y);
+    y -= fontSizePx + lineGapPx;
+  }
+
   context.restore();
 }
 
