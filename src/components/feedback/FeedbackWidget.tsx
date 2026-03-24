@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
 const FEEDBACK_ENTER_DURATION_MS = 320;
 const FEEDBACK_EXIT_DURATION_MS = 180;
+const FEEDBACK_HEIGHT_TRANSITION_MS = 260;
 
 type FeedbackViewState = {
   activeSource: FeedbackSource | null;
@@ -56,6 +57,11 @@ type FeedbackPanelContentProps = {
   onSubmit: () => void;
   sentiment: FeedbackSentiment | null;
   status: FeedbackViewState["status"];
+};
+
+type AnimatedFeedbackBodyProps = {
+  active: boolean;
+  children: React.ReactNode;
 };
 
 function getSessionStorage() {
@@ -284,6 +290,57 @@ function FeedbackPanelContent({
         </div>
       )}
     </>
+  );
+}
+
+function AnimatedFeedbackBody({ active, children }: AnimatedFeedbackBodyProps) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const contentElement = contentRef.current;
+    if (!contentElement) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setHeight(Math.ceil(contentElement.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    resizeObserver.observe(contentElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [active, children]);
+
+  return (
+    <div
+      className={cn(
+        active &&
+          "overflow-hidden transition-[height] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+      )}
+      style={
+        active && height !== null
+          ? {
+              height,
+              transitionDuration: `${FEEDBACK_HEIGHT_TRANSITION_MS}ms`,
+            }
+          : undefined
+      }
+    >
+      <div ref={contentRef}>{children}</div>
+    </div>
   );
 }
 
@@ -591,38 +648,40 @@ export function FeedbackWidget({
   };
 
   const panelContent = (
-    <FeedbackPanelContent
-      canSubmit={canSubmit}
-      errorMessage={errorMessage}
-      freeText={freeText}
-      isDarkSurface={isDarkSurface}
-      onClose={closePanel}
-      onFreeTextChange={(nextFreeText) =>
-        setViewState((currentState) => ({
-          ...currentState,
-          freeText: nextFreeText,
-        }))
-      }
-      onGoBack={() =>
-        setViewState((currentState) => ({
-          ...currentState,
-          sentiment: null,
-          freeText: "",
-          errorMessage: null,
-        }))
-      }
-      onSelectSentiment={(nextSentiment) =>
-        setViewState((currentState) => ({
-          ...currentState,
-          sentiment: nextSentiment,
-        }))
-      }
-      onSubmit={() => {
-        void handleSubmit();
-      }}
-      sentiment={sentiment}
-      status={status}
-    />
+    <AnimatedFeedbackBody active={isPanelVisible}>
+      <FeedbackPanelContent
+        canSubmit={canSubmit}
+        errorMessage={errorMessage}
+        freeText={freeText}
+        isDarkSurface={isDarkSurface}
+        onClose={closePanel}
+        onFreeTextChange={(nextFreeText) =>
+          setViewState((currentState) => ({
+            ...currentState,
+            freeText: nextFreeText,
+          }))
+        }
+        onGoBack={() =>
+          setViewState((currentState) => ({
+            ...currentState,
+            sentiment: null,
+            freeText: "",
+            errorMessage: null,
+          }))
+        }
+        onSelectSentiment={(nextSentiment) =>
+          setViewState((currentState) => ({
+            ...currentState,
+            sentiment: nextSentiment,
+          }))
+        }
+        onSubmit={() => {
+          void handleSubmit();
+        }}
+        sentiment={sentiment}
+        status={status}
+      />
+    </AnimatedFeedbackBody>
   );
   const desktopPanelStyle =
     panelState === "opening"
