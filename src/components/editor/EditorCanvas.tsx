@@ -66,6 +66,7 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import { detectMacPlatform } from "@/lib/platform";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -3080,21 +3081,6 @@ function drawGridLines(
   }
 
   graphics.stroke();
-}
-
-function detectMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-
-  const navigatorWithUserAgentData = navigator as Navigator & {
-    userAgentData?: { platform?: string };
-  };
-  const userAgentDataPlatform =
-    typeof navigatorWithUserAgentData.userAgentData?.platform === "string"
-      ? navigatorWithUserAgentData.userAgentData.platform
-      : "";
-  if (/mac/i.test(userAgentDataPlatform)) return true;
-
-  return /mac/i.test(navigator.platform);
 }
 
 function getTextResolution(): number {
