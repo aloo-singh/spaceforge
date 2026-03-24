@@ -10,6 +10,55 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.38.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-24</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Visible keyboard shortcut keycaps for feedback actions</li>
+                <li>
+                  Keyboard submission support for feedback:
+                  macOS: <code>Cmd+Enter</code>, Windows/Linux: <code>Ctrl+Enter</code>
+                </li>
+                <li>Keyboard back and close support in the feedback flow using <code>Esc</code></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Feedback text step now auto-focuses the input</li>
+                <li>Send shortcut presentation now uses a compact keycap style consistent with other product shortcuts</li>
+                <li>Send button layout is tighter and more balanced</li>
+                <li>Feedback flow feels cleaner and more intentional on desktop and mobile</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Mobile feedback drawer no longer loses input focus while typing</li>
+                <li>Mobile drawer width and inset behaviour improved so content no longer hangs off the right edge</li>
+                <li>Shared mobile drawer path is now more consistent across feedback and delete confirmation flows</li>
+                <li>First-project bootstrap race fixed so duplicate initial projects are no longer created</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>This release closes out the current feedback-system workstream</li>
+                <li>A small remaining mobile drawer open-animation polish issue is tracked separately for later refinement</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.37.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-24</span>
           </div>
