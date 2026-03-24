@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { useTheme } from "next-themes";
 import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
+import {
+  ExportPngDialog,
+  type ExportPngRequest,
+} from "@/components/editor/ExportPngDialog";
 import { EarlyExplorerBadge } from "@/components/ui/EarlyExplorerBadge";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
@@ -10,12 +15,12 @@ import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
-import { normalizeEditorExportSignature } from "@/lib/editor/settings";
+import { resolveEditorThemeMode } from "@/lib/editor/theme";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 type HistoryControlsProps = {
-  onExportPng?: (signatureText?: string) => void | Promise<void>;
+  onExportPng?: (request: ExportPngRequest) => void | Promise<void>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
@@ -34,6 +39,8 @@ export function HistoryControls({
   const settingsDialogId = "editor-settings-surface";
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -41,7 +48,6 @@ export function HistoryControls({
   );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
-  const exportSignatureText = useEditorStore((state) => state.settings.exportSignatureText);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const isCanvasEmpty = useEditorStore(
@@ -62,9 +68,10 @@ export function HistoryControls({
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
   const canInsertOpening = hasHydrated && selectedWall !== null;
-  const normalizedSignature = normalizeEditorExportSignature(exportSignatureText);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
+  const defaultExportTheme = theme === "light" || theme === "dark" ? theme : "system";
+  const currentThemeLabel = resolveEditorThemeMode(resolvedTheme) === "light" ? "Light" : "Dark";
   const resetCameraTitle = !hasHydrated
     ? "Fit view is unavailable until the editor finishes loading"
     : hasRooms
@@ -154,16 +161,16 @@ export function HistoryControls({
             type="button"
             variant="outline"
             size="default"
-            onClick={() => onExportPng?.(normalizedSignature || undefined)}
+            onClick={() => setIsExportDialogOpen(true)}
             disabled={isExportButtonDisabled}
-            aria-label="Export current canvas as PNG"
+            aria-label="Open PNG export options"
             title={exportButtonTitle}
+            aria-haspopup="dialog"
+            aria-expanded={isExportDialogOpen}
             className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <Download />
-            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">
-              {isExportingPng ? "Exporting..." : "Export PNG"}
-            </span>
+            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Export PNG</span>
           </Button>
           <Button
             type="button"
@@ -254,6 +261,18 @@ export function HistoryControls({
         contentId={settingsDialogId}
         open={isSettingsDialogOpen}
         onOpenChange={setIsSettingsDialogOpen}
+      />
+
+      <ExportPngDialog
+        key={`${defaultExportTheme}-${isExportDialogOpen ? "open" : "closed"}`}
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        onExport={(request) => onExportPng?.(request)}
+        isExporting={isExportingPng}
+        exportDisabled={isExportButtonDisabled}
+        exportDisabledReason={exportDisabledReason}
+        defaultTheme={defaultExportTheme}
+        currentThemeLabel={currentThemeLabel}
       />
     </>
   );

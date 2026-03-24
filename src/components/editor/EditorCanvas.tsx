@@ -63,6 +63,7 @@ import {
 import { getActiveSnapStepMm, getScaleOverlayState } from "@/lib/editor/snapping";
 import {
   getMeasurementTextScale,
+  normalizeEditorExportSignature,
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
@@ -85,6 +86,7 @@ import type {
   ViewportSize,
 } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
+import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
@@ -567,18 +569,27 @@ export default function EditorCanvas({
 
   const createCanvasExportSnapshot = useCallback(
     ({
+      includeSignature,
       innerPaddingPx,
       paddingPx,
+      showDimensions,
+      showGrid,
       signatureText,
+      themeMode,
     }: {
+      includeSignature: boolean;
       innerPaddingPx: number;
       paddingPx: number;
+      showDimensions: boolean;
+      showGrid: boolean;
       signatureText?: string;
+      themeMode: "light" | "dark";
     }) => {
       const app = appRef.current;
       if (!app) return null;
 
       const state = useEditorStore.getState();
+      const exportTheme = getEditorCanvasTheme(themeMode);
       const layoutBounds = getLayoutBoundsFromDocument(state.document);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
@@ -616,7 +627,7 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         null,
-        editorThemeRef.current
+        exportTheme
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -624,7 +635,7 @@ export default function EditorCanvas({
         null,
         exportCamera,
         exportViewport,
-        editorThemeRef.current
+        exportTheme
       );
       drawWallInteractionOverlay(
         exportWallOverlayGraphics,
@@ -636,7 +647,7 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         null,
-        editorThemeRef.current
+        exportTheme
       );
       drawRoomLabels(
         exportRoomLabels,
@@ -646,9 +657,9 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         state.settings,
-        shouldShowDimensions(state.settings, state.isDimensionsVisibilityOverrideActive),
+        showDimensions,
         null,
-        editorThemeRef.current
+        exportTheme
       );
       drawDraft(
         exportDraftGraphics,
@@ -657,27 +668,31 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         getActiveSnapStepMm(exportCamera),
-        editorThemeRef.current
+        exportTheme
       );
 
       return {
         renderer: app.renderer,
         stage: exportStage,
         options: {
-          backgroundColor: editorThemeMode === "light" ? "#ffffff" : "#000000",
+          backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           paddingPx,
-          grid: {
-            spacingPx: exportGridSpacingPx,
-            originXPx: exportGridOriginXPx,
-            originYPx: exportGridOriginYPx,
-            color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
-            alpha: editorThemeMode === "light" ? 0.08 : 0.1,
-          },
-          signature: signatureText
+          grid: showGrid
             ? {
-                text: signatureText,
-                color: editorThemeMode === "light" ? "#0f172a" : "#f8fafc",
-                alpha: editorThemeMode === "light" ? 0.72 : 0.7,
+                spacingPx: exportGridSpacingPx,
+                originXPx: exportGridOriginXPx,
+                originYPx: exportGridOriginYPx,
+                color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                alpha: themeMode === "light" ? 0.08 : 0.1,
+              }
+            : undefined,
+          signature: includeSignature
+            ? {
+                lines: signatureText
+                  ? [`Designed by ${signatureText}`, "Designed with [s]paceforge", "spaceforge.app"]
+                  : ["Designed with [s]paceforge", "spaceforge.app"],
+                color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                alpha: themeMode === "light" ? 0.72 : 0.7,
               }
             : undefined,
         },
@@ -686,10 +701,10 @@ export default function EditorCanvas({
         },
       };
     },
-    [editorThemeMode]
+    []
   );
 
-  const exportCurrentCanvasAsPng = useCallback(async (signatureText?: string) => {
+  const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
     if (isExportingPng) return;
 
     track(ANALYTICS_EVENTS.exportStarted, {
@@ -697,11 +712,18 @@ export default function EditorCanvas({
     });
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
 
-    const hasSignature = Boolean(signatureText?.trim());
+    const exportSignatureText = normalizeEditorExportSignature(
+      useEditorStore.getState().settings.exportSignatureText
+    );
+    const resolvedThemeMode = request.theme === "system" ? editorThemeMode : request.theme;
     const exportSnapshot = createCanvasExportSnapshot({
-      innerPaddingPx: hasSignature ? 88 : 72,
+      includeSignature: true,
+      innerPaddingPx: exportSignatureText ? 108 : 92,
       paddingPx: 48,
-      signatureText,
+      showDimensions: request.showDimensions,
+      showGrid: request.showGrid,
+      signatureText: exportSignatureText || undefined,
+      themeMode: resolvedThemeMode,
     });
     if (!exportSnapshot) {
       return;
@@ -734,12 +756,16 @@ export default function EditorCanvas({
       exportSnapshot.destroy();
       setIsExportingPng(false);
     }
-  }, [completeHint, createCanvasExportSnapshot, isExportingPng]);
+  }, [completeHint, createCanvasExportSnapshot, editorThemeMode, isExportingPng]);
 
   const generateThumbnailDataUrl = useCallback(async () => {
     const exportSnapshot = createCanvasExportSnapshot({
+      includeSignature: false,
       innerPaddingPx: 56,
       paddingPx: 24,
+      showDimensions: false,
+      showGrid: false,
+      themeMode: editorThemeMode,
     });
     if (!exportSnapshot) {
       return null;
@@ -753,7 +779,7 @@ export default function EditorCanvas({
     } finally {
       exportSnapshot.destroy();
     }
-  }, [createCanvasExportSnapshot]);
+  }, [createCanvasExportSnapshot, editorThemeMode]);
 
   useEffect(() => {
     editorThemeRef.current = editorTheme;
