@@ -10,16 +10,17 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.38.1</h2>
+            <h2 className="text-2xl font-semibold">v0.38.2</h2>
             <span className="text-sm text-muted-foreground">2026-03-24</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Private &quot;You found this early 🌀&quot; badge in the editor header (localStorage flag, visible only to the user)</li>
-                <li>Minimal gamification foundation for private pride (Phase 1)</li>
+                <li>Low-contrast selected states in light mode across shared shadcn primitives, including segmented controls, pills, buttons, and toggles</li>
+                <li>Selected surfaces now use stronger, calm contrast in light mode while dark mode remains unchanged</li>
+                <li>Fix applied at the shared token and primitive level through <code>globals.css</code> and the shared button and badge components</li>
               </ul>
             </div>
           </div>
