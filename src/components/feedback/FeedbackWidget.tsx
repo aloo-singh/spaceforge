@@ -53,6 +53,7 @@ type FeedbackPanelContentProps = {
   freeText: string;
   isMacPlatform: boolean;
   isDarkSurface: boolean;
+  isSubmitModifierHeld: boolean;
   onClose: () => void;
   onFreeTextChange: (value: string) => void;
   onGoBack: () => void;
@@ -60,6 +61,7 @@ type FeedbackPanelContentProps = {
   onSubmit: () => void;
   sentiment: FeedbackSentiment | null;
   status: FeedbackViewState["status"];
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 type AnimatedFeedbackBodyProps = {
@@ -130,6 +132,7 @@ function FeedbackPanelContent({
   freeText,
   isMacPlatform,
   isDarkSurface,
+  isSubmitModifierHeld,
   onClose,
   onFreeTextChange,
   onGoBack,
@@ -137,6 +140,7 @@ function FeedbackPanelContent({
   onSubmit,
   sentiment,
   status,
+  textareaRef,
 }: FeedbackPanelContentProps) {
   const submitShortcutKeys = isMacPlatform ? ["⌘", "↩"] : ["Ctrl", "↩"];
   const isSubmitting = status === "submitting";
@@ -245,6 +249,8 @@ function FeedbackPanelContent({
       ) : (
         <div className="mt-5 space-y-3.5">
           <textarea
+            ref={textareaRef}
+            autoFocus
             value={freeText}
             onChange={(event) => onFreeTextChange(event.target.value)}
             onKeyDown={(event) => {
@@ -315,16 +321,23 @@ function FeedbackPanelContent({
                 <Send className="size-4" />
               )}
               <span>{status === "submitting" ? "Sending..." : "Send"}</span>
-              <KeycapCombo
+              <span
                 aria-hidden="true"
-                keys={submitShortcutKeys}
-                className="ml-1"
-                keyClassName={cn(
-                  "bg-white/12 text-white/86 shadow-none",
-                  submitShortcutKeys[0] === "Ctrl" ? "min-w-[2.2rem]" : "min-w-5"
+                className={cn(
+                  "overflow-hidden transition-[width,margin,opacity,transform] duration-150 ease-out",
+                  isSubmitModifierHeld ? "ml-1 w-[3.45rem] opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-1"
                 )}
-                separatorClassName="text-white/60"
-              />
+              >
+                <KeycapCombo
+                  keys={submitShortcutKeys}
+                  separator=""
+                  className="gap-0.5 justify-end whitespace-nowrap"
+                  keyClassName={cn(
+                    "bg-white/12 text-white/86 shadow-none",
+                    submitShortcutKeys[0] === "Ctrl" ? "min-w-[2.2rem]" : "min-w-5"
+                  )}
+                />
+              </span>
             </Button>
           </div>
         </div>
@@ -406,7 +419,9 @@ export function FeedbackWidget({
     loadPromptSessionState(pageContext)
   );
   const [isMacPlatform, setIsMacPlatform] = useState(false);
+  const [isSubmitModifierHeld, setIsSubmitModifierHeld] = useState(false);
   const { isMobile, isReady: isMobileReady } = useMobile();
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
   const activeSource = viewState.activeSource;
   const sentiment = viewState.sentiment;
@@ -436,6 +451,20 @@ export function FeedbackWidget({
   useLayoutEffect(() => {
     setIsMacPlatform(detectMacPlatform());
   }, []);
+
+  useEffect(() => {
+    if (sentiment === null || status === "submitted") {
+      setIsSubmitModifierHeld(false);
+    }
+  }, [sentiment, status]);
+
+  useEffect(() => {
+    if (sentiment === null || status === "submitted") {
+      return;
+    }
+
+    textareaRef.current?.focus();
+  }, [sentiment, status]);
 
   const beginPanelOpen = useCallback(() => {
     desktopPanelAnimationRef.current?.cancel();
@@ -733,6 +762,32 @@ export function FeedbackWidget({
     };
   }, [closePanel, handleGoBack, isPanelVisible, sentiment, status]);
 
+  useEffect(() => {
+    if (!isPanelVisible || sentiment === null || status === "submitted") {
+      return;
+    }
+
+    const syncModifierState = (event: KeyboardEvent) => {
+      setIsSubmitModifierHeld(isMacPlatform ? event.metaKey : event.ctrlKey);
+    };
+
+    const clearModifierState = () => {
+      setIsSubmitModifierHeld(false);
+    };
+
+    window.addEventListener("keydown", syncModifierState);
+    window.addEventListener("keyup", syncModifierState);
+    window.addEventListener("blur", clearModifierState);
+    document.addEventListener("visibilitychange", clearModifierState);
+
+    return () => {
+      window.removeEventListener("keydown", syncModifierState);
+      window.removeEventListener("keyup", syncModifierState);
+      window.removeEventListener("blur", clearModifierState);
+      document.removeEventListener("visibilitychange", clearModifierState);
+    };
+  }, [isMacPlatform, isPanelVisible, sentiment, status]);
+
   const panelContent = (
     <AnimatedFeedbackBody active={isPanelVisible}>
       <FeedbackPanelContent
@@ -741,6 +796,7 @@ export function FeedbackWidget({
         freeText={freeText}
         isMacPlatform={isMacPlatform}
         isDarkSurface={isDarkSurface}
+        isSubmitModifierHeld={isSubmitModifierHeld}
         onClose={closePanel}
         onFreeTextChange={(nextFreeText) =>
           setViewState((currentState) => ({
@@ -760,6 +816,7 @@ export function FeedbackWidget({
         }}
         sentiment={sentiment}
         status={status}
+        textareaRef={textareaRef}
       />
     </AnimatedFeedbackBody>
   );
