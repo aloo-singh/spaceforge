@@ -13,7 +13,7 @@ import {
 import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Keycap, KeycapCombo } from "@/components/ui/keycap";
+import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { detectMacPlatform } from "@/lib/platform";
 import { useMobile } from "@/lib/use-mobile";
@@ -142,7 +142,7 @@ function FeedbackPanelContent({
   status,
   textareaRef,
 }: FeedbackPanelContentProps) {
-  const submitShortcutKeys = isMacPlatform ? ["⌘", "↩"] : ["Ctrl", "↩"];
+  const submitShortcutLabel = isMacPlatform ? "⌘↩" : "Ctrl↩";
   const isSubmitting = status === "submitting";
 
   return (
@@ -313,7 +313,7 @@ function FeedbackPanelContent({
               size="sm"
               onClick={onSubmit}
               disabled={!canSubmit}
-              className="bg-blue-500 text-white hover:bg-blue-500/90"
+              className="gap-1 px-2 pr-1 bg-blue-500 text-white hover:bg-blue-500/90"
             >
               {status === "submitting" ? (
                 <LoaderCircle className="size-4 animate-spin" />
@@ -324,19 +324,17 @@ function FeedbackPanelContent({
               <span
                 aria-hidden="true"
                 className={cn(
-                  "overflow-hidden transition-[width,margin,opacity,transform] duration-150 ease-out",
-                  isSubmitModifierHeld ? "ml-1 w-[3.45rem] opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-1"
+                  "grid transition-[grid-template-columns,opacity,transform] duration-150 ease-out",
+                  isSubmitModifierHeld
+                    ? "grid-cols-[1fr] opacity-100 translate-x-0"
+                    : "grid-cols-[0fr] opacity-0 translate-x-1"
                 )}
               >
-                <KeycapCombo
-                  keys={submitShortcutKeys}
-                  separator=""
-                  className="gap-0.5 justify-end whitespace-nowrap"
-                  keyClassName={cn(
-                    "bg-white/12 text-white/86 shadow-none",
-                    submitShortcutKeys[0] === "Ctrl" ? "min-w-[2.2rem]" : "min-w-5"
-                  )}
-                />
+                <Keycap
+                  className="h-5 min-w-0 overflow-hidden rounded-sm border-white/18 bg-white/12 px-1 text-[10px] text-white/86 shadow-none"
+                >
+                  {submitShortcutLabel}
+                </Keycap>
               </span>
             </Button>
           </div>
