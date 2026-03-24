@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertDialog,
@@ -12,7 +11,15 @@ import {
   AlertDialogPortal,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHandle,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -39,8 +46,6 @@ export function ResponsiveAlertDialog({
   contentClassName,
   surfaceOverride,
 }: ResponsiveAlertDialogProps) {
-  const mobileTitleId = useState(() => `mobile-alert-title-${Math.random().toString(36).slice(2)}`)[0];
-  const mobileDescriptionId = useState(() => `mobile-alert-description-${Math.random().toString(36).slice(2)}`)[0];
   const { isMobile, isReady: isMobileReady } = useMobile();
   if (!surfaceOverride && open && !isMobileReady) {
     return null;
@@ -51,27 +56,25 @@ export function ResponsiveAlertDialog({
 
   if (isDrawer) {
     return (
-      <MobileDrawerShell
+      <Drawer
         open={open}
         onOpenChange={onOpenChange}
-        className={className}
+        shouldScaleBackground={false}
+        direction="bottom"
         dismissible={false}
-        titleId={mobileTitleId}
-        descriptionId={description ? mobileDescriptionId : undefined}
       >
-        <div className="flex flex-col gap-2 text-left">
-          <h2 id={mobileTitleId} className="text-base font-semibold">
-            {title}
-          </h2>
-          {description ? (
-            <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        {children ? <div className={cn(contentClassName)}>{children}</div> : null}
-        {footer ? <div className="mt-6 flex flex-col-reverse gap-2">{footer}</div> : null}
-      </MobileDrawerShell>
+        <DrawerContent className={className}>
+          <DrawerHandle />
+          <div className="min-w-0 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
+            <DrawerHeader>
+              <DrawerTitle>{title}</DrawerTitle>
+              {description ? <DrawerDescription>{description}</DrawerDescription> : null}
+            </DrawerHeader>
+            {children ? <div className={cn(contentClassName)}>{children}</div> : null}
+            {footer ? <DrawerFooter className="mt-6">{footer}</DrawerFooter> : null}
+          </div>
+        </DrawerContent>
+      </Drawer>
     );
   }
 

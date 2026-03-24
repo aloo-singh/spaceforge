@@ -12,7 +12,15 @@ import {
   DialogPortal,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHandle,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -48,8 +56,6 @@ export function ResponsiveDialog({
   panelRef,
 }: ResponsiveDialogProps) {
   const fallbackContentId = useId();
-  const mobileTitleId = useId();
-  const mobileDescriptionId = useId();
   const { isMobile, isReady: isMobileReady } = useMobile();
   const resolvedContentId = contentId ?? fallbackContentId;
   if (!surfaceOverride && open && !isMobileReady) {
@@ -61,40 +67,31 @@ export function ResponsiveDialog({
 
   if (isDrawer) {
     return (
-      <MobileDrawerShell
+      <Drawer
         open={open}
         onOpenChange={onOpenChange}
-        panelRef={panelRef}
-        className={className}
-        titleId={mobileTitleId}
-        descriptionId={description ? mobileDescriptionId : undefined}
+        shouldScaleBackground={false}
+        direction="bottom"
       >
-        {hideHeader ? (
-          <div className="sr-only">
-            <h2 id={mobileTitleId} className="text-base font-semibold">
-              {title}
-            </h2>
-            {description ? (
-              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
+        <DrawerContent ref={panelRef} className={className}>
+          <DrawerHandle />
+          <div className="min-w-0 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
+            {hideHeader ? (
+              <DrawerHeader className="sr-only">
+                <DrawerTitle>{title}</DrawerTitle>
+                {description ? <DrawerDescription>{description}</DrawerDescription> : null}
+              </DrawerHeader>
+            ) : (
+              <DrawerHeader>
+                <DrawerTitle>{title}</DrawerTitle>
+                {description ? <DrawerDescription>{description}</DrawerDescription> : null}
+              </DrawerHeader>
+            )}
+            {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
+            {footer ? <DrawerFooter className="mt-6">{footer}</DrawerFooter> : null}
           </div>
-        ) : (
-          <div className="flex flex-col gap-2 text-left">
-            <h2 id={mobileTitleId} className="text-base font-semibold">
-              {title}
-            </h2>
-            {description ? (
-              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
-          </div>
-        )}
-        {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
-        {footer ? <div className="mt-6 flex flex-col-reverse gap-2">{footer}</div> : null}
-      </MobileDrawerShell>
+        </DrawerContent>
+      </Drawer>
     );
   }
 
