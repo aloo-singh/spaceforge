@@ -101,7 +101,7 @@ export function ExportPngDialog({
 
         <ExportToggleCard
           title="Export theme"
-          description={`Choose a fixed export look or follow the current editor theme (${currentThemeLabel}).`}
+          description={`Match the current editor theme or choose a fixed look (${currentThemeLabel}).`}
           value={theme === "system" ? `System (${currentThemeLabel})` : theme === "light" ? "Light" : "Dark"}
         >
           <div
@@ -134,7 +134,7 @@ export function ExportPngDialog({
               aria-pressed={theme === "system"}
               onClick={() => setTheme("system")}
             >
-              System
+              {`System (${currentThemeLabel})`}
             </Button>
           </div>
         </ExportToggleCard>
@@ -166,7 +166,7 @@ function ExportToggleCard({ title, description, value, children }: ExportToggleC
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
           {value}
         </div>
       </div>
