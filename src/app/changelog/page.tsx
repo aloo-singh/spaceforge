@@ -10,6 +10,52 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.37.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-24</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Resolved intermittent duplicate first-project creation during bootstrap</li>
+                <li>Fixed mobile feedback input losing focus while typing</li>
+                <li>Fixed mobile drawer width overflow so controls no longer hang off the right edge</li>
+                <li>Improved shared mobile drawer safe-area padding and horizontal inset behaviour</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Reworked shared mobile drawer behaviour so feedback and delete confirmation use the same drawer path</li>
+                <li>Mobile drawers now slide in and out more reliably and consistently</li>
+                <li>Shared mobile drawer sizing now behaves better across short and tall content</li>
+                <li>Desktop dialog behaviour remained unchanged while mobile behaviour was stabilised</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>First-project bootstrap now goes through a single guarded path</li>
+                <li>Shared mobile dialog and drawer routing is now more consistent across features</li>
+                <li>Feedback and delete confirmation both rely on the shared mobile drawer primitive</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>This release focuses on trust, stability, and shared primitive consistency</li>
+                <li>A small remaining polish item is still noted for later: mobile drawer content-fit tuning and keycap affordances</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.36.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-23</span>
           </div>

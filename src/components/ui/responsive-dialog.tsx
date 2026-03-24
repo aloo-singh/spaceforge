@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 import type { ReactNode } from "react";
 import {
   Dialog,
@@ -12,7 +12,16 @@ import {
   DialogPortal,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MobileDrawerShell } from "@/components/ui/mobile-drawer-shell";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHandle,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
 type ResponsiveDialogProps = {
@@ -47,65 +56,42 @@ export function ResponsiveDialog({
   panelRef,
 }: ResponsiveDialogProps) {
   const fallbackContentId = useId();
-  const mobileTitleId = useId();
-  const mobileDescriptionId = useId();
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile, isReady: isMobileReady } = useMobile();
   const resolvedContentId = contentId ?? fallbackContentId;
+  if (!surfaceOverride && open && !isMobileReady) {
+    return null;
+  }
+
   const resolvedSurface = surfaceOverride ?? (isMobile ? "drawer" : "dialog");
   const isDrawer = resolvedSurface === "drawer";
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const updateMatch = () => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateMatch();
-    mediaQuery.addEventListener("change", updateMatch);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMatch);
-    };
-  }, []);
-
   if (isDrawer) {
     return (
-      <MobileDrawerShell
+      <Drawer
         open={open}
         onOpenChange={onOpenChange}
-        panelRef={panelRef}
-        className={className}
-        titleId={mobileTitleId}
-        descriptionId={description ? mobileDescriptionId : undefined}
+        shouldScaleBackground={false}
+        direction="bottom"
       >
-        {hideHeader ? (
-          <div className="sr-only">
-            <h2 id={mobileTitleId} className="text-base font-semibold">
-              {title}
-            </h2>
-            {description ? (
-              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
+        <DrawerContent ref={panelRef} className={className}>
+          <DrawerHandle />
+          <div className="min-w-0 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
+            {hideHeader ? (
+              <DrawerHeader className="sr-only">
+                <DrawerTitle>{title}</DrawerTitle>
+                {description ? <DrawerDescription>{description}</DrawerDescription> : null}
+              </DrawerHeader>
+            ) : (
+              <DrawerHeader>
+                <DrawerTitle>{title}</DrawerTitle>
+                {description ? <DrawerDescription>{description}</DrawerDescription> : null}
+              </DrawerHeader>
+            )}
+            {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
+            {footer ? <DrawerFooter className="mt-6">{footer}</DrawerFooter> : null}
           </div>
-        ) : (
-          <div className="flex flex-col gap-2 text-left">
-            <h2 id={mobileTitleId} className="text-base font-semibold">
-              {title}
-            </h2>
-            {description ? (
-              <p id={mobileDescriptionId} className="text-sm leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
-          </div>
-        )}
-        {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
-        {footer ? <div className="mt-6 flex flex-col-reverse gap-2">{footer}</div> : null}
-      </MobileDrawerShell>
+        </DrawerContent>
+      </Drawer>
     );
   }
 

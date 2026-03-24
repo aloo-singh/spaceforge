@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -14,11 +14,13 @@ import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 
 const FEEDBACK_PROMPT_DELAY_MS = 45_000;
 const FEEDBACK_ENTER_DURATION_MS = 320;
 const FEEDBACK_EXIT_DURATION_MS = 180;
+const FEEDBACK_HEIGHT_TRANSITION_MS = 260;
 
 type FeedbackViewState = {
   activeSource: FeedbackSource | null;
@@ -55,6 +57,11 @@ type FeedbackPanelContentProps = {
   onSubmit: () => void;
   sentiment: FeedbackSentiment | null;
   status: FeedbackViewState["status"];
+};
+
+type AnimatedFeedbackBodyProps = {
+  active: boolean;
+  children: React.ReactNode;
 };
 
 function getSessionStorage() {
@@ -114,21 +121,6 @@ function createInitialViewState(): FeedbackViewState {
   };
 }
 
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  const focusableSelectors = [
-    "button:not([disabled])",
-    "[href]",
-    "input:not([disabled])",
-    "select:not([disabled])",
-    "textarea:not([disabled])",
-    "[tabindex]:not([tabindex='-1'])",
-  ];
-
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors.join(","))).filter(
-    (element) => !element.hasAttribute("aria-hidden")
-  );
-}
-
 function FeedbackPanelContent({
   canSubmit,
   errorMessage,
@@ -145,7 +137,7 @@ function FeedbackPanelContent({
   return (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <p
             className={cn(
               "font-measurement text-[11px] font-semibold tracking-[0.18em] uppercase",
@@ -193,7 +185,7 @@ function FeedbackPanelContent({
           onClick={onClose}
           disabled={status === "submitting"}
           className={cn(
-            "rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
+            "shrink-0 rounded-full p-1.5 transition-[transform,colors] duration-75 ease-out active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:active:scale-100",
             isDarkSurface ? "text-white/56 hover:bg-white/10 hover:text-white" : "text-foreground/48 hover:bg-muted hover:text-foreground"
           )}
           aria-label="Close feedback"
@@ -301,6 +293,57 @@ function FeedbackPanelContent({
   );
 }
 
+function AnimatedFeedbackBody({ active, children }: AnimatedFeedbackBodyProps) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const contentElement = contentRef.current;
+    if (!contentElement) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setHeight(Math.ceil(contentElement.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    resizeObserver.observe(contentElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [active, children]);
+
+  return (
+    <div
+      className={cn(
+        active &&
+          "overflow-hidden transition-[height] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+      )}
+      style={
+        active && height !== null
+          ? {
+              height,
+              transitionDuration: `${FEEDBACK_HEIGHT_TRANSITION_MS}ms`,
+            }
+          : undefined
+      }
+    >
+      <div ref={contentRef}>{children}</div>
+    </div>
+  );
+}
+
 export function FeedbackWidget({
   pageContext,
   projectId = null,
@@ -317,13 +360,12 @@ export function FeedbackWidget({
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopPanelAnimationRef = useRef<Animation | null>(null);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const [panelState, setPanelState] = useState<"closed" | "opening" | "open" | "closing">("closed");
   const [viewState, setViewState] = useState<FeedbackViewState>(() => createInitialViewState());
   const [promptSessionState, setPromptSessionState] = useState<FeedbackPromptSessionState>(() =>
     loadPromptSessionState(pageContext)
   );
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile, isReady: isMobileReady } = useMobile();
   const isOpen = panelState === "opening" || panelState === "open" || panelState === "closing";
   const activeSource = viewState.activeSource;
   const sentiment = viewState.sentiment;
@@ -334,24 +376,6 @@ export function FeedbackWidget({
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const updateMatch = () => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateMatch();
-    mediaQuery.addEventListener("change", updateMatch);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMatch);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -468,6 +492,15 @@ export function FeedbackWidget({
     }
   }, [activeSource, isMobile, pageContext, promptSessionState, status]);
 
+  const handleMobileDrawerOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        closePanel();
+      }
+    },
+    [closePanel]
+  );
+
   useEffect(() => {
     if (isMobile || !desktopPanelRef.current) {
       return;
@@ -549,49 +582,6 @@ export function FeedbackWidget({
     }
   }, [isMobile, isPromptSurface, panelState]);
 
-  useEffect(() => {
-    if (!isMobile || !isOpen) {
-      return;
-    }
-
-    previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const focusFrame = window.requestAnimationFrame(() => {
-      const drawerElement = mobileDrawerRef.current;
-      if (!drawerElement) {
-        return;
-      }
-
-      const firstFocusableElement = getFocusableElements(drawerElement)[0];
-      if (firstFocusableElement) {
-        firstFocusableElement.focus();
-        return;
-      }
-
-      drawerElement.focus();
-    });
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closePanel();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-      previouslyFocusedElementRef.current?.focus();
-      previouslyFocusedElementRef.current = null;
-    };
-  }, [closePanel, isMobile, isOpen]);
-
   const openManualFlow = () => {
     if (status === "submitting") {
       return;
@@ -658,38 +648,40 @@ export function FeedbackWidget({
   };
 
   const panelContent = (
-    <FeedbackPanelContent
-      canSubmit={canSubmit}
-      errorMessage={errorMessage}
-      freeText={freeText}
-      isDarkSurface={isDarkSurface}
-      onClose={closePanel}
-      onFreeTextChange={(nextFreeText) =>
-        setViewState((currentState) => ({
-          ...currentState,
-          freeText: nextFreeText,
-        }))
-      }
-      onGoBack={() =>
-        setViewState((currentState) => ({
-          ...currentState,
-          sentiment: null,
-          freeText: "",
-          errorMessage: null,
-        }))
-      }
-      onSelectSentiment={(nextSentiment) =>
-        setViewState((currentState) => ({
-          ...currentState,
-          sentiment: nextSentiment,
-        }))
-      }
-      onSubmit={() => {
-        void handleSubmit();
-      }}
-      sentiment={sentiment}
-      status={status}
-    />
+    <AnimatedFeedbackBody active={isPanelVisible}>
+      <FeedbackPanelContent
+        canSubmit={canSubmit}
+        errorMessage={errorMessage}
+        freeText={freeText}
+        isDarkSurface={isDarkSurface}
+        onClose={closePanel}
+        onFreeTextChange={(nextFreeText) =>
+          setViewState((currentState) => ({
+            ...currentState,
+            freeText: nextFreeText,
+          }))
+        }
+        onGoBack={() =>
+          setViewState((currentState) => ({
+            ...currentState,
+            sentiment: null,
+            freeText: "",
+            errorMessage: null,
+          }))
+        }
+        onSelectSentiment={(nextSentiment) =>
+          setViewState((currentState) => ({
+            ...currentState,
+            sentiment: nextSentiment,
+          }))
+        }
+        onSubmit={() => {
+          void handleSubmit();
+        }}
+        sentiment={sentiment}
+        status={status}
+      />
+    </AnimatedFeedbackBody>
   );
   const desktopPanelStyle =
     panelState === "opening"
@@ -707,7 +699,7 @@ export function FeedbackWidget({
   return (
     <>
       <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
-        {!isMobile ? (
+        {isMobileReady && !isMobile ? (
           <Card
             ref={desktopPanelRef}
             style={desktopPanelStyle}
@@ -735,7 +727,7 @@ export function FeedbackWidget({
             isDarkSurface
               ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
               : "border-border/70 bg-background/94 text-foreground hover:bg-background",
-            isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
+            isMobileReady && isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
           )}
           aria-label="Open feedback"
         >
@@ -745,18 +737,14 @@ export function FeedbackWidget({
 
       <ResponsiveDialog
         open={isMobile && isPanelVisible}
-        onOpenChange={(open) => {
-          if (!open) {
-            closePanel();
-          }
-        }}
+        onOpenChange={handleMobileDrawerOpenChange}
         title="Feedback"
         hideHeader
         surfaceOverride="drawer"
         motionState={panelState === "closed" ? undefined : panelState}
         panelRef={mobileDrawerRef}
         className={cn(
-          "rounded-t-3xl border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl will-change-transform",
+          "rounded-t-3xl border shadow-xl",
           isDarkSurface
             ? "border-white/12 bg-neutral-950 text-white"
             : "border-border/70 bg-card text-card-foreground"
