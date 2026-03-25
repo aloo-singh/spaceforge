@@ -10,6 +10,26 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.43.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-25</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Live preview inside the Export PNG dialog</li>
+                <li>Desktop: split layout (live preview on left, settings on right)</li>
+                <li>Mobile: stacked preview above settings</li>
+                <li>Preview updates in real time (throttled) as any setting changes</li>
+                <li>Export button remains fixed at the bottom</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.42.2</h2>
             <span className="text-sm text-muted-foreground">2026-03-25</span>
           </div>
