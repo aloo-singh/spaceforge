@@ -72,6 +72,7 @@ export function HistoryControls({
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
   const defaultExportTheme = theme === "light" || theme === "dark" ? theme : "system";
   const currentThemeLabel = resolveEditorThemeMode(resolvedTheme) === "light" ? "Light" : "Dark";
+  const defaultDesignedBy = useEditorStore((state) => state.settings.exportSignatureText);
   const resetCameraTitle = !hasHydrated
     ? "Fit view is unavailable until the editor finishes loading"
     : hasRooms
@@ -264,7 +265,7 @@ export function HistoryControls({
       />
 
       <ExportPngDialog
-        key={`${defaultExportTheme}-${isExportDialogOpen ? "open" : "closed"}`}
+        key={`${defaultExportTheme}-${defaultDesignedBy}-${isExportDialogOpen ? "open" : "closed"}`}
         open={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
         onExport={(request) => onExportPng?.(request)}
@@ -273,6 +274,7 @@ export function HistoryControls({
         exportDisabledReason={exportDisabledReason}
         defaultTheme={defaultExportTheme}
         currentThemeLabel={currentThemeLabel}
+        defaultDesignedBy={defaultDesignedBy}
       />
     </>
   );

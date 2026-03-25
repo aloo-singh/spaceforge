@@ -4,11 +4,20 @@ import { useState, type ReactNode } from "react";
 import { Download } from "lucide-react";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
+const EXPORT_TITLE_MAX_LENGTH = 80;
+const EXPORT_DESCRIPTION_MAX_LENGTH = 240;
 
 export type ExportPngRequest = {
+  title: string;
+  description: string;
+  showLegend: boolean;
+  designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
   theme: ExportPngThemeOption;
@@ -23,6 +32,7 @@ type ExportPngDialogProps = {
   exportDisabledReason?: string;
   defaultTheme: ExportPngThemeOption;
   currentThemeLabel: "Light" | "Dark";
+  defaultDesignedBy?: string;
 };
 
 export function ExportPngDialog({
@@ -34,7 +44,12 @@ export function ExportPngDialog({
   exportDisabledReason,
   defaultTheme,
   currentThemeLabel,
+  defaultDesignedBy = "",
 }: ExportPngDialogProps) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [showLegend, setShowLegend] = useState(false);
+  const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
   const [showGrid, setShowGrid] = useState(true);
   const [showDimensions, setShowDimensions] = useState(true);
   const [theme, setTheme] = useState<ExportPngThemeOption>(defaultTheme);
@@ -46,6 +61,10 @@ export function ExportPngDialog({
 
     onOpenChange(false);
     void onExport({
+      title,
+      description,
+      showLegend,
+      designedBy,
       showGrid,
       showDimensions,
       theme,
@@ -73,6 +92,83 @@ export function ExportPngDialog({
       }
     >
       <section className="space-y-3">
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">Export details</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Add optional context without changing the live canvas.
+              </p>
+            </div>
+            <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
+              Optional
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="export-png-title" className="text-xs font-medium text-foreground">
+                Title
+              </label>
+              <Input
+                id="export-png-title"
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value.slice(0, EXPORT_TITLE_MAX_LENGTH))}
+                maxLength={EXPORT_TITLE_MAX_LENGTH}
+                placeholder="Project title"
+                className="h-9 bg-background/90"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="export-png-description" className="text-xs font-medium text-foreground">
+                Description
+              </label>
+              <Textarea
+                id="export-png-description"
+                value={description}
+                onChange={(event) =>
+                  setDescription(event.target.value.slice(0, EXPORT_DESCRIPTION_MAX_LENGTH))
+                }
+                maxLength={EXPORT_DESCRIPTION_MAX_LENGTH}
+                placeholder="Add a short note about the plan"
+                className="min-h-24 resize-none bg-background/90"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="export-png-designed-by" className="text-xs font-medium text-foreground">
+                Designed by
+              </label>
+              <Input
+                id="export-png-designed-by"
+                type="text"
+                value={designedBy}
+                onChange={(event) =>
+                  setDesignedBy(event.target.value.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH))
+                }
+                maxLength={EDITOR_EXPORT_SIGNATURE_MAX_LENGTH}
+                placeholder="Your name or studio"
+                className="h-9 bg-background/90"
+              />
+            </div>
+          </div>
+        </div>
+
+        <ExportToggleCard
+          title="Show legend"
+          description="Add a simple room list with names and areas beneath the plan."
+          value={showLegend ? "On" : "Off"}
+        >
+          <BinaryChoice
+            ariaLabel="Show legend"
+            enabled={showLegend}
+            onEnable={() => setShowLegend(true)}
+            onDisable={() => setShowLegend(false)}
+          />
+        </ExportToggleCard>
+
         <ExportToggleCard
           title="Show grid"
           description="Keep the calm layout grid in the exported image."
@@ -112,6 +208,15 @@ export function ExportPngDialog({
             <Button
               type="button"
               size="sm"
+              variant={theme === "system" ? "secondary" : "ghost"}
+              aria-pressed={theme === "system"}
+              onClick={() => setTheme("system")}
+            >
+              {`System (${currentThemeLabel})`}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
               variant={theme === "light" ? "secondary" : "ghost"}
               aria-pressed={theme === "light"}
               onClick={() => setTheme("light")}
@@ -126,15 +231,6 @@ export function ExportPngDialog({
               onClick={() => setTheme("dark")}
             >
               Dark
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={theme === "system" ? "secondary" : "ghost"}
-              aria-pressed={theme === "system"}
-              onClick={() => setTheme("system")}
-            >
-              {`System (${currentThemeLabel})`}
             </Button>
           </div>
         </ExportToggleCard>
@@ -164,7 +260,7 @@ function ExportToggleCard({ title, description, value, children }: ExportToggleC
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <p className="mt-1 text-xs leading-relaxed whitespace-nowrap text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
         <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
           {value}

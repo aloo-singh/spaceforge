@@ -53,6 +53,7 @@ import {
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
 import {
+  formatMetricRoomAreaForRoom,
   formatMetricWallDimension,
   getEdgeLengthMillimetres,
   getRoomEdgeMeasurements,
@@ -170,6 +171,20 @@ function getScaledMeasurementPx(
 
 function clampValue(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeExportSingleLineText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeExportMultilineText(value: string): string {
+  return value
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 type EditorCanvasProps = {
@@ -575,6 +590,9 @@ export default function EditorCanvas({
       showDimensions,
       showGrid,
       signatureText,
+      titleText,
+      descriptionText,
+      legendItems,
       themeMode,
     }: {
       includeSignature: boolean;
@@ -583,6 +601,9 @@ export default function EditorCanvas({
       showDimensions: boolean;
       showGrid: boolean;
       signatureText?: string;
+      titleText?: string;
+      descriptionText?: string;
+      legendItems?: { name: string; area: string }[];
       themeMode: "light" | "dark";
     }) => {
       const app = appRef.current;
@@ -677,6 +698,24 @@ export default function EditorCanvas({
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           paddingPx,
+          header:
+            titleText || descriptionText
+              ? {
+                  title: titleText,
+                  description: descriptionText,
+                  color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                  mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
+                }
+              : undefined,
+          legend:
+            legendItems && legendItems.length > 0
+              ? {
+                  items: legendItems,
+                  color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                  mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
+                  dividerColor: themeMode === "light" ? "#cbd5e1" : "#334155",
+                }
+              : undefined,
           grid: showGrid
             ? {
                 spacingPx: exportGridSpacingPx,
@@ -713,15 +752,26 @@ export default function EditorCanvas({
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
 
     const exportSignatureText = normalizeEditorExportSignature(
-      useEditorStore.getState().settings.exportSignatureText
+      request.designedBy || useEditorStore.getState().settings.exportSignatureText
     );
+    const exportTitle = normalizeExportSingleLineText(request.title);
+    const exportDescription = normalizeExportMultilineText(request.description);
+    const exportLegendItems = request.showLegend
+      ? useEditorStore.getState().document.rooms.map((room, index) => ({
+          name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
+          area: formatMetricRoomAreaForRoom(room),
+        }))
+      : undefined;
     const resolvedThemeMode = request.theme === "system" ? editorThemeMode : request.theme;
     const exportSnapshot = createCanvasExportSnapshot({
       includeSignature: true,
-      innerPaddingPx: exportSignatureText ? 108 : 92,
+      innerPaddingPx: exportSignatureText || exportLegendItems?.length ? 108 : 92,
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
+      titleText: exportTitle || undefined,
+      descriptionText: exportDescription || undefined,
+      legendItems: exportLegendItems,
       signatureText: exportSignatureText || undefined,
       themeMode: resolvedThemeMode,
     });
