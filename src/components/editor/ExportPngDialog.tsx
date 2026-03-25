@@ -17,6 +17,7 @@ export type ExportPngRequest = {
   title: string;
   description: string;
   showLegend: boolean;
+  showScaleBar: boolean;
   designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
@@ -49,6 +50,7 @@ export function ExportPngDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [showLegend, setShowLegend] = useState(false);
+  const [showScaleBar, setShowScaleBar] = useState(false);
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
   const [showGrid, setShowGrid] = useState(true);
   const [showDimensions, setShowDimensions] = useState(true);
@@ -64,6 +66,7 @@ export function ExportPngDialog({
       title,
       description,
       showLegend,
+      showScaleBar,
       designedBy,
       showGrid,
       showDimensions,
@@ -77,7 +80,7 @@ export function ExportPngDialog({
       onOpenChange={onOpenChange}
       title="Export PNG"
       description="Adjust a few export details without changing the live editor."
-      className="sm:w-[min(100%,32rem)] sm:p-4"
+      className="sm:w-[min(100%,32rem)] sm:p-3.5"
       footer={
         <Button
           type="button"
@@ -91,12 +94,12 @@ export function ExportPngDialog({
         </Button>
       }
     >
-      <section className="space-y-3">
-        <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+      <section className="space-y-2.5">
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <h3 className="text-sm font-medium text-foreground">Export details</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 Add optional context without changing the live canvas.
               </p>
             </div>
@@ -105,9 +108,9 @@ export function ExportPngDialog({
             </div>
           </div>
 
-          <div className="mt-3 space-y-3">
-            <div className="space-y-1.5">
-              <label htmlFor="export-png-title" className="text-xs font-medium text-foreground">
+          <div className="mt-2.5 space-y-2.5">
+            <div className="space-y-1">
+              <label htmlFor="export-png-title" className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
                 Title
               </label>
               <Input
@@ -121,8 +124,8 @@ export function ExportPngDialog({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="export-png-description" className="text-xs font-medium text-foreground">
+            <div className="space-y-1">
+              <label htmlFor="export-png-description" className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
                 Description
               </label>
               <Textarea
@@ -137,8 +140,8 @@ export function ExportPngDialog({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="export-png-designed-by" className="text-xs font-medium text-foreground">
+            <div className="space-y-1">
+              <label htmlFor="export-png-designed-by" className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
                 Designed by
               </label>
               <Input
@@ -166,6 +169,19 @@ export function ExportPngDialog({
             enabled={showLegend}
             onEnable={() => setShowLegend(true)}
             onDisable={() => setShowLegend(false)}
+          />
+        </ExportToggleCard>
+
+        <ExportToggleCard
+          title="Show scale bar"
+          description="Add the current plan scale using the same measurement treatment as the canvas."
+          value={showScaleBar ? "On" : "Off"}
+        >
+          <BinaryChoice
+            ariaLabel="Show scale bar"
+            enabled={showScaleBar}
+            onEnable={() => setShowScaleBar(true)}
+            onDisable={() => setShowScaleBar(false)}
           />
         </ExportToggleCard>
 
@@ -201,7 +217,7 @@ export function ExportPngDialog({
           value={theme === "system" ? `System (${currentThemeLabel})` : theme === "light" ? "Light" : "Dark"}
         >
           <div
-            className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
+            className="mt-2.5 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
             role="group"
             aria-label="Export theme"
           >
@@ -235,7 +251,7 @@ export function ExportPngDialog({
           </div>
         </ExportToggleCard>
 
-        <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
           <p className="font-measurement text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
             Designed with
           </p>
@@ -256,11 +272,11 @@ type ExportToggleCardProps = {
 
 function ExportToggleCard({ title, description, value, children }: ExportToggleCardProps) {
   return (
-    <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+    <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
         <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
           {value}
@@ -281,7 +297,7 @@ type BinaryChoiceProps = {
 function BinaryChoice({ ariaLabel, enabled, onEnable, onDisable }: BinaryChoiceProps) {
   return (
     <div
-      className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+      className="mt-2.5 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
       role="group"
       aria-label={ariaLabel}
     >

@@ -589,6 +589,7 @@ export default function EditorCanvas({
       paddingPx,
       showDimensions,
       showGrid,
+      showScaleBar,
       signatureText,
       titleText,
       descriptionText,
@@ -600,6 +601,7 @@ export default function EditorCanvas({
       paddingPx: number;
       showDimensions: boolean;
       showGrid: boolean;
+      showScaleBar: boolean;
       signatureText?: string;
       titleText?: string;
       descriptionText?: string;
@@ -627,6 +629,7 @@ export default function EditorCanvas({
         (0 - exportCamera.xMm) * exportCamera.pixelsPerMm + exportViewport.width / 2;
       const exportGridOriginYPx =
         (0 - exportCamera.yMm) * exportCamera.pixelsPerMm + exportViewport.height / 2;
+      const exportScaleOverlay = getScaleOverlayState(exportCamera);
       const exportStage = new Container();
       const exportRoomGraphics = new Graphics();
       const exportOpeningGraphics = new Graphics();
@@ -725,6 +728,14 @@ export default function EditorCanvas({
                 alpha: themeMode === "light" ? 0.08 : 0.1,
               }
             : undefined,
+          scaleBar: showScaleBar
+            ? {
+                widthPx: exportScaleOverlay.widthPx,
+                label: exportScaleOverlay.label,
+                color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
+              }
+            : undefined,
           signature: includeSignature
             ? {
                 lines: signatureText
@@ -769,6 +780,7 @@ export default function EditorCanvas({
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
+      showScaleBar: request.showScaleBar,
       titleText: exportTitle || undefined,
       descriptionText: exportDescription || undefined,
       legendItems: exportLegendItems,
@@ -815,6 +827,7 @@ export default function EditorCanvas({
       paddingPx: 24,
       showDimensions: false,
       showGrid: false,
+      showScaleBar: false,
       themeMode: editorThemeMode,
     });
     if (!exportSnapshot) {
