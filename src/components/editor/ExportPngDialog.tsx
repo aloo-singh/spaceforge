@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
+import {
+  PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
+  PROJECT_EXPORT_TITLE_MAX_LENGTH,
+} from "@/lib/projects/exportConfig";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
-const EXPORT_TITLE_MAX_LENGTH = 80;
-const EXPORT_DESCRIPTION_MAX_LENGTH = 240;
 
 export type ExportPngRequest = {
   title: string;
@@ -31,7 +33,20 @@ type ExportPngDialogProps = {
   isExporting?: boolean;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
-  defaultTheme: ExportPngThemeOption;
+  title: string;
+  description: string;
+  showLegend: boolean;
+  showScaleBar: boolean;
+  showGrid: boolean;
+  showDimensions: boolean;
+  theme: ExportPngThemeOption;
+  onTitleChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onShowLegendChange: (value: boolean) => void;
+  onShowScaleBarChange: (value: boolean) => void;
+  onShowGridChange: (value: boolean) => void;
+  onShowDimensionsChange: (value: boolean) => void;
+  onThemeChange: (value: ExportPngThemeOption) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -43,18 +58,24 @@ export function ExportPngDialog({
   isExporting = false,
   exportDisabled = false,
   exportDisabledReason,
-  defaultTheme,
+  title,
+  description,
+  showLegend,
+  showScaleBar,
+  showGrid,
+  showDimensions,
+  theme,
+  onTitleChange,
+  onDescriptionChange,
+  onShowLegendChange,
+  onShowScaleBarChange,
+  onShowGridChange,
+  onShowDimensionsChange,
+  onThemeChange,
   currentThemeLabel,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [showLegend, setShowLegend] = useState(false);
-  const [showScaleBar, setShowScaleBar] = useState(false);
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
-  const [showGrid, setShowGrid] = useState(true);
-  const [showDimensions, setShowDimensions] = useState(true);
-  const [theme, setTheme] = useState<ExportPngThemeOption>(defaultTheme);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
 
@@ -81,6 +102,9 @@ export function ExportPngDialog({
       title="Export PNG"
       description="Adjust a few export details without changing the live editor."
       className="sm:w-[min(100%,32rem)] sm:p-3.5"
+      contentClassName="pr-1"
+      footerClassName="px-0"
+      stickyFooter
       footer={
         <Button
           type="button"
@@ -94,11 +118,11 @@ export function ExportPngDialog({
         </Button>
       }
     >
-      <section className="space-y-2.5">
-        <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+      <section className="space-y-2.5 pb-1">
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
-              <h3 className="text-sm font-medium text-foreground">Export details</h3>
+              <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Export details</h3>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 Add optional context without changing the live canvas.
               </p>
@@ -117,8 +141,8 @@ export function ExportPngDialog({
                 id="export-png-title"
                 type="text"
                 value={title}
-                onChange={(event) => setTitle(event.target.value.slice(0, EXPORT_TITLE_MAX_LENGTH))}
-                maxLength={EXPORT_TITLE_MAX_LENGTH}
+                onChange={(event) => onTitleChange(event.target.value)}
+                maxLength={PROJECT_EXPORT_TITLE_MAX_LENGTH}
                 placeholder="Project title"
                 className="h-9 bg-background/90"
               />
@@ -131,10 +155,8 @@ export function ExportPngDialog({
               <Textarea
                 id="export-png-description"
                 value={description}
-                onChange={(event) =>
-                  setDescription(event.target.value.slice(0, EXPORT_DESCRIPTION_MAX_LENGTH))
-                }
-                maxLength={EXPORT_DESCRIPTION_MAX_LENGTH}
+                onChange={(event) => onDescriptionChange(event.target.value)}
+                maxLength={PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH}
                 placeholder="Add a short note about the plan"
                 className="min-h-24 resize-none bg-background/90"
               />
@@ -167,8 +189,8 @@ export function ExportPngDialog({
           <BinaryChoice
             ariaLabel="Show legend"
             enabled={showLegend}
-            onEnable={() => setShowLegend(true)}
-            onDisable={() => setShowLegend(false)}
+            onEnable={() => onShowLegendChange(true)}
+            onDisable={() => onShowLegendChange(false)}
           />
         </ExportToggleCard>
 
@@ -180,8 +202,8 @@ export function ExportPngDialog({
           <BinaryChoice
             ariaLabel="Show scale bar"
             enabled={showScaleBar}
-            onEnable={() => setShowScaleBar(true)}
-            onDisable={() => setShowScaleBar(false)}
+            onEnable={() => onShowScaleBarChange(true)}
+            onDisable={() => onShowScaleBarChange(false)}
           />
         </ExportToggleCard>
 
@@ -193,8 +215,8 @@ export function ExportPngDialog({
           <BinaryChoice
             ariaLabel="Show grid"
             enabled={showGrid}
-            onEnable={() => setShowGrid(true)}
-            onDisable={() => setShowGrid(false)}
+            onEnable={() => onShowGridChange(true)}
+            onDisable={() => onShowGridChange(false)}
           />
         </ExportToggleCard>
 
@@ -206,8 +228,8 @@ export function ExportPngDialog({
           <BinaryChoice
             ariaLabel="Show dimensions"
             enabled={showDimensions}
-            onEnable={() => setShowDimensions(true)}
-            onDisable={() => setShowDimensions(false)}
+            onEnable={() => onShowDimensionsChange(true)}
+            onDisable={() => onShowDimensionsChange(false)}
           />
         </ExportToggleCard>
 
@@ -226,7 +248,7 @@ export function ExportPngDialog({
               size="sm"
               variant={theme === "system" ? "secondary" : "ghost"}
               aria-pressed={theme === "system"}
-              onClick={() => setTheme("system")}
+              onClick={() => onThemeChange("system")}
             >
               {`System (${currentThemeLabel})`}
             </Button>
@@ -235,7 +257,7 @@ export function ExportPngDialog({
               size="sm"
               variant={theme === "light" ? "secondary" : "ghost"}
               aria-pressed={theme === "light"}
-              onClick={() => setTheme("light")}
+              onClick={() => onThemeChange("light")}
             >
               Light
             </Button>
@@ -244,14 +266,14 @@ export function ExportPngDialog({
               size="sm"
               variant={theme === "dark" ? "secondary" : "ghost"}
               aria-pressed={theme === "dark"}
-              onClick={() => setTheme("dark")}
+              onClick={() => onThemeChange("dark")}
             >
               Dark
             </Button>
           </div>
         </ExportToggleCard>
 
-        <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
           <p className="font-measurement text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
             Designed with
           </p>

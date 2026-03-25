@@ -1,4 +1,4 @@
-import type { EditorDocumentState } from "@/lib/editor/history";
+import { createEmptyEditorDocumentState, type EditorDocumentState } from "@/lib/editor/history";
 
 const DEFAULT_PROJECT_NAME_OPTIONS = [
   "My first layout",
@@ -24,7 +24,5 @@ export function getDefaultProjectName({ existingProjectCount = 0 }: { existingPr
 }
 
 export function createEmptyProjectDocument(): EditorDocumentState {
-  return {
-    rooms: [],
-  };
+  return createEmptyEditorDocumentState();
 }

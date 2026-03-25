@@ -11,6 +11,13 @@ import {
   normalizeEditorSettings,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  cloneEditorExportPreferences,
+  DEFAULT_EDITOR_EXPORT_PREFERENCES,
+  normalizeEditorExportPreferences,
+  type EditorExportPreferences,
+} from "@/lib/editor/exportPreferences";
+import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 
 // Browser persistence schema for the editor.
 // Compatibility rules:
@@ -22,10 +29,11 @@ import {
 // - v6 payloads restore layout + camera + bounded snapshot history + current editor settings + room openings.
 // - v7 payloads also preserve canonical segment-local opening offsets for numeric wall hosts.
 // - v8 payloads also persist opening-side and hinge-side fields for inspector editing.
+// - v9 payloads also persist export dialog session preferences.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 8;
+export const EDITOR_PERSISTENCE_VERSION = 9;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -39,12 +47,14 @@ type PersistedRoom = {
 
 type PersistedDocument = {
   rooms: PersistedRoom[];
+  exportConfig?: EditorDocumentState["exportConfig"];
 };
 
 export type PersistedEditorSnapshot = {
   document: EditorDocumentState;
   camera: CameraState;
   settings: EditorSettings;
+  exportPreferences: EditorExportPreferences;
   historyStack: EditorDocumentState[];
   historyIndex: number;
 };
@@ -53,6 +63,7 @@ export type PersistedEditorHydrationSnapshot = {
   document: EditorDocumentState;
   camera: CameraState | null;
   settings: EditorSettings;
+  exportPreferences: EditorExportPreferences;
   historyStack: EditorDocumentState[] | null;
   historyIndex: number | null;
 };
@@ -129,10 +140,22 @@ export type PersistedEditorPayloadV7 = {
 };
 
 export type PersistedEditorPayloadV8 = {
+  version: 8;
+  document: PersistedDocument;
+  camera: CameraState;
+  settings: EditorSettings;
+  history: {
+    stack: PersistedDocument[];
+    index: number;
+  };
+};
+
+export type PersistedEditorPayloadV9 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
   settings: EditorSettings;
+  exportPreferences: EditorExportPreferences;
   history: {
     stack: PersistedDocument[];
     index: number;
@@ -220,6 +243,7 @@ function isCameraState(value: unknown): value is CameraState {
 function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
   if (!Array.isArray(value.rooms)) return false;
+  if (value.exportConfig !== undefined && !isObject(value.exportConfig)) return false;
   return value.rooms.every((room) => isRoom(room));
 }
 
@@ -254,6 +278,7 @@ function cloneRoom(room: PersistedRoom | Room): Room {
 
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
   return {
+    exportConfig: normalizeProjectExportConfig(document.exportConfig),
     rooms: document.rooms.map(cloneRoom),
   };
 }
@@ -279,6 +304,7 @@ function createHistorylessHydrationSnapshot(
     document: cloneDocument(document),
     camera: camera ? cloneCamera(camera) : null,
     settings: cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
+    exportPreferences: cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES),
     historyStack: null,
     historyIndex: null,
   };
@@ -291,6 +317,7 @@ function normalizeDocumentForSegmentAnchoring(
   const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
 
   return {
+    exportConfig: normalizeProjectExportConfig(document.exportConfig),
     rooms: document.rooms.map((room) => {
       const clonedRoom = cloneRoom(room);
       if (!migrateNumericSegmentOffsets || clonedRoom.openings.length === 0) {
@@ -337,6 +364,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 5 &&
         parsed.version !== 6 &&
         parsed.version !== 7 &&
+        parsed.version !== 8 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -375,6 +403,11 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
             ? DEFAULT_EDITOR_SETTINGS
             : normalizeEditorSettings(parsed.settings) ?? DEFAULT_EDITOR_SETTINGS
         ),
+        exportPreferences: cloneEditorExportPreferences(
+          parsed.version === EDITOR_PERSISTENCE_VERSION
+            ? normalizeEditorExportPreferences(parsed.exportPreferences)
+            : DEFAULT_EDITOR_EXPORT_PREFERENCES
+        ),
         historyStack: normalizedHistory?.historyStack ?? null,
         historyIndex: normalizedHistory?.historyIndex ?? null,
       },
@@ -395,11 +428,12 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV8 = {
+  const payload: PersistedEditorPayloadV9 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
     settings: cloneEditorSettings(snapshot.settings),
+    exportPreferences: cloneEditorExportPreferences(snapshot.exportPreferences),
     history: {
       stack: (normalizedHistory?.historyStack ?? [snapshot.document]).map((document) => cloneDocument(document)),
       index: normalizedHistory?.historyIndex ?? 0,
@@ -424,6 +458,7 @@ export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot 
     document: hydrationSnapshot.document,
     camera: hydrationSnapshot.camera,
     settings: hydrationSnapshot.settings,
+    exportPreferences: hydrationSnapshot.exportPreferences,
     historyStack: hydrationSnapshot.historyStack,
     historyIndex: hydrationSnapshot.historyIndex,
   };

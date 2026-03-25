@@ -13,6 +13,13 @@ export type HydratedCommandHistory = {
 };
 
 export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState): boolean {
+  if (
+    a.exportConfig.title !== b.exportConfig.title ||
+    a.exportConfig.description !== b.exportConfig.description
+  ) {
+    return false;
+  }
+
   if (a.rooms.length !== b.rooms.length) return false;
 
   for (let i = 0; i < a.rooms.length; i += 1) {
@@ -28,6 +35,10 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
 
 export function cloneDocumentState(document: EditorDocumentState): EditorDocumentState {
   return {
+    exportConfig: {
+      title: document.exportConfig.title,
+      description: document.exportConfig.description,
+    },
     rooms: document.rooms.map((room) => ({
       id: room.id,
       name: room.name,
