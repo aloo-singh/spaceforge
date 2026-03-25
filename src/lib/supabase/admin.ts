@@ -224,7 +224,7 @@ export async function requireAdminUser(): Promise<SupabaseAuthUser> {
   const user = await getAuthenticatedSupabaseUser();
 
   if (!user || !isAdminEmail(user.email)) {
-    redirect("/");
+    redirect("/admin/login");
   }
 
   return user;
