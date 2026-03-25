@@ -40,6 +40,7 @@ type ResponsiveDialogProps = {
   motionState?: "opening" | "open" | "closing";
   surfaceOverride?: "dialog" | "drawer";
   panelRef?: React.RefObject<HTMLDivElement | null>;
+  contentScrollable?: boolean;
 };
 
 export function ResponsiveDialog({
@@ -58,6 +59,7 @@ export function ResponsiveDialog({
   motionState = "open",
   surfaceOverride,
   panelRef,
+  contentScrollable = true,
 }: ResponsiveDialogProps) {
   const fallbackContentId = useId();
   const { isMobile, isReady: isMobileReady } = useMobile();
@@ -105,7 +107,8 @@ export function ResponsiveDialog({
               <div
                 className={cn(
                   hideHeader ? "" : "mt-5",
-                  stickyFooter && "min-h-0 flex-1 overflow-y-auto",
+                  stickyFooter && "min-h-0 flex-1",
+                  stickyFooter && contentScrollable && "overflow-y-auto",
                   contentClassName
                 )}
               >
@@ -166,7 +169,8 @@ export function ResponsiveDialog({
             <div
               className={cn(
                 hideHeader ? "" : "mt-5",
-                stickyFooter && "min-h-0 flex-1 overflow-y-auto",
+                stickyFooter && "min-h-0 flex-1",
+                stickyFooter && contentScrollable && "overflow-y-auto",
                 contentClassName
               )}
             >
