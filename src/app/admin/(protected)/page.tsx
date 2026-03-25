@@ -1,56 +1,7 @@
-import { Badge } from "@/components/ui/badge";
+import { FeedbackInboxTable } from "@/components/admin/FeedbackInboxTable";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { fetchFeedbackSubmissions } from "@/lib/feedback/server";
-import type { FeedbackSubmissionRecord } from "@/lib/feedback/types";
-
-const createdAtFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function formatCreatedAt(createdAt: string) {
-  return createdAtFormatter.format(new Date(createdAt));
-}
-
-function formatSentiment(sentiment: FeedbackSubmissionRecord["sentiment"]) {
-  return sentiment === "positive" ? "Yes" : "Not really";
-}
-
-function formatPageContext(pageContext: FeedbackSubmissionRecord["pageContext"]) {
-  return pageContext === "editor" ? "Editor" : "Projects";
-}
-
-function formatSource(source: FeedbackSubmissionRecord["source"]) {
-  return source === "manual_button" ? "Manual button" : "Prompt";
-}
-
-function formatFreeText(freeText: string) {
-  const trimmedText = freeText.trim();
-
-  if (!trimmedText) {
-    return "No written feedback";
-  }
-
-  return trimmedText.length > 120 ? `${trimmedText.slice(0, 117)}...` : trimmedText;
-}
-
-function sentimentBadgeClassName(sentiment: FeedbackSubmissionRecord["sentiment"]) {
-  return sentiment === "positive"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-red-200 bg-red-50 text-red-700";
-}
 
 export default async function AdminPage() {
   const feedbackSubmissions = await fetchFeedbackSubmissions();
@@ -89,47 +40,7 @@ export default async function AdminPage() {
               </Empty>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[170px]">Created</TableHead>
-                  <TableHead className="w-[120px]">Sentiment</TableHead>
-                  <TableHead className="w-[120px]">Page</TableHead>
-                  <TableHead className="w-[140px]">Source</TableHead>
-                  <TableHead>Free text</TableHead>
-                  <TableHead className="w-[180px]">Timing</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {feedbackSubmissions.map((submission) => (
-                  <TableRow key={submission.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-foreground/80">
-                      {formatCreatedAt(submission.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={sentimentBadgeClassName(submission.sentiment)}
-                      >
-                        {formatSentiment(submission.sentiment)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground/75">
-                      {formatPageContext(submission.pageContext)}
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground/75">
-                      {formatSource(submission.source)}
-                    </TableCell>
-                    <TableCell className="max-w-[420px] text-sm leading-6 text-foreground/75">
-                      {formatFreeText(submission.freeText)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {submission.timeSinceOpenSeconds} seconds after open
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <FeedbackInboxTable feedbackSubmissions={feedbackSubmissions} />
           )}
         </CardContent>
       </Card>
