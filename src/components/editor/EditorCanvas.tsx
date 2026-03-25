@@ -31,7 +31,7 @@ import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
-import { exportPixiCanvasToPngBlob } from "@/lib/editor/exportPng";
+import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import { isOrthogonalPointPath, isPointInPolygon, isSimplePolygon } from "@/lib/editor/roomGeometry";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
@@ -754,14 +754,7 @@ export default function EditorCanvas({
     []
   );
 
-  const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
-    if (isExportingPng) return;
-
-    track(ANALYTICS_EVENTS.exportStarted, {
-      exportType: "png",
-    });
-    trackFirstAction(ANALYTICS_EVENTS.exportStarted);
-
+  const createPngExportSnapshotFromRequest = useCallback((request: ExportPngRequest) => {
     const exportSignatureText = normalizeEditorExportSignature(
       request.designedBy || useEditorStore.getState().settings.exportSignatureText
     );
@@ -774,7 +767,8 @@ export default function EditorCanvas({
         }))
       : undefined;
     const resolvedThemeMode = request.theme === "system" ? editorThemeMode : request.theme;
-    const exportSnapshot = createCanvasExportSnapshot({
+
+    return createCanvasExportSnapshot({
       includeSignature: true,
       innerPaddingPx: exportSignatureText || exportLegendItems?.length ? 108 : 92,
       paddingPx: 48,
@@ -787,6 +781,17 @@ export default function EditorCanvas({
       signatureText: exportSignatureText || undefined,
       themeMode: resolvedThemeMode,
     });
+  }, [createCanvasExportSnapshot, editorThemeMode]);
+
+  const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
+    if (isExportingPng) return;
+
+    track(ANALYTICS_EVENTS.exportStarted, {
+      exportType: "png",
+    });
+    trackFirstAction(ANALYTICS_EVENTS.exportStarted);
+
+    const exportSnapshot = createPngExportSnapshotFromRequest(request);
     if (!exportSnapshot) {
       return;
     }
@@ -818,7 +823,23 @@ export default function EditorCanvas({
       exportSnapshot.destroy();
       setIsExportingPng(false);
     }
-  }, [completeHint, createCanvasExportSnapshot, editorThemeMode, isExportingPng]);
+  }, [completeHint, createPngExportSnapshotFromRequest, isExportingPng]);
+
+  const generateExportPreviewDataUrl = useCallback(async (request: ExportPngRequest) => {
+    const exportSnapshot = createPngExportSnapshotFromRequest(request);
+    if (!exportSnapshot) {
+      return null;
+    }
+
+    try {
+      return await exportPixiCanvasToPngDataUrl({
+        renderer: exportSnapshot.renderer,
+        stage: exportSnapshot.stage,
+      }, exportSnapshot.options);
+    } finally {
+      exportSnapshot.destroy();
+    }
+  }, [createPngExportSnapshotFromRequest]);
 
   const generateThumbnailDataUrl = useCallback(async () => {
     const exportSnapshot = createCanvasExportSnapshot({
@@ -1195,6 +1216,7 @@ export default function EditorCanvas({
         <HistoryControls
           leadingContent={topBarLeadingContent}
           onExportPng={exportCurrentCanvasAsPng}
+          onPreviewExportPng={generateExportPreviewDataUrl}
           isExportingPng={isExportingPng}
           exportDisabled={!isCanvasReadyForExport || !hasRooms}
           exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}

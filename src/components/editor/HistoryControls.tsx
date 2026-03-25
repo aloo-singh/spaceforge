@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 type HistoryControlsProps = {
   onExportPng?: (request: ExportPngRequest) => void | Promise<void>;
+  onPreviewExportPng?: (request: ExportPngRequest) => Promise<string | null>;
   isExportingPng?: boolean;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
@@ -30,6 +31,7 @@ type HistoryControlsProps = {
 
 export function HistoryControls({
   onExportPng,
+  onPreviewExportPng,
   isExportingPng = false,
   exportDisabled = false,
   exportDisabledReason,
@@ -273,6 +275,7 @@ export function HistoryControls({
         open={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
         onExport={(request) => onExportPng?.(request)}
+        onPreviewRequest={onPreviewExportPng}
         isExporting={isExportingPng}
         exportDisabled={isExportButtonDisabled}
         exportDisabledReason={exportDisabledReason}
