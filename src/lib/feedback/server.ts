@@ -25,6 +25,14 @@ type SupabaseFeedbackSubmissionRow = {
   created_at: string;
 };
 
+function createFeedbackSubmissionsSearchParams() {
+  return new URLSearchParams({
+    select:
+      "id,app_user_id,project_id,client_token,page_context,source,sentiment,free_text,time_since_open_seconds,prompt_variant,metadata,created_at",
+    order: "created_at.desc",
+  });
+}
+
 function assertSupabaseConfig() {
   const config = getSupabaseServerConfig();
   if (!config) {
@@ -115,4 +123,28 @@ export async function createFeedbackSubmission(
   }
 
   return mapFeedbackSubmissionRecord(row);
+}
+
+export async function fetchFeedbackSubmissions(): Promise<FeedbackSubmissionRecord[]> {
+  const config = assertSupabaseConfig();
+  const url = new URL("/rest/v1/feedback_submissions", config.url);
+  url.search = createFeedbackSubmissionsSearchParams().toString();
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase feedback query failed: ${response.status} ${errorText}`);
+  }
+
+  const rows = (await response.json()) as SupabaseFeedbackSubmissionRow[];
+  return rows.map(mapFeedbackSubmissionRecord);
 }
