@@ -11,6 +11,21 @@ export type PixiPngExportSource =
 export type PixiPngExportOptions = {
   backgroundColor?: string;
   paddingPx?: number;
+  header?: {
+    title?: string;
+    description?: string;
+    color: string;
+    mutedColor: string;
+  };
+  legend?: {
+    items: {
+      name: string;
+      area: string;
+    }[];
+    color: string;
+    mutedColor: string;
+    dividerColor: string;
+  };
   signature?: {
     lines: string[];
     color: string;
@@ -28,6 +43,20 @@ export type PixiPngExportOptions = {
 const DEFAULT_EXPORT_BACKGROUND = "#ffffff";
 const DEFAULT_EXPORT_PADDING_PX = 48;
 const DEFAULT_EDGE_CROP_PX = 1;
+const EXPORT_TEXT_FONT_FAMILY = "system-ui, sans-serif";
+
+type ExportTextLine = {
+  text: string;
+  font: string;
+  color: string;
+  alpha?: number;
+  gapAfterPx?: number;
+};
+
+type ExportTextBlock = {
+  lines: ExportTextLine[];
+  height: number;
+};
 
 function resolveRenderer(source: PixiPngExportSource): Renderer {
   if ("extract" in source) return source;
@@ -61,7 +90,27 @@ function composeExportCanvas(
   const sourceWidth = sourceCanvas.width - edgeCropPx * 2;
   const sourceHeight = sourceCanvas.height - edgeCropPx * 2;
   const exportWidth = Math.max(1, sourceWidth + paddingPx * 2);
-  const exportHeight = Math.max(1, sourceHeight + paddingPx * 2);
+  const measurementCanvas = document.createElement("canvas");
+  const measurementContext = measurementCanvas.getContext("2d");
+  if (!measurementContext) {
+    throw new Error("Pixi PNG export failed: unable to acquire 2D export context.");
+  }
+
+  const footerGapPx = getSectionGap(paddingPx);
+  const headerBlock = buildHeaderBlock(measurementContext, sourceWidth, options.header);
+  const legendBlock = buildLegendBlock(
+    measurementContext,
+    Math.max(220, exportWidth - paddingPx * 2 - 168),
+    options.legend
+  );
+  const signatureBlock = buildSignatureBlock(options.signature, paddingPx);
+  const topSectionHeight = headerBlock ? headerBlock.height + footerGapPx : 0;
+  const bottomContentHeight = Math.max(legendBlock?.height ?? 0, signatureBlock?.height ?? 0);
+  const bottomSectionHeight = bottomContentHeight > 0 ? footerGapPx + bottomContentHeight : 0;
+  const exportHeight = Math.max(
+    1,
+    sourceHeight + paddingPx * 2 + topSectionHeight + bottomSectionHeight
+  );
   const composedCanvas = document.createElement("canvas");
   composedCanvas.width = exportWidth;
   composedCanvas.height = exportHeight;
@@ -74,7 +123,12 @@ function composeExportCanvas(
   context.imageSmoothingEnabled = false;
   context.fillStyle = options.backgroundColor ?? DEFAULT_EXPORT_BACKGROUND;
   context.fillRect(0, 0, exportWidth, exportHeight);
-  drawExportGrid(context, exportWidth, exportHeight, options.grid, paddingPx - edgeCropPx);
+  drawExportGrid(context, exportWidth, exportHeight, options.grid, paddingPx - edgeCropPx + topSectionHeight);
+
+  if (headerBlock) {
+    drawLeftAlignedTextBlock(context, headerBlock, paddingPx, paddingPx);
+  }
+
   context.drawImage(
     sourceCanvas as unknown as CanvasImageSource,
     sourceX,
@@ -82,11 +136,21 @@ function composeExportCanvas(
     sourceWidth,
     sourceHeight,
     paddingPx,
-    paddingPx,
+    paddingPx + topSectionHeight,
     sourceWidth,
     sourceHeight
   );
-  drawExportSignature(context, exportWidth, exportHeight, options.signature, paddingPx);
+
+  if (legendBlock) {
+    drawLeftAlignedTextBlock(
+      context,
+      legendBlock,
+      paddingPx,
+      exportHeight - paddingPx - legendBlock.height
+    );
+  }
+
+  drawExportSignature(context, exportWidth, exportHeight, signatureBlock, paddingPx);
 
   return composedCanvas;
 }
@@ -146,37 +210,243 @@ function drawExportSignature(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
-  signature: PixiPngExportOptions["signature"],
+  signatureBlock: ExportTextBlock | null,
   paddingPx: number
 ) {
-  if (!signature) return;
-  const lines = signature.lines.map((line) => line.trim()).filter((line) => line.length > 0);
-  if (lines.length === 0) return;
+  if (!signatureBlock) return;
 
-  const alpha = typeof signature.alpha === "number" ? Math.max(0, Math.min(1, signature.alpha)) : 0.7;
   const horizontalInset = Math.max(12, Math.floor(paddingPx * 0.33));
   const baselineInset = Math.max(10, Math.floor(paddingPx * 0.24));
-  const primaryFontSizePx = Math.max(11, Math.min(14, Math.floor(paddingPx * 0.24)));
-  const secondaryFontSizePx = Math.max(10, primaryFontSizePx - 1);
   const lineGapPx = 4;
 
   context.save();
   context.textAlign = "right";
   context.textBaseline = "alphabetic";
-  context.fillStyle = signature.color;
-  context.globalAlpha = alpha;
 
   let y = height - baselineInset;
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const isBrandLine = index === lines.length - 2 && lines.length > 1;
-    const fontSizePx = isBrandLine ? primaryFontSizePx : secondaryFontSizePx;
-    const fontWeight = isBrandLine ? 600 : 500;
-    context.font = `${fontWeight} ${fontSizePx}px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
-    context.fillText(lines[index], width - horizontalInset, y);
-    y -= fontSizePx + lineGapPx;
+  for (let index = signatureBlock.lines.length - 1; index >= 0; index -= 1) {
+    const line = signatureBlock.lines[index];
+    context.font = line.font;
+    context.fillStyle = line.color;
+    context.globalAlpha = line.alpha ?? 1;
+    context.fillText(line.text, width - horizontalInset, y);
+    y -= getFontSizePx(line.font) + (index > 0 ? lineGapPx : 0);
   }
 
   context.restore();
+}
+
+function buildHeaderBlock(
+  context: CanvasRenderingContext2D,
+  maxWidth: number,
+  header: PixiPngExportOptions["header"]
+): ExportTextBlock | null {
+  if (!header) return null;
+
+  const title = header.title?.trim() ?? "";
+  const description = header.description?.trim() ?? "";
+  if (!title && !description) return null;
+
+  const lines: ExportTextLine[] = [];
+  const titleFont = `600 22px ${EXPORT_TEXT_FONT_FAMILY}`;
+  const descriptionFont = `400 13px ${EXPORT_TEXT_FONT_FAMILY}`;
+
+  if (title) {
+    for (const line of wrapText(context, title, titleFont, maxWidth)) {
+      lines.push({
+        text: line,
+        font: titleFont,
+        color: header.color,
+      });
+    }
+  }
+
+  if (description) {
+    if (lines.length > 0) {
+      lines[lines.length - 1].gapAfterPx = 10;
+    }
+
+    const paragraphs = description
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    paragraphs.forEach((paragraph, paragraphIndex) => {
+      for (const line of wrapText(context, paragraph, descriptionFont, maxWidth)) {
+        lines.push({
+          text: line,
+          font: descriptionFont,
+          color: header.mutedColor,
+          alpha: 0.92,
+        });
+      }
+
+      if (paragraphIndex < paragraphs.length - 1 && lines.length > 0) {
+        lines[lines.length - 1].gapAfterPx = 6;
+      }
+    });
+  }
+
+  return lines.length > 0
+    ? {
+        lines,
+        height: getTextBlockHeight(lines),
+      }
+    : null;
+}
+
+function buildLegendBlock(
+  context: CanvasRenderingContext2D,
+  maxWidth: number,
+  legend: PixiPngExportOptions["legend"]
+): ExportTextBlock | null {
+  if (!legend || legend.items.length === 0) return null;
+
+  const lines: ExportTextLine[] = [
+    {
+      text: "Legend",
+      font: `600 12px ${MEASUREMENT_TEXT_FONT_FAMILY}`,
+      color: legend.color,
+      gapAfterPx: 8,
+    },
+  ];
+  const nameFont = `500 13px ${EXPORT_TEXT_FONT_FAMILY}`;
+  const areaFont = `500 12px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+  const nameWidth = Math.max(120, maxWidth - 8);
+
+  legend.items.forEach((item, itemIndex) => {
+    const wrappedName = wrapText(context, item.name, nameFont, nameWidth);
+    wrappedName.forEach((line, lineIndex) => {
+      lines.push({
+        text: `${lineIndex === 0 ? "\u2022 " : "  "}${line}`,
+        font: nameFont,
+        color: legend.color,
+      });
+    });
+
+    lines.push({
+      text: item.area,
+      font: areaFont,
+      color: legend.mutedColor,
+      alpha: 0.94,
+      gapAfterPx: itemIndex < legend.items.length - 1 ? 6 : 0,
+    });
+  });
+
+  return {
+    lines,
+    height: getTextBlockHeight(lines),
+  };
+}
+
+function buildSignatureBlock(
+  signature: PixiPngExportOptions["signature"],
+  paddingPx: number
+): ExportTextBlock | null {
+  if (!signature) return null;
+
+  const lines = signature.lines.map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) return null;
+
+  const alpha = typeof signature.alpha === "number" ? Math.max(0, Math.min(1, signature.alpha)) : 0.7;
+  const primaryFontSizePx = Math.max(11, Math.min(14, Math.floor(paddingPx * 0.24)));
+  const secondaryFontSizePx = Math.max(10, primaryFontSizePx - 1);
+  const textLines = lines.map<ExportTextLine>((line, index) => {
+    const isBrandLine = index === lines.length - 2 && lines.length > 1;
+    const fontSizePx = isBrandLine ? primaryFontSizePx : secondaryFontSizePx;
+    const fontWeight = isBrandLine ? 600 : 500;
+
+    return {
+      text: line,
+      font: `${fontWeight} ${fontSizePx}px ${MEASUREMENT_TEXT_FONT_FAMILY}`,
+      color: signature.color,
+      alpha,
+    };
+  });
+
+  return {
+    lines: textLines,
+    height: getTextBlockHeight(textLines, 4),
+  };
+}
+
+function drawLeftAlignedTextBlock(
+  context: CanvasRenderingContext2D,
+  block: ExportTextBlock,
+  x: number,
+  y: number
+) {
+  context.save();
+  context.textAlign = "left";
+  context.textBaseline = "top";
+
+  let cursorY = y;
+  for (const line of block.lines) {
+    context.font = line.font;
+    context.fillStyle = line.color;
+    context.globalAlpha = line.alpha ?? 1;
+    context.fillText(line.text, x, cursorY);
+    cursorY += getLineHeightPx(line.font) + (line.gapAfterPx ?? 0);
+  }
+
+  context.restore();
+}
+
+function wrapText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  font: string,
+  maxWidth: number
+): string[] {
+  const normalizedText = text.trim();
+  if (!normalizedText) return [];
+
+  context.save();
+  context.font = font;
+
+  const words = normalizedText.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const candidateLine = currentLine ? `${currentLine} ${word}` : word;
+    if (context.measureText(candidateLine).width <= maxWidth || !currentLine) {
+      currentLine = candidateLine;
+      continue;
+    }
+
+    lines.push(currentLine);
+    currentLine = word;
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  context.restore();
+  return lines;
+}
+
+function getTextBlockHeight(lines: ExportTextLine[], defaultGapPx = 0) {
+  return lines.reduce((total, line) => {
+    return total + getLineHeightPx(line.font) + (line.gapAfterPx ?? defaultGapPx);
+  }, 0);
+}
+
+function getLineHeightPx(font: string) {
+  const fontSizePx = getFontSizePx(font);
+  if (fontSizePx >= 20) return fontSizePx + 6;
+  if (fontSizePx >= 13) return fontSizePx + 5;
+  return fontSizePx + 4;
+}
+
+function getFontSizePx(font: string) {
+  const match = font.match(/(\d+)px/);
+  return match ? Number(match[1]) : 12;
+}
+
+function getSectionGap(paddingPx: number) {
+  return Math.max(18, Math.floor(paddingPx * 0.42));
 }
 
 function extractSourceCanvas(source: PixiPngExportSource): ICanvas {
