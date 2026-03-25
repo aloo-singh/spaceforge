@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.42.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-25</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Export Phase 2 Polish)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Larger, more prominent title and description in exported PNG</li>
+                <li>Cleaner legend layout with JetBrains Mono for areas</li>
+                <li>
+                  New &quot;Show scale bar&quot; toggle (defaults to Off, reuses canvas scale style)
+                </li>
+                <li>Tighter spacing and calmer labels inside the Export dialog</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.42.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-25</span>
           </div>

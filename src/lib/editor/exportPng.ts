@@ -26,6 +26,12 @@ export type PixiPngExportOptions = {
     mutedColor: string;
     dividerColor: string;
   };
+  scaleBar?: {
+    widthPx: number;
+    label: string;
+    color: string;
+    mutedColor: string;
+  };
   signature?: {
     lines: string[];
     color: string;
@@ -55,6 +61,14 @@ type ExportTextLine = {
 
 type ExportTextBlock = {
   lines: ExportTextLine[];
+  height: number;
+};
+
+type ExportScaleBarBlock = {
+  widthPx: number;
+  label: string;
+  color: string;
+  mutedColor: string;
   height: number;
 };
 
@@ -103,9 +117,11 @@ function composeExportCanvas(
     Math.max(220, exportWidth - paddingPx * 2 - 168),
     options.legend
   );
+  const scaleBarBlock = buildScaleBarBlock(options.scaleBar);
   const signatureBlock = buildSignatureBlock(options.signature, paddingPx);
+  const bottomLeftBlockHeight = getBottomLeftBlockHeight(scaleBarBlock, legendBlock);
   const topSectionHeight = headerBlock ? headerBlock.height + footerGapPx : 0;
-  const bottomContentHeight = Math.max(legendBlock?.height ?? 0, signatureBlock?.height ?? 0);
+  const bottomContentHeight = Math.max(bottomLeftBlockHeight, signatureBlock?.height ?? 0);
   const bottomSectionHeight = bottomContentHeight > 0 ? footerGapPx + bottomContentHeight : 0;
   const exportHeight = Math.max(
     1,
@@ -141,12 +157,17 @@ function composeExportCanvas(
     sourceHeight
   );
 
+  const bottomLeftStartY = exportHeight - paddingPx - bottomLeftBlockHeight;
+  if (scaleBarBlock) {
+    drawScaleBarBlock(context, scaleBarBlock, paddingPx, bottomLeftStartY);
+  }
+
   if (legendBlock) {
     drawLeftAlignedTextBlock(
       context,
       legendBlock,
       paddingPx,
-      exportHeight - paddingPx - legendBlock.height
+      bottomLeftStartY + (scaleBarBlock ? scaleBarBlock.height + getBottomLeftBlockGap() : 0)
     );
   }
 
@@ -248,8 +269,8 @@ function buildHeaderBlock(
   if (!title && !description) return null;
 
   const lines: ExportTextLine[] = [];
-  const titleFont = `600 22px ${EXPORT_TEXT_FONT_FAMILY}`;
-  const descriptionFont = `400 13px ${EXPORT_TEXT_FONT_FAMILY}`;
+  const titleFont = `700 30px ${EXPORT_TEXT_FONT_FAMILY}`;
+  const descriptionFont = `400 16px ${EXPORT_TEXT_FONT_FAMILY}`;
 
   if (title) {
     for (const line of wrapText(context, title, titleFont, maxWidth)) {
@@ -257,13 +278,14 @@ function buildHeaderBlock(
         text: line,
         font: titleFont,
         color: header.color,
+        gapAfterPx: 2,
       });
     }
   }
 
   if (description) {
     if (lines.length > 0) {
-      lines[lines.length - 1].gapAfterPx = 10;
+      lines[lines.length - 1].gapAfterPx = 12;
     }
 
     const paragraphs = description
@@ -282,7 +304,7 @@ function buildHeaderBlock(
       }
 
       if (paragraphIndex < paragraphs.length - 1 && lines.length > 0) {
-        lines[lines.length - 1].gapAfterPx = 6;
+        lines[lines.length - 1].gapAfterPx = 8;
       }
     });
   }
@@ -307,20 +329,21 @@ function buildLegendBlock(
       text: "Legend",
       font: `600 12px ${MEASUREMENT_TEXT_FONT_FAMILY}`,
       color: legend.color,
-      gapAfterPx: 8,
+      gapAfterPx: 10,
     },
   ];
-  const nameFont = `500 13px ${EXPORT_TEXT_FONT_FAMILY}`;
-  const areaFont = `500 12px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
-  const nameWidth = Math.max(120, maxWidth - 8);
+  const nameFont = `500 14px ${EXPORT_TEXT_FONT_FAMILY}`;
+  const areaFont = `600 12px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+  const nameWidth = Math.max(120, maxWidth - 12);
 
   legend.items.forEach((item, itemIndex) => {
     const wrappedName = wrapText(context, item.name, nameFont, nameWidth);
     wrappedName.forEach((line, lineIndex) => {
       lines.push({
-        text: `${lineIndex === 0 ? "\u2022 " : "  "}${line}`,
+        text: `${lineIndex === 0 ? "\u2022 " : "   "}${line}`,
         font: nameFont,
         color: legend.color,
+        gapAfterPx: lineIndex === wrappedName.length - 1 ? 1 : 0,
       });
     });
 
@@ -329,13 +352,28 @@ function buildLegendBlock(
       font: areaFont,
       color: legend.mutedColor,
       alpha: 0.94,
-      gapAfterPx: itemIndex < legend.items.length - 1 ? 6 : 0,
+      gapAfterPx: itemIndex < legend.items.length - 1 ? 10 : 0,
     });
   });
 
   return {
     lines,
     height: getTextBlockHeight(lines),
+  };
+}
+
+function buildScaleBarBlock(
+  scaleBar: PixiPngExportOptions["scaleBar"]
+): ExportScaleBarBlock | null {
+  if (!scaleBar) return null;
+  if (!Number.isFinite(scaleBar.widthPx) || scaleBar.widthPx <= 0) return null;
+
+  return {
+    widthPx: Math.max(1, Math.round(scaleBar.widthPx)),
+    label: scaleBar.label.trim(),
+    color: scaleBar.color,
+    mutedColor: scaleBar.mutedColor,
+    height: 31,
   };
 }
 
@@ -389,6 +427,35 @@ function drawLeftAlignedTextBlock(
     cursorY += getLineHeightPx(line.font) + (line.gapAfterPx ?? 0);
   }
 
+  context.restore();
+}
+
+function drawScaleBarBlock(
+  context: CanvasRenderingContext2D,
+  block: ExportScaleBarBlock,
+  x: number,
+  y: number
+) {
+  const labelFont = `500 11px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+  const lineTopY = y + 18.5;
+
+  context.save();
+  context.textAlign = "left";
+  context.textBaseline = "top";
+  context.font = labelFont;
+  context.fillStyle = block.color;
+  context.globalAlpha = 0.78;
+  context.fillText(block.label, x, y);
+
+  context.strokeStyle = block.color;
+  context.globalAlpha = 0.72;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(x + 0.5, lineTopY + 8);
+  context.lineTo(x + 0.5, lineTopY);
+  context.lineTo(x + block.widthPx - 0.5, lineTopY);
+  context.lineTo(x + block.widthPx - 0.5, lineTopY + 8);
+  context.stroke();
   context.restore();
 }
 
@@ -447,6 +514,21 @@ function getFontSizePx(font: string) {
 
 function getSectionGap(paddingPx: number) {
   return Math.max(18, Math.floor(paddingPx * 0.42));
+}
+
+function getBottomLeftBlockGap() {
+  return 16;
+}
+
+function getBottomLeftBlockHeight(
+  scaleBarBlock: ExportScaleBarBlock | null,
+  legendBlock: ExportTextBlock | null
+) {
+  if (scaleBarBlock && legendBlock) {
+    return scaleBarBlock.height + getBottomLeftBlockGap() + legendBlock.height;
+  }
+
+  return scaleBarBlock?.height ?? legendBlock?.height ?? 0;
 }
 
 function extractSourceCanvas(source: PixiPngExportSource): ICanvas {
