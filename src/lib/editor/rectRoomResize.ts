@@ -45,7 +45,20 @@ export function getAxisAlignedRoomBounds(room: Room): RoomRectBounds | null {
   return getAxisAlignedRectangleBounds(room.points);
 }
 
-export function getRoomPointsFromBounds(bounds: RoomRectBounds): Point[] {
+export function getRoomPointsFromBounds(
+  bounds: RoomRectBounds,
+  referencePoints?: Point[]
+): Point[] {
+  if (referencePoints) {
+    const referenceBounds = getAxisAlignedRectangleBounds(referencePoints);
+    if (referenceBounds) {
+      return referencePoints.map((point) => ({
+        x: point.x === referenceBounds.minX ? bounds.minX : bounds.maxX,
+        y: point.y === referenceBounds.minY ? bounds.minY : bounds.maxY,
+      }));
+    }
+  }
+
   return getRectanglePointsFromBounds(bounds);
 }
 
