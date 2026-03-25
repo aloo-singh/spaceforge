@@ -220,6 +220,35 @@ export async function setAuthenticatedSessionCookie(session: SupabaseAuthSession
   });
 }
 
+export async function clearAuthenticatedSessionCookie() {
+  const cookieStore = await cookies();
+  cookieStore.set(getSupabaseAuthCookieName(), "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
+export async function signOutAuthenticatedUser() {
+  const config = getSupabasePublicConfig();
+  const accessToken = await getSupabaseAccessTokenFromCookies();
+
+  if (config && accessToken) {
+    await fetch(`${config.url}/auth/v1/logout`, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    }).catch(() => undefined);
+  }
+
+  await clearAuthenticatedSessionCookie();
+}
+
 export async function requireAdminUser(): Promise<SupabaseAuthUser> {
   const user = await getAuthenticatedSupabaseUser();
 

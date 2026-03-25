@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3, Inbox } from "lucide-react";
 
+import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,6 +101,16 @@ export function AdminShell({ userEmail, children }: AdminShellProps) {
                   Access
                 </p>
                 <p className="mt-2 break-all text-sm text-foreground/75">{userEmail}</p>
+                <form action={logoutAdminAction} className="mt-3">
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-0 text-foreground/65 hover:bg-transparent hover:text-foreground"
+                  >
+                    Log out
+                  </Button>
+                </form>
               </div>
             </CardContent>
           </Card>
