@@ -40,7 +40,7 @@ export function HistoryControls({
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const { theme, resolvedTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -70,9 +70,13 @@ export function HistoryControls({
   const canInsertOpening = hasHydrated && selectedWall !== null;
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
-  const defaultExportTheme = theme === "light" || theme === "dark" ? theme : "system";
   const currentThemeLabel = resolveEditorThemeMode(resolvedTheme) === "light" ? "Light" : "Dark";
   const defaultDesignedBy = useEditorStore((state) => state.settings.exportSignatureText);
+  const exportTitle = useEditorStore((state) => state.document.exportConfig.title);
+  const exportDescription = useEditorStore((state) => state.document.exportConfig.description);
+  const exportPreferences = useEditorStore((state) => state.exportPreferences);
+  const updateExportPreferences = useEditorStore((state) => state.updateExportPreferences);
+  const updateProjectExportConfig = useEditorStore((state) => state.updateProjectExportConfig);
   const resetCameraTitle = !hasHydrated
     ? "Fit view is unavailable until the editor finishes loading"
     : hasRooms
@@ -265,14 +269,27 @@ export function HistoryControls({
       />
 
       <ExportPngDialog
-        key={`${defaultExportTheme}-${defaultDesignedBy}-${isExportDialogOpen ? "open" : "closed"}`}
+        key={`${defaultDesignedBy}-${isExportDialogOpen ? "open" : "closed"}`}
         open={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
         onExport={(request) => onExportPng?.(request)}
         isExporting={isExportingPng}
         exportDisabled={isExportButtonDisabled}
         exportDisabledReason={exportDisabledReason}
-        defaultTheme={defaultExportTheme}
+        title={exportTitle}
+        description={exportDescription}
+        showLegend={exportPreferences.showLegend}
+        showScaleBar={exportPreferences.showScaleBar}
+        showGrid={exportPreferences.showGrid}
+        showDimensions={exportPreferences.showDimensions}
+        theme={exportPreferences.theme}
+        onTitleChange={(value) => updateProjectExportConfig({ title: value })}
+        onDescriptionChange={(value) => updateProjectExportConfig({ description: value })}
+        onShowLegendChange={(value) => updateExportPreferences({ showLegend: value })}
+        onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}
+        onShowGridChange={(value) => updateExportPreferences({ showGrid: value })}
+        onShowDimensionsChange={(value) => updateExportPreferences({ showDimensions: value })}
+        onThemeChange={(value) => updateExportPreferences({ theme: value })}
         currentThemeLabel={currentThemeLabel}
         defaultDesignedBy={defaultDesignedBy}
       />

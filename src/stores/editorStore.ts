@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
-import { applyEditorCommand, type EditorCommand } from "@/lib/editor/history";
+import {
+  applyEditorCommand,
+  type EditorCommand,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
 import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
@@ -33,6 +37,12 @@ import {
   saveEditorSnapshot,
 } from "@/lib/editor/editorPersistence";
 import {
+  areEditorExportPreferencesEqual,
+  cloneEditorExportPreferences,
+  DEFAULT_EDITOR_EXPORT_PREFERENCES,
+  type EditorExportPreferences,
+} from "@/lib/editor/exportPreferences";
+import {
   areEditorSettingsEqual,
   cloneEditorSettings,
   DEFAULT_EDITOR_SETTINGS,
@@ -56,6 +66,7 @@ import {
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
 import { getActiveSnapStepMm } from "@/lib/editor/snapping";
+import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type {
   CameraState,
   DoorHingeSide,
@@ -81,9 +92,7 @@ type RoomDraftState = {
   history: Point[][];
 };
 
-type DocumentState = {
-  rooms: Room[];
-};
+type DocumentState = EditorDocumentState;
 
 type RenameSessionState = {
   roomId: string;
@@ -94,6 +103,7 @@ type EditorState = {
   document: DocumentState;
   camera: CameraState;
   settings: EditorSettings;
+  exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
@@ -111,6 +121,8 @@ type EditorState = {
   setDimensionsVisibilityOverrideActive: (isActive: boolean) => void;
   setViewport: (width: number, height: number) => void;
   updateSettings: (settings: Partial<EditorSettings>) => void;
+  updateExportPreferences: (preferences: Partial<EditorExportPreferences>) => void;
+  updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
@@ -165,6 +177,7 @@ type EditorState = {
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = {
   rooms: [],
+  exportConfig: normalizeProjectExportConfig(null),
 };
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
@@ -201,6 +214,7 @@ function createOpeningId(): string {
 
 function updateRoomNameInDocument(document: DocumentState, roomId: string, name: string): DocumentState {
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === roomId
         ? {
@@ -218,6 +232,7 @@ function updateRoomPointsInDocument(
   nextPoints: Point[]
 ): DocumentState {
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === roomId
         ? {
@@ -236,6 +251,7 @@ function updateRoomOpeningOffsetInDocument(
   nextOffsetMm: number
 ): DocumentState {
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === roomId
         ? {
@@ -260,6 +276,7 @@ function updateRoomOpeningInDocument(
   nextOpening: RoomOpening
 ): DocumentState {
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === roomId
         ? {
@@ -280,6 +297,7 @@ function updateRoomOpeningWidthInDocument(
   nextWidthMm: number
 ): DocumentState {
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === roomId
         ? {
@@ -469,6 +487,10 @@ function getSafePersistedHistorySnapshot(
     buildPersistedHistorySnapshot(document, history, PERSISTED_HISTORY_STATE_LIMIT) ?? {
       historyStack: [
         {
+          exportConfig: {
+            title: document.exportConfig.title,
+            description: document.exportConfig.description,
+          },
           rooms: document.rooms.map((room) => ({
             id: room.id,
             name: room.name,
@@ -512,6 +534,10 @@ function createInitialEditorSettings(): EditorSettings {
   return hydrationSnapshot?.settings ?? cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
 }
 
+function createInitialEditorExportPreferences(): EditorExportPreferences {
+  return hydrationSnapshot?.exportPreferences ?? cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES);
+}
+
 type ActiveResetCameraAnimation = {
   frameId: number;
   sequence: number;
@@ -544,6 +570,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
   settings: createInitialEditorSettings(),
+  exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
   viewport: {
     width: 1,
@@ -580,6 +607,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         settings: nextSettings,
+      };
+    }),
+  updateExportPreferences: (preferences) =>
+    set((state) => {
+      const nextPreferences: EditorExportPreferences = {
+        ...state.exportPreferences,
+        ...preferences,
+      };
+      if (areEditorExportPreferencesEqual(state.exportPreferences, nextPreferences)) return state;
+
+      return {
+        exportPreferences: nextPreferences,
+      };
+    }),
+  updateProjectExportConfig: (config) =>
+    set((state) => {
+      const nextExportConfig = normalizeProjectExportConfig({
+        ...state.document.exportConfig,
+        ...config,
+      });
+      if (
+        state.document.exportConfig.title === nextExportConfig.title &&
+        state.document.exportConfig.description === nextExportConfig.description
+      ) {
+        return state;
+      }
+
+      return {
+        document: {
+          ...state.document,
+          exportConfig: nextExportConfig,
+        },
       };
     }),
   panCameraByPx: (delta) => {
@@ -895,8 +954,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? updateRoomNameInDocument(state.document, renameSession.roomId, renameSession.initialName)
           : state.document;
 
-      return {
-        document: nextDocument,
+    return {
+      document: nextDocument,
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
@@ -1269,9 +1328,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetCanvas: () => {
     stopResetCameraAnimation();
     set((state) => ({
-      document: {
-        rooms: [],
-      },
+      document: cloneDocumentState(DEFAULT_DOCUMENT_STATE),
       camera: { ...DEFAULT_CAMERA_STATE },
       roomDraft: {
         points: [],
@@ -1380,6 +1437,7 @@ if (typeof window !== "undefined") {
       document: state.document,
       camera: state.camera,
       settings: state.settings,
+      exportPreferences: state.exportPreferences,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     };
@@ -1393,6 +1451,7 @@ if (typeof window !== "undefined") {
       document: state.document,
       camera: state.camera,
       settings: state.settings,
+      exportPreferences: state.exportPreferences,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     });
@@ -1402,6 +1461,7 @@ if (typeof window !== "undefined") {
       document: state.document,
       camera: state.camera,
       settings: state.settings,
+      exportPreferences: state.exportPreferences,
       historyStack: historySnapshot.historyStack,
       historyIndex: historySnapshot.historyIndex,
     });
@@ -1435,9 +1495,22 @@ if (typeof window !== "undefined") {
     const didDocumentChange = state.document !== previousState.document;
     const didCameraChange = !areCamerasEqual(state.camera, previousState.camera);
     const didSettingsChange = !areEditorSettingsEqual(state.settings, previousState.settings);
+    const didExportPreferencesChange = !areEditorExportPreferencesEqual(
+      state.exportPreferences,
+      previousState.exportPreferences
+    );
     const didPastChange = state.history.past !== previousState.history.past;
     const didFutureChange = state.history.future !== previousState.history.future;
-    if (!didDocumentChange && !didCameraChange && !didSettingsChange && !didPastChange && !didFutureChange) return;
+    if (
+      !didDocumentChange &&
+      !didCameraChange &&
+      !didSettingsChange &&
+      !didExportPreferencesChange &&
+      !didPastChange &&
+      !didFutureChange
+    ) {
+      return;
+    }
 
     if (autosaveTimeout) {
       clearTimeout(autosaveTimeout);

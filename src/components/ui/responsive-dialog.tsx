@@ -34,6 +34,8 @@ type ResponsiveDialogProps = {
   footer?: ReactNode;
   className?: string;
   contentClassName?: string;
+  footerClassName?: string;
+  stickyFooter?: boolean;
   hideHeader?: boolean;
   motionState?: "opening" | "open" | "closing";
   surfaceOverride?: "dialog" | "drawer";
@@ -50,6 +52,8 @@ export function ResponsiveDialog({
   footer,
   className,
   contentClassName,
+  footerClassName,
+  stickyFooter = false,
   hideHeader = false,
   motionState = "open",
   surfaceOverride,
@@ -73,9 +77,19 @@ export function ResponsiveDialog({
         shouldScaleBackground={false}
         direction="bottom"
       >
-        <DrawerContent ref={panelRef} className={className}>
+        <DrawerContent
+          ref={panelRef}
+          className={cn(stickyFooter && "overflow-hidden", className)}
+        >
           <DrawerHandle />
-          <div className="min-w-0 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
+          <div
+            className={cn(
+              "min-w-0 px-4 pt-3 sm:px-5",
+              stickyFooter
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                : "overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            )}
+          >
             {hideHeader ? (
               <DrawerHeader className="sr-only">
                 <DrawerTitle>{title}</DrawerTitle>
@@ -87,8 +101,29 @@ export function ResponsiveDialog({
                 {description ? <DrawerDescription>{description}</DrawerDescription> : null}
               </DrawerHeader>
             )}
-            {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
-            {footer ? <DrawerFooter className="mt-6">{footer}</DrawerFooter> : null}
+            {children ? (
+              <div
+                className={cn(
+                  hideHeader ? "" : "mt-5",
+                  stickyFooter && "min-h-0 flex-1 overflow-y-auto",
+                  contentClassName
+                )}
+              >
+                {children}
+              </div>
+            ) : null}
+            {footer ? (
+              <DrawerFooter
+                className={cn(
+                  stickyFooter &&
+                    "shrink-0 border-t border-border/60 bg-card px-0 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3",
+                  !stickyFooter && "mt-6",
+                  footerClassName
+                )}
+              >
+                {footer}
+              </DrawerFooter>
+            ) : null}
           </div>
         </DrawerContent>
       </Drawer>
@@ -109,7 +144,8 @@ export function ResponsiveDialog({
           ref={panelRef}
           hideClose
           className={cn(
-            "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] overflow-y-auto p-5",
+            "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] p-5",
+            stickyFooter ? "flex min-h-0 flex-col overflow-hidden" : "overflow-y-auto",
             motionState === "opening" && "animate-in zoom-in-95 fade-in-0 duration-200",
             motionState === "closing" && "animate-out zoom-out-95 fade-out-0 duration-150",
             className
@@ -126,8 +162,29 @@ export function ResponsiveDialog({
               {description ? <DialogDescription>{description}</DialogDescription> : null}
             </DialogHeader>
           )}
-          {children ? <div className={cn(hideHeader ? "" : "mt-5", contentClassName)}>{children}</div> : null}
-          {footer ? <DialogFooter className="mt-6 sm:justify-end">{footer}</DialogFooter> : null}
+          {children ? (
+            <div
+              className={cn(
+                hideHeader ? "" : "mt-5",
+                stickyFooter && "min-h-0 flex-1 overflow-y-auto",
+                contentClassName
+              )}
+            >
+              {children}
+            </div>
+          ) : null}
+          {footer ? (
+            <DialogFooter
+              className={cn(
+                stickyFooter &&
+                  "mt-4 shrink-0 border-t border-border/60 bg-card pt-3 sm:justify-end",
+                !stickyFooter && "mt-6 sm:justify-end",
+                footerClassName
+              )}
+            >
+              {footer}
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </DialogPortal>
     </Dialog>

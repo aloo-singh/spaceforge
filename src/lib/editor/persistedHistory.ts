@@ -1,5 +1,6 @@
 import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
+import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type { Room, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
@@ -13,6 +14,16 @@ export type HydratedCommandHistory = {
 };
 
 export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState): boolean {
+  const exportConfigA = normalizeProjectExportConfig(a.exportConfig);
+  const exportConfigB = normalizeProjectExportConfig(b.exportConfig);
+
+  if (
+    exportConfigA.title !== exportConfigB.title ||
+    exportConfigA.description !== exportConfigB.description
+  ) {
+    return false;
+  }
+
   if (a.rooms.length !== b.rooms.length) return false;
 
   for (let i = 0; i < a.rooms.length; i += 1) {
@@ -27,7 +38,13 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
 }
 
 export function cloneDocumentState(document: EditorDocumentState): EditorDocumentState {
+  const exportConfig = normalizeProjectExportConfig(document.exportConfig);
+
   return {
+    exportConfig: {
+      title: exportConfig.title,
+      description: exportConfig.description,
+    },
     rooms: document.rooms.map((room) => ({
       id: room.id,
       name: room.name,

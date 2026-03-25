@@ -30,6 +30,12 @@ function getDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
   return JSON.stringify(document);
 }
 
+function getThumbnailDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
+  return JSON.stringify({
+    rooms: document.rooms,
+  });
+}
+
 function scheduleIdleTask(callback: () => void) {
   if (typeof window !== "undefined" && "requestIdleCallback" in window) {
     const idleCallbackId = window.requestIdleCallback(callback, {
@@ -140,7 +146,7 @@ export function EditorProjectBootstrap({
             lastSyncedSignatureRef.current = getDocumentSignature(fallbackDocument);
             lastSyncedThumbnailSignatureRef.current =
               fallbackProject.thumbnailDataUrl || fallbackDocument.rooms.length === 0
-                ? getDocumentSignature(fallbackDocument)
+                ? getThumbnailDocumentSignature(fallbackDocument)
                 : null;
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
@@ -163,7 +169,7 @@ export function EditorProjectBootstrap({
           lastSyncedSignatureRef.current = getDocumentSignature(project.document);
           lastSyncedThumbnailSignatureRef.current =
             project.thumbnailDataUrl || project.document.rooms.length === 0
-              ? getDocumentSignature(project.document)
+              ? getThumbnailDocumentSignature(project.document)
               : null;
           setActiveProjectId(project.id);
           isBootstrappingRef.current = false;
@@ -192,7 +198,7 @@ export function EditorProjectBootstrap({
         lastSyncedSignatureRef.current = getDocumentSignature(nextDocument);
         lastSyncedThumbnailSignatureRef.current =
           selectedProject.thumbnailDataUrl || nextDocument.rooms.length === 0
-            ? getDocumentSignature(nextDocument)
+            ? getThumbnailDocumentSignature(nextDocument)
             : null;
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
@@ -247,7 +253,7 @@ export function EditorProjectBootstrap({
     }
 
     const nextDocument = cloneDocumentState(document);
-    const nextSignature = getDocumentSignature(nextDocument);
+    const nextSignature = getThumbnailDocumentSignature(nextDocument);
     if (nextSignature === lastSyncedSignatureRef.current) {
       return;
     }
@@ -310,7 +316,7 @@ export function EditorProjectBootstrap({
           })
             .then((project) => {
               if (isCancelled) return;
-              lastSyncedThumbnailSignatureRef.current = getDocumentSignature(project.document);
+              lastSyncedThumbnailSignatureRef.current = getThumbnailDocumentSignature(project.document);
             })
             .catch((error) => {
               console.error("Failed to sync project thumbnail.", error);

@@ -1,8 +1,14 @@
 import { cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import type { Room, RoomOpening } from "@/lib/editor/types";
+import {
+  cloneProjectExportConfig,
+  DEFAULT_PROJECT_EXPORT_CONFIG,
+  type ProjectExportConfig,
+} from "@/lib/projects/exportConfig";
 
 export type EditorDocumentState = {
   rooms: Room[];
+  exportConfig: ProjectExportConfig;
 };
 
 export type EditorCommand =
@@ -65,11 +71,13 @@ export function applyEditorCommand(
   if (command.type === "complete-room") {
     if (direction === "undo") {
       return {
+        ...document,
         rooms: document.rooms.filter((room) => room.id !== command.room.id),
       };
     }
 
     return {
+      ...document,
       rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
     };
   }
@@ -86,11 +94,13 @@ export function applyEditorCommand(
       });
 
       return {
+        ...document,
         rooms: nextRooms,
       };
     }
 
     return {
+      ...document,
       rooms: document.rooms.filter((room) => room.id !== command.room.id),
     };
   }
@@ -98,6 +108,7 @@ export function applyEditorCommand(
   if (command.type === "resize-room") {
     const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
     return {
+      ...document,
       rooms: document.rooms.map((room) =>
         room.id === command.roomId
           ? {
@@ -112,6 +123,7 @@ export function applyEditorCommand(
   if (command.type === "move-room") {
     const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
     return {
+      ...document,
       rooms: document.rooms.map((room) =>
         room.id === command.roomId
           ? {
@@ -125,6 +137,7 @@ export function applyEditorCommand(
 
   if (command.type === "add-opening") {
     return {
+      ...document,
       rooms: document.rooms.map((room) => {
         if (room.id !== command.roomId) return room;
 
@@ -144,6 +157,7 @@ export function applyEditorCommand(
 
   if (command.type === "delete-opening") {
     return {
+      ...document,
       rooms: document.rooms.map((room) => {
         if (room.id !== command.roomId) return room;
 
@@ -166,6 +180,7 @@ export function applyEditorCommand(
       direction === "undo" ? command.previousOffsetMm : command.nextOffsetMm;
 
     return {
+      ...document,
       rooms: document.rooms.map((room) => {
         if (room.id !== command.roomId) return room;
 
@@ -189,6 +204,7 @@ export function applyEditorCommand(
       direction === "undo" ? command.previousOpening : command.nextOpening;
 
     return {
+      ...document,
       rooms: document.rooms.map((room) => {
         if (room.id !== command.roomId) return room;
 
@@ -204,6 +220,7 @@ export function applyEditorCommand(
 
   const nextName = direction === "undo" ? command.previousName : command.nextName;
   return {
+    ...document,
     rooms: document.rooms.map((room) =>
       room.id === command.roomId
         ? {
@@ -212,5 +229,12 @@ export function applyEditorCommand(
           }
         : room
     ),
+  };
+}
+
+export function createEmptyEditorDocumentState(): EditorDocumentState {
+  return {
+    rooms: [],
+    exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
   };
 }

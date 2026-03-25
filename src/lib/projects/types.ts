@@ -1,5 +1,9 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { cloneDocumentState } from "@/lib/editor/persistedHistory";
+import {
+  PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
+  PROJECT_EXPORT_TITLE_MAX_LENGTH,
+} from "@/lib/projects/exportConfig";
 
 export type AppUser = {
   id: string;
@@ -78,7 +82,24 @@ function isRoom(value: unknown): boolean {
 export function isProjectDocument(value: unknown): value is EditorDocumentState {
   if (!isObject(value)) return false;
   if (!Array.isArray(value.rooms)) return false;
-  return value.rooms.every(isRoom);
+  if (!value.rooms.every(isRoom)) return false;
+  if (!("exportConfig" in value) || value.exportConfig === undefined) return true;
+  if (!isObject(value.exportConfig)) return false;
+  if (
+    value.exportConfig.title !== undefined &&
+    (typeof value.exportConfig.title !== "string" ||
+      value.exportConfig.title.replace(/\r?\n/g, " ").length > PROJECT_EXPORT_TITLE_MAX_LENGTH)
+  ) {
+    return false;
+  }
+  if (
+    value.exportConfig.description !== undefined &&
+    (typeof value.exportConfig.description !== "string" ||
+      value.exportConfig.description.replace(/\r\n/g, "\n").length > PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function isProjectThumbnailDataUrl(value: unknown): value is string | null {
