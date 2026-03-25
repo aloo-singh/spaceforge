@@ -208,6 +208,15 @@ export function ExportPngDialog({
             <Button
               type="button"
               size="sm"
+              variant={theme === "system" ? "secondary" : "ghost"}
+              aria-pressed={theme === "system"}
+              onClick={() => setTheme("system")}
+            >
+              {`System (${currentThemeLabel})`}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
               variant={theme === "light" ? "secondary" : "ghost"}
               aria-pressed={theme === "light"}
               onClick={() => setTheme("light")}
@@ -222,15 +231,6 @@ export function ExportPngDialog({
               onClick={() => setTheme("dark")}
             >
               Dark
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={theme === "system" ? "secondary" : "ghost"}
-              aria-pressed={theme === "system"}
-              onClick={() => setTheme("system")}
-            >
-              {`System (${currentThemeLabel})`}
             </Button>
           </div>
         </ExportToggleCard>
