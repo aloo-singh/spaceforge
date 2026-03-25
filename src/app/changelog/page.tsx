@@ -10,6 +10,23 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.39.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-25</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>First-resize visual glitch on newly created rectangular rooms (diagonal stretch/distortion on initial drag)</li>
+                <li>Rectangular resize now correctly preserves the room&apos;s existing corner ordering</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.39.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-24</span>
           </div>
