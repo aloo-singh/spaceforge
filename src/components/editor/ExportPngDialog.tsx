@@ -150,10 +150,11 @@ export function ExportPngDialog({
       onOpenChange={onOpenChange}
       title="Export PNG"
       description="Adjust a few export details without changing the live editor."
-      className="sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
-      contentClassName="overflow-hidden pr-0"
+      className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
+      contentClassName="min-h-0 pr-0 overflow-y-auto lg:overflow-hidden"
       footerClassName="px-0"
       stickyFooter
+      contentScrollable={false}
       footer={
         <Button
           type="button"
@@ -167,8 +168,8 @@ export function ExportPngDialog({
         </Button>
       }
     >
-      <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,24rem)]">
-        <section className="min-h-0">
+      <div className="grid min-h-0 gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(22rem,24rem)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+        <section className="min-h-0 lg:h-full">
           <div className="flex h-full min-h-[16rem] flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/25">
             <div className="border-b border-border/60 px-4 py-3">
               <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
@@ -177,15 +178,17 @@ export function ExportPngDialog({
               </p>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4">
-              <div className="flex h-full max-h-full w-full items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background/90 p-3">
+              <div className="flex h-full max-h-full min-h-[18rem] w-full items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background/90 p-3">
                 {previewSrc ? (
-                  <div className="relative aspect-[4/5] h-full max-h-full w-full overflow-hidden rounded-lg">
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-lg">
                     <Image
                       src={previewSrc}
                       alt="Live PNG export preview"
-                      fill
+                      width={1600}
+                      height={1200}
                       unoptimized
-                      className="object-contain"
+                      sizes="(min-width: 1024px) 50vw, 100vw"
+                      className="h-auto max-h-full w-auto max-w-full object-contain object-center"
                     />
                   </div>
                 ) : (
@@ -198,7 +201,7 @@ export function ExportPngDialog({
           </div>
         </section>
 
-        <section className="min-h-0 overflow-y-auto pr-1">
+        <section className="min-h-0 pr-1 lg:h-full lg:overflow-y-auto">
           <div className="space-y-2.5 pb-1">
             <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
