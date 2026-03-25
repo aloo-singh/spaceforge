@@ -315,7 +315,7 @@ export function attachRoomResizeInput(
               gridSizeMm: activeSnapStepMm,
               minRoomSizeMm: MIN_ROOM_SIZE_MM,
             });
-      const nextPoints = getRoomPointsFromBounds(nextBounds);
+      const nextPoints = getRoomPointsFromBounds(nextBounds, activeSession.startPoints);
       activeSession.latestSnappedPoints = nextPoints;
       previewRoomResize(activeSession.roomId, nextPoints);
       return;
