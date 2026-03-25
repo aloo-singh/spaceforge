@@ -10,6 +10,25 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.40.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-25</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Protected <code>/admin</code> route group with sidebar shell</li>
+                <li>Simple admin login page at <code>/admin/login</code></li>
+                <li>Logout link inside admin shell</li>
+                <li>Server-side protection via <code>ADMIN_EMAILS</code> environment variable</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.39.1</h2>
             <span className="text-sm text-muted-foreground">2026-03-25</span>
           </div>
