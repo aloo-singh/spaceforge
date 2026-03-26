@@ -47,7 +47,7 @@ const ChartContainer = React.forwardRef<
         ref={ref}
         data-chart={id ?? chartId}
         className={cn(
-          "h-[240px] w-full text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/70 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none",
+          "h-[240px] w-full text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/70 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-default-tooltip]:rounded-lg [&_.recharts-default-tooltip]:border [&_.recharts-default-tooltip]:border-border/80 [&_.recharts-default-tooltip]:bg-popover [&_.recharts-default-tooltip]:text-popover-foreground [&_.recharts-default-tooltip]:shadow-md [&_.recharts-tooltip-item]:text-popover-foreground [&_.recharts-tooltip-label]:text-popover-foreground",
           className
         )}
         {...props}
@@ -60,4 +60,37 @@ const ChartContainer = React.forwardRef<
 });
 ChartContainer.displayName = "ChartContainer";
 
-export { ChartContainer, ChartContext };
+const chartTooltipContentStyle = {
+  backgroundColor: "hsl(var(--popover))",
+  borderColor: "hsl(var(--border))",
+  borderRadius: "calc(var(--radius) - 2px)",
+  boxShadow: "0 10px 30px hsl(var(--foreground) / 0.08)",
+  color: "hsl(var(--popover-foreground))",
+} as const;
+
+const chartTooltipLabelStyle = {
+  color: "hsl(var(--popover-foreground))",
+  fontWeight: 500,
+  marginBottom: "0.25rem",
+} as const;
+
+const chartTooltipItemStyle = {
+  color: "hsl(var(--popover-foreground))",
+  padding: 0,
+} as const;
+
+const chartTooltipCursorStyle = {
+  stroke: "hsl(var(--border))",
+  strokeDasharray: "3 6",
+  strokeOpacity: 0.95,
+  strokeWidth: 1.25,
+} as const;
+
+export {
+  ChartContainer,
+  ChartContext,
+  chartTooltipContentStyle,
+  chartTooltipCursorStyle,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+};

@@ -11,7 +11,14 @@ import {
   YAxis,
 } from "recharts";
 
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  chartTooltipContentStyle,
+  chartTooltipCursorStyle,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 
 type FeedbackTrendChartProps = {
@@ -19,7 +26,7 @@ type FeedbackTrendChartProps = {
     date: string;
     submissions: number;
   }>;
-  variant?: "full" | "sparkline";
+  variant?: "compact" | "full" | "sparkline";
   className?: string;
 };
 
@@ -53,24 +60,24 @@ export function FeedbackTrendChart({
     return (
       <ChartContainer
         config={chartConfig}
-        className={cn("h-10 w-full [&_.recharts-surface]:overflow-visible", className)}
+        className={cn("h-5 w-full [&_.recharts-surface]:overflow-visible", className)}
       >
         <LineChart
           accessibilityLayer
           data={data}
           margin={{
-            left: 1,
-            right: 1,
-            top: 3,
-            bottom: 3,
+            left: 0,
+            right: 0,
+            top: 1,
+            bottom: 1,
           }}
         >
           <Line
             type="monotone"
             dataKey="submissions"
             stroke="var(--color-submissions)"
-            strokeOpacity={0.7}
-            strokeWidth={1.5}
+            strokeOpacity={0.62}
+            strokeWidth={1}
             dot={false}
             isAnimationActive={false}
           />
@@ -80,14 +87,17 @@ export function FeedbackTrendChart({
   }
 
   return (
-    <ChartContainer config={chartConfig} className={cn("h-[320px]", className)}>
+    <ChartContainer
+      config={chartConfig}
+      className={cn(variant === "compact" ? "h-[180px]" : "h-[320px]", className)}
+    >
       <AreaChart
         accessibilityLayer
         data={data}
         margin={{
-          left: 4,
-          right: 12,
-          top: 8,
+          left: variant === "compact" ? 0 : 4,
+          right: variant === "compact" ? 8 : 12,
+          top: variant === "compact" ? 4 : 8,
           bottom: 4,
         }}
       >
@@ -103,12 +113,15 @@ export function FeedbackTrendChart({
           axisLine={false}
           tickLine={false}
           allowDecimals={false}
-          width={28}
+          width={variant === "compact" ? 24 : 28}
         />
         <Tooltip
-          cursor={{ strokeDasharray: "3 6" }}
+          cursor={chartTooltipCursorStyle}
+          contentStyle={chartTooltipContentStyle}
+          itemStyle={chartTooltipItemStyle}
           labelFormatter={(label) => formatTickLabel(String(label))}
           formatter={(value) => formatTooltipValue(Number(value ?? 0))}
+          labelStyle={chartTooltipLabelStyle}
         />
         <Area
           type="monotone"
@@ -121,10 +134,10 @@ export function FeedbackTrendChart({
           type="monotone"
           dataKey="submissions"
           stroke="var(--color-submissions)"
-          strokeWidth={2}
+          strokeWidth={variant === "compact" ? 1.8 : 2}
           dot={false}
           activeDot={{
-            r: 4,
+            r: variant === "compact" ? 3.5 : 4,
             fill: "var(--color-submissions)",
             stroke: "var(--color-background)",
             strokeWidth: 1.5,

@@ -280,7 +280,7 @@ export function FeedbackInboxTable({
           </div>
           <Link
             href="/admin/analytics/feedback-graph"
-            className="group inline-flex w-fit items-center gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-2 transition-colors hover:border-border hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="group inline-flex w-fit items-center gap-2.5 rounded-xl border border-border/60 bg-background/60 px-3 py-1.5 transition-colors hover:border-border hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <div className="min-w-0">
               <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/40 uppercase">
@@ -288,11 +288,11 @@ export function FeedbackInboxTable({
               </p>
               <p className="text-xs text-muted-foreground">Open full feedback graph</p>
             </div>
-            <div className="w-24 shrink-0">
+            <div className="w-20 shrink-0">
               <FeedbackTrendChart
                 data={feedbackTrend}
                 variant="sparkline"
-                className="h-8 text-foreground/65"
+                className="text-foreground/65"
               />
             </div>
           </Link>
