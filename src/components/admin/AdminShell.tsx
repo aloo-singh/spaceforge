@@ -116,7 +116,7 @@ export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminSh
                                   <span className="block text-sm font-medium">{item.label}</span>
                                   {item.label === "Feedback Inbox" && unreadFeedbackCount > 0 ? (
                                     <Badge
-                                      variant="secondary"
+                                      variant="destructive"
                                       className="min-w-6 justify-center px-1.5 py-0 text-[10px] leading-4"
                                     >
                                       {unreadFeedbackCount}
