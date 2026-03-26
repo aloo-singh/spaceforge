@@ -60,7 +60,7 @@ const analyticsNavItems = [
   },
   {
     href: "/admin/analytics/drop-off-before-first-room",
-    label: "Drop-off before first room",
+    label: "No canvas interaction",
   },
   {
     href: "/admin/analytics/average-time-to-first-room",

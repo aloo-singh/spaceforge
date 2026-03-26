@@ -47,6 +47,16 @@ export type AnalyticsMetricDetail = {
   chartDescription: string;
   valueType: AnalyticsMetricValueType;
   data: AnalyticsMetricDetailPoint[];
+  breakdownTitle?: string;
+  breakdownDescription?: string;
+  breakdownItems?: AnalyticsMetricBreakdownItem[];
+};
+
+export type AnalyticsMetricBreakdownItem = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "default" | "alert";
 };
 
 export type FeedbackTrendPoint = {
@@ -88,13 +98,13 @@ const analyticsMetricDefinitions = [
   },
   {
     slug: "drop-off-before-first-room",
-    label: "Drop-off before first room",
+    label: "No canvas interaction",
     detail: `Share of sessions with no wall selection or room creation over the last ${SESSION_WINDOW_DAYS} days`,
     description:
-      "The daily share of sessions that opened but never reached a meaningful canvas interaction, using the existing wall-selected and room-created events.",
-    chartTitle: "Daily drop-off rate",
+      "The daily share of sessions that opened but never reached a meaningful canvas interaction, using existing wall-selection, shared-wall disambiguation, and room-creation signals.",
+    chartTitle: "Daily no-interaction rate",
     chartDescription:
-      "Percentage of sessions opened on each day that ended without a wall selection or room creation event.",
+      "Percentage of sessions opened on each day that ended without a wall-selection or room-creation signal.",
     valueType: "percent",
   },
   {
@@ -229,7 +239,8 @@ function getPropertyString(properties: Record<string, unknown> | null, key: stri
 async function fetchRecentAnalyticsEvents(sinceIso: string) {
   const query = new URLSearchParams({
     select: "event,timestamp,session_id,properties",
-    event: "in.(app_opened,room_created,first_success,wall_selected)",
+    event:
+      "in.(app_opened,room_created,first_success,wall_selected,shared_wall_disambiguation_used,session_summary)",
     timestamp: `gte.${sinceIso}`,
     order: "timestamp.asc",
   });
@@ -302,6 +313,12 @@ type AnalyticsDerivedSeries = {
   dropOffRate: number;
   averageFirstRoomDuration: number | null;
   totalRoomsCreated: number;
+  dropOffBreakdown: {
+    openedSessions: number;
+    noCanvasInteractionSessions: number;
+    wallSelectionSessions: number;
+    roomCreatedSessions: number;
+  };
 };
 
 function deriveAnalyticsSeries(
@@ -318,6 +335,8 @@ function deriveAnalyticsSeries(
   const openedSessions = new Set<string>();
   const drawnSessions = new Set<string>();
   const meaningfulSessions = new Set<string>();
+  const wallSelectionSessions = new Set<string>();
+  const roomCreatedSessions = new Set<string>();
   const firstRoomDurations = new Map<string, number>();
   const openedAtBySession = new Map<string, number>();
   const openedDateBySession = new Map<string, string>();
@@ -355,6 +374,7 @@ function deriveAnalyticsSeries(
 
     if (event.event === "room_created") {
       meaningfulSessions.add(event.session_id);
+      roomCreatedSessions.add(event.session_id);
       if (detailDateSet.has(dateKey)) {
         roomsCreatedPerDay.set(dateKey, (roomsCreatedPerDay.get(dateKey) ?? 0) + 1);
       }
@@ -366,6 +386,20 @@ function deriveAnalyticsSeries(
 
     if (event.event === "wall_selected") {
       meaningfulSessions.add(event.session_id);
+      wallSelectionSessions.add(event.session_id);
+    }
+
+    if (event.event === "shared_wall_disambiguation_used") {
+      meaningfulSessions.add(event.session_id);
+      wallSelectionSessions.add(event.session_id);
+    }
+
+    if (event.event === "session_summary") {
+      const roomsCreated = getPropertyNumber(event.properties, "roomsCreated");
+      if (roomsCreated !== null && roomsCreated > 0) {
+        meaningfulSessions.add(event.session_id);
+        roomCreatedSessions.add(event.session_id);
+      }
     }
 
     if (event.event === "first_success") {
@@ -466,6 +500,12 @@ function deriveAnalyticsSeries(
   const meaningfulOpenedSessionCount = openedSessionIds.filter((sessionId) =>
     meaningfulSessions.has(sessionId)
   ).length;
+  const wallSelectionOpenedSessionCount = openedSessionIds.filter((sessionId) =>
+    wallSelectionSessions.has(sessionId)
+  ).length;
+  const roomCreatedOpenedSessionCount = openedSessionIds.filter((sessionId) =>
+    roomCreatedSessions.has(sessionId)
+  ).length;
   const drawRate =
     openedSessions.size === 0 ? 0 : drawnOpenedSessionCount / openedSessions.size;
   const dropOffRate =
@@ -488,6 +528,12 @@ function deriveAnalyticsSeries(
     dropOffRate,
     averageFirstRoomDuration,
     totalRoomsCreated,
+    dropOffBreakdown: {
+      openedSessions: openedSessions.size,
+      noCanvasInteractionSessions: Math.max(0, openedSessions.size - meaningfulOpenedSessionCount),
+      wallSelectionSessions: wallSelectionOpenedSessionCount,
+      roomCreatedSessions: roomCreatedOpenedSessionCount,
+    },
   };
 }
 
@@ -589,6 +635,36 @@ function buildMetricDetail(
     chartDescription: metric.chartDescription,
     valueType: metric.valueType,
     data: getMetricDetailData(slug, derivedSeries),
+    ...(slug === "drop-off-before-first-room"
+      ? {
+          breakdownTitle: "What those sessions did",
+          breakdownDescription:
+            "A simple count breakdown across the same 30-day session window. Wall selection and room creation can overlap.",
+          breakdownItems: [
+            {
+              label: "Sessions opened",
+              value: formatInteger(derivedSeries.dropOffBreakdown.openedSessions),
+              detail: "Total sessions in the analysis window.",
+            },
+            {
+              label: "No canvas interaction",
+              value: formatInteger(derivedSeries.dropOffBreakdown.noCanvasInteractionSessions),
+              detail: "Opened but never reached wall selection or room creation.",
+              tone: "alert" as const,
+            },
+            {
+              label: "Reached wall selection",
+              value: formatInteger(derivedSeries.dropOffBreakdown.wallSelectionSessions),
+              detail: "Sessions with at least one tracked wall-selection signal.",
+            },
+            {
+              label: "Created a room",
+              value: formatInteger(derivedSeries.dropOffBreakdown.roomCreatedSessions),
+              detail: "Sessions with tracked room creation evidence.",
+            },
+          ],
+        }
+      : {}),
   };
 }
 

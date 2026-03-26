@@ -37,7 +37,7 @@ export default async function AdminAnalyticsPage() {
               className={cn(
                 "shadow-sm transition-colors group-focus-visible:ring-2 group-focus-visible:ring-ring/50",
                 metric.tone === "alert"
-                  ? "border-red-200/80 bg-red-50/40 group-hover:border-red-300/90 group-hover:bg-red-50/60 dark:border-red-900/50 dark:bg-red-950/15 dark:group-hover:border-red-800/70 dark:group-hover:bg-red-950/25"
+                  ? "border-red-300/80 bg-red-50/55 group-hover:border-red-400/90 group-hover:bg-red-50/75 dark:border-red-900/70 dark:bg-red-950/25 dark:group-hover:border-red-800/85 dark:group-hover:bg-red-950/35"
                   : "border-border/70 bg-background/90 group-hover:border-foreground/20 group-hover:bg-background"
               )}
             >
@@ -47,7 +47,7 @@ export default async function AdminAnalyticsPage() {
                     className={cn(
                       "font-measurement text-[10px] font-semibold tracking-[0.16em] uppercase",
                       metric.tone === "alert"
-                        ? "text-red-700/80 dark:text-red-300/80"
+                        ? "text-red-800/85 dark:text-red-200/85"
                         : "text-foreground/45"
                     )}
                   >
@@ -57,7 +57,7 @@ export default async function AdminAnalyticsPage() {
                     className={cn(
                       "mt-0.5 size-4 shrink-0 transition-transform group-hover:translate-x-0.5",
                       metric.tone === "alert"
-                        ? "text-red-700/45 group-hover:text-red-700/70 dark:text-red-300/45 dark:group-hover:text-red-300/70"
+                        ? "text-red-800/55 group-hover:text-red-800/80 dark:text-red-200/55 dark:group-hover:text-red-200/80"
                         : "text-foreground/35 group-hover:text-foreground/60"
                     )}
                   />
