@@ -18,8 +18,8 @@ export default async function AdminPage() {
               Latest product feedback
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              All submissions from the public feedback flow, ordered by most recent first. This
-              view stays intentionally calm and read-only for Phase 1.
+              Review unread product signals first, then switch to the full history when needed.
+              This view stays intentionally calm while supporting lightweight daily triage.
             </p>
           </div>
         </CardContent>
