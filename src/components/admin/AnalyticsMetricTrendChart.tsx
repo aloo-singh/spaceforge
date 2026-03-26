@@ -4,10 +4,8 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis 
 
 import {
   ChartContainer,
-  chartTooltipContentStyle,
-  chartTooltipCursorStyle,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
+  ChartTooltipContent,
+  ChartTooltipCursor,
   type ChartConfig,
 } from "@/components/ui/chart";
 import type {
@@ -109,12 +107,16 @@ export function AnalyticsMetricTrendChart({
             tickFormatter={(value: number) => formatYAxisTick(value, valueType)}
           />
           <Tooltip
-            cursor={chartTooltipCursorStyle}
-            contentStyle={chartTooltipContentStyle}
-            itemStyle={chartTooltipItemStyle}
-            labelFormatter={(label) => formatDateLabel(String(label))}
-            formatter={(value) => formatValue(Number(value ?? 0), valueType)}
-            labelStyle={chartTooltipLabelStyle}
+            cursor={<ChartTooltipCursor />}
+            content={({ active, label, payload }) => (
+              <ChartTooltipContent
+                active={active}
+                label={label}
+                payload={payload}
+                formatLabel={(value) => formatDateLabel(value)}
+                formatValue={(value) => formatValue(value, valueType)}
+              />
+            )}
           />
           <Area
             type="monotone"
@@ -152,12 +154,16 @@ export function AnalyticsMetricTrendChart({
             tickFormatter={(value: number) => formatYAxisTick(value, valueType)}
           />
           <Tooltip
-            cursor={chartTooltipCursorStyle}
-            contentStyle={chartTooltipContentStyle}
-            itemStyle={chartTooltipItemStyle}
-            labelFormatter={(label) => formatDateLabel(String(label))}
-            formatter={(value) => formatValue(Number(value ?? 0), valueType)}
-            labelStyle={chartTooltipLabelStyle}
+            cursor={<ChartTooltipCursor />}
+            content={({ active, label, payload }) => (
+              <ChartTooltipContent
+                active={active}
+                label={label}
+                payload={payload}
+                formatLabel={(value) => formatDateLabel(value)}
+                formatValue={(value) => formatValue(value, valueType)}
+              />
+            )}
           />
           <Line
             type="monotone"

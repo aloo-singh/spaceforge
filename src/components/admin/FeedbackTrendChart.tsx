@@ -13,10 +13,8 @@ import {
 
 import {
   ChartContainer,
-  chartTooltipContentStyle,
-  chartTooltipCursorStyle,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
+  ChartTooltipContent,
+  ChartTooltipCursor,
   type ChartConfig,
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
@@ -33,7 +31,7 @@ type FeedbackTrendChartProps = {
 const chartConfig = {
   submissions: {
     label: "Feedback submissions",
-    color: "hsl(var(--foreground))",
+    color: "var(--color-chart-1)",
   },
 } satisfies ChartConfig;
 
@@ -116,12 +114,16 @@ export function FeedbackTrendChart({
           width={variant === "compact" ? 24 : 28}
         />
         <Tooltip
-          cursor={chartTooltipCursorStyle}
-          contentStyle={chartTooltipContentStyle}
-          itemStyle={chartTooltipItemStyle}
-          labelFormatter={(label) => formatTickLabel(String(label))}
-          formatter={(value) => formatTooltipValue(Number(value ?? 0))}
-          labelStyle={chartTooltipLabelStyle}
+          cursor={<ChartTooltipCursor />}
+          content={({ active, label, payload }) => (
+            <ChartTooltipContent
+              active={active}
+              label={label}
+              payload={payload}
+              formatLabel={(value) => formatTickLabel(value)}
+              formatValue={(value) => formatTooltipValue(value)}
+            />
+          )}
         />
         <Area
           type="monotone"
