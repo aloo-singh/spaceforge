@@ -104,7 +104,7 @@ export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminSh
               </div>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent className="flex-none overflow-visible">
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu aria-label="Admin sections">
