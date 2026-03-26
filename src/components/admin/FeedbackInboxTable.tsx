@@ -272,7 +272,7 @@ export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTablePr
             </p>
           </div>
           <p className="font-measurement text-[11px] text-muted-foreground/75">
-            Last updated {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt, now) : "just now"}
+            Last feedback received {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt, now) : "just now"}
           </p>
         </div>
 
