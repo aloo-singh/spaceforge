@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { PanelLeft } from "lucide-react";
-import { Slot } from "radix-ui";
+import { Collapsible, Slot } from "radix-ui";
 
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
@@ -328,7 +328,55 @@ const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonP
 );
 SidebarMenuButton.displayName = "SidebarMenuButton";
 
+const SidebarMenuSub = React.forwardRef<HTMLUListElement, React.ComponentProps<"ul">>(
+  ({ className, ...props }, ref) => (
+    <ul
+      ref={ref}
+      data-slot="sidebar-menu-sub"
+      className={cn(
+        "ml-5 flex flex-col gap-1 border-l border-sidebar-border/60 pl-3 group-data-[state=collapsed]/sidebar:hidden",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+SidebarMenuSub.displayName = "SidebarMenuSub";
+
+const SidebarMenuSubItem = React.forwardRef<HTMLLIElement, React.ComponentProps<"li">>(
+  ({ className, ...props }, ref) => (
+    <li ref={ref} data-slot="sidebar-menu-sub-item" className={cn("list-none", className)} {...props} />
+  )
+);
+SidebarMenuSubItem.displayName = "SidebarMenuSubItem";
+
+type SidebarMenuSubButtonProps = React.ComponentProps<"a"> & {
+  asChild?: boolean;
+  isActive?: boolean;
+};
+
+const SidebarMenuSubButton = React.forwardRef<HTMLAnchorElement, SidebarMenuSubButtonProps>(
+  ({ asChild = false, isActive = false, className, ...props }, ref) => {
+    const Comp = asChild ? Slot.Root : "a";
+
+    return (
+      <Comp
+        ref={ref}
+        data-slot="sidebar-menu-sub-button"
+        data-active={isActive}
+        className={cn(
+          "flex min-h-9 w-full items-center rounded-xl px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
+
 export {
+  Collapsible,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -340,6 +388,9 @@ export {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,

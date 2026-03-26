@@ -1,14 +1,16 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Inbox, LogOut, Mail } from "lucide-react";
+import { BarChart3, ChevronRight, Inbox, LogOut, Mail } from "lucide-react";
 
 import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -20,6 +22,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
@@ -38,16 +43,41 @@ const adminNavItems = [
     description: "Incoming product signals",
     icon: Inbox,
   },
+] as const;
+
+const analyticsNavItems = [
   {
     href: "/admin/analytics",
-    label: "Analytics",
-    description: "Core product telemetry",
-    icon: BarChart3,
+    label: "Overview",
+  },
+  {
+    href: "/admin/analytics/sessions-per-day",
+    label: "Sessions per day",
+  },
+  {
+    href: "/admin/analytics/drawing-at-least-one-room",
+    label: "% drawing at least one room",
+  },
+  {
+    href: "/admin/analytics/average-time-to-first-room",
+    label: "Average time to first room",
+  },
+  {
+    href: "/admin/analytics/total-rooms-created",
+    label: "Total rooms created",
   },
 ] as const;
 
 export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminShellProps) {
   const pathname = usePathname();
+  const isAnalyticsSectionActive = pathname.startsWith("/admin/analytics");
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = React.useState(isAnalyticsSectionActive);
+
+  React.useEffect(() => {
+    if (isAnalyticsSectionActive) {
+      setIsAnalyticsOpen(true);
+    }
+  }, [isAnalyticsSectionActive]);
 
   return (
     <SidebarProvider>
@@ -80,10 +110,7 @@ export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminSh
                   <SidebarMenu aria-label="Admin sections">
                     {adminNavItems.map((item) => {
                       const Icon = item.icon;
-                      const isActive =
-                        item.href === "/admin"
-                          ? pathname === "/admin"
-                          : pathname.startsWith(item.href);
+                      const isActive = pathname === item.href;
 
                       return (
                         <SidebarMenuItem key={item.label}>
@@ -116,6 +143,53 @@ export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminSh
                         </SidebarMenuItem>
                       );
                     })}
+
+                    <SidebarMenuItem>
+                      <Collapsible.Root open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
+                        <Collapsible.Trigger asChild>
+                          <SidebarMenuButton
+                            isActive={isAnalyticsSectionActive}
+                            title="Analytics"
+                            className="shadow-none"
+                          >
+                            <BarChart3 className="mt-0.5 size-4 shrink-0" />
+                            <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
+                              <span className="flex items-center justify-between gap-3">
+                                <span className="block text-sm font-medium">Analytics</span>
+                                <ChevronRight
+                                  className="size-4 shrink-0 text-sidebar-foreground/45 transition-transform data-[state=open]:rotate-90"
+                                  data-state={isAnalyticsOpen ? "open" : "closed"}
+                                />
+                              </span>
+                              <span className="block text-xs text-sidebar-foreground/65">
+                                Core product telemetry
+                              </span>
+                            </span>
+                          </SidebarMenuButton>
+                        </Collapsible.Trigger>
+
+                        <Collapsible.Content>
+                          <SidebarMenuSub>
+                            {analyticsNavItems.map((item) => {
+                              const isActive = pathname === item.href;
+
+                              return (
+                                <SidebarMenuSubItem key={item.href}>
+                                  <SidebarMenuSubButton asChild isActive={isActive}>
+                                    <Link
+                                      href={item.href}
+                                      aria-current={isActive ? "page" : undefined}
+                                    >
+                                      {item.label}
+                                    </Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        </Collapsible.Content>
+                      </Collapsible.Root>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
