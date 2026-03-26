@@ -42,13 +42,37 @@ const updatedAtFormatter = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-GB", {
+  numeric: "auto",
+});
+
 function formatCreatedAt(createdAt: string) {
   const date = new Date(createdAt);
   return `${createdAtDateFormatter.format(date)}, ${createdAtTimeFormatter.format(date)}`;
 }
 
-function formatUpdatedAt(createdAt: string) {
-  return updatedAtFormatter.format(new Date(createdAt));
+function formatUpdatedAt(createdAt: string, now: number) {
+  const updatedAt = new Date(createdAt);
+
+  if (Number.isNaN(updatedAt.getTime())) {
+    return updatedAtFormatter.format(new Date(now));
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - updatedAt.getTime()) / 1000));
+
+  if (elapsedSeconds < 45) {
+    return "just now";
+  }
+
+  if (elapsedSeconds < 3_600) {
+    return relativeTimeFormatter.format(-Math.floor(elapsedSeconds / 60), "minute");
+  }
+
+  if (elapsedSeconds < 86_400) {
+    return relativeTimeFormatter.format(-Math.floor(elapsedSeconds / 3_600), "hour");
+  }
+
+  return relativeTimeFormatter.format(-Math.floor(elapsedSeconds / 86_400), "day");
 }
 
 function formatSentiment(sentiment: FeedbackSubmissionRecord["sentiment"]) {
@@ -64,7 +88,20 @@ function formatSource(source: FeedbackSubmissionRecord["source"]) {
 }
 
 function formatTiming(timeSinceOpenSeconds: number) {
-  return `${timeSinceOpenSeconds} sec after open`;
+  const totalSeconds = Math.max(0, Math.floor(timeSinceOpenSeconds));
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+
+  return `${seconds}s`;
 }
 
 function getFreeTextPreview(freeText: string) {
@@ -110,6 +147,7 @@ function MarkAllReadButton({ disabled }: { disabled: boolean }) {
 }
 
 export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTableProps) {
+  const [now, setNow] = useState(() => Date.now());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FeedbackInboxFilter>("unread");
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
@@ -117,6 +155,14 @@ export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTablePr
   const [isMarkAllPending, setIsMarkAllPending] = useState(false);
   const [showMarkAllToast, setShowMarkAllToast] = useState(false);
   const markReadFormRefs = useRef<Record<string, HTMLFormElement | null>>({});
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!showMarkAllToast) {
@@ -226,7 +272,7 @@ export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTablePr
             </p>
           </div>
           <p className="font-measurement text-[11px] text-muted-foreground/75">
-            Last updated {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt) : "just now"}
+            Last feedback received {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt, now) : "just now"}
           </p>
         </div>
 

@@ -10,22 +10,25 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.45.2</h2>
+            <h2 className="text-2xl font-semibold">v0.45.3</h2>
             <span className="text-sm text-muted-foreground">2026-03-26</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
-                Improved (Feedback Inbox Phase 3)
+                Improved (Feedback Inbox Timing Polish)
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Subtle left accent + tint for unread rows</li>
-                <li>&quot;Last updated&quot; timestamp in header</li>
-                <li>Keyboard hint (<code>r</code> key) for marking focused row as read</li>
-                <li>Clearer &quot;Expand&quot;/&quot;Collapse&quot; affordance on rows</li>
-                <li>Calm confirmation after &quot;Mark all as read&quot;</li>
-                <li>Minor table hover/focus improvements via shared primitive</li>
+                <li>
+                  &quot;Last updated&quot; now shows friendly relative time (&quot;just now&quot;,
+                  &quot;5 minutes ago&quot;, &quot;2 hours ago&quot;) with light auto-refresh
+                </li>
+                <li>
+                  Timing column uses compact format: &quot;57s&quot;, &quot;3m 18s&quot;,
+                  &quot;1h 12m&quot; (smallest populated unit only)
+                </li>
+                <li>Both use consistent measurement typography</li>
               </ul>
             </div>
           </div>
