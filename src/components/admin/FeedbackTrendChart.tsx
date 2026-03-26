@@ -1,20 +1,32 @@
 "use client";
 
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
 
 type FeedbackTrendChartProps = {
   data: Array<{
     date: string;
     submissions: number;
   }>;
+  variant?: "full" | "sparkline";
+  className?: string;
 };
 
 const chartConfig = {
   submissions: {
     label: "Feedback submissions",
-    color: "var(--color-chart-1)",
+    color: "hsl(var(--foreground))",
   },
 } satisfies ChartConfig;
 
@@ -26,10 +38,50 @@ function formatTickLabel(value: string) {
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-export function FeedbackTrendChart({ data }: FeedbackTrendChartProps) {
+function formatTooltipValue(value: number) {
+  return new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function FeedbackTrendChart({
+  data,
+  variant = "full",
+  className,
+}: FeedbackTrendChartProps) {
+  if (variant === "sparkline") {
+    return (
+      <ChartContainer
+        config={chartConfig}
+        className={cn("h-10 w-full [&_.recharts-surface]:overflow-visible", className)}
+      >
+        <LineChart
+          accessibilityLayer
+          data={data}
+          margin={{
+            left: 1,
+            right: 1,
+            top: 3,
+            bottom: 3,
+          }}
+        >
+          <Line
+            type="monotone"
+            dataKey="submissions"
+            stroke="var(--color-submissions)"
+            strokeOpacity={0.7}
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ChartContainer>
+    );
+  }
+
   return (
-    <ChartContainer config={chartConfig} className="h-[280px]">
-      <LineChart
+    <ChartContainer config={chartConfig} className={cn("h-[320px]", className)}>
+      <AreaChart
         accessibilityLayer
         data={data}
         margin={{
@@ -53,6 +105,18 @@ export function FeedbackTrendChart({ data }: FeedbackTrendChartProps) {
           allowDecimals={false}
           width={28}
         />
+        <Tooltip
+          cursor={{ strokeDasharray: "3 6" }}
+          labelFormatter={(label) => formatTickLabel(String(label))}
+          formatter={(value) => formatTooltipValue(Number(value ?? 0))}
+        />
+        <Area
+          type="monotone"
+          dataKey="submissions"
+          stroke="none"
+          fill="var(--color-submissions)"
+          fillOpacity={0.12}
+        />
         <Line
           type="monotone"
           dataKey="submissions"
@@ -66,7 +130,7 @@ export function FeedbackTrendChart({ data }: FeedbackTrendChartProps) {
             strokeWidth: 1.5,
           }}
         />
-      </LineChart>
+      </AreaChart>
     </ChartContainer>
   );
 }

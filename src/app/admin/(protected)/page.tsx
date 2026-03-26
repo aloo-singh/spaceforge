@@ -1,10 +1,14 @@
 import { FeedbackInboxTable } from "@/components/admin/FeedbackInboxTable";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { fetchAdminFeedbackTrend } from "@/lib/admin/analytics";
 import { fetchFeedbackSubmissions } from "@/lib/feedback/server";
 
 export default async function AdminPage() {
-  const feedbackSubmissions = await fetchFeedbackSubmissions();
+  const [feedbackSubmissions, feedbackTrend] = await Promise.all([
+    fetchFeedbackSubmissions(),
+    fetchAdminFeedbackTrend(),
+  ]);
 
   return (
     <div className="w-full space-y-4">
@@ -40,7 +44,10 @@ export default async function AdminPage() {
               </Empty>
             </div>
           ) : (
-            <FeedbackInboxTable feedbackSubmissions={feedbackSubmissions} />
+            <FeedbackInboxTable
+              feedbackSubmissions={feedbackSubmissions}
+              feedbackTrend={feedbackTrend}
+            />
           )}
         </CardContent>
       </Card>

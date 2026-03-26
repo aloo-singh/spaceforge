@@ -61,6 +61,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SESSION_WINDOW_DAYS = 30;
 const SESSION_AVERAGE_DAYS = 7;
 const FEEDBACK_TREND_DAYS = 30;
+export const FEEDBACK_GRAPH_DAYS = 90;
 
 const analyticsMetricDefinitions = [
   {
@@ -258,8 +259,8 @@ async function fetchRecentFeedbackSubmissions(sinceIso: string) {
   return (await response.json()) as FeedbackSubmissionRow[];
 }
 
-function buildFeedbackTrend(rows: FeedbackSubmissionRow[]) {
-  const dateSeries = getDateSeries(FEEDBACK_TREND_DAYS);
+function buildFeedbackTrend(rows: FeedbackSubmissionRow[], days: number) {
+  const dateSeries = getDateSeries(days);
   const counts = new Map(dateSeries.map((date) => [date, 0]));
 
   for (const row of rows) {
@@ -536,19 +537,25 @@ function buildMetricDetail(
 
 export async function fetchAdminAnalyticsDashboardData(): Promise<AdminAnalyticsDashboardData> {
   const analyticsSinceIso = getDateDaysAgo(SESSION_WINDOW_DAYS - 1).toISOString();
-  const feedbackSinceIso = getDateDaysAgo(FEEDBACK_TREND_DAYS - 1).toISOString();
 
-  const [recentAnalyticsEvents, totalRoomsCreated, recentFeedbackSubmissions] = await Promise.all([
+  const [recentAnalyticsEvents, totalRoomsCreated, feedbackTrend] = await Promise.all([
     fetchRecentAnalyticsEvents(analyticsSinceIso),
     fetchTotalRoomsCreated(),
-    fetchRecentFeedbackSubmissions(feedbackSinceIso),
+    fetchAdminFeedbackTrend(FEEDBACK_TREND_DAYS),
   ]);
   const derivedSeries = deriveAnalyticsSeries(recentAnalyticsEvents, totalRoomsCreated);
 
   return {
     metricCards: buildMetricCards(derivedSeries),
-    feedbackTrend: buildFeedbackTrend(recentFeedbackSubmissions),
+    feedbackTrend,
   };
+}
+
+export async function fetchAdminFeedbackTrend(days: number = FEEDBACK_TREND_DAYS) {
+  const feedbackSinceIso = getDateDaysAgo(days - 1).toISOString();
+  const recentFeedbackSubmissions = await fetchRecentFeedbackSubmissions(feedbackSinceIso);
+
+  return buildFeedbackTrend(recentFeedbackSubmissions, days);
 }
 
 export async function fetchAdminAnalyticsMetricDetail(

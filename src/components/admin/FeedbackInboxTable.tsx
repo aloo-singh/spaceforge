@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useFormStatus } from "react-dom";
@@ -8,6 +9,7 @@ import {
   markAllFeedbackSubmissionsReadAction,
   markFeedbackSubmissionReadAction,
 } from "@/app/admin/actions";
+import { FeedbackTrendChart } from "@/components/admin/FeedbackTrendChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
@@ -19,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { FeedbackTrendPoint } from "@/lib/admin/analytics";
 import type { FeedbackSubmissionRecord } from "@/lib/feedback/types";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +125,7 @@ function sentimentBadgeClassName(sentiment: FeedbackSubmissionRecord["sentiment"
 
 type FeedbackInboxTableProps = {
   feedbackSubmissions: FeedbackSubmissionRecord[];
+  feedbackTrend: FeedbackTrendPoint[];
 };
 
 type FeedbackInboxFilter = "unread" | "all";
@@ -146,7 +150,10 @@ function MarkAllReadButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTableProps) {
+export function FeedbackInboxTable({
+  feedbackSubmissions,
+  feedbackTrend,
+}: FeedbackInboxTableProps) {
   const [now, setNow] = useState(() => Date.now());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FeedbackInboxFilter>("unread");
@@ -271,6 +278,24 @@ export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTablePr
               {unreadCount} unread {unreadCount === 1 ? "item" : "items"}
             </p>
           </div>
+          <Link
+            href="/admin/analytics/feedback-graph"
+            className="group inline-flex w-fit items-center gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-2 transition-colors hover:border-border hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <div className="min-w-0">
+              <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/40 uppercase">
+                30d trend
+              </p>
+              <p className="text-xs text-muted-foreground">Open full feedback graph</p>
+            </div>
+            <div className="w-24 shrink-0">
+              <FeedbackTrendChart
+                data={feedbackTrend}
+                variant="sparkline"
+                className="h-8 text-foreground/65"
+              />
+            </div>
+          </Link>
           <p className="font-measurement text-[11px] text-muted-foreground/75">
             Last feedback received {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt, now) : "just now"}
           </p>
