@@ -14,7 +14,7 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
   const chartVariant = metric.slug === "total-rooms-created" ? "area" : "line";
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
       <div>
         <Button
           asChild
@@ -30,7 +30,7 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
       </div>
 
       <Card className="w-full border-border/70 bg-card/95 shadow-sm">
-        <CardContent className="space-y-5 p-6">
+        <CardContent className="space-y-5 p-5 md:p-6">
           <div className="space-y-2">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.18em] text-foreground/45 uppercase">
               Analytics
@@ -41,7 +41,7 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
             </p>
           </div>
 
-          <div className="rounded-xl border border-border/70 bg-background/80 p-5">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4 md:p-5">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
               Current readout
             </p>
@@ -54,7 +54,7 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
       </Card>
 
       <Card className="border-border/70 bg-background/90 shadow-sm">
-        <CardContent className="space-y-5 p-6">
+        <CardContent className="space-y-4 p-5 md:p-6">
           <div className="space-y-2">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
               Detail

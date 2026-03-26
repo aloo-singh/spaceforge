@@ -4,6 +4,8 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis 
 
 import {
   ChartContainer,
+  ChartTooltipContent,
+  ChartTooltipCursor,
   type ChartConfig,
 } from "@/components/ui/chart";
 import type {
@@ -105,9 +107,16 @@ export function AnalyticsMetricTrendChart({
             tickFormatter={(value: number) => formatYAxisTick(value, valueType)}
           />
           <Tooltip
-            cursor={{ strokeDasharray: "3 6" }}
-            labelFormatter={(label) => formatDateLabel(String(label))}
-            formatter={(value) => formatValue(Number(value ?? 0), valueType)}
+            cursor={<ChartTooltipCursor />}
+            content={({ active, label, payload }) => (
+              <ChartTooltipContent
+                active={active}
+                label={label}
+                payload={payload}
+                formatLabel={(value) => formatDateLabel(value)}
+                formatValue={(value) => formatValue(value, valueType)}
+              />
+            )}
           />
           <Area
             type="monotone"
@@ -145,9 +154,16 @@ export function AnalyticsMetricTrendChart({
             tickFormatter={(value: number) => formatYAxisTick(value, valueType)}
           />
           <Tooltip
-            cursor={{ strokeDasharray: "3 6" }}
-            labelFormatter={(label) => formatDateLabel(String(label))}
-            formatter={(value) => formatValue(Number(value ?? 0), valueType)}
+            cursor={<ChartTooltipCursor />}
+            content={({ active, label, payload }) => (
+              <ChartTooltipContent
+                active={active}
+                label={label}
+                payload={payload}
+                formatLabel={(value) => formatDateLabel(value)}
+                formatValue={(value) => formatValue(value, valueType)}
+              />
+            )}
           />
           <Line
             type="monotone"

@@ -11,7 +11,7 @@ export default async function AdminFeedbackGraphPage() {
   const totalSubmissions = feedbackTrend.reduce((total, point) => total + point.submissions, 0);
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
       <div>
         <Button
           asChild
@@ -27,7 +27,7 @@ export default async function AdminFeedbackGraphPage() {
       </div>
 
       <Card className="w-full border-border/70 bg-card/95 shadow-sm">
-        <CardContent className="space-y-5 p-6">
+        <CardContent className="space-y-5 p-5 md:p-6">
           <div className="space-y-2">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.18em] text-foreground/45 uppercase">
               Feedback analytics
@@ -41,7 +41,7 @@ export default async function AdminFeedbackGraphPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border/70 bg-background/80 p-5">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4 md:p-5">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
               Window total
             </p>
@@ -59,7 +59,7 @@ export default async function AdminFeedbackGraphPage() {
       </Card>
 
       <Card className="border-border/70 bg-background/90 shadow-sm">
-        <CardContent className="space-y-5 p-6">
+        <CardContent className="space-y-4 p-5 md:p-6">
           <div className="space-y-2">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
               Daily trend
