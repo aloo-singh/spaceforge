@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BarChart3, Inbox, LogOut, Mail } from "lucide-react";
 
 import { logoutAdminAction } from "@/app/admin/actions";
@@ -34,20 +37,18 @@ const adminNavItems = [
     label: "Feedback Inbox",
     description: "Incoming product signals",
     icon: Inbox,
-    isActive: true,
-    isDisabled: false,
   },
   {
-    href: "/admin",
+    href: "/admin/analytics",
     label: "Analytics",
-    description: "Placeholder for Phase 2",
+    description: "Core product telemetry",
     icon: BarChart3,
-    isActive: false,
-    isDisabled: true,
   },
 ] as const;
 
 export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminShellProps) {
+  const pathname = usePathname();
+
   return (
     <SidebarProvider>
       <main className="min-h-[calc(100vh-3.5rem)] flex-1 bg-muted/20">
@@ -79,37 +80,20 @@ export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminSh
                   <SidebarMenu aria-label="Admin sections">
                     {adminNavItems.map((item) => {
                       const Icon = item.icon;
-
-                      if (item.isDisabled) {
-                        return (
-                          <SidebarMenuItem key={item.label}>
-                            <SidebarMenuButton
-                              type="button"
-                              disabled
-                              title={item.label}
-                              className="text-sidebar-foreground/55 hover:bg-transparent hover:text-sidebar-foreground/55"
-                            >
-                              <Icon className="mt-0.5 size-4 shrink-0 text-sidebar-foreground/55" />
-                              <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
-                                <span className="block text-sm font-medium">{item.label}</span>
-                                <span className="block text-xs text-sidebar-foreground/55">
-                                  {item.description}
-                                </span>
-                              </span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        );
-                      }
+                      const isActive =
+                        item.href === "/admin"
+                          ? pathname === "/admin"
+                          : pathname.startsWith(item.href);
 
                       return (
                         <SidebarMenuItem key={item.label}>
                           <SidebarMenuButton
                             asChild
-                            isActive={item.isActive}
+                            isActive={isActive}
                             title={item.label}
                             className="shadow-none"
                           >
-                            <Link href={item.href} aria-current={item.isActive ? "page" : undefined}>
+                            <Link href={item.href} aria-current={isActive ? "page" : undefined}>
                               <Icon className="mt-0.5 size-4 shrink-0" />
                               <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
                                 <span className="flex items-center gap-2">
