@@ -7,8 +7,8 @@ export default async function AdminPage() {
   const feedbackSubmissions = await fetchFeedbackSubmissions();
 
   return (
-    <div className="space-y-4">
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+    <div className="w-full space-y-4">
+      <Card className="w-full border-border/70 bg-card/95 shadow-sm">
         <CardContent className="space-y-4 p-6">
           <div className="space-y-2">
             <p className="font-measurement text-[10px] font-semibold tracking-[0.18em] text-foreground/45 uppercase">
@@ -25,7 +25,7 @@ export default async function AdminPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-background/90 shadow-sm">
+      <Card className="w-full border-border/70 bg-background/90 shadow-sm">
         <CardContent className="p-0">
           {feedbackSubmissions.length === 0 ? (
             <div className="p-6">
