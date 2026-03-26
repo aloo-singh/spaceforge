@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+
 import { FeedbackTrendChart } from "@/components/admin/FeedbackTrendChart";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchAdminAnalyticsDashboardData } from "@/lib/admin/analytics";
@@ -27,17 +30,22 @@ export default async function AdminAnalyticsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {dashboard.metricCards.map((metric) => (
-          <Card key={metric.label} className="border-border/70 bg-background/90 shadow-sm">
-            <CardContent className="space-y-3 p-6">
-              <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
-                {metric.label}
-              </p>
-              <div className="space-y-1">
-                <p className="text-3xl font-semibold tracking-tight text-foreground">{metric.value}</p>
-                <p className="text-sm leading-6 text-muted-foreground">{metric.detail}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <Link key={metric.slug} href={metric.href} className="group block focus-visible:outline-none">
+            <Card className="border-border/70 bg-background/90 shadow-sm transition-colors group-hover:border-foreground/20 group-hover:bg-background group-focus-visible:ring-2 group-focus-visible:ring-ring/50">
+              <CardContent className="space-y-3 p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+                    {metric.label}
+                  </p>
+                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-foreground/35 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground/60" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-3xl font-semibold tracking-tight text-foreground">{metric.value}</p>
+                  <p className="text-sm leading-6 text-muted-foreground">{metric.detail}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
