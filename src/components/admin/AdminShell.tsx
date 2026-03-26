@@ -3,6 +3,7 @@ import { BarChart3, Inbox, LogOut, Mail } from "lucide-react";
 
 import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -23,6 +24,7 @@ import {
 
 type AdminShellProps = {
   userEmail: string;
+  unreadFeedbackCount: number;
   children: React.ReactNode;
 };
 
@@ -45,7 +47,7 @@ const adminNavItems = [
   },
 ] as const;
 
-export function AdminShell({ userEmail, children }: AdminShellProps) {
+export function AdminShell({ userEmail, unreadFeedbackCount, children }: AdminShellProps) {
   return (
     <SidebarProvider>
       <main className="min-h-[calc(100vh-3.5rem)] flex-1 bg-muted/20">
@@ -110,7 +112,17 @@ export function AdminShell({ userEmail, children }: AdminShellProps) {
                             <Link href={item.href} aria-current={item.isActive ? "page" : undefined}>
                               <Icon className="mt-0.5 size-4 shrink-0" />
                               <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
-                                <span className="block text-sm font-medium">{item.label}</span>
+                                <span className="flex items-center gap-2">
+                                  <span className="block text-sm font-medium">{item.label}</span>
+                                  {item.label === "Feedback Inbox" && unreadFeedbackCount > 0 ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="min-w-6 justify-center px-1.5 py-0 text-[10px] leading-4"
+                                    >
+                                      {unreadFeedbackCount}
+                                    </Badge>
+                                  ) : null}
+                                </span>
                                 <span className="block text-xs text-sidebar-foreground/65">
                                   {item.description}
                                 </span>

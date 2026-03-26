@@ -33,6 +33,8 @@ export type FeedbackSubmissionRecord = {
   timeSinceOpenSeconds: number;
   promptVariant: string | null;
   metadata: FeedbackMetadata | null;
+  isRead: boolean;
+  readAt: string | null;
   createdAt: string;
 };
 

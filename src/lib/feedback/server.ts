@@ -22,13 +22,15 @@ type SupabaseFeedbackSubmissionRow = {
   time_since_open_seconds: number;
   prompt_variant: string | null;
   metadata: Record<string, unknown> | null;
+  is_read: boolean;
+  read_at: string | null;
   created_at: string;
 };
 
 function createFeedbackSubmissionsSearchParams() {
   return new URLSearchParams({
     select:
-      "id,app_user_id,project_id,client_token,page_context,source,sentiment,free_text,time_since_open_seconds,prompt_variant,metadata,created_at",
+      "id,app_user_id,project_id,client_token,page_context,source,sentiment,free_text,time_since_open_seconds,prompt_variant,metadata,is_read,read_at,created_at",
     order: "created_at.desc",
   });
 }
@@ -57,7 +59,7 @@ async function feedbackRequest(pathname: string, init: RequestInit) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Supabase feedback insert failed: ${response.status} ${errorText}`);
+    throw new Error(`Supabase feedback request failed: ${response.status} ${errorText}`);
   }
 
   return response;
@@ -89,6 +91,8 @@ function mapFeedbackSubmissionRecord(row: SupabaseFeedbackSubmissionRow): Feedba
     timeSinceOpenSeconds: row.time_since_open_seconds,
     promptVariant: row.prompt_variant,
     metadata: row.metadata as FeedbackMetadata | null,
+    isRead: row.is_read,
+    readAt: row.read_at,
     createdAt: row.created_at,
   };
 }
@@ -147,4 +151,79 @@ export async function fetchFeedbackSubmissions(): Promise<FeedbackSubmissionReco
 
   const rows = (await response.json()) as SupabaseFeedbackSubmissionRow[];
   return rows.map(mapFeedbackSubmissionRecord);
+}
+
+export async function fetchUnreadFeedbackSubmissionCount(): Promise<number> {
+  const config = assertSupabaseConfig();
+  const url = new URL("/rest/v1/feedback_submissions", config.url);
+  url.search = new URLSearchParams({
+    select: "id",
+    is_read: "is.false",
+    limit: "1",
+  }).toString();
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      Prefer: "count=exact",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase feedback query failed: ${response.status} ${errorText}`);
+  }
+
+  const contentRange = response.headers.get("content-range");
+  const totalCount = contentRange?.split("/")[1];
+  if (totalCount) {
+    const parsedCount = Number.parseInt(totalCount, 10);
+    if (Number.isFinite(parsedCount)) {
+      return parsedCount;
+    }
+  }
+
+  const rows = (await response.json()) as Array<{ id: string }>;
+  return rows.length;
+}
+
+export async function markFeedbackSubmissionAsRead(submissionId: string) {
+  const readAt = new Date().toISOString();
+  const query = new URLSearchParams({
+    id: `eq.${submissionId}`,
+    is_read: "is.false",
+  });
+
+  await feedbackRequest(`feedback_submissions?${query.toString()}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      is_read: true,
+      read_at: readAt,
+    }),
+  });
+}
+
+export async function markAllFeedbackSubmissionsAsRead() {
+  const readAt = new Date().toISOString();
+  const query = new URLSearchParams({
+    is_read: "is.false",
+  });
+
+  await feedbackRequest(`feedback_submissions?${query.toString()}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      is_read: true,
+      read_at: readAt,
+    }),
+  });
 }
