@@ -9,6 +9,8 @@ const DrawerTrigger = DrawerPrimitive.Trigger;
 const DrawerPortal = DrawerPrimitive.Portal;
 const DrawerClose = DrawerPrimitive.Close;
 
+type DrawerSide = "bottom" | "left" | "right";
+
 const DrawerOverlay = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
@@ -23,19 +25,35 @@ DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, style, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content> & {
+    side?: DrawerSide;
+  }
+>(({ className, children, side = "bottom", style, ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed bottom-0 z-50 mt-24 box-border flex max-h-[calc(100dvh-0.5rem)] min-w-0 flex-col overflow-x-hidden rounded-t-3xl border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
+        side === "bottom"
+          ? "fixed bottom-0 z-50 mt-24 box-border flex max-h-[calc(100dvh-0.5rem)] min-w-0 flex-col overflow-x-hidden rounded-t-3xl border border-border/70 bg-card text-card-foreground shadow-xl outline-none"
+          : "fixed top-0 bottom-0 z-50 box-border flex min-w-0 flex-col overflow-x-hidden border border-border/70 bg-card text-card-foreground shadow-xl outline-none",
+        side === "left" && "left-0 rounded-r-3xl border-l-0",
+        side === "right" && "right-0 rounded-l-3xl border-r-0",
         className
       )}
       style={{
-        left: "calc(env(safe-area-inset-left) + 0.75rem)",
-        right: "calc(env(safe-area-inset-right) + 0.75rem)",
+        ...(side === "bottom"
+          ? {
+              left: "calc(env(safe-area-inset-left) + 0.75rem)",
+              right: "calc(env(safe-area-inset-right) + 0.75rem)",
+            }
+          : side === "left"
+            ? {
+                left: "env(safe-area-inset-left)",
+              }
+            : {
+                right: "env(safe-area-inset-right)",
+              }),
         ...style,
       }}
       {...props}

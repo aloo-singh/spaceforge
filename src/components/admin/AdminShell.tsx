@@ -1,10 +1,25 @@
 import Link from "next/link";
-import { BarChart3, Inbox } from "lucide-react";
+import { BarChart3, Inbox, LogOut, Mail } from "lucide-react";
 
 import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 type AdminShellProps = {
   userEmail: string;
@@ -32,92 +47,127 @@ const adminNavItems = [
 
 export function AdminShell({ userEmail, children }: AdminShellProps) {
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] bg-muted/20">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:gap-8 lg:px-8">
-        <aside className="w-full lg:max-w-xs">
-          <Card className="border-border/70 bg-card/95 shadow-sm">
-            <CardContent className="space-y-6 p-4">
-              <div className="space-y-2">
-                <p className="font-measurement text-[10px] font-semibold tracking-[0.18em] text-foreground/45 uppercase">
-                  Admin
-                </p>
-                <BrandWordmark className="text-base" />
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Calm, minimal workspace for internal review and operational tooling.
-                </p>
+    <SidebarProvider>
+      <main className="min-h-[calc(100vh-3.5rem)] bg-muted/20">
+        <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:gap-8 lg:px-8">
+          <Sidebar collapsible="icon" className="shrink-0">
+            <SidebarHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-2">
+                  <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                  <div className="group-data-[state=collapsed]/sidebar:hidden">
+                    <BrandWordmark className="text-base text-sidebar-foreground" />
+                  </div>
+                  <div className="hidden group-data-[state=collapsed]/sidebar:block">
+                    <span className="font-measurement text-base leading-none font-semibold tracking-tight text-sidebar-foreground">
+                      [s]
+                    </span>
+                  </div>
+                  <p className="text-sm leading-6 text-sidebar-foreground/70 group-data-[state=collapsed]/sidebar:hidden">
+                    Calm, minimal workspace for internal review and operational tooling.
+                  </p>
+                </div>
+                <SidebarTrigger className="shrink-0" />
               </div>
+            </SidebarHeader>
 
-              <nav className="space-y-2" aria-label="Admin sections">
-                {adminNavItems.map((item) => {
-                  const Icon = item.icon;
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu aria-label="Admin sections">
+                    {adminNavItems.map((item) => {
+                      const Icon = item.icon;
 
-                  if (item.isDisabled) {
-                    return (
-                      <Button
-                        key={item.label}
-                        type="button"
-                        variant="ghost"
-                        className="h-auto w-full justify-start rounded-lg border border-transparent px-3 py-3 text-left"
-                        disabled
-                      >
-                        <span className="flex items-start gap-3">
-                          <Icon className="mt-0.5 size-4 text-muted-foreground" />
-                          <span className="space-y-1">
-                            <span className="block text-sm font-medium">{item.label}</span>
-                            <span className="block text-xs text-muted-foreground">
-                              {item.description}
-                            </span>
-                          </span>
-                        </span>
-                      </Button>
-                    );
-                  }
+                      if (item.isDisabled) {
+                        return (
+                          <SidebarMenuItem key={item.label}>
+                            <SidebarMenuButton
+                              type="button"
+                              disabled
+                              title={item.label}
+                              className="text-sidebar-foreground/55 hover:bg-transparent hover:text-sidebar-foreground/55"
+                            >
+                              <Icon className="mt-0.5 size-4 shrink-0 text-sidebar-foreground/55" />
+                              <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
+                                <span className="block text-sm font-medium">{item.label}</span>
+                                <span className="block text-xs text-sidebar-foreground/55">
+                                  {item.description}
+                                </span>
+                              </span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      }
 
-                  return (
-                    <Button
-                      key={item.label}
-                      asChild
-                      variant="secondary"
-                      className="h-auto w-full justify-start rounded-lg border border-border/70 px-3 py-3 text-left shadow-none"
-                    >
-                      <Link href={item.href} aria-current={item.isActive ? "page" : undefined}>
-                        <span className="flex items-start gap-3">
-                          <Icon className="mt-0.5 size-4" />
-                          <span className="space-y-1">
-                            <span className="block text-sm font-medium">{item.label}</span>
-                            <span className="block text-xs text-foreground/65">
-                              {item.description}
-                            </span>
-                          </span>
-                        </span>
-                      </Link>
-                    </Button>
-                  );
-                })}
-              </nav>
+                      return (
+                        <SidebarMenuItem key={item.label}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={item.isActive}
+                            title={item.label}
+                            className="shadow-none"
+                          >
+                            <Link href={item.href} aria-current={item.isActive ? "page" : undefined}>
+                              <Icon className="mt-0.5 size-4 shrink-0" />
+                              <span className="min-w-0 space-y-1 group-data-[state=collapsed]/sidebar:hidden">
+                                <span className="block text-sm font-medium">{item.label}</span>
+                                <span className="block text-xs text-sidebar-foreground/65">
+                                  {item.description}
+                                </span>
+                              </span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
 
-              <div className="rounded-lg border border-border/70 bg-background/70 px-3 py-3">
-                <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+            <SidebarFooter>
+              <div className="rounded-2xl border border-sidebar-border/70 bg-background/70 px-3 py-3">
+                <SidebarGroupLabel className="opacity-100 group-data-[state=collapsed]/sidebar:opacity-0">
                   Access
-                </p>
-                <p className="mt-2 break-all text-sm text-foreground/75">{userEmail}</p>
+                </SidebarGroupLabel>
+                <div className="mt-2 flex items-start gap-2">
+                  <Mail className="mt-0.5 size-4 shrink-0 text-sidebar-foreground/55" />
+                  <p
+                    className="min-w-0 break-all text-sm text-foreground/75 group-data-[state=collapsed]/sidebar:hidden"
+                    title={userEmail}
+                  >
+                    {userEmail}
+                  </p>
+                </div>
                 <form action={logoutAdminAction} className="mt-3">
                   <Button
                     type="submit"
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-0 text-foreground/65 hover:bg-transparent hover:text-foreground"
+                    title="Log out"
+                    className="h-8 w-full justify-start gap-2 px-0 text-foreground/65 hover:bg-transparent hover:text-foreground group-data-[state=collapsed]/sidebar:justify-center"
                   >
-                    Log out
+                    <LogOut className="size-4 shrink-0" />
+                    <span className="group-data-[state=collapsed]/sidebar:hidden">Log out</span>
                   </Button>
                 </form>
               </div>
-            </CardContent>
-          </Card>
-        </aside>
+            </SidebarFooter>
 
-        <section className="min-w-0 flex-1">{children}</section>
-      </div>
-    </main>
+            <SidebarRail />
+          </Sidebar>
+
+          <SidebarInset>
+            <div className="mb-4 flex sm:hidden">
+              <SidebarTrigger
+                variant="outline"
+                className="border-border/70 bg-background/90 text-foreground shadow-sm"
+              />
+            </div>
+            <section className="min-w-0 flex-1">{children}</section>
+          </SidebarInset>
+        </div>
+      </main>
+    </SidebarProvider>
   );
 }
