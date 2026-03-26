@@ -10,6 +10,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.45.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-26</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Export Live Preview Polish)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Better preview image scaling and aspect ratio for clean framing</li>
+                <li>Subtle, calm refresh overlay during updates (non-jarring)</li>
+                <li>Rebalanced desktop split layout (wider preview, tighter settings pane)</li>
+                <li>Smoother mobile stacked spacing</li>
+                <li>Sticky Export button preserved</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.44.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-26</span>
           </div>
