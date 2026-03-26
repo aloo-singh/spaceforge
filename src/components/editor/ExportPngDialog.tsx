@@ -13,6 +13,7 @@ import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
   PROJECT_EXPORT_TITLE_MAX_LENGTH,
 } from "@/lib/projects/exportConfig";
+import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
 
@@ -80,6 +81,9 @@ export function ExportPngDialog({
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewDimensions, setPreviewDimensions] = useState({ width: 1600, height: 1200 });
+  const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
+  const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const previewRequestIdRef = useRef(0);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
@@ -89,7 +93,14 @@ export function ExportPngDialog({
 
     const requestId = previewRequestIdRef.current + 1;
     previewRequestIdRef.current = requestId;
+    let refreshIndicatorTimeoutId: number | null = null;
     const timeoutId = window.setTimeout(() => {
+      setIsPreviewRefreshing(true);
+      refreshIndicatorTimeoutId = window.setTimeout(() => {
+        if (previewRequestIdRef.current !== requestId) return;
+        setIsPreviewRefreshVisible(true);
+      }, 160);
+
       void onPreviewRequest({
         title,
         description,
@@ -109,11 +120,22 @@ export function ExportPngDialog({
         .catch((error) => {
           if (previewRequestIdRef.current !== requestId) return;
           console.error("PNG preview render failed.", error);
+        })
+        .finally(() => {
+          if (previewRequestIdRef.current !== requestId) return;
+          if (refreshIndicatorTimeoutId !== null) {
+            window.clearTimeout(refreshIndicatorTimeoutId);
+          }
+          setIsPreviewRefreshing(false);
+          setIsPreviewRefreshVisible(false);
         });
     }, 180);
 
     return () => {
       window.clearTimeout(timeoutId);
+      if (refreshIndicatorTimeoutId !== null) {
+        window.clearTimeout(refreshIndicatorTimeoutId);
+      }
     };
   }, [
     open,
@@ -131,7 +153,7 @@ export function ExportPngDialog({
   const handleExport = () => {
     if (isExportButtonDisabled) return;
 
-    onOpenChange(false);
+    handleOpenChange(false);
     void onExport({
       title,
       description,
@@ -144,10 +166,18 @@ export function ExportPngDialog({
     });
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setIsPreviewRefreshing(false);
+      setIsPreviewRefreshVisible(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   return (
     <ResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title="Export PNG"
       description="Adjust a few export details without changing the live editor."
       className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
@@ -168,41 +198,61 @@ export function ExportPngDialog({
         </Button>
       }
     >
-      <div className="grid min-h-0 gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(22rem,24rem)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+      <div className="grid min-h-0 gap-3 sm:gap-4 lg:h-full lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,23.5rem)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:overflow-hidden xl:grid-cols-[minmax(0,1.08fr)_minmax(23rem,24.5rem)] xl:gap-5">
         <section className="min-h-0 lg:h-full">
-          <div className="flex h-full min-h-[16rem] flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/25">
+          <div className="flex h-full min-h-[15.5rem] flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/25">
             <div className="border-b border-border/60 px-4 py-3">
               <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 Updates automatically as export settings change.
               </p>
             </div>
-            <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4">
-              <div className="flex h-full max-h-full min-h-[18rem] w-full items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background/90 p-3">
+            <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4 lg:p-4">
+              <div className="relative flex h-full max-h-full min-h-[16.5rem] w-full items-center justify-center overflow-hidden rounded-[1rem] border border-border/70 bg-background/95 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[18rem] sm:p-4">
                 {previewSrc ? (
-                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-lg">
+                  <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[0.875rem] border border-border/60 bg-background/80">
                     <Image
                       src={previewSrc}
                       alt="Live PNG export preview"
-                      width={1600}
-                      height={1200}
+                      width={previewDimensions.width}
+                      height={previewDimensions.height}
                       unoptimized
                       sizes="(min-width: 1024px) 50vw, 100vw"
-                      className="h-auto max-h-full w-auto max-w-full object-contain object-center"
+                      className="h-full w-full object-contain object-center p-2.5 sm:p-3"
+                      onLoadingComplete={(image) => {
+                        if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+                        setPreviewDimensions({
+                          width: image.naturalWidth,
+                          height: image.naturalHeight,
+                        });
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="flex aspect-[4/5] min-h-[14rem] w-full items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/30 px-6 text-center text-sm leading-relaxed text-muted-foreground">
+                  <div className="flex h-full min-h-[14rem] w-full items-center justify-center rounded-[0.875rem] border border-dashed border-border/70 bg-muted/24 px-6 text-center text-sm leading-relaxed text-muted-foreground">
                     Preview will appear here and stay in sync with the export settings.
                   </div>
                 )}
+                <div
+                  aria-hidden={!isPreviewRefreshing}
+                  className={cn(
+                    "pointer-events-none absolute inset-0 rounded-[0.875rem] transition-opacity duration-200",
+                    isPreviewRefreshVisible ? "opacity-100" : "opacity-0"
+                  )}
+                >
+                  <div className="absolute inset-0 bg-background/28 backdrop-blur-[1px]" />
+                  <div className="absolute inset-x-4 top-4 h-1 rounded-full bg-border/55 overflow-hidden">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-foreground/18" />
+                  </div>
+                  <div className="absolute inset-x-4 bottom-4 h-9 rounded-[0.75rem] border border-border/45 bg-background/48" />
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         <section className="min-h-0 pr-1 lg:h-full lg:overflow-y-auto">
-          <div className="space-y-2.5 pb-1">
+          <div className="space-y-2.5 pb-2 lg:pb-1">
             <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div>
