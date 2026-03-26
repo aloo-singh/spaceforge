@@ -19,11 +19,13 @@ export type AnalyticsMetricCard = {
   label: string;
   value: string;
   detail: string;
+  tone: "default" | "alert";
 };
 
 export type AnalyticsMetricSlug =
   | "sessions-per-day"
   | "drawing-at-least-one-room"
+  | "drop-off-before-first-room"
   | "average-time-to-first-room"
   | "total-rooms-created";
 
@@ -82,6 +84,17 @@ const analyticsMetricDefinitions = [
       "The daily conversion rate from session start to at least one room created, grouped by the day each session began.",
     chartTitle: "Daily drawing rate",
     chartDescription: "Percentage of sessions opened on each day that drew at least one room.",
+    valueType: "percent",
+  },
+  {
+    slug: "drop-off-before-first-room",
+    label: "Drop-off before first room",
+    detail: `Share of sessions with no wall selection or room creation over the last ${SESSION_WINDOW_DAYS} days`,
+    description:
+      "The daily share of sessions that opened but never reached a meaningful canvas interaction, using the existing wall-selected and room-created events.",
+    chartTitle: "Daily drop-off rate",
+    chartDescription:
+      "Percentage of sessions opened on each day that ended without a wall selection or room creation event.",
     valueType: "percent",
   },
   {
@@ -216,7 +229,7 @@ function getPropertyString(properties: Record<string, unknown> | null, key: stri
 async function fetchRecentAnalyticsEvents(sinceIso: string) {
   const query = new URLSearchParams({
     select: "event,timestamp,session_id,properties",
-    event: "in.(app_opened,room_created,first_success)",
+    event: "in.(app_opened,room_created,first_success,wall_selected)",
     timestamp: `gte.${sinceIso}`,
     order: "timestamp.asc",
   });
@@ -281,10 +294,12 @@ function buildFeedbackTrend(rows: FeedbackSubmissionRow[], days: number) {
 type AnalyticsDerivedSeries = {
   sessionsPerDay: Map<string, Set<string>>;
   drawRatePerDay: Map<string, number>;
+  dropOffRatePerDay: Map<string, number>;
   averageTimeToFirstRoomPerDay: Map<string, number>;
   cumulativeRoomsCreatedPerDay: Map<string, number>;
   sessionAverage: number;
   drawRate: number;
+  dropOffRate: number;
   averageFirstRoomDuration: number | null;
   totalRoomsCreated: number;
 };
@@ -298,9 +313,11 @@ function deriveAnalyticsSeries(
   const sessionAverageDates = new Set(detailDates.slice(-SESSION_AVERAGE_DAYS));
   const sessionsPerDay = new Map<string, Set<string>>();
   const drawnSessionsPerOpenedDate = new Map<string, Set<string>>();
+  const meaningfulSessionsPerOpenedDate = new Map<string, Set<string>>();
   const roomsCreatedPerDay = new Map<string, number>();
   const openedSessions = new Set<string>();
   const drawnSessions = new Set<string>();
+  const meaningfulSessions = new Set<string>();
   const firstRoomDurations = new Map<string, number>();
   const openedAtBySession = new Map<string, number>();
   const openedDateBySession = new Map<string, string>();
@@ -311,6 +328,7 @@ function deriveAnalyticsSeries(
   for (const date of detailDates) {
     sessionsPerDay.set(date, new Set<string>());
     drawnSessionsPerOpenedDate.set(date, new Set<string>());
+    meaningfulSessionsPerOpenedDate.set(date, new Set<string>());
     roomsCreatedPerDay.set(date, 0);
   }
 
@@ -336,6 +354,7 @@ function deriveAnalyticsSeries(
     }
 
     if (event.event === "room_created") {
+      meaningfulSessions.add(event.session_id);
       if (detailDateSet.has(dateKey)) {
         roomsCreatedPerDay.set(dateKey, (roomsCreatedPerDay.get(dateKey) ?? 0) + 1);
       }
@@ -343,6 +362,10 @@ function deriveAnalyticsSeries(
       if (existingFirstRoomAt === undefined || timestampMs < existingFirstRoomAt) {
         firstRoomAtBySession.set(event.session_id, timestampMs);
       }
+    }
+
+    if (event.event === "wall_selected") {
+      meaningfulSessions.add(event.session_id);
     }
 
     if (event.event === "first_success") {
@@ -377,6 +400,15 @@ function deriveAnalyticsSeries(
     drawnSessionsPerOpenedDate.get(openedDate)?.add(sessionId);
   }
 
+  for (const sessionId of meaningfulSessions) {
+    const openedDate = openedDateBySession.get(sessionId);
+    if (!openedDate || !detailDateSet.has(openedDate)) {
+      continue;
+    }
+
+    meaningfulSessionsPerOpenedDate.get(openedDate)?.add(sessionId);
+  }
+
   for (const sessionId of firstRoomAtBySession.keys()) {
     const openedDate = openedDateBySession.get(sessionId);
     if (!openedDate || !detailDateSet.has(openedDate)) {
@@ -384,7 +416,9 @@ function deriveAnalyticsSeries(
     }
 
     drawnSessions.add(sessionId);
+    meaningfulSessions.add(sessionId);
     drawnSessionsPerOpenedDate.get(openedDate)?.add(sessionId);
+    meaningfulSessionsPerOpenedDate.get(openedDate)?.add(sessionId);
   }
 
   for (const [sessionId, duration] of firstRoomDurations) {
@@ -398,6 +432,7 @@ function deriveAnalyticsSeries(
   }
 
   const drawRatePerDay = new Map<string, number>();
+  const dropOffRatePerDay = new Map<string, number>();
   const averageTimeToFirstRoomPerDay = new Map<string, number>();
   const recentRoomsCreated = Array.from(roomsCreatedPerDay.values()).reduce(
     (total, count) => total + count,
@@ -409,10 +444,12 @@ function deriveAnalyticsSeries(
   for (const date of detailDates) {
     const sessionCount = sessionsPerDay.get(date)?.size ?? 0;
     const drawnCount = drawnSessionsPerOpenedDate.get(date)?.size ?? 0;
+    const meaningfulCount = meaningfulSessionsPerOpenedDate.get(date)?.size ?? 0;
     const durationCount = durationCountsByDate.get(date) ?? 0;
     const durationTotal = durationTotalsByDate.get(date) ?? 0;
 
     drawRatePerDay.set(date, sessionCount === 0 ? 0 : drawnCount / sessionCount);
+    dropOffRatePerDay.set(date, sessionCount === 0 ? 0 : 1 - meaningfulCount / sessionCount);
     averageTimeToFirstRoomPerDay.set(date, durationCount === 0 ? 0 : durationTotal / durationCount);
 
     cumulativeRoomsCreated += roomsCreatedPerDay.get(date) ?? 0;
@@ -424,8 +461,15 @@ function deriveAnalyticsSeries(
     0
   );
   const sessionAverage = sessionCountTotal / SESSION_AVERAGE_DAYS;
+  const openedSessionIds = Array.from(openedSessions);
+  const drawnOpenedSessionCount = openedSessionIds.filter((sessionId) => drawnSessions.has(sessionId)).length;
+  const meaningfulOpenedSessionCount = openedSessionIds.filter((sessionId) =>
+    meaningfulSessions.has(sessionId)
+  ).length;
   const drawRate =
-    openedSessions.size === 0 ? 0 : drawnSessions.size / Math.max(1, openedSessions.size);
+    openedSessions.size === 0 ? 0 : drawnOpenedSessionCount / openedSessions.size;
+  const dropOffRate =
+    openedSessions.size === 0 ? 0 : 1 - meaningfulOpenedSessionCount / openedSessions.size;
   const firstRoomDurationValues = Array.from(firstRoomDurations.values());
   const averageFirstRoomDuration =
     firstRoomDurationValues.length === 0
@@ -436,10 +480,12 @@ function deriveAnalyticsSeries(
   return {
     sessionsPerDay,
     drawRatePerDay,
+    dropOffRatePerDay,
     averageTimeToFirstRoomPerDay,
     cumulativeRoomsCreatedPerDay,
     sessionAverage,
     drawRate,
+    dropOffRate,
     averageFirstRoomDuration,
     totalRoomsCreated,
   };
@@ -472,6 +518,11 @@ function getMetricDetailData(
         date,
         value,
       }));
+    case "drop-off-before-first-room":
+      return Array.from(derivedSeries.dropOffRatePerDay.entries()).map(([date, value]) => ({
+        date,
+        value,
+      }));
     case "average-time-to-first-room":
       return Array.from(derivedSeries.averageTimeToFirstRoomPerDay.entries()).map(([date, value]) => ({
         date,
@@ -492,6 +543,8 @@ function buildMetricCards(derivedSeries: AnalyticsDerivedSeries): AnalyticsMetri
         ? derivedSeries.sessionAverage
         : metric.slug === "drawing-at-least-one-room"
           ? derivedSeries.drawRate
+          : metric.slug === "drop-off-before-first-room"
+            ? derivedSeries.dropOffRate
           : metric.slug === "average-time-to-first-room"
             ? derivedSeries.averageFirstRoomDuration
             : derivedSeries.totalRoomsCreated;
@@ -502,6 +555,10 @@ function buildMetricCards(derivedSeries: AnalyticsDerivedSeries): AnalyticsMetri
       label: metric.label,
       value: formatMetricValue(metric.valueType, metricValue),
       detail: metric.detail,
+      tone:
+        metric.slug === "drop-off-before-first-room" && (metricValue ?? 0) >= 0.5
+          ? "alert"
+          : "default",
     };
   });
 }

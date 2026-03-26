@@ -59,6 +59,10 @@ const analyticsNavItems = [
     label: "% drawing at least one room",
   },
   {
+    href: "/admin/analytics/drop-off-before-first-room",
+    label: "Drop-off before first room",
+  },
+  {
     href: "/admin/analytics/average-time-to-first-room",
     label: "Average time to first room",
   },
