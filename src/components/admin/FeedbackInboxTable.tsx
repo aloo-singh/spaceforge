@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Keycap } from "@/components/ui/keycap";
 import {
   Table,
   TableBody,
@@ -33,9 +34,21 @@ const createdAtTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 
+const updatedAtFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 function formatCreatedAt(createdAt: string) {
   const date = new Date(createdAt);
   return `${createdAtDateFormatter.format(date)}, ${createdAtTimeFormatter.format(date)}`;
+}
+
+function formatUpdatedAt(createdAt: string) {
+  return updatedAtFormatter.format(new Date(createdAt));
 }
 
 function formatSentiment(sentiment: FeedbackSubmissionRecord["sentiment"]) {
@@ -99,48 +112,125 @@ function MarkAllReadButton({ disabled }: { disabled: boolean }) {
 export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FeedbackInboxFilter>("unread");
-  const unreadCount = useMemo(
-    () => feedbackSubmissions.filter((submission) => !submission.isRead).length,
-    [feedbackSubmissions]
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(() => new Set());
+  const [isMarkAllPending, setIsMarkAllPending] = useState(false);
+  const [showMarkAllToast, setShowMarkAllToast] = useState(false);
+  const markReadFormRefs = useRef<Record<string, HTMLFormElement | null>>({});
+
+  useEffect(() => {
+    if (!showMarkAllToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowMarkAllToast(false);
+    }, 2800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [showMarkAllToast]);
+
+  const submissionsWithReadState = useMemo(
+    () =>
+      feedbackSubmissions.map((submission) => ({
+        ...submission,
+        isRead: isMarkAllPending || submission.isRead || locallyReadIds.has(submission.id),
+      })),
+    [feedbackSubmissions, isMarkAllPending, locallyReadIds]
   );
+
+  const unreadCount = useMemo(
+    () => submissionsWithReadState.filter((submission) => !submission.isRead).length,
+    [submissionsWithReadState]
+  );
+
   const visibleSubmissions = useMemo(
     () =>
       activeFilter === "unread"
-        ? feedbackSubmissions.filter((submission) => !submission.isRead)
-        : feedbackSubmissions,
-    [activeFilter, feedbackSubmissions]
+        ? submissionsWithReadState.filter((submission) => !submission.isRead)
+        : submissionsWithReadState,
+    [activeFilter, submissionsWithReadState]
   );
 
+  const lastUpdatedAt = useMemo(() => {
+    if (feedbackSubmissions.length === 0) {
+      return null;
+    }
+
+    return feedbackSubmissions.reduce((latestCreatedAt, submission) => {
+      return new Date(submission.createdAt) > new Date(latestCreatedAt)
+        ? submission.createdAt
+        : latestCreatedAt;
+    }, feedbackSubmissions[0].createdAt);
+  }, [feedbackSubmissions]);
+
+  const handleMarkRead = async (submissionId: string, formData: FormData) => {
+    setLocallyReadIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.add(submissionId);
+      return nextIds;
+    });
+
+    try {
+      await markFeedbackSubmissionReadAction(formData);
+    } catch (error) {
+      setLocallyReadIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(submissionId);
+        return nextIds;
+      });
+
+      throw error;
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    setIsMarkAllPending(true);
+
+    try {
+      await markAllFeedbackSubmissionsReadAction();
+      setShowMarkAllToast(true);
+    } catch (error) {
+      setIsMarkAllPending(false);
+      throw error;
+    }
+  };
+
   return (
-    <div>
+    <div className="relative">
       <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="inline-flex rounded-xl border border-border/70 bg-background/70 p-1">
-            <Button
-              type="button"
-              variant={activeFilter === "unread" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setActiveFilter("unread")}
-              aria-pressed={activeFilter === "unread"}
-            >
-              Unread
-            </Button>
-            <Button
-              type="button"
-              variant={activeFilter === "all" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setActiveFilter("all")}
-              aria-pressed={activeFilter === "all"}
-            >
-              All
-            </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-xl border border-border/70 bg-background/70 p-1">
+              <Button
+                type="button"
+                variant={activeFilter === "unread" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("unread")}
+                aria-pressed={activeFilter === "unread"}
+              >
+                Unread
+              </Button>
+              <Button
+                type="button"
+                variant={activeFilter === "all" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("all")}
+                aria-pressed={activeFilter === "all"}
+              >
+                All
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {unreadCount} unread {unreadCount === 1 ? "item" : "items"}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {unreadCount} unread {unreadCount === 1 ? "item" : "items"}
+          <p className="font-measurement text-[11px] text-muted-foreground/75">
+            Last updated {lastUpdatedAt ? formatUpdatedAt(lastUpdatedAt) : "just now"}
           </p>
         </div>
 
-        <form action={markAllFeedbackSubmissionsReadAction}>
+        <form action={handleMarkAllRead}>
           <MarkAllReadButton disabled={unreadCount === 0} />
         </form>
       </div>
@@ -181,142 +271,193 @@ export function FeedbackInboxTable({ feedbackSubmissions }: FeedbackInboxTablePr
               </TableCell>
             </TableRow>
           ) : null}
-        {visibleSubmissions.map((submission) => {
-          const trimmedFreeText = submission.freeText.trim();
-          const isExpandable = trimmedFreeText.length > 0;
-          const isExpanded = expandedId === submission.id;
-          const isUnread = !submission.isRead;
+          {visibleSubmissions.map((submission) => {
+            const trimmedFreeText = submission.freeText.trim();
+            const isExpandable = trimmedFreeText.length > 0;
+            const isExpanded = expandedId === submission.id;
+            const isUnread = !submission.isRead;
+            const isRowFocused = focusedRowId === submission.id;
 
-          const handleToggle = () => {
-            if (!isExpandable) {
-              return;
-            }
+            const handleToggle = () => {
+              if (!isExpandable) {
+                return;
+              }
 
-            setExpandedId((currentId) => (currentId === submission.id ? null : submission.id));
-          };
+              setExpandedId((currentId) => (currentId === submission.id ? null : submission.id));
+            };
 
-          return (
-            <Fragment key={submission.id}>
-              <TableRow
-                aria-expanded={isExpandable ? isExpanded : undefined}
-                className={cn(
-                  "group",
-                  isUnread && "bg-background",
-                  isExpandable && "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/30"
-                )}
-                onClick={handleToggle}
-                onKeyDown={(event) => {
-                  if (!isExpandable) {
-                    return;
-                  }
-
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    handleToggle();
-                  }
-                }}
-                role={isExpandable ? "button" : undefined}
-                tabIndex={isExpandable ? 0 : undefined}
-              >
-                <TableCell
+            return (
+              <Fragment key={submission.id}>
+                <TableRow
+                  aria-expanded={isExpandable ? isExpanded : undefined}
                   className={cn(
-                    "whitespace-nowrap border-l-2 px-3 py-3 align-top font-measurement text-[13px]",
-                    isUnread
-                      ? "border-l-selected-surface-border font-semibold text-foreground/90"
-                      : "border-l-transparent text-foreground/80"
+                    "group outline-none",
+                    isUnread && "bg-blue-500/[0.035]",
+                    isExpanded && "bg-muted/[0.16]",
+                    !isExpandable && "cursor-default"
                   )}
+                  data-interactive={isExpandable ? "true" : undefined}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setFocusedRowId((currentId) => (currentId === submission.id ? null : currentId));
+                    }
+                  }}
+                  onClick={handleToggle}
+                  onFocus={() => setFocusedRowId(submission.id)}
+                  onKeyDown={(event) => {
+                    if (
+                      isUnread &&
+                      event.key.toLowerCase() === "r" &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.altKey
+                    ) {
+                      event.preventDefault();
+                      markReadFormRefs.current[submission.id]?.requestSubmit();
+                      return;
+                    }
+
+                    if (!isExpandable) {
+                      return;
+                    }
+
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleToggle();
+                    }
+                  }}
+                  role={isExpandable ? "button" : undefined}
+                  tabIndex={0}
                 >
-                  {formatCreatedAt(submission.createdAt)}
-                </TableCell>
-                <TableCell className="px-3 py-3 align-top">
-                  <Badge
-                    variant="outline"
+                  <TableCell
                     className={cn(
-                      "min-w-[88px] justify-center font-medium",
-                      sentimentBadgeClassName(submission.sentiment)
+                      "whitespace-nowrap border-l-2 px-3 py-3 align-top font-measurement text-[13px]",
+                      isUnread
+                        ? "border-l-blue-500 font-semibold text-foreground/90"
+                        : "border-l-transparent text-foreground/80"
                     )}
                   >
-                    {formatSentiment(submission.sentiment)}
-                  </Badge>
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "px-3 py-3 align-top text-sm",
-                    isUnread ? "font-medium text-foreground/85" : "text-foreground/75"
-                  )}
-                >
-                  {formatPageContext(submission.pageContext)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "px-3 py-3 align-top text-sm",
-                    isUnread ? "font-medium text-foreground/85" : "text-foreground/75"
-                  )}
-                >
-                  {formatSource(submission.source)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "max-w-[440px] px-3 py-3 align-top text-sm leading-6",
-                    isUnread ? "text-foreground/85" : "text-foreground/75"
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <span
+                    {formatCreatedAt(submission.createdAt)}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top">
+                    <Badge
+                      variant="outline"
                       className={cn(
-                        "min-w-0 flex-1",
-                        !isExpanded && "line-clamp-2",
-                        !trimmedFreeText && "italic text-muted-foreground",
-                        isUnread && trimmedFreeText && "font-medium"
+                        "min-w-[88px] justify-center font-medium",
+                        sentimentBadgeClassName(submission.sentiment)
                       )}
                     >
-                      {isExpanded && trimmedFreeText ? trimmedFreeText : getFreeTextPreview(submission.freeText)}
-                    </span>
-                    {isExpandable ? (
-                      <ChevronDown
-                        aria-hidden="true"
-                        className={cn(
-                          "mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                          isExpanded && "rotate-180"
-                        )}
-                      />
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell className="whitespace-nowrap px-3 py-3 align-top font-measurement text-[13px] text-muted-foreground">
-                  {formatTiming(submission.timeSinceOpenSeconds)}
-                </TableCell>
-                <TableCell className="px-3 py-3 align-top">
-                  <div
-                    className="flex justify-end"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    {isUnread ? (
-                      <form action={markFeedbackSubmissionReadAction}>
-                        <input type="hidden" name="submissionId" value={submission.id} />
-                        <MarkReadButton />
-                      </form>
-                    ) : (
-                      <span className="pt-1 text-xs font-medium text-muted-foreground">Read</span>
+                      {formatSentiment(submission.sentiment)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "px-3 py-3 align-top text-sm",
+                      isUnread ? "font-medium text-foreground/85" : "text-foreground/75"
                     )}
-                  </div>
-                </TableCell>
-              </TableRow>
-              {isExpandable && isExpanded ? (
-                <TableRow className="bg-muted/[0.14] hover:bg-muted/[0.14]">
-                  <TableCell className="px-3 pt-0 pb-4" colSpan={7}>
-                    <div className="rounded-lg border border-border/60 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground/80">
-                      {trimmedFreeText}
+                  >
+                    {formatPageContext(submission.pageContext)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "px-3 py-3 align-top text-sm",
+                      isUnread ? "font-medium text-foreground/85" : "text-foreground/75"
+                    )}
+                  >
+                    {formatSource(submission.source)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "max-w-[440px] px-3 py-3 align-top text-sm leading-6",
+                      isUnread ? "text-foreground/85" : "text-foreground/75"
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1",
+                          !isExpanded && "line-clamp-2",
+                          !trimmedFreeText && "italic text-muted-foreground",
+                          isUnread && trimmedFreeText && "font-medium"
+                        )}
+                      >
+                        {isExpanded && trimmedFreeText
+                          ? trimmedFreeText
+                          : getFreeTextPreview(submission.freeText)}
+                      </span>
+                      {isExpandable ? (
+                        <span className="flex shrink-0 items-center gap-2 pt-0.5 text-[11px] text-muted-foreground/75">
+                          <span className="font-measurement uppercase tracking-[0.14em]">
+                            {isExpanded ? "Collapse" : "Expand"}
+                          </span>
+                          <ChevronDown
+                            aria-hidden="true"
+                            className={cn(
+                              "size-4 text-muted-foreground transition-transform duration-200",
+                              isExpanded && "rotate-180"
+                            )}
+                          />
+                        </span>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-3 py-3 align-top font-measurement text-[13px] text-muted-foreground">
+                    {formatTiming(submission.timeSinceOpenSeconds)}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top">
+                    <div
+                      className="flex justify-end"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      {isUnread ? (
+                        <form
+                          action={(formData) => handleMarkRead(submission.id, formData)}
+                          className="flex items-center"
+                          ref={(element) => {
+                            markReadFormRefs.current[submission.id] = element;
+                          }}
+                        >
+                          <input type="hidden" name="submissionId" value={submission.id} />
+                          <MarkReadButton />
+                          {isRowFocused ? (
+                            <span className="ml-2 inline-flex align-middle">
+                              <Keycap aria-hidden="true">R</Keycap>
+                            </span>
+                          ) : null}
+                        </form>
+                      ) : (
+                        <span className="pt-1 text-xs font-medium text-muted-foreground">Read</span>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : null}
-            </Fragment>
-          );
-        })}
+                {isExpandable && isExpanded ? (
+                  <TableRow className="bg-muted/[0.14] hover:bg-muted/[0.14]">
+                    <TableCell className="px-3 pt-0 pb-4" colSpan={7}>
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground/80">
+                        {trimmedFreeText}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </TableBody>
       </Table>
+
+      <div
+        aria-live="polite"
+        className={cn(
+          "pointer-events-none fixed right-6 bottom-6 z-50 transition-all duration-200",
+          showMarkAllToast ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+        )}
+      >
+        <div className="rounded-xl border border-border/70 bg-background/95 px-4 py-3 shadow-lg shadow-black/5 backdrop-blur-sm">
+          <p className="text-sm font-medium text-foreground/88">All feedback marked as read</p>
+        </div>
+      </div>
     </div>
   );
 }
