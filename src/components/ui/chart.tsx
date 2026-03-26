@@ -63,11 +63,11 @@ ChartContainer.displayName = "ChartContainer";
 type ChartTooltipContentProps = {
   active?: boolean;
   label?: string | number;
-  payload?: Array<{
+  payload?: ReadonlyArray<{
     color?: string;
-    dataKey?: string | number;
-    name?: string | number;
-    value?: number | string;
+    dataKey?: unknown;
+    name?: unknown;
+    value?: unknown;
   }>;
   formatLabel?: (value: string) => string;
   formatValue?: (value: number) => string;
@@ -110,7 +110,7 @@ function ChartTooltipContent({
 
 type ChartTooltipCursorProps = {
   height?: number;
-  points?: Array<{
+  points?: ReadonlyArray<{
     x: number;
     y: number;
   }>;
