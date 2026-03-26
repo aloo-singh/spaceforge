@@ -48,8 +48,8 @@ const adminNavItems = [
 export function AdminShell({ userEmail, children }: AdminShellProps) {
   return (
     <SidebarProvider>
-      <main className="min-h-[calc(100vh-3.5rem)] bg-muted/20">
-        <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:gap-8 lg:px-8">
+      <main className="min-h-[calc(100vh-3.5rem)] flex-1 bg-muted/20">
+        <div className="flex w-full gap-6 px-4 py-6 sm:px-6 lg:gap-8 lg:px-8">
           <Sidebar collapsible="icon" className="shrink-0">
             <SidebarHeader>
               <div className="flex items-start justify-between gap-3">
@@ -157,14 +157,14 @@ export function AdminShell({ userEmail, children }: AdminShellProps) {
             <SidebarRail />
           </Sidebar>
 
-          <SidebarInset>
+          <SidebarInset className="w-full">
             <div className="mb-4 flex sm:hidden">
               <SidebarTrigger
                 variant="outline"
                 className="border-border/70 bg-background/90 text-foreground shadow-sm"
               />
             </div>
-            <section className="min-w-0 flex-1">{children}</section>
+            <section className="min-w-0 w-full flex-1">{children}</section>
           </SidebarInset>
         </div>
       </main>
