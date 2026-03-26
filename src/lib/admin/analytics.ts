@@ -98,8 +98,8 @@ const analyticsMetricDefinitions = [
   },
   {
     slug: "drop-off-before-first-room",
-    label: "No canvas interaction",
-    detail: `Share of sessions with no wall selection or room creation over the last ${SESSION_WINDOW_DAYS} days`,
+    label: "Never started drawing",
+    detail: `Share of sessions that never reached wall selection or room creation over the last ${SESSION_WINDOW_DAYS} days`,
     description:
       "The daily share of sessions that opened but never reached a meaningful canvas interaction, using existing wall-selection, shared-wall disambiguation, and room-creation signals.",
     chartTitle: "Daily no-interaction rate",
@@ -637,30 +637,30 @@ function buildMetricDetail(
     data: getMetricDetailData(slug, derivedSeries),
     ...(slug === "drop-off-before-first-room"
       ? {
-          breakdownTitle: "What those sessions did",
+          breakdownTitle: "How these sessions ended",
           breakdownDescription:
-            "A simple count breakdown across the same 30-day session window. Wall selection and room creation can overlap.",
+            "A simple readout across the same 30-day window. Some sessions appear in more than one engaged group.",
           breakdownItems: [
             {
-              label: "Sessions opened",
+              label: "Sessions that opened",
               value: formatInteger(derivedSeries.dropOffBreakdown.openedSessions),
-              detail: "Total sessions in the analysis window.",
+              detail: "Everyone included in this view.",
             },
             {
-              label: "No canvas interaction",
+              label: "Never started drawing",
               value: formatInteger(derivedSeries.dropOffBreakdown.noCanvasInteractionSessions),
-              detail: "Opened but never reached wall selection or room creation.",
+              detail: "Opened the editor but never touched a tracked canvas action.",
               tone: "alert" as const,
             },
             {
-              label: "Reached wall selection",
+              label: "Explored the canvas",
               value: formatInteger(derivedSeries.dropOffBreakdown.wallSelectionSessions),
-              detail: "Sessions with at least one tracked wall-selection signal.",
+              detail: "Reached at least one tracked wall-selection moment.",
             },
             {
-              label: "Created a room",
+              label: "Got to first room",
               value: formatInteger(derivedSeries.dropOffBreakdown.roomCreatedSessions),
-              detail: "Sessions with tracked room creation evidence.",
+              detail: "Reached a tracked room-creation outcome.",
             },
           ],
         }
