@@ -30,6 +30,7 @@ import {
   TRANSFORM_SETTLE_TOTAL_MS,
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
+import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openings";
 import type { Point, Room } from "@/lib/editor/types";
 
 type RoomResizeStoreState = {
@@ -38,6 +39,7 @@ type RoomResizeStoreState = {
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
+  selectedOpening: { roomId: string; openingId: string } | null;
   selectWallByRoomId: (roomId: string, wall: RectWall) => void;
   clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
@@ -187,6 +189,19 @@ export function attachRoomResizeInput(
     return { room, bounds, isConstrainedVertexRoom, state };
   };
 
+  const hasSelectedOpeningResizeHandleHit = (screenPoint: Point) => {
+    const state = store.getState();
+    return (
+      findSelectedOpeningWidthHandleAtScreenPoint(
+        state.document.rooms,
+        state.selectedOpening,
+        screenPoint,
+        state.camera,
+        state.viewport
+      ) !== null
+    );
+  };
+
   const publishHandleState = () => {
     callbacks.onHandleStateChange({
       hoveredWall,
@@ -331,6 +346,11 @@ export function attachRoomResizeInput(
       return;
     }
 
+    if (hasSelectedOpeningResizeHandleHit(screenPoint)) {
+      setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+      return;
+    }
+
     if (selected.isConstrainedVertexRoom) {
       const vertexHandles = getConstrainedVertexHandleLayouts(
         selected.room,
@@ -365,6 +385,8 @@ export function attachRoomResizeInput(
     if (!selected) return;
 
     const screenPoint = toCanvasPoint(event);
+    if (hasSelectedOpeningResizeHandleHit(screenPoint)) return;
+
     const hitVertexIndex = selected.isConstrainedVertexRoom
       ? hitTestConstrainedVertexHandle(
           getConstrainedVertexHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),

@@ -10,22 +10,21 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.50.0</h2>
+            <h2 className="text-2xl font-semibold">v0.49.2</h2>
             <span className="text-sm text-muted-foreground">2026-03-27</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
-                Improved (Analytics)
+                Fixed (Geometry Hardening)
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>
-                  Replaced skewed &quot;average time to first room&quot; with realistic median
-                  time for active sessions (within 5 minutes)
+                  Handle priority: selected window/opening resize handles now correctly take
+                  precedence over nearby room corners
                 </li>
-                <li>Added simple distribution bar chart on the detail page</li>
-                <li>Kept original raw average available as secondary context</li>
+                <li>Dragging the intended handle feels logical and predictable</li>
               </ul>
             </div>
           </div>
