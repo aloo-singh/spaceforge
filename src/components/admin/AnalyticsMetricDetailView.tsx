@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+import { AnalyticsMetricDistributionChart } from "@/components/admin/AnalyticsMetricDistributionChart";
 import { AnalyticsMetricTrendChart } from "@/components/admin/AnalyticsMetricTrendChart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +15,7 @@ type AnalyticsMetricDetailViewProps = {
 export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewProps) {
   const chartVariant = metric.slug === "total-rooms-created" ? "area" : "line";
   const hasBreakdown = (metric.breakdownItems?.length ?? 0) > 0;
+  const hasDistribution = (metric.distributionData?.length ?? 0) > 0;
 
   return (
     <div className="w-full space-y-5">
@@ -112,6 +114,28 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
           />
         </CardContent>
       </Card>
+
+      {hasDistribution ? (
+        <Card className="border-border/70 bg-background/90 shadow-sm">
+          <CardContent className="space-y-4 p-5 md:p-6">
+            <div className="space-y-2">
+              <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+                Distribution
+              </p>
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                  {metric.distributionTitle}
+                </h2>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {metric.distributionDescription}
+                </p>
+              </div>
+            </div>
+
+            <AnalyticsMetricDistributionChart data={metric.distributionData ?? []} />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

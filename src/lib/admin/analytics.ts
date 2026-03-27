@@ -36,6 +36,11 @@ export type AnalyticsMetricDetailPoint = {
   value: number;
 };
 
+export type AnalyticsMetricDistributionPoint = {
+  label: string;
+  value: number;
+};
+
 export type AnalyticsMetricDetail = {
   slug: AnalyticsMetricSlug;
   href: string;
@@ -50,6 +55,9 @@ export type AnalyticsMetricDetail = {
   breakdownTitle?: string;
   breakdownDescription?: string;
   breakdownItems?: AnalyticsMetricBreakdownItem[];
+  distributionTitle?: string;
+  distributionDescription?: string;
+  distributionData?: AnalyticsMetricDistributionPoint[];
 };
 
 export type AnalyticsMetricBreakdownItem = {
@@ -70,9 +78,12 @@ export type AdminAnalyticsDashboardData = {
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_SECOND = 1000;
+const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const SESSION_WINDOW_DAYS = 30;
 const SESSION_AVERAGE_DAYS = 7;
 const FEEDBACK_TREND_DAYS = 30;
+const ACTIVE_FIRST_ROOM_WINDOW_MS = 5 * MS_PER_MINUTE;
 export const FEEDBACK_GRAPH_DAYS = 90;
 
 const analyticsMetricDefinitions = [
@@ -109,12 +120,13 @@ const analyticsMetricDefinitions = [
   },
   {
     slug: "average-time-to-first-room",
-    label: "Average time to first room",
-    detail: `Measured from session start over the last ${SESSION_WINDOW_DAYS} days`,
+    label: "Median time to first room",
+    detail: `For sessions that reached a first room within ${ACTIVE_FIRST_ROOM_WINDOW_MS / MS_PER_MINUTE} minutes over the last ${SESSION_WINDOW_DAYS} days`,
     description:
-      "Average time from session start to the first room created, grouped by the day the session began.",
-    chartTitle: "Daily average time to first room",
-    chartDescription: "Average time-to-first-room for sessions opened on each day.",
+      "A more realistic readout of time to first room, using the median for sessions that reached a first room within five minutes of opening. The raw average remains visible as secondary context.",
+    chartTitle: "Daily median time to first room",
+    chartDescription:
+      "Median time-to-first-room for sessions opened on each day that reached a first room within five minutes.",
     valueType: "duration",
   },
   {
@@ -307,11 +319,13 @@ type AnalyticsDerivedSeries = {
   drawRatePerDay: Map<string, number>;
   dropOffRatePerDay: Map<string, number>;
   averageTimeToFirstRoomPerDay: Map<string, number>;
+  medianActiveTimeToFirstRoomPerDay: Map<string, number>;
   cumulativeRoomsCreatedPerDay: Map<string, number>;
   sessionAverage: number;
   drawRate: number;
   dropOffRate: number;
   averageFirstRoomDuration: number | null;
+  medianActiveFirstRoomDuration: number | null;
   totalRoomsCreated: number;
   dropOffBreakdown: {
     openedSessions: number;
@@ -319,7 +333,50 @@ type AnalyticsDerivedSeries = {
     wallSelectionSessions: number;
     roomCreatedSessions: number;
   };
+  firstRoomTimeBreakdown: {
+    sessionsWithFirstRoom: number;
+    activeSessionsWithinFiveMinutes: number;
+    sessionsOverFiveMinutes: number;
+    rawAverageDuration: number | null;
+    overallMedianDuration: number | null;
+  };
+  firstRoomDistribution: AnalyticsMetricDistributionPoint[];
 };
+
+function getMedian(values: number[]) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const midpoint = Math.floor(sortedValues.length / 2);
+
+  if (sortedValues.length % 2 === 0) {
+    return (sortedValues[midpoint - 1] + sortedValues[midpoint]) / 2;
+  }
+
+  return sortedValues[midpoint];
+}
+
+function buildFirstRoomDistribution(values: number[]): AnalyticsMetricDistributionPoint[] {
+  const buckets = [
+    { label: "<30s", minMs: 0, maxMs: 30 * MS_PER_SECOND },
+    { label: "30-60s", minMs: 30 * MS_PER_SECOND, maxMs: 60 * MS_PER_SECOND },
+    { label: "1-2m", minMs: 1 * MS_PER_MINUTE, maxMs: 2 * MS_PER_MINUTE },
+    { label: "2-3m", minMs: 2 * MS_PER_MINUTE, maxMs: 3 * MS_PER_MINUTE },
+    { label: "3-5m", minMs: 3 * MS_PER_MINUTE, maxMs: 5 * MS_PER_MINUTE },
+    { label: ">5m", minMs: 5 * MS_PER_MINUTE, maxMs: null },
+  ] as const;
+
+  return buckets.map((bucket) => ({
+    label: bucket.label,
+    value: values.filter((value) =>
+      bucket.maxMs === null
+        ? value > bucket.minMs
+        : value >= bucket.minMs && value < bucket.maxMs
+    ).length,
+  }));
+}
 
 function deriveAnalyticsSeries(
   events: AnalyticsEventRow[],
@@ -343,12 +400,14 @@ function deriveAnalyticsSeries(
   const firstRoomAtBySession = new Map<string, number>();
   const durationTotalsByDate = new Map<string, number>();
   const durationCountsByDate = new Map<string, number>();
+  const activeDurationValuesByDate = new Map<string, number[]>();
 
   for (const date of detailDates) {
     sessionsPerDay.set(date, new Set<string>());
     drawnSessionsPerOpenedDate.set(date, new Set<string>());
     meaningfulSessionsPerOpenedDate.set(date, new Set<string>());
     roomsCreatedPerDay.set(date, 0);
+    activeDurationValuesByDate.set(date, []);
   }
 
   for (const event of events) {
@@ -463,11 +522,16 @@ function deriveAnalyticsSeries(
 
     durationTotalsByDate.set(openedDate, (durationTotalsByDate.get(openedDate) ?? 0) + duration);
     durationCountsByDate.set(openedDate, (durationCountsByDate.get(openedDate) ?? 0) + 1);
+
+    if (duration <= ACTIVE_FIRST_ROOM_WINDOW_MS) {
+      activeDurationValuesByDate.get(openedDate)?.push(duration);
+    }
   }
 
   const drawRatePerDay = new Map<string, number>();
   const dropOffRatePerDay = new Map<string, number>();
   const averageTimeToFirstRoomPerDay = new Map<string, number>();
+  const medianActiveTimeToFirstRoomPerDay = new Map<string, number>();
   const recentRoomsCreated = Array.from(roomsCreatedPerDay.values()).reduce(
     (total, count) => total + count,
     0
@@ -481,10 +545,12 @@ function deriveAnalyticsSeries(
     const meaningfulCount = meaningfulSessionsPerOpenedDate.get(date)?.size ?? 0;
     const durationCount = durationCountsByDate.get(date) ?? 0;
     const durationTotal = durationTotalsByDate.get(date) ?? 0;
+    const activeDurationValues = activeDurationValuesByDate.get(date) ?? [];
 
     drawRatePerDay.set(date, sessionCount === 0 ? 0 : drawnCount / sessionCount);
     dropOffRatePerDay.set(date, sessionCount === 0 ? 0 : 1 - meaningfulCount / sessionCount);
     averageTimeToFirstRoomPerDay.set(date, durationCount === 0 ? 0 : durationTotal / durationCount);
+    medianActiveTimeToFirstRoomPerDay.set(date, getMedian(activeDurationValues) ?? 0);
 
     cumulativeRoomsCreated += roomsCreatedPerDay.get(date) ?? 0;
     cumulativeRoomsCreatedPerDay.set(date, cumulativeRoomsCreated);
@@ -511,22 +577,29 @@ function deriveAnalyticsSeries(
   const dropOffRate =
     openedSessions.size === 0 ? 0 : 1 - meaningfulOpenedSessionCount / openedSessions.size;
   const firstRoomDurationValues = Array.from(firstRoomDurations.values());
+  const activeFirstRoomDurationValues = firstRoomDurationValues.filter(
+    (duration) => duration <= ACTIVE_FIRST_ROOM_WINDOW_MS
+  );
   const averageFirstRoomDuration =
     firstRoomDurationValues.length === 0
       ? null
       : firstRoomDurationValues.reduce((total, value) => total + value, 0) /
         firstRoomDurationValues.length;
+  const medianActiveFirstRoomDuration = getMedian(activeFirstRoomDurationValues);
+  const overallMedianDuration = getMedian(firstRoomDurationValues);
 
   return {
     sessionsPerDay,
     drawRatePerDay,
     dropOffRatePerDay,
     averageTimeToFirstRoomPerDay,
+    medianActiveTimeToFirstRoomPerDay,
     cumulativeRoomsCreatedPerDay,
     sessionAverage,
     drawRate,
     dropOffRate,
     averageFirstRoomDuration,
+    medianActiveFirstRoomDuration,
     totalRoomsCreated,
     dropOffBreakdown: {
       openedSessions: openedSessions.size,
@@ -534,6 +607,17 @@ function deriveAnalyticsSeries(
       wallSelectionSessions: wallSelectionOpenedSessionCount,
       roomCreatedSessions: roomCreatedOpenedSessionCount,
     },
+    firstRoomTimeBreakdown: {
+      sessionsWithFirstRoom: firstRoomDurationValues.length,
+      activeSessionsWithinFiveMinutes: activeFirstRoomDurationValues.length,
+      sessionsOverFiveMinutes: Math.max(
+        0,
+        firstRoomDurationValues.length - activeFirstRoomDurationValues.length
+      ),
+      rawAverageDuration: averageFirstRoomDuration,
+      overallMedianDuration,
+    },
+    firstRoomDistribution: buildFirstRoomDistribution(firstRoomDurationValues),
   };
 }
 
@@ -570,10 +654,12 @@ function getMetricDetailData(
         value,
       }));
     case "average-time-to-first-room":
-      return Array.from(derivedSeries.averageTimeToFirstRoomPerDay.entries()).map(([date, value]) => ({
-        date,
-        value,
-      }));
+      return Array.from(derivedSeries.medianActiveTimeToFirstRoomPerDay.entries()).map(
+        ([date, value]) => ({
+          date,
+          value,
+        })
+      );
     case "total-rooms-created":
       return Array.from(derivedSeries.cumulativeRoomsCreatedPerDay.entries()).map(([date, value]) => ({
         date,
@@ -592,7 +678,7 @@ function buildMetricCards(derivedSeries: AnalyticsDerivedSeries): AnalyticsMetri
           : metric.slug === "drop-off-before-first-room"
             ? derivedSeries.dropOffRate
           : metric.slug === "average-time-to-first-room"
-            ? derivedSeries.averageFirstRoomDuration
+            ? derivedSeries.medianActiveFirstRoomDuration
             : derivedSeries.totalRoomsCreated;
 
     return {
@@ -664,7 +750,46 @@ function buildMetricDetail(
             },
           ],
         }
-      : {}),
+      : slug === "average-time-to-first-room"
+        ? {
+            breakdownTitle: "How this metric is framed",
+            breakdownDescription:
+              "The headline readout excludes long-idle sessions by focusing on first rooms reached within five minutes. Raw values remain visible for comparison.",
+            breakdownItems: [
+              {
+                label: "Sessions with a first room",
+                value: formatInteger(derivedSeries.firstRoomTimeBreakdown.sessionsWithFirstRoom),
+                detail: "All sessions that reached at least one tracked room-creation outcome.",
+              },
+              {
+                label: "Within five minutes",
+                value: formatInteger(
+                  derivedSeries.firstRoomTimeBreakdown.activeSessionsWithinFiveMinutes
+                ),
+                detail: "Sessions included in the headline median.",
+              },
+              {
+                label: "Over five minutes",
+                value: formatInteger(derivedSeries.firstRoomTimeBreakdown.sessionsOverFiveMinutes),
+                detail: "Long-tail sessions kept out of the headline readout.",
+              },
+              {
+                label: "Raw average",
+                value: formatDuration(derivedSeries.firstRoomTimeBreakdown.rawAverageDuration),
+                detail: "The original mean across every session that eventually drew a room.",
+              },
+              {
+                label: "Overall median",
+                value: formatDuration(derivedSeries.firstRoomTimeBreakdown.overallMedianDuration),
+                detail: "Median across all first-room sessions, including the slower tail.",
+              },
+            ],
+            distributionTitle: "First-room distribution",
+            distributionDescription:
+              "A bucketed view across the same 30-day window. The last bucket captures the long tail that inflated the raw average.",
+            distributionData: derivedSeries.firstRoomDistribution,
+          }
+        : {}),
   };
 }
 
