@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
@@ -66,8 +67,9 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
       />
       {shouldHideCanvasDuringBootstrap ? (
         <div className="absolute inset-0 flex items-center justify-center bg-neutral-950">
-          <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/72 backdrop-blur">
-            Loading project...
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/72 backdrop-blur">
+            <LoaderCircle className="size-4 animate-spin text-white/44" aria-hidden="true" />
+            <span>Loading project...</span>
           </div>
         </div>
       ) : null}
