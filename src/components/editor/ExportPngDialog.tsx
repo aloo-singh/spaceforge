@@ -113,6 +113,10 @@ export function ExportPngDialog({
   const previewRequestIdRef = useRef(0);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
+  const effectiveLegendPosition: EditorExportLegendPosition =
+    showLegend && legendPosition !== "none" ? legendPosition : "none";
+  const effectiveScaleBarPosition: EditorExportScaleBarPosition =
+    showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -132,10 +136,10 @@ export function ExportPngDialog({
         description,
         titlePosition,
         descriptionPosition,
-        showLegend,
-        showScaleBar,
-        legendPosition,
-        scaleBarPosition,
+        showLegend: effectiveLegendPosition !== "none",
+        showScaleBar: effectiveScaleBarPosition !== "none",
+        legendPosition: effectiveLegendPosition,
+        scaleBarPosition: effectiveScaleBarPosition,
         designedBy,
         showGrid,
         showDimensions,
@@ -174,10 +178,8 @@ export function ExportPngDialog({
     description,
     titlePosition,
     descriptionPosition,
-    showLegend,
-    showScaleBar,
-    legendPosition,
-    scaleBarPosition,
+    effectiveLegendPosition,
+    effectiveScaleBarPosition,
     designedBy,
     showGrid,
     showDimensions,
@@ -193,10 +195,10 @@ export function ExportPngDialog({
       description,
       titlePosition,
       descriptionPosition,
-      showLegend,
-      showScaleBar,
-      legendPosition,
-      scaleBarPosition,
+      showLegend: effectiveLegendPosition !== "none",
+      showScaleBar: effectiveScaleBarPosition !== "none",
+      legendPosition: effectiveLegendPosition,
+      scaleBarPosition: effectiveScaleBarPosition,
       designedBy,
       showGrid,
       showDimensions,
@@ -374,52 +376,48 @@ export function ExportPngDialog({
             </div>
 
             <ExportToggleCard
-              title="Show legend"
+              title="Legend"
               description="Add a simple room list with names and areas beneath the plan."
-              value={showLegend ? "On" : "Off"}
+              value={
+                effectiveLegendPosition === "bottom"
+                  ? "Bottom"
+                  : effectiveLegendPosition === "right-side"
+                    ? "Right side"
+                    : "None"
+              }
             >
-              <div className="mt-2.5 space-y-2.5">
-                <BinaryChoice
-                  ariaLabel="Show legend"
-                  enabled={showLegend}
-                  onEnable={() => onShowLegendChange(true)}
-                  onDisable={() => onShowLegendChange(false)}
-                />
-                <PositionChoice
-                  ariaLabel="Legend position"
-                  value={legendPosition}
-                  options={[
-                    { label: "Bottom", value: "bottom" },
-                    { label: "Right side", value: "right-side" },
-                    { label: "None", value: "none" },
-                  ]}
-                  onChange={onLegendPositionChange}
-                />
-              </div>
+              <PositionChoice
+                ariaLabel="Legend position"
+                value={effectiveLegendPosition}
+                options={[
+                  { label: "Bottom", value: "bottom" },
+                  { label: "Right side", value: "right-side" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={(value) => {
+                  onShowLegendChange(value !== "none");
+                  onLegendPositionChange(value);
+                }}
+              />
             </ExportToggleCard>
 
             <ExportToggleCard
-              title="Show scale bar"
+              title="Scale bar"
               description="Add the current plan scale using the same measurement treatment as the canvas."
-              value={showScaleBar ? "On" : "Off"}
+              value={effectiveScaleBarPosition === "bottom-left" ? "Bottom-left" : "None"}
             >
-              <div className="mt-2.5 space-y-2.5">
-                <BinaryChoice
-                  ariaLabel="Show scale bar"
-                  enabled={showScaleBar}
-                  onEnable={() => onShowScaleBarChange(true)}
-                  onDisable={() => onShowScaleBarChange(false)}
-                />
-                <PositionChoice
-                  ariaLabel="Scale bar position"
-                  value={scaleBarPosition}
-                  options={[
-                    { label: "Bottom-left", value: "bottom-left" },
-                    { label: "None", value: "none" },
-                  ]}
-                  onChange={onScaleBarPositionChange}
-                />
-              </div>
+              <PositionChoice
+                ariaLabel="Scale bar position"
+                value={effectiveScaleBarPosition}
+                options={[
+                  { label: "Bottom-left", value: "bottom-left" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={(value) => {
+                  onShowScaleBarChange(value !== "none");
+                  onScaleBarPositionChange(value);
+                }}
+              />
             </ExportToggleCard>
 
             <ExportToggleCard

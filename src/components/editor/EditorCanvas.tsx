@@ -780,18 +780,20 @@ export default function EditorCanvas({
       request.descriptionPosition === "below-title"
         ? normalizeExportMultilineText(request.description)
         : "";
+    const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
+    const effectiveScaleBarPosition = request.showScaleBar ? request.scaleBarPosition : "none";
     const exportLegendItems =
-      request.showLegend && request.legendPosition !== "none"
+      effectiveLegendPosition !== "none"
         ? useEditorStore.getState().document.rooms.map((room, index) => ({
             name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
             area: formatMetricRoomAreaForRoom(room),
           }))
         : undefined;
-    const shouldShowScaleBar =
-      request.showScaleBar && request.scaleBarPosition === "bottom-left";
+    const shouldShowScaleBar = effectiveScaleBarPosition === "bottom-left";
     const resolvedThemeMode = request.theme === "system" ? editorThemeMode : request.theme;
-    const hasBottomLegend = request.legendPosition === "bottom" && (exportLegendItems?.length ?? 0) > 0;
-    const hasRightLegend = request.legendPosition === "right-side" && (exportLegendItems?.length ?? 0) > 0;
+    const hasBottomLegend = effectiveLegendPosition === "bottom" && (exportLegendItems?.length ?? 0) > 0;
+    const hasRightLegend =
+      effectiveLegendPosition === "right-side" && (exportLegendItems?.length ?? 0) > 0;
     const hasBottomLeftContent = shouldShowScaleBar || hasBottomLegend;
     const exportInnerPaddingPx = exportSignatureText || hasBottomLeftContent ? 108 : 92;
 
