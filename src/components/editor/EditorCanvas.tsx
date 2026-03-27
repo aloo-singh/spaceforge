@@ -12,6 +12,7 @@ import {
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import { getOrthogonalWallHandleLayouts } from "@/lib/editor/orthogonalWallResize";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
@@ -113,10 +114,12 @@ const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
   hoveredCorner: null,
   hoveredVertexIndex: null,
+  hoveredWallSegmentIndex: null,
   hoveredRoomId: null,
   activeWall: null,
   activeCorner: null,
   activeVertexIndex: null,
+  activeWallSegmentIndex: null,
   activeRoomId: null,
 } as const;
 const EMPTY_HOVERED_SELECTABLE_WALL = null as {
@@ -230,10 +233,12 @@ export default function EditorCanvas({
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
     hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
@@ -1347,10 +1352,12 @@ function drawScene(
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
     hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
   transformFeedback: TransformFeedback | null,
@@ -1505,10 +1512,12 @@ function drawRooms(
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
     hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -1587,8 +1596,49 @@ function drawRooms(
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
     const vertexHandles = getConstrainedVertexHandleLayouts(room, camera, viewport);
+    const wallSegmentHandles =
+      vertexHandles.length > 0 ? getOrthogonalWallHandleLayouts(room, camera, viewport) : [];
 
     if (vertexHandles.length > 0) {
+      for (const handle of wallSegmentHandles) {
+        const isHovered =
+          roomResizeUi.hoveredRoomId === room.id &&
+          roomResizeUi.hoveredWallSegmentIndex === handle.wallIndex;
+        const isActive =
+          roomResizeUi.activeRoomId === room.id &&
+          roomResizeUi.activeWallSegmentIndex === handle.wallIndex;
+        const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
+        const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
+        const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
+        const radius = Math.min(handle.width, handle.height) / 2;
+        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
+        const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
+
+        if (haloPadding > 0) {
+          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
+          graphics.roundRect(
+            handle.left - haloPadding,
+            handle.top - haloPadding,
+            handle.width + haloPadding * 2,
+            handle.height + haloPadding * 2,
+            radius + haloPadding
+          );
+          graphics.fill();
+        }
+
+        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
+        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+        graphics.fill();
+
+        graphics.setStrokeStyle({
+          width: strokeWidth,
+          color: theme.roomOutline,
+          alpha: strokeAlpha,
+        });
+        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+        graphics.stroke();
+      }
+
       for (const handle of vertexHandles) {
         const isHovered =
           roomResizeUi.hoveredRoomId === room.id &&
@@ -1621,8 +1671,6 @@ function drawRooms(
         graphics.circle(handle.center.x, handle.center.y, radius);
         graphics.stroke();
       }
-
-      continue;
     }
 
     const bounds = getAxisAlignedRoomBounds(room);
@@ -1734,10 +1782,12 @@ function drawWallInteractionOverlay(
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
     hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
   isDraftingRoom: boolean,
@@ -2423,6 +2473,7 @@ function drawSelectedRoomDimensions(
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
   camera: CameraState,
@@ -3090,7 +3141,13 @@ function getSelectedRoomDimensionAvoidRects(
   const vertexHandles = getConstrainedVertexHandleLayouts(room, camera, viewport);
 
   if (vertexHandles.length > 0) {
-    return vertexHandles.map((handle) => {
+    const wallHandleRects = getOrthogonalWallHandleLayouts(room, camera, viewport).map((handle) => ({
+      left: handle.left - handlePaddingPx,
+      right: handle.left + handle.width + handlePaddingPx,
+      top: handle.top - handlePaddingPx,
+      bottom: handle.top + handle.height + handlePaddingPx,
+    }));
+    const vertexHandleRects = vertexHandles.map((handle) => {
       const halfSize = handle.size / 2 + handlePaddingPx;
 
       return {
@@ -3100,6 +3157,8 @@ function getSelectedRoomDimensionAvoidRects(
         bottom: handle.center.y + halfSize,
       };
     });
+
+    return [...wallHandleRects, ...vertexHandleRects];
   }
 
   const bounds = getAxisAlignedRoomBounds(room);

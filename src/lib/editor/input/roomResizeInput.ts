@@ -8,6 +8,11 @@ import {
   isNonRectangularOrthogonalRoom,
 } from "@/lib/editor/constrainedVertexAdjustments";
 import { snapPointToGrid } from "@/lib/editor/geometry";
+import { getRoomWallSegment } from "@/lib/editor/openings";
+import {
+  getOrthogonalWallHandleLayouts,
+  hitTestOrthogonalWallHandle,
+} from "@/lib/editor/orthogonalWallResize";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import { getActiveSnapStepMm } from "@/lib/editor/snapping";
 import {
@@ -31,7 +36,7 @@ import {
   type TransformFeedback,
 } from "@/lib/editor/transformFeedback";
 import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openings";
-import type { Point, Room } from "@/lib/editor/types";
+import type { Point, Room, RoomWall } from "@/lib/editor/types";
 
 type RoomResizeStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
@@ -40,7 +45,7 @@ type RoomResizeStoreState = {
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
   selectedOpening: { roomId: string; openingId: string } | null;
-  selectWallByRoomId: (roomId: string, wall: RectWall) => void;
+  selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
@@ -55,10 +60,12 @@ type RoomResizeInputCallbacks = {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
     hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
     hoveredRoomId: string | null;
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   }) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
@@ -95,6 +102,12 @@ function getCursorForWall(wall: RectWall): string {
   return wall === "top" || wall === "bottom" ? NS_RESIZE_CURSOR : EW_RESIZE_CURSOR;
 }
 
+function getCursorForWallSegment(room: Room, wallSegmentIndex: number): string {
+  const segment = getRoomWallSegment(room, wallSegmentIndex);
+  if (!segment) return "";
+  return segment.axis === "horizontal" ? NS_RESIZE_CURSOR : EW_RESIZE_CURSOR;
+}
+
 function getCursorForCorner(corner: RectCorner): string {
   return corner === "top-left" || corner === "bottom-right"
     ? NESW_RESIZE_CURSOR
@@ -114,6 +127,7 @@ export function attachRoomResizeInput(
   let hoveredWall: RectWall | null = null;
   let hoveredCorner: RectCorner | null = null;
   let hoveredVertexIndex: number | null = null;
+  let hoveredWallSegmentIndex: number | null = null;
   let activeSession: ResizeSession | null = null;
   let currentCursor: string = "";
   const commitRoomResize = store.getState().commitRoomResize;
@@ -207,14 +221,16 @@ export function attachRoomResizeInput(
       hoveredWall,
       hoveredCorner,
       hoveredVertexIndex,
+      hoveredWallSegmentIndex,
       hoveredRoomId:
-        hoveredWall || hoveredCorner || hoveredVertexIndex !== null
+        hoveredWall || hoveredCorner || hoveredVertexIndex !== null || hoveredWallSegmentIndex !== null
           ? getSelectedEditableRoom()?.room.id ?? null
           : null,
       activeWall: activeSession?.target.type === "wall" ? activeSession.target.wall : null,
       activeCorner: activeSession?.target.type === "corner" ? activeSession.target.corner : null,
       activeVertexIndex:
         activeSession?.target.type === "vertex" ? activeSession.target.vertexIndex : null,
+      activeWallSegmentIndex: null,
       activeRoomId: activeSession?.roomId ?? null,
     });
   };
@@ -248,6 +264,12 @@ export function attachRoomResizeInput(
       return;
     }
 
+    if (hoveredWallSegmentIndex !== null && !isSpaceHeld) {
+      const selected = getSelectedEditableRoom();
+      setCursor(selected ? getCursorForWallSegment(selected.room, hoveredWallSegmentIndex) : "");
+      return;
+    }
+
     if (hoveredWall && !isSpaceHeld) {
       setCursor(getCursorForWall(hoveredWall));
       return;
@@ -261,17 +283,20 @@ export function attachRoomResizeInput(
     wall: RectWall | null;
     corner: RectCorner | null;
     vertexIndex: number | null;
+    wallSegmentIndex: number | null;
   }) => {
     if (
       hoveredWall === next.wall &&
       hoveredCorner === next.corner &&
-      hoveredVertexIndex === next.vertexIndex
+      hoveredVertexIndex === next.vertexIndex &&
+      hoveredWallSegmentIndex === next.wallSegmentIndex
     ) {
       return;
     }
     hoveredWall = next.wall;
     hoveredCorner = next.corner;
     hoveredVertexIndex = next.vertexIndex;
+    hoveredWallSegmentIndex = next.wallSegmentIndex;
     updateCursor();
     publishHandleState();
     callbacks.requestRender();
@@ -287,6 +312,7 @@ export function attachRoomResizeInput(
     hoveredWall = null;
     hoveredCorner = null;
     hoveredVertexIndex = null;
+    hoveredWallSegmentIndex = null;
     updateCursor();
     publishHandleState();
     callbacks.requestRender();
@@ -337,17 +363,17 @@ export function attachRoomResizeInput(
     }
 
     if (event.buttons !== 0) {
-      setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+      setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
     if (isSpaceHeld || !selected) {
-      setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+      setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
     if (hasSelectedOpeningResizeHandleHit(screenPoint)) {
-      setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+      setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
@@ -358,12 +384,24 @@ export function attachRoomResizeInput(
         selected.state.viewport
       );
       const hitVertexIndex = hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
-      setHoveredHandle({ wall: null, corner: null, vertexIndex: hitVertexIndex });
+      const wallHandles = getOrthogonalWallHandleLayouts(
+        selected.room,
+        selected.state.camera,
+        selected.state.viewport
+      );
+      const hitWallSegmentIndex =
+        hitVertexIndex === null ? hitTestOrthogonalWallHandle(wallHandles, screenPoint) : null;
+      setHoveredHandle({
+        wall: null,
+        corner: null,
+        vertexIndex: hitVertexIndex,
+        wallSegmentIndex: hitWallSegmentIndex,
+      });
       return;
     }
 
     if (!selected.bounds) {
-      setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+      setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
@@ -371,10 +409,15 @@ export function attachRoomResizeInput(
     const handles = getWallHandleLayouts(selected.bounds, selected.state.camera, selected.state.viewport);
     const hitCorner = hitTestCornerHandle(cornerHandles, screenPoint);
     if (hitCorner) {
-      setHoveredHandle({ wall: null, corner: hitCorner, vertexIndex: null });
+      setHoveredHandle({ wall: null, corner: hitCorner, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
-    setHoveredHandle({ wall: hitTestWallHandle(handles, screenPoint), corner: null, vertexIndex: null });
+    setHoveredHandle({
+      wall: hitTestWallHandle(handles, screenPoint),
+      corner: null,
+      vertexIndex: null,
+      wallSegmentIndex: null,
+    });
   };
 
   const onPointerDown = (event: PointerEvent) => {
@@ -393,6 +436,26 @@ export function attachRoomResizeInput(
           screenPoint
         )
       : null;
+    const hitWallSegmentIndex =
+      selected.isConstrainedVertexRoom && hitVertexIndex === null
+        ? hitTestOrthogonalWallHandle(
+            getOrthogonalWallHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),
+            screenPoint
+          )
+        : null;
+    if (hitWallSegmentIndex !== null) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      selected.state.selectWallByRoomId(selected.room.id, hitWallSegmentIndex);
+      hoveredWall = null;
+      hoveredCorner = null;
+      hoveredVertexIndex = null;
+      hoveredWallSegmentIndex = hitWallSegmentIndex;
+      updateCursor();
+      publishHandleState();
+      callbacks.requestRender();
+      return;
+    }
     const cornerHandles =
       !selected.isConstrainedVertexRoom && selected.bounds
         ? getCornerHandleLayouts(selected.bounds, selected.state.camera, selected.state.viewport)
@@ -438,6 +501,7 @@ export function attachRoomResizeInput(
     hoveredWall = hitWall;
     hoveredCorner = hitCorner;
     hoveredVertexIndex = hitVertexIndex;
+    hoveredWallSegmentIndex = null;
     updateCursor();
     publishHandleState();
     callbacks.requestRender();
@@ -476,7 +540,7 @@ export function attachRoomResizeInput(
 
   const onPointerLeave = () => {
     if (activeSession) return;
-    setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+    setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -484,7 +548,7 @@ export function attachRoomResizeInput(
     if (event.code === "Space") {
       isSpaceHeld = true;
       if (!activeSession) {
-        setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+        setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       }
       updateCursor();
     }
@@ -506,7 +570,7 @@ export function attachRoomResizeInput(
       stopSession();
       return;
     }
-    setHoveredHandle({ wall: null, corner: null, vertexIndex: null });
+    setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
     updateCursor();
   };
 
