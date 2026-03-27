@@ -603,6 +603,7 @@ export default function EditorCanvas({
       showDimensions,
       showGrid,
       showScaleBar,
+      legendPosition,
       signatureText,
       titleText,
       descriptionText,
@@ -615,6 +616,7 @@ export default function EditorCanvas({
       showDimensions: boolean;
       showGrid: boolean;
       showScaleBar: boolean;
+      legendPosition?: "bottom" | "right-side";
       signatureText?: string;
       titleText?: string;
       descriptionText?: string;
@@ -727,6 +729,7 @@ export default function EditorCanvas({
             legendItems && legendItems.length > 0
               ? {
                   items: legendItems,
+                  position: legendPosition,
                   color: themeMode === "light" ? "#0f172a" : "#f8fafc",
                   mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
                   dividerColor: themeMode === "light" ? "#cbd5e1" : "#334155",
@@ -771,23 +774,35 @@ export default function EditorCanvas({
     const exportSignatureText = normalizeEditorExportSignature(
       request.designedBy || useEditorStore.getState().settings.exportSignatureText
     );
-    const exportTitle = normalizeExportSingleLineText(request.title);
-    const exportDescription = normalizeExportMultilineText(request.description);
-    const exportLegendItems = request.showLegend
-      ? useEditorStore.getState().document.rooms.map((room, index) => ({
-          name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
-          area: formatMetricRoomAreaForRoom(room),
-        }))
-      : undefined;
+    const exportTitle =
+      request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+    const exportDescription =
+      request.descriptionPosition === "below-title"
+        ? normalizeExportMultilineText(request.description)
+        : "";
+    const exportLegendItems =
+      request.showLegend && request.legendPosition !== "none"
+        ? useEditorStore.getState().document.rooms.map((room, index) => ({
+            name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
+            area: formatMetricRoomAreaForRoom(room),
+          }))
+        : undefined;
+    const shouldShowScaleBar =
+      request.showScaleBar && request.scaleBarPosition === "bottom-left";
     const resolvedThemeMode = request.theme === "system" ? editorThemeMode : request.theme;
+    const hasBottomLegend = request.legendPosition === "bottom" && (exportLegendItems?.length ?? 0) > 0;
+    const hasRightLegend = request.legendPosition === "right-side" && (exportLegendItems?.length ?? 0) > 0;
+    const hasBottomLeftContent = shouldShowScaleBar || hasBottomLegend;
+    const exportInnerPaddingPx = exportSignatureText || hasBottomLeftContent ? 108 : 92;
 
     return createCanvasExportSnapshot({
       includeSignature: true,
-      innerPaddingPx: exportSignatureText || exportLegendItems?.length ? 108 : 92,
+      innerPaddingPx: exportInnerPaddingPx,
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
-      showScaleBar: request.showScaleBar,
+      showScaleBar: shouldShowScaleBar,
+      legendPosition: hasRightLegend ? "right-side" : hasBottomLegend ? "bottom" : undefined,
       titleText: exportTitle || undefined,
       descriptionText: exportDescription || undefined,
       legendItems: exportLegendItems,
