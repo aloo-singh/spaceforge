@@ -27,6 +27,7 @@ export function EditorSettingsDialog({
   const updateSettings = useEditorStore((state) => state.updateSettings);
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
+  const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
 
@@ -156,6 +157,44 @@ export function EditorSettingsDialog({
           <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
             Hold Alt/Option to temporarily invert this while drawing or resizing.
           </p>
+
+          <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+            <div>
+              <h4 className="text-xs font-medium text-foreground">Wall measurement position</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Place selected-room wall measurements just inside the walls or offset them outside.
+              </p>
+            </div>
+
+            <div
+              className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+              role="radiogroup"
+              aria-label="Wall measurement position"
+            >
+              <Button
+                type="button"
+                size="sm"
+                role="radio"
+                variant={isWallMeasurementInside ? "secondary" : "ghost"}
+                aria-checked={isWallMeasurementInside}
+                onClick={() => updateSettings({ wallMeasurementPosition: "inside" })}
+                className="min-w-28 flex-1 sm:flex-none"
+              >
+                Inside walls
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                role="radio"
+                variant={!isWallMeasurementInside ? "secondary" : "ghost"}
+                aria-checked={!isWallMeasurementInside}
+                onClick={() => updateSettings({ wallMeasurementPosition: "outside" })}
+                className="min-w-28 flex-1 sm:flex-none"
+              >
+                Outside walls
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div
