@@ -33,7 +33,12 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
-import { isOrthogonalPointPath, isPointInPolygon, isSimplePolygon } from "@/lib/editor/roomGeometry";
+import {
+  isAxisAlignedRectangle,
+  isOrthogonalPointPath,
+  isPointInPolygon,
+  isSimplePolygon,
+} from "@/lib/editor/roomGeometry";
 import { getEditorCanvasTheme, resolveEditorThemeMode, type EditorCanvasTheme } from "@/lib/editor/theme";
 import {
   type ActiveEditorOnboardingHint,
@@ -141,6 +146,7 @@ const RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX = 20;
 const RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX = 8;
 const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_INSIDE_EDGE_PADDING_PX = 6;
+const RESIZE_DIMENSION_NON_RECT_VERTICAL_EDGE_EXTRA_PADDING_PX = 8;
 const RESIZE_DIMENSION_HANDLE_CLEARANCE_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
@@ -2339,6 +2345,7 @@ type ResizeDimensionLabelSpec = {
   tangentDirection: ScreenPoint;
   wallLengthPx: number;
   normalPlacement: "center" | "inside" | "outside";
+  normalOffsetBiasPx: number;
 };
 
 type ResizeDimensionLabelLayout = {
@@ -2651,6 +2658,7 @@ function createDimensionLabelSpecForWallMeasurement(
     wall,
     axis: wall === "top" || wall === "bottom" ? "horizontal" : "vertical",
     normalPlacement: "center",
+    normalOffsetBiasPx: 0,
     ...getResizeDimensionAnchorForWall(bounds, wall, camera, viewport, settings),
   };
 }
@@ -2800,6 +2808,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
     x: outwardScreen.x - midpointScreen.x,
     y: outwardScreen.y - midpointScreen.y,
   };
+  const isNonRectangularRoom = !isAxisAlignedRectangle(room.points);
 
   return {
     text: formatMetricWallDimension(edge.lengthMillimetres),
@@ -2810,6 +2819,10 @@ function createDimensionLabelSpecForEdgeMeasurement(
     tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
     wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
     normalPlacement: settings.wallMeasurementPosition,
+    normalOffsetBiasPx:
+      isNonRectangularRoom && edge.start.x === edge.end.x
+        ? RESIZE_DIMENSION_NON_RECT_VERTICAL_EDGE_EXTRA_PADDING_PX
+        : 0,
   };
 }
 
@@ -2893,7 +2906,11 @@ function getResolvedResizeDimensionLabelLayouts(
     const height = measurementText.height + dimensionPaddingYPx * 2;
     measurementText.destroy();
     const normalOffsetPx =
-      labelSpec.normalPlacement === "center" ? 0 : height / 2 + insideEdgePaddingPx;
+      labelSpec.normalPlacement === "center"
+        ? 0
+        : height / 2 +
+          insideEdgePaddingPx +
+          getScaledMeasurementPx(labelSpec.normalOffsetBiasPx, settings);
     const avoidanceDirection =
       labelSpec.normalPlacement === "inside"
         ? {
@@ -3169,6 +3186,7 @@ function getDraftActiveSegmentDimensionLabelSpec(
     wall,
     axis: isHorizontal ? "horizontal" : "vertical",
     normalPlacement: "center",
+    normalOffsetBiasPx: 0,
     center: {
       x: (startScreen.x + endScreen.x) / 2,
       y: (startScreen.y + endScreen.y) / 2,
