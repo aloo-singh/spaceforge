@@ -5,6 +5,7 @@ import { AnalyticsMetricTrendChart } from "@/components/admin/AnalyticsMetricTre
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { AnalyticsMetricDetail } from "@/lib/admin/analytics";
+import { cn } from "@/lib/utils";
 
 type AnalyticsMetricDetailViewProps = {
   metric: AnalyticsMetricDetail;
@@ -12,6 +13,7 @@ type AnalyticsMetricDetailViewProps = {
 
 export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewProps) {
   const chartVariant = metric.slug === "total-rooms-created" ? "area" : "line";
+  const hasBreakdown = (metric.breakdownItems?.length ?? 0) > 0;
 
   return (
     <div className="w-full space-y-5">
@@ -50,6 +52,41 @@ export function AnalyticsMetricDetailView({ metric }: AnalyticsMetricDetailViewP
               <p className="text-sm leading-6 text-muted-foreground">{metric.detail}</p>
             </div>
           </div>
+
+          {hasBreakdown ? (
+            <div className="rounded-xl border border-border/70 bg-background/80 p-4 md:p-5">
+              <div className="space-y-1">
+                <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+                  {metric.breakdownTitle}
+                </p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {metric.breakdownDescription}
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {metric.breakdownItems?.map((item) => (
+                  <div
+                    key={item.label}
+                    className={cn(
+                      "rounded-lg border p-3",
+                      item.tone === "alert"
+                        ? "border-red-300/70 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/20"
+                        : "border-border/70 bg-card/70"
+                    )}
+                  >
+                    <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                      {item.value}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -5,6 +5,7 @@ import { FeedbackTrendChart } from "@/components/admin/FeedbackTrendChart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchAdminAnalyticsDashboardData } from "@/lib/admin/analytics";
+import { cn } from "@/lib/utils";
 
 export default async function AdminAnalyticsPage() {
   const dashboard = await fetchAdminAnalyticsDashboardData();
@@ -32,13 +33,34 @@ export default async function AdminAnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {dashboard.metricCards.map((metric) => (
           <Link key={metric.slug} href={metric.href} className="group block focus-visible:outline-none">
-            <Card className="border-border/70 bg-background/90 shadow-sm transition-colors group-hover:border-foreground/20 group-hover:bg-background group-focus-visible:ring-2 group-focus-visible:ring-ring/50">
+            <Card
+              className={cn(
+                "shadow-sm transition-colors group-focus-visible:ring-2 group-focus-visible:ring-ring/50",
+                metric.tone === "alert"
+                  ? "border-red-300/80 bg-red-50/55 group-hover:border-red-400/90 group-hover:bg-red-50/75 dark:border-red-900/70 dark:bg-red-950/25 dark:group-hover:border-red-800/85 dark:group-hover:bg-red-950/35"
+                  : "border-border/70 bg-background/90 group-hover:border-foreground/20 group-hover:bg-background"
+              )}
+            >
               <CardContent className="space-y-3 p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-measurement text-[10px] font-semibold tracking-[0.16em] text-foreground/45 uppercase">
+                  <p
+                    className={cn(
+                      "font-measurement text-[10px] font-semibold tracking-[0.16em] uppercase",
+                      metric.tone === "alert"
+                        ? "text-red-800/85 dark:text-red-200/85"
+                        : "text-foreground/45"
+                    )}
+                  >
                     {metric.label}
                   </p>
-                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-foreground/35 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground/60" />
+                  <ArrowRight
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0 transition-transform group-hover:translate-x-0.5",
+                      metric.tone === "alert"
+                        ? "text-red-800/55 group-hover:text-red-800/80 dark:text-red-200/55 dark:group-hover:text-red-200/80"
+                        : "text-foreground/35 group-hover:text-foreground/60"
+                    )}
+                  />
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-semibold tracking-tight text-foreground">{metric.value}</p>
