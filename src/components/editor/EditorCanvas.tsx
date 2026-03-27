@@ -2404,6 +2404,7 @@ type ResizeDimensionLabelLayout = {
   outwardDirection: ScreenPoint;
   tangentDirection: ScreenPoint;
   avoidanceDirection: ScreenPoint;
+  normalPlacement: "center" | "inside" | "outside";
   width: number;
   height: number;
 };
@@ -2984,6 +2985,7 @@ function getResolvedResizeDimensionLabelLayouts(
       outwardDirection: labelSpec.outwardDirection,
       tangentDirection: labelSpec.tangentDirection,
       avoidanceDirection,
+      normalPlacement: labelSpec.normalPlacement,
       width,
       height,
     };
@@ -3013,7 +3015,12 @@ function getResolvedResizeDimensionLabelLayouts(
 
   for (let index = 0; index < labelLayouts.length; index += 1) {
     for (let otherIndex = index + 1; otherIndex < labelLayouts.length; otherIndex += 1) {
-      if (!rectsOverlap(getCenteredRectFromLayout(labelLayouts[index]), getCenteredRectFromLayout(labelLayouts[otherIndex]))) {
+      if (
+        !rectsOverlap(
+          getCenteredRectFromLayout(labelLayouts[index]),
+          getCenteredRectFromLayout(labelLayouts[otherIndex])
+        )
+      ) {
         continue;
       }
 
@@ -3035,6 +3042,28 @@ function getResolvedResizeDimensionLabelLayouts(
     }
   }
 
+  if (roomLabelLayout) {
+    for (let index = 0; index < labelLayouts.length; index += 1) {
+      labelLayouts[index] = nudgeResizeDimensionLabelAwayFromRect(
+        labelLayouts[index],
+        roomLabelLayout,
+        viewport,
+        roomLabelLayout.height + labelGapPx
+      );
+    }
+  }
+
+  if (avoidRects.length > 0) {
+    for (let index = 0; index < labelLayouts.length; index += 1) {
+      labelLayouts[index] = nudgeResizeDimensionLabelAwayFromAvoidRects(
+        labelLayouts[index],
+        avoidRects,
+        viewport,
+        handleClearancePx
+      );
+    }
+  }
+
   return labelLayouts;
 }
 
@@ -3048,11 +3077,11 @@ function nudgeResizeDimensionLabelAwayFromRect(
     return labelLayout;
   }
 
-  return nudgeResizeDimensionLabel(
+  return getResolvedResizeDimensionLabelCollisionLayout(
     labelLayout,
-    labelLayout.avoidanceDirection,
     viewport,
-    distancePx
+    distancePx,
+    [rect]
   );
 }
 
@@ -3072,15 +3101,63 @@ function nudgeResizeDimensionLabelAwayFromAvoidRects(
       break;
     }
 
-    resolvedLayout = nudgeResizeDimensionLabel(
+    resolvedLayout = getResolvedResizeDimensionLabelCollisionLayout(
       resolvedLayout,
-      resolvedLayout.avoidanceDirection,
       viewport,
-      distancePx
+      distancePx,
+      [overlappingRect]
     );
   }
 
   return resolvedLayout;
+}
+
+function getResolvedResizeDimensionLabelCollisionLayout(
+  labelLayout: ResizeDimensionLabelLayout,
+  viewport: ViewportSize,
+  distancePx: number,
+  collisionRects: OverlayAvoidRect[]
+): ResizeDimensionLabelLayout {
+  const nudgeDirections: ScreenPoint[] = [];
+
+  if (labelLayout.normalPlacement !== "center") {
+    nudgeDirections.push(
+      {
+        x: -labelLayout.tangentDirection.x,
+        y: -labelLayout.tangentDirection.y,
+      },
+      labelLayout.tangentDirection
+    );
+  }
+
+  nudgeDirections.push(labelLayout.avoidanceDirection);
+
+  const originalRect = getCenteredRectFromLayout(labelLayout);
+  let bestLayout = labelLayout;
+  let bestOverlapCount = countOverlappingRects(originalRect, collisionRects);
+  let bestOverlapArea = getTotalRectOverlapArea(originalRect, collisionRects);
+
+  for (const direction of nudgeDirections) {
+    const nudgedLayout = nudgeResizeDimensionLabel(labelLayout, direction, viewport, distancePx);
+    const nudgedRect = getCenteredRectFromLayout(nudgedLayout);
+    const overlapCount = countOverlappingRects(nudgedRect, collisionRects);
+    const overlapArea = getTotalRectOverlapArea(nudgedRect, collisionRects);
+
+    if (
+      overlapCount < bestOverlapCount ||
+      (overlapCount === bestOverlapCount && overlapArea < bestOverlapArea)
+    ) {
+      bestLayout = nudgedLayout;
+      bestOverlapCount = overlapCount;
+      bestOverlapArea = overlapArea;
+    }
+
+    if (overlapCount === 0) {
+      break;
+    }
+  }
+
+  return bestLayout;
 }
 
 function nudgeResizeDimensionLabel(
@@ -3296,6 +3373,32 @@ function rectsOverlap(
   b: { left: number; right: number; top: number; bottom: number }
 ) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+function countOverlappingRects(
+  rect: { left: number; right: number; top: number; bottom: number },
+  avoidRects: OverlayAvoidRect[]
+) {
+  return avoidRects.reduce(
+    (count, avoidRect) => (rectsOverlap(rect, avoidRect) ? count + 1 : count),
+    0
+  );
+}
+
+function getTotalRectOverlapArea(
+  rect: { left: number; right: number; top: number; bottom: number },
+  avoidRects: OverlayAvoidRect[]
+) {
+  return avoidRects.reduce((total, avoidRect) => {
+    if (!rectsOverlap(rect, avoidRect)) {
+      return total;
+    }
+
+    const overlapWidth = Math.min(rect.right, avoidRect.right) - Math.max(rect.left, avoidRect.left);
+    const overlapHeight = Math.min(rect.bottom, avoidRect.bottom) - Math.max(rect.top, avoidRect.top);
+
+    return total + overlapWidth * overlapHeight;
+  }, 0);
 }
 
 function drawDraft(
