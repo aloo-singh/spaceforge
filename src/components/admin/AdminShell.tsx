@@ -64,7 +64,7 @@ const analyticsNavItems = [
   },
   {
     href: "/admin/analytics/average-time-to-first-room",
-    label: "Average time to first room",
+    label: "Median time to first room",
   },
   {
     href: "/admin/analytics/total-rooms-created",
