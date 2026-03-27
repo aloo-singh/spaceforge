@@ -102,6 +102,7 @@ type RenameSessionState = {
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
+  pendingProjectOpenCameraFit: boolean;
   settings: EditorSettings;
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
@@ -171,6 +172,7 @@ type EditorState = {
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
+  fitCameraOnProjectOpen: () => void;
   loadProjectDocument: (document: DocumentState) => void;
 };
 
@@ -538,6 +540,18 @@ function createInitialEditorExportPreferences(): EditorExportPreferences {
   return hydrationSnapshot?.exportPreferences ?? cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES);
 }
 
+function isViewportReadyForProjectOpenCameraFit(viewport: ViewportSize): boolean {
+  return viewport.width > 1 && viewport.height > 1;
+}
+
+function getProjectOpenCamera(document: DocumentState, viewport: ViewportSize): CameraState {
+  return getCameraFitTarget({
+    rooms: document.rooms,
+    viewport,
+    emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+  }).camera;
+}
+
 type ActiveResetCameraAnimation = {
   frameId: number;
   sequence: number;
@@ -569,6 +583,7 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
+  pendingProjectOpenCameraFit: false,
   settings: createInitialEditorSettings(),
   exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
@@ -596,7 +611,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isDimensionsVisibilityOverrideActive: isActive,
       };
     }),
-  setViewport: (width, height) => set({ viewport: { width, height } }),
+  setViewport: (width, height) =>
+    set((state) => {
+      const nextViewport = { width, height };
+      const didViewportChange =
+        state.viewport.width !== nextViewport.width || state.viewport.height !== nextViewport.height;
+
+      if (!didViewportChange && !state.pendingProjectOpenCameraFit) {
+        return state;
+      }
+
+      if (
+        !state.pendingProjectOpenCameraFit ||
+        !isViewportReadyForProjectOpenCameraFit(nextViewport)
+      ) {
+        return {
+          viewport: nextViewport,
+        };
+      }
+
+      stopResetCameraAnimation();
+
+      return {
+        viewport: nextViewport,
+        camera: getProjectOpenCamera(state.document, nextViewport),
+        pendingProjectOpenCameraFit: false,
+      };
+    }),
   updateSettings: (settings) =>
     set((state) => {
       const nextSettings: EditorSettings = {
@@ -1330,6 +1371,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       document: cloneDocumentState(DEFAULT_DOCUMENT_STATE),
       camera: { ...DEFAULT_CAMERA_STATE },
+      pendingProjectOpenCameraFit: false,
       roomDraft: {
         points: [],
         history: [],
@@ -1393,6 +1435,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: remainingFuture.length > 0,
       };
     }),
+  fitCameraOnProjectOpen: () =>
+    set((state) => {
+      const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
+
+      stopResetCameraAnimation();
+
+      if (shouldDeferCameraFit) {
+        if (state.pendingProjectOpenCameraFit) {
+          return state;
+        }
+
+        return {
+          pendingProjectOpenCameraFit: true,
+        };
+      }
+
+      const targetCamera = getProjectOpenCamera(state.document, state.viewport);
+      if (!state.pendingProjectOpenCameraFit && areCamerasEqual(state.camera, targetCamera)) {
+        return state;
+      }
+
+      return {
+        camera: targetCamera,
+        pendingProjectOpenCameraFit: false,
+      };
+    }),
   loadProjectDocument: (document) =>
     set((state) => {
       const nextDocument = cloneDocumentState(document);
@@ -1401,14 +1469,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       stopResetCameraAnimation();
+      const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
 
       return {
         document: nextDocument,
-        camera: getCameraFitTarget({
-          rooms: nextDocument.rooms,
-          viewport: state.viewport,
-          emptyLayoutCamera: DEFAULT_CAMERA_STATE,
-        }).camera,
+        camera: shouldDeferCameraFit
+          ? state.camera
+          : getProjectOpenCamera(nextDocument, state.viewport),
+        pendingProjectOpenCameraFit: shouldDeferCameraFit,
         roomDraft: EMPTY_ROOM_DRAFT,
         selectedRoomId: null,
         selectedWall: null,

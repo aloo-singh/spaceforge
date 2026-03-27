@@ -73,6 +73,7 @@ export function EditorProjectBootstrap({
 }: EditorProjectBootstrapProps) {
   const router = useRouter();
   const document = useEditorStore((state) => state.document);
+  const fitCameraOnProjectOpen = useEditorStore((state) => state.fitCameraOnProjectOpen);
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -136,6 +137,8 @@ export function EditorProjectBootstrap({
             const currentDocument = useEditorStore.getState().document;
             if (!areDocumentsEqual(currentDocument, fallbackDocument)) {
               loadProjectDocument(fallbackDocument);
+            } else {
+              fitCameraOnProjectOpen();
             }
 
             saveActiveProjectId(fallbackProject.id);
@@ -188,6 +191,8 @@ export function EditorProjectBootstrap({
         const currentDocument = useEditorStore.getState().document;
         if (!areDocumentsEqual(currentDocument, nextDocument)) {
           loadProjectDocument(nextDocument);
+        } else {
+          fitCameraOnProjectOpen();
         }
 
         saveActiveProjectId(selectedProject.id);
@@ -244,7 +249,7 @@ export function EditorProjectBootstrap({
     return () => {
       isCancelled = true;
     };
-  }, [loadProjectDocument, projectId, resetCanvas, router]);
+  }, [fitCameraOnProjectOpen, loadProjectDocument, projectId, resetCanvas, router]);
 
   useEffect(() => {
     const clientToken = clientTokenRef.current;
