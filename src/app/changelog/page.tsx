@@ -16,12 +16,14 @@ export default function ChangelogPage() {
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Analytics Drop-off)
+              </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>New &quot;Drop-off before first room&quot; metric card on the analytics dashboard</li>
-                <li>Shows % of sessions that never reached wall selection or room creation</li>
+                <li>Refined &quot;Drop-off before first room&quot; card wording to &quot;No canvas interaction&quot;</li>
+                <li>Added clear breakdown cards showing what those sessions actually did</li>
                 <li>Subtle red accent when drop-off rate is high</li>
-                <li>Sidebar link to the new detail page (ready for future expansion)</li>
+                <li>Detail page now provides immediate insight</li>
               </ul>
             </div>
           </div>
