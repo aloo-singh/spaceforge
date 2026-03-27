@@ -1,5 +1,7 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { getRoomWallSegment } from "@/lib/editor/openings";
+import { snapToGrid } from "@/lib/editor/geometry";
+import { isOrthogonalPointPath, isSimplePolygon } from "@/lib/editor/roomGeometry";
 import type { CameraState, Point, Room, ViewportSize } from "@/lib/editor/types";
 
 export type OrthogonalWallHandleLayout = {
@@ -78,6 +80,39 @@ export function hitTestOrthogonalWallHandle(
   }
 
   return null;
+}
+
+export function getOrthogonalWallAdjustmentResult(
+  points: Point[],
+  wallIndex: number,
+  cursorWorld: Point,
+  options?: { gridSizeMm?: number }
+): Point[] | null {
+  if (points.length < 4) return null;
+
+  const start = points[wallIndex];
+  const end = points[(wallIndex + 1) % points.length];
+  const axis =
+    start.x === end.x ? "vertical" : start.y === end.y ? "horizontal" : null;
+  if (!axis) return null;
+
+  const gridSizeMm = options?.gridSizeMm ?? 1;
+  const nextPoints = points.map((point) => ({ ...point }));
+
+  if (axis === "horizontal") {
+    const snappedY = snapToGrid(cursorWorld.y, gridSizeMm);
+    nextPoints[wallIndex] = { ...start, y: snappedY };
+    nextPoints[(wallIndex + 1) % points.length] = { ...end, y: snappedY };
+  } else {
+    const snappedX = snapToGrid(cursorWorld.x, gridSizeMm);
+    nextPoints[wallIndex] = { ...start, x: snappedX };
+    nextPoints[(wallIndex + 1) % points.length] = { ...end, x: snappedX };
+  }
+
+  if (!isOrthogonalPointPath(nextPoints, { closed: true })) return null;
+  if (!isSimplePolygon(nextPoints)) return null;
+
+  return nextPoints;
 }
 
 function clampHandleLength(lengthPx: number) {
