@@ -2338,7 +2338,7 @@ type ResizeDimensionLabelSpec = {
   outwardDirection: ScreenPoint;
   tangentDirection: ScreenPoint;
   wallLengthPx: number;
-  normalPlacement: "center" | "inside";
+  normalPlacement: "center" | "inside" | "outside";
 };
 
 type ResizeDimensionLabelLayout = {
@@ -2420,7 +2420,7 @@ function drawSelectedRoomDimensions(
   },
   camera: CameraState,
   viewport: ViewportSize,
-  settings: Pick<EditorSettings, "measurementFontSize">,
+  settings: Pick<EditorSettings, "measurementFontSize" | "wallMeasurementPosition">,
   theme: EditorCanvasTheme
 ) {
   if (roomResizeUi.activeRoomId || roomResizeUi.activeWall || roomResizeUi.activeCorner) return;
@@ -2435,7 +2435,7 @@ function drawSelectedRoomDimensions(
     showArea: true,
   });
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport),
+    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport, settings),
     roomLabelLayout,
     viewport,
     getSelectedRoomDimensionAvoidRects(selectedRoom, camera, viewport),
@@ -2738,7 +2738,8 @@ function getSelectedRoomDimensionLabelSpecs(
   room: Room,
   selectedWall: RoomWallSelection | null,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "wallMeasurementPosition">
 ): ResizeDimensionLabelSpec[] {
   if (selectedWall) {
     const wallMeasurement = getRoomWallMeasurement(room, selectedWall.wall);
@@ -2748,13 +2749,20 @@ function getSelectedRoomDimensionLabelSpecs(
       room,
       wallMeasurement,
       camera,
-      viewport
+      viewport,
+      settings
     );
     return labelSpec ? [labelSpec] : [];
   }
 
   return getRoomEdgeMeasurements(room).flatMap((edge) => {
-    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(room, edge, camera, viewport);
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(
+      room,
+      edge,
+      camera,
+      viewport,
+      settings
+    );
     return labelSpec ? [labelSpec] : [];
   });
 }
@@ -2763,7 +2771,8 @@ function createDimensionLabelSpecForEdgeMeasurement(
   room: Room,
   edge: { start: Point; end: Point; lengthMillimetres: number },
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "wallMeasurementPosition">
 ): ResizeDimensionLabelSpec | null {
   const midpoint = {
     x: (edge.start.x + edge.end.x) / 2,
@@ -2800,7 +2809,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
     outwardDirection: normalizeAxisAlignedScreenDirection(outwardVector),
     tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
     wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
-    normalPlacement: "inside",
+    normalPlacement: settings.wallMeasurementPosition,
   };
 }
 
@@ -2883,8 +2892,8 @@ function getResolvedResizeDimensionLabelLayouts(
     const width = measurementText.width + dimensionPaddingXPx * 2;
     const height = measurementText.height + dimensionPaddingYPx * 2;
     measurementText.destroy();
-    const insideOffsetPx =
-      labelSpec.normalPlacement === "inside" ? height / 2 + insideEdgePaddingPx : 0;
+    const normalOffsetPx =
+      labelSpec.normalPlacement === "center" ? 0 : height / 2 + insideEdgePaddingPx;
     const avoidanceDirection =
       labelSpec.normalPlacement === "inside"
         ? {
@@ -2892,9 +2901,16 @@ function getResolvedResizeDimensionLabelLayouts(
             y: -labelSpec.outwardDirection.y,
           }
         : labelSpec.outwardDirection;
+    const placementDirection =
+      labelSpec.normalPlacement === "inside"
+        ? {
+            x: -labelSpec.outwardDirection.x,
+            y: -labelSpec.outwardDirection.y,
+          }
+        : labelSpec.outwardDirection;
     const shiftedCenter = {
-      x: labelSpec.center.x - labelSpec.outwardDirection.x * insideOffsetPx,
-      y: labelSpec.center.y - labelSpec.outwardDirection.y * insideOffsetPx,
+      x: labelSpec.center.x + placementDirection.x * normalOffsetPx,
+      y: labelSpec.center.y + placementDirection.y * normalOffsetPx,
     };
 
     return {
