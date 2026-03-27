@@ -146,7 +146,7 @@ const RESIZE_DIMENSION_MIN_VISIBLE_WALL_PX = 20;
 const RESIZE_DIMENSION_SHORT_WALL_EXTRA_OFFSET_PX = 8;
 const RESIZE_DIMENSION_CORNER_SEPARATION_PX = 10;
 const RESIZE_DIMENSION_INSIDE_EDGE_PADDING_PX = 6;
-const RESIZE_DIMENSION_NON_RECT_VERTICAL_EDGE_EXTRA_PADDING_PX = 8;
+const RESIZE_DIMENSION_NON_RECT_EDGE_EXTRA_PADDING_PX = 12;
 const RESIZE_DIMENSION_HANDLE_CLEARANCE_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
@@ -2819,10 +2819,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
     tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
     wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
     normalPlacement: settings.wallMeasurementPosition,
-    normalOffsetBiasPx:
-      isNonRectangularRoom && edge.start.x === edge.end.x
-        ? RESIZE_DIMENSION_NON_RECT_VERTICAL_EDGE_EXTRA_PADDING_PX
-        : 0,
+    normalOffsetBiasPx: isNonRectangularRoom ? RESIZE_DIMENSION_NON_RECT_EDGE_EXTRA_PADDING_PX : 0,
   };
 }
 
