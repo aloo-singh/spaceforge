@@ -9,9 +9,15 @@ import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
+import type {
+  EditorExportLegendPosition,
+  EditorExportScaleBarPosition,
+} from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
   PROJECT_EXPORT_TITLE_MAX_LENGTH,
+  type ProjectExportDescriptionPosition,
+  type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
 import { cn } from "@/lib/utils";
 
@@ -20,8 +26,12 @@ export type ExportPngThemeOption = "light" | "dark" | "system";
 export type ExportPngRequest = {
   title: string;
   description: string;
+  titlePosition: ProjectExportTitlePosition;
+  descriptionPosition: ProjectExportDescriptionPosition;
   showLegend: boolean;
   showScaleBar: boolean;
+  legendPosition: EditorExportLegendPosition;
+  scaleBarPosition: EditorExportScaleBarPosition;
   designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
@@ -38,18 +48,26 @@ type ExportPngDialogProps = {
   exportDisabledReason?: string;
   title: string;
   description: string;
+  titlePosition: ProjectExportTitlePosition;
+  descriptionPosition: ProjectExportDescriptionPosition;
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
   theme: ExportPngThemeOption;
+  legendPosition: EditorExportLegendPosition;
+  scaleBarPosition: EditorExportScaleBarPosition;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
+  onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
+  onDescriptionPositionChange: (value: ProjectExportDescriptionPosition) => void;
   onShowLegendChange: (value: boolean) => void;
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
   onShowDimensionsChange: (value: boolean) => void;
   onThemeChange: (value: ExportPngThemeOption) => void;
+  onLegendPositionChange: (value: EditorExportLegendPosition) => void;
+  onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -64,18 +82,26 @@ export function ExportPngDialog({
   exportDisabledReason,
   title,
   description,
+  titlePosition,
+  descriptionPosition,
   showLegend,
   showScaleBar,
   showGrid,
   showDimensions,
   theme,
+  legendPosition,
+  scaleBarPosition,
   onTitleChange,
   onDescriptionChange,
+  onTitlePositionChange,
+  onDescriptionPositionChange,
   onShowLegendChange,
   onShowScaleBarChange,
   onShowGridChange,
   onShowDimensionsChange,
   onThemeChange,
+  onLegendPositionChange,
+  onScaleBarPositionChange,
   currentThemeLabel,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
@@ -87,6 +113,10 @@ export function ExportPngDialog({
   const previewRequestIdRef = useRef(0);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
+  const effectiveLegendPosition: EditorExportLegendPosition =
+    showLegend && legendPosition !== "none" ? legendPosition : "none";
+  const effectiveScaleBarPosition: EditorExportScaleBarPosition =
+    showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -104,8 +134,12 @@ export function ExportPngDialog({
       void onPreviewRequest({
         title,
         description,
-        showLegend,
-        showScaleBar,
+        titlePosition,
+        descriptionPosition,
+        showLegend: effectiveLegendPosition !== "none",
+        showScaleBar: effectiveScaleBarPosition !== "none",
+        legendPosition: effectiveLegendPosition,
+        scaleBarPosition: effectiveScaleBarPosition,
         designedBy,
         showGrid,
         showDimensions,
@@ -142,8 +176,10 @@ export function ExportPngDialog({
     onPreviewRequest,
     title,
     description,
-    showLegend,
-    showScaleBar,
+    titlePosition,
+    descriptionPosition,
+    effectiveLegendPosition,
+    effectiveScaleBarPosition,
     designedBy,
     showGrid,
     showDimensions,
@@ -157,8 +193,12 @@ export function ExportPngDialog({
     void onExport({
       title,
       description,
-      showLegend,
-      showScaleBar,
+      titlePosition,
+      descriptionPosition,
+      showLegend: effectiveLegendPosition !== "none",
+      showScaleBar: effectiveScaleBarPosition !== "none",
+      legendPosition: effectiveLegendPosition,
+      scaleBarPosition: effectiveScaleBarPosition,
       designedBy,
       showGrid,
       showDimensions,
@@ -282,6 +322,16 @@ export function ExportPngDialog({
                   />
                 </div>
 
+                <PositionChoice
+                  ariaLabel="Title position"
+                  value={titlePosition}
+                  options={[
+                    { label: "Top", value: "top" },
+                    { label: "None", value: "none" },
+                  ]}
+                  onChange={onTitlePositionChange}
+                />
+
                 <div className="space-y-1">
                   <label htmlFor="export-png-description" className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
                     Description
@@ -295,6 +345,16 @@ export function ExportPngDialog({
                     className="min-h-24 resize-none bg-background/90"
                   />
                 </div>
+
+                <PositionChoice
+                  ariaLabel="Description position"
+                  value={descriptionPosition}
+                  options={[
+                    { label: "Below title", value: "below-title" },
+                    { label: "None", value: "none" },
+                  ]}
+                  onChange={onDescriptionPositionChange}
+                />
 
                 <div className="space-y-1">
                   <label htmlFor="export-png-designed-by" className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
@@ -316,28 +376,47 @@ export function ExportPngDialog({
             </div>
 
             <ExportToggleCard
-              title="Show legend"
+              title="Legend"
               description="Add a simple room list with names and areas beneath the plan."
-              value={showLegend ? "On" : "Off"}
+              value={
+                effectiveLegendPosition === "bottom"
+                  ? "Bottom"
+                  : effectiveLegendPosition === "right-side"
+                    ? "Right side"
+                    : "None"
+              }
             >
-              <BinaryChoice
-                ariaLabel="Show legend"
-                enabled={showLegend}
-                onEnable={() => onShowLegendChange(true)}
-                onDisable={() => onShowLegendChange(false)}
+              <PositionChoice
+                ariaLabel="Legend position"
+                value={effectiveLegendPosition}
+                options={[
+                  { label: "Bottom", value: "bottom" },
+                  { label: "Right side", value: "right-side" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={(value) => {
+                  onShowLegendChange(value !== "none");
+                  onLegendPositionChange(value);
+                }}
               />
             </ExportToggleCard>
 
             <ExportToggleCard
-              title="Show scale bar"
+              title="Scale bar"
               description="Add the current plan scale using the same measurement treatment as the canvas."
-              value={showScaleBar ? "On" : "Off"}
+              value={effectiveScaleBarPosition === "bottom-left" ? "Bottom-left" : "None"}
             >
-              <BinaryChoice
-                ariaLabel="Show scale bar"
-                enabled={showScaleBar}
-                onEnable={() => onShowScaleBarChange(true)}
-                onDisable={() => onShowScaleBarChange(false)}
+              <PositionChoice
+                ariaLabel="Scale bar position"
+                value={effectiveScaleBarPosition}
+                options={[
+                  { label: "Bottom-left", value: "bottom-left" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={(value) => {
+                  onShowScaleBarChange(value !== "none");
+                  onScaleBarPositionChange(value);
+                }}
               />
             </ExportToggleCard>
 
@@ -455,7 +534,7 @@ type BinaryChoiceProps = {
 function BinaryChoice({ ariaLabel, enabled, onEnable, onDisable }: BinaryChoiceProps) {
   return (
     <div
-      className="mt-2.5 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+      className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
       role="group"
       aria-label={ariaLabel}
     >
@@ -479,6 +558,47 @@ function BinaryChoice({ ariaLabel, enabled, onEnable, onDisable }: BinaryChoiceP
       >
         Off
       </Button>
+    </div>
+  );
+}
+
+type PositionChoiceOption<TValue extends string> = {
+  label: string;
+  value: TValue;
+};
+
+type PositionChoiceProps<TValue extends string> = {
+  ariaLabel: string;
+  value: TValue;
+  options: PositionChoiceOption<TValue>[];
+  onChange: (value: TValue) => void;
+};
+
+function PositionChoice<TValue extends string>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+}: PositionChoiceProps<TValue>) {
+  return (
+    <div
+      className="grid w-full gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map((option) => (
+        <Button
+          key={option.value}
+          type="button"
+          size="sm"
+          variant={value === option.value ? "secondary" : "ghost"}
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </Button>
+      ))}
     </div>
   );
 }

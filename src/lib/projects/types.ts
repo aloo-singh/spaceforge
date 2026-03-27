@@ -99,6 +99,20 @@ export function isProjectDocument(value: unknown): value is EditorDocumentState 
   ) {
     return false;
   }
+  if (
+    value.exportConfig.titlePosition !== undefined &&
+    value.exportConfig.titlePosition !== "top" &&
+    value.exportConfig.titlePosition !== "none"
+  ) {
+    return false;
+  }
+  if (
+    value.exportConfig.descriptionPosition !== undefined &&
+    value.exportConfig.descriptionPosition !== "below-title" &&
+    value.exportConfig.descriptionPosition !== "none"
+  ) {
+    return false;
+  }
   return true;
 }
 

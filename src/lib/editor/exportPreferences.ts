@@ -1,4 +1,6 @@
 export type EditorExportThemePreference = "light" | "dark" | "system";
+export type EditorExportLegendPosition = "bottom" | "right-side" | "none";
+export type EditorExportScaleBarPosition = "bottom-left" | "none";
 
 export type EditorExportPreferences = {
   showLegend: boolean;
@@ -6,6 +8,8 @@ export type EditorExportPreferences = {
   showGrid: boolean;
   showDimensions: boolean;
   theme: EditorExportThemePreference;
+  legendPosition: EditorExportLegendPosition;
+  scaleBarPosition: EditorExportScaleBarPosition;
 };
 
 export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
@@ -14,6 +18,8 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   showGrid: true,
   showDimensions: true,
   theme: "system",
+  legendPosition: "bottom",
+  scaleBarPosition: "bottom-left",
 };
 
 export function cloneEditorExportPreferences(
@@ -25,6 +31,8 @@ export function cloneEditorExportPreferences(
     showGrid: preferences.showGrid,
     showDimensions: preferences.showDimensions,
     theme: preferences.theme,
+    legendPosition: preferences.legendPosition,
+    scaleBarPosition: preferences.scaleBarPosition,
   };
 }
 
@@ -37,7 +45,9 @@ export function areEditorExportPreferencesEqual(
     a.showScaleBar === b.showScaleBar &&
     a.showGrid === b.showGrid &&
     a.showDimensions === b.showDimensions &&
-    a.theme === b.theme
+    a.theme === b.theme &&
+    a.legendPosition === b.legendPosition &&
+    a.scaleBarPosition === b.scaleBarPosition
   );
 }
 
@@ -68,5 +78,17 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       (value.theme === "light" || value.theme === "dark" || value.theme === "system")
         ? value.theme
         : DEFAULT_EDITOR_EXPORT_PREFERENCES.theme,
+    legendPosition:
+      "legendPosition" in value &&
+      (value.legendPosition === "bottom" ||
+        value.legendPosition === "right-side" ||
+        value.legendPosition === "none")
+        ? value.legendPosition
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.legendPosition,
+    scaleBarPosition:
+      "scaleBarPosition" in value &&
+      (value.scaleBarPosition === "bottom-left" || value.scaleBarPosition === "none")
+        ? value.scaleBarPosition
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.scaleBarPosition,
   };
 }

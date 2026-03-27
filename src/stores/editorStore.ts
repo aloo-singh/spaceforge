@@ -492,6 +492,8 @@ function getSafePersistedHistorySnapshot(
           exportConfig: {
             title: document.exportConfig.title,
             description: document.exportConfig.description,
+            titlePosition: document.exportConfig.titlePosition,
+            descriptionPosition: document.exportConfig.descriptionPosition,
           },
           rooms: document.rooms.map((room) => ({
             id: room.id,
@@ -670,7 +672,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       if (
         state.document.exportConfig.title === nextExportConfig.title &&
-        state.document.exportConfig.description === nextExportConfig.description
+        state.document.exportConfig.description === nextExportConfig.description &&
+        state.document.exportConfig.titlePosition === nextExportConfig.titlePosition &&
+        state.document.exportConfig.descriptionPosition === nextExportConfig.descriptionPosition
       ) {
         return state;
       }

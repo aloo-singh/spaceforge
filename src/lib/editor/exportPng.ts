@@ -22,6 +22,7 @@ export type PixiPngExportOptions = {
       name: string;
       area: string;
     }[];
+    position?: "bottom" | "right-side";
     color: string;
     mutedColor: string;
     dividerColor: string;
@@ -62,6 +63,7 @@ type ExportTextLine = {
 type ExportTextBlock = {
   lines: ExportTextLine[];
   height: number;
+  width: number;
 };
 
 type ExportScaleBarBlock = {
@@ -103,7 +105,7 @@ function composeExportCanvas(
   const sourceY = edgeCropPx;
   const sourceWidth = sourceCanvas.width - edgeCropPx * 2;
   const sourceHeight = sourceCanvas.height - edgeCropPx * 2;
-  const exportWidth = Math.max(1, sourceWidth + paddingPx * 2);
+  const baseExportWidth = Math.max(1, sourceWidth + paddingPx * 2);
   const measurementCanvas = document.createElement("canvas");
   const measurementContext = measurementCanvas.getContext("2d");
   if (!measurementContext) {
@@ -111,22 +113,37 @@ function composeExportCanvas(
   }
 
   const footerGapPx = getSectionGap(paddingPx);
+  const legendPosition = options.legend?.position === "right-side" ? "right-side" : "bottom";
   const headerBlock = buildHeaderBlock(measurementContext, sourceWidth, options.header);
+  const sideLegendMaxWidth = Math.max(220, Math.min(320, Math.floor(sourceWidth * 0.32)));
   const legendBlock = buildLegendBlock(
     measurementContext,
-    Math.max(220, exportWidth - paddingPx * 2 - 168),
+    legendPosition === "right-side"
+      ? sideLegendMaxWidth
+      : Math.max(220, baseExportWidth - paddingPx * 2 - 168),
     options.legend
   );
   const scaleBarBlock = buildScaleBarBlock(options.scaleBar);
-  const signatureBlock = buildSignatureBlock(options.signature, paddingPx);
-  const bottomLeftBlockHeight = getBottomLeftBlockHeight(scaleBarBlock, legendBlock);
+  const signatureBlock = buildSignatureBlock(measurementContext, options.signature, paddingPx);
+  const rightLegendWidth = legendPosition === "right-side" ? legendBlock?.width ?? 0 : 0;
+  const rightColumnGapPx = rightLegendWidth > 0 ? footerGapPx : 0;
+  const exportWidth = Math.max(1, sourceWidth + paddingPx * 2 + rightColumnGapPx + rightLegendWidth);
+  const bottomLeftBlockHeight =
+    legendPosition === "bottom" ? getBottomLeftBlockHeight(scaleBarBlock, legendBlock) : scaleBarBlock?.height ?? 0;
   const topSectionHeight = headerBlock ? headerBlock.height + footerGapPx : 0;
   const bottomContentHeight = Math.max(bottomLeftBlockHeight, signatureBlock?.height ?? 0);
   const bottomSectionHeight = bottomContentHeight > 0 ? footerGapPx + bottomContentHeight : 0;
-  const exportHeight = Math.max(
+  const baseExportHeight = Math.max(
     1,
     sourceHeight + paddingPx * 2 + topSectionHeight + bottomSectionHeight
   );
+  const rightLegendHeight =
+    legendPosition === "right-side" ? paddingPx * 2 + topSectionHeight + (legendBlock?.height ?? 0) : 0;
+  const rightLegendWithSignatureHeight =
+    legendPosition === "right-side" && legendBlock && signatureBlock
+      ? paddingPx * 2 + topSectionHeight + legendBlock.height + footerGapPx + signatureBlock.height
+      : 0;
+  const exportHeight = Math.max(baseExportHeight, rightLegendHeight, rightLegendWithSignatureHeight);
   const composedCanvas = document.createElement("canvas");
   composedCanvas.width = exportWidth;
   composedCanvas.height = exportHeight;
@@ -162,12 +179,21 @@ function composeExportCanvas(
     drawScaleBarBlock(context, scaleBarBlock, paddingPx, bottomLeftStartY);
   }
 
-  if (legendBlock) {
+  if (legendBlock && legendPosition === "bottom") {
     drawLeftAlignedTextBlock(
       context,
       legendBlock,
       paddingPx,
       bottomLeftStartY + (scaleBarBlock ? scaleBarBlock.height + getBottomLeftBlockGap() : 0)
+    );
+  }
+
+  if (legendBlock && legendPosition === "right-side") {
+    drawLeftAlignedTextBlock(
+      context,
+      legendBlock,
+      paddingPx + sourceWidth + rightColumnGapPx,
+      paddingPx + topSectionHeight
     );
   }
 
@@ -313,6 +339,7 @@ function buildHeaderBlock(
     ? {
         lines,
         height: getTextBlockHeight(lines),
+        width: getTextBlockWidth(context, lines),
       }
     : null;
 }
@@ -359,6 +386,7 @@ function buildLegendBlock(
   return {
     lines,
     height: getTextBlockHeight(lines),
+    width: getTextBlockWidth(context, lines),
   };
 }
 
@@ -378,6 +406,7 @@ function buildScaleBarBlock(
 }
 
 function buildSignatureBlock(
+  context: CanvasRenderingContext2D,
   signature: PixiPngExportOptions["signature"],
   paddingPx: number
 ): ExportTextBlock | null {
@@ -405,6 +434,7 @@ function buildSignatureBlock(
   return {
     lines: textLines,
     height: getTextBlockHeight(textLines, 4),
+    width: getTextBlockWidth(context, textLines),
   };
 }
 
@@ -498,6 +528,19 @@ function getTextBlockHeight(lines: ExportTextLine[], defaultGapPx = 0) {
   return lines.reduce((total, line) => {
     return total + getLineHeightPx(line.font) + (line.gapAfterPx ?? defaultGapPx);
   }, 0);
+}
+
+function getTextBlockWidth(context: CanvasRenderingContext2D, lines: ExportTextLine[]) {
+  let width = 0;
+
+  context.save();
+  for (const line of lines) {
+    context.font = line.font;
+    width = Math.max(width, context.measureText(line.text).width);
+  }
+  context.restore();
+
+  return Math.ceil(width);
 }
 
 function getLineHeightPx(font: string) {

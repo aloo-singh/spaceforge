@@ -76,6 +76,10 @@ export function HistoryControls({
   const defaultDesignedBy = useEditorStore((state) => state.settings.exportSignatureText);
   const exportTitle = useEditorStore((state) => state.document.exportConfig.title);
   const exportDescription = useEditorStore((state) => state.document.exportConfig.description);
+  const exportTitlePosition = useEditorStore((state) => state.document.exportConfig.titlePosition);
+  const exportDescriptionPosition = useEditorStore(
+    (state) => state.document.exportConfig.descriptionPosition
+  );
   const exportPreferences = useEditorStore((state) => state.exportPreferences);
   const updateExportPreferences = useEditorStore((state) => state.updateExportPreferences);
   const updateProjectExportConfig = useEditorStore((state) => state.updateProjectExportConfig);
@@ -281,18 +285,28 @@ export function HistoryControls({
         exportDisabledReason={exportDisabledReason}
         title={exportTitle}
         description={exportDescription}
+        titlePosition={exportTitlePosition}
+        descriptionPosition={exportDescriptionPosition}
         showLegend={exportPreferences.showLegend}
         showScaleBar={exportPreferences.showScaleBar}
         showGrid={exportPreferences.showGrid}
         showDimensions={exportPreferences.showDimensions}
         theme={exportPreferences.theme}
+        legendPosition={exportPreferences.legendPosition}
+        scaleBarPosition={exportPreferences.scaleBarPosition}
         onTitleChange={(value) => updateProjectExportConfig({ title: value })}
         onDescriptionChange={(value) => updateProjectExportConfig({ description: value })}
+        onTitlePositionChange={(value) => updateProjectExportConfig({ titlePosition: value })}
+        onDescriptionPositionChange={(value) =>
+          updateProjectExportConfig({ descriptionPosition: value })
+        }
         onShowLegendChange={(value) => updateExportPreferences({ showLegend: value })}
         onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}
         onShowGridChange={(value) => updateExportPreferences({ showGrid: value })}
         onShowDimensionsChange={(value) => updateExportPreferences({ showDimensions: value })}
         onThemeChange={(value) => updateExportPreferences({ theme: value })}
+        onLegendPositionChange={(value) => updateExportPreferences({ legendPosition: value })}
+        onScaleBarPositionChange={(value) => updateExportPreferences({ scaleBarPosition: value })}
         currentThemeLabel={currentThemeLabel}
         defaultDesignedBy={defaultDesignedBy}
       />

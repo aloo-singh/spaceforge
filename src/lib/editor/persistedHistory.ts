@@ -19,7 +19,9 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
 
   if (
     exportConfigA.title !== exportConfigB.title ||
-    exportConfigA.description !== exportConfigB.description
+    exportConfigA.description !== exportConfigB.description ||
+    exportConfigA.titlePosition !== exportConfigB.titlePosition ||
+    exportConfigA.descriptionPosition !== exportConfigB.descriptionPosition
   ) {
     return false;
   }
@@ -44,6 +46,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
     exportConfig: {
       title: exportConfig.title,
       description: exportConfig.description,
+      titlePosition: exportConfig.titlePosition,
+      descriptionPosition: exportConfig.descriptionPosition,
     },
     rooms: document.rooms.map((room) => ({
       id: room.id,
