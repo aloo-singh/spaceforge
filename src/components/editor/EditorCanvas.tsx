@@ -11,10 +11,7 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
-import {
-  getConstrainedVertexHandleLayouts,
-  isNonRectangularOrthogonalRoom,
-} from "@/lib/editor/constrainedVertexAdjustments";
+import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
@@ -2349,7 +2346,7 @@ type ResizeDimensionLabelLayout = {
   center: ScreenPoint;
   outwardDirection: ScreenPoint;
   tangentDirection: ScreenPoint;
-  handleAvoidanceDirection: ScreenPoint;
+  avoidanceDirection: ScreenPoint;
   width: number;
   height: number;
 };
@@ -2803,7 +2800,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
     outwardDirection: normalizeAxisAlignedScreenDirection(outwardVector),
     tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
     wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
-    normalPlacement: isNonRectangularOrthogonalRoom(room) ? "inside" : "center",
+    normalPlacement: "inside",
   };
 }
 
@@ -2888,7 +2885,7 @@ function getResolvedResizeDimensionLabelLayouts(
     measurementText.destroy();
     const insideOffsetPx =
       labelSpec.normalPlacement === "inside" ? height / 2 + insideEdgePaddingPx : 0;
-    const handleAvoidanceDirection =
+    const avoidanceDirection =
       labelSpec.normalPlacement === "inside"
         ? {
             x: -labelSpec.outwardDirection.x,
@@ -2905,7 +2902,7 @@ function getResolvedResizeDimensionLabelLayouts(
       center: clampResizeDimensionLabelCenter(shiftedCenter, width, height, viewport),
       outwardDirection: labelSpec.outwardDirection,
       tangentDirection: labelSpec.tangentDirection,
-      handleAvoidanceDirection,
+      avoidanceDirection,
       width,
       height,
     };
@@ -2972,7 +2969,7 @@ function nudgeResizeDimensionLabelAwayFromRect(
 
   return nudgeResizeDimensionLabel(
     labelLayout,
-    labelLayout.outwardDirection,
+    labelLayout.avoidanceDirection,
     viewport,
     distancePx
   );
@@ -2996,7 +2993,7 @@ function nudgeResizeDimensionLabelAwayFromAvoidRects(
 
     resolvedLayout = nudgeResizeDimensionLabel(
       resolvedLayout,
-      resolvedLayout.handleAvoidanceDirection,
+      resolvedLayout.avoidanceDirection,
       viewport,
       distancePx
     );
