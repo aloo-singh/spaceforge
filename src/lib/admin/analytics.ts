@@ -360,7 +360,9 @@ function getMedian(values: number[]) {
 
 function buildFirstRoomDistribution(values: number[]): AnalyticsMetricDistributionPoint[] {
   const buckets = [
-    { label: "<30s", minMs: 0, maxMs: 30 * MS_PER_SECOND },
+    { label: "0-10s", minMs: 0, maxMs: 10 * MS_PER_SECOND },
+    { label: "10-20s", minMs: 10 * MS_PER_SECOND, maxMs: 20 * MS_PER_SECOND },
+    { label: "20-30s", minMs: 20 * MS_PER_SECOND, maxMs: 30 * MS_PER_SECOND },
     { label: "30-60s", minMs: 30 * MS_PER_SECOND, maxMs: 60 * MS_PER_SECOND },
     { label: "1-2m", minMs: 1 * MS_PER_MINUTE, maxMs: 2 * MS_PER_MINUTE },
     { label: "2-3m", minMs: 2 * MS_PER_MINUTE, maxMs: 3 * MS_PER_MINUTE },
