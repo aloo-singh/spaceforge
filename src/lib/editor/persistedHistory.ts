@@ -258,16 +258,29 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       changedRoom.previous.interiorAssets ?? [],
       changedRoom.next.interiorAssets ?? []
     );
-    if (!movedAsset) return null;
+    if (movedAsset) {
+      return {
+        type: "move-interior-asset",
+        roomId: changedRoom.next.id,
+        assetId: movedAsset.assetId,
+        previousXmm: movedAsset.previousXmm,
+        previousYmm: movedAsset.previousYmm,
+        nextXmm: movedAsset.nextXmm,
+        nextYmm: movedAsset.nextYmm,
+      };
+    }
+
+    const updatedAsset = inferUpdatedInteriorAsset(
+      changedRoom.previous.interiorAssets ?? [],
+      changedRoom.next.interiorAssets ?? []
+    );
+    if (!updatedAsset) return null;
 
     return {
-      type: "move-interior-asset",
+      type: "update-interior-asset",
       roomId: changedRoom.next.id,
-      assetId: movedAsset.assetId,
-      previousXmm: movedAsset.previousXmm,
-      previousYmm: movedAsset.previousYmm,
-      nextXmm: movedAsset.nextXmm,
-      nextYmm: movedAsset.nextYmm,
+      previousAsset: updatedAsset.previousAsset,
+      nextAsset: updatedAsset.nextAsset,
     };
   }
 
@@ -422,6 +435,41 @@ function inferMovedInteriorAsset(
   }
 
   return movedAsset;
+}
+
+function inferUpdatedInteriorAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+): { previousAsset: RoomInteriorAsset; nextAsset: RoomInteriorAsset } | null {
+  if (previousAssets.length !== nextAssets.length) return null;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  let updatedAsset: { previousAsset: RoomInteriorAsset; nextAsset: RoomInteriorAsset } | null = null;
+
+  for (const previousAsset of previousAssets) {
+    const nextAsset = nextById.get(previousAsset.id);
+    if (!nextAsset) return null;
+
+    const didOnlyMove = previousAsset.xMm !== nextAsset.xMm || previousAsset.yMm !== nextAsset.yMm;
+    const didChange =
+      previousAsset.type !== nextAsset.type ||
+      previousAsset.xMm !== nextAsset.xMm ||
+      previousAsset.yMm !== nextAsset.yMm ||
+      previousAsset.widthMm !== nextAsset.widthMm ||
+      previousAsset.depthMm !== nextAsset.depthMm;
+    if (!didChange) continue;
+    if (didOnlyMove && previousAsset.widthMm === nextAsset.widthMm && previousAsset.depthMm === nextAsset.depthMm) {
+      return null;
+    }
+    if (updatedAsset) return null;
+
+    updatedAsset = {
+      previousAsset: cloneRoomInteriorAsset(previousAsset),
+      nextAsset: cloneRoomInteriorAsset(nextAsset),
+    };
+  }
+
+  return updatedAsset;
 }
 
 function inferUpdatedOpening(

@@ -14,6 +14,7 @@ import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
 import {
   DEFAULT_STAIR_TREAD_SPACING_MM,
+  getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
 } from "@/lib/editor/interiorAssets";
 import { getOrthogonalWallHandleLayouts } from "@/lib/editor/orthogonalWallResize";
@@ -2172,6 +2173,42 @@ function drawRoomInteriorAssets(
       });
       graphics.moveTo(left + 4, y);
       graphics.lineTo(left + width - 4, y);
+      graphics.stroke();
+    }
+
+    if (!isSelected) continue;
+
+    const rectBounds = getInteriorAssetBoundsAsRectBounds(asset);
+    const wallHandles = getWallHandleLayouts(rectBounds, camera, viewport);
+    const cornerHandles = getCornerHandleLayouts(rectBounds, camera, viewport);
+
+    for (const handle of wallHandles) {
+      const radius = Math.min(handle.width, handle.height) / 2;
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.3 });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: 1.5,
+        color: theme.roomOutline,
+        alpha: 0.9,
+      });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.stroke();
+    }
+
+    for (const handle of cornerHandles) {
+      const half = handle.size / 2;
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.38 });
+      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: 1.5,
+        color: theme.roomOutline,
+        alpha: 0.92,
+      });
+      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
       graphics.stroke();
     }
   }

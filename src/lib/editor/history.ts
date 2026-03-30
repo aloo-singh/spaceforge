@@ -80,6 +80,12 @@ export type EditorCommand =
       nextYmm: number;
     }
   | {
+      type: "update-interior-asset";
+      roomId: string;
+      previousAsset: RoomInteriorAsset;
+      nextAsset: RoomInteriorAsset;
+    }
+  | {
       type: "update-opening";
       roomId: string;
       previousOpening: RoomOpening;
@@ -289,6 +295,24 @@ export function applyEditorCommand(
                   yMm: nextYmm,
                 }
               : asset
+          ),
+        };
+      }),
+    };
+  }
+
+  if (command.type === "update-interior-asset") {
+    const nextAsset = direction === "undo" ? command.previousAsset : command.nextAsset;
+
+    return {
+      ...document,
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.roomId) return room;
+
+        return {
+          ...room,
+          interiorAssets: room.interiorAssets.map((asset) =>
+            asset.id === nextAsset.id ? cloneRoomInteriorAsset(nextAsset) : asset
           ),
         };
       }),

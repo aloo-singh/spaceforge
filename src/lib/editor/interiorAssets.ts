@@ -1,6 +1,7 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { getPolygonBounds, isPointInPolygon } from "@/lib/editor/roomGeometry";
+import type { RectCorner, RectWall, RoomRectBounds } from "@/lib/editor/rectRoomResize";
 import type {
   CameraState,
   Point,
@@ -11,8 +12,10 @@ import type {
 } from "@/lib/editor/types";
 
 export const DEFAULT_STAIR_WIDTH_MM = 1200;
-export const DEFAULT_STAIR_DEPTH_MM = 2800;
+export const DEFAULT_STAIR_DEPTH_MM = 2700;
 export const DEFAULT_STAIR_TREAD_SPACING_MM = 300;
+export const MIN_STAIR_WIDTH_MM = 300;
+export const MIN_STAIR_DEPTH_MM = DEFAULT_STAIR_TREAD_SPACING_MM;
 const INTERIOR_ASSET_HIT_PADDING_PX = 10;
 
 export type RoomInteriorAssetBounds = {
@@ -21,6 +24,9 @@ export type RoomInteriorAssetBounds = {
   top: number;
   bottom: number;
 };
+
+export type InteriorAssetResizeWall = RectWall;
+export type InteriorAssetResizeCorner = RectCorner;
 
 export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAsset {
   return {
@@ -152,6 +158,59 @@ export function constrainInteriorAssetCenter(
   return findConstrainedInteriorAssetCenter(room, asset.widthMm, asset.depthMm, nextCenter);
 }
 
+export function getInteriorAssetBoundsAsRectBounds(
+  asset: Pick<RoomInteriorAsset, "xMm" | "yMm" | "widthMm" | "depthMm">
+): RoomRectBounds {
+  const bounds = getRoomInteriorAssetBounds(asset);
+  return {
+    minX: bounds.left,
+    maxX: bounds.right,
+    minY: bounds.top,
+    maxY: bounds.bottom,
+  };
+}
+
+export function getInteriorAssetFromBounds(
+  asset: RoomInteriorAsset,
+  bounds: RoomRectBounds
+): RoomInteriorAsset {
+  return {
+    ...cloneRoomInteriorAsset(asset),
+    xMm: (bounds.minX + bounds.maxX) / 2,
+    yMm: (bounds.minY + bounds.maxY) / 2,
+    widthMm: bounds.maxX - bounds.minX,
+    depthMm: bounds.maxY - bounds.minY,
+  };
+}
+
+export function getResizedStairForWallDrag(
+  room: Room,
+  asset: RoomInteriorAsset,
+  wall: InteriorAssetResizeWall,
+  cursorWorld: Point
+): RoomInteriorAsset | null {
+  const nextBounds = resizeInteriorAssetBoundsForWallDrag(
+    getInteriorAssetBoundsAsRectBounds(asset),
+    wall,
+    cursorWorld
+  );
+  return getConstrainedResizedStair(room, asset, nextBounds);
+}
+
+export function getResizedStairForCornerDrag(
+  room: Room,
+  asset: RoomInteriorAsset,
+  corner: InteriorAssetResizeCorner,
+  cursorWorld: Point
+): RoomInteriorAsset | null {
+  const nextBounds = resizeInteriorAssetBoundsForCornerDrag(
+    getInteriorAssetBoundsAsRectBounds(asset),
+    corner,
+    cursorWorld
+  );
+  return getConstrainedResizedStair(room, asset, nextBounds);
+}
+
 function findDefaultStairPlacement(room: Room): Point | null {
   const anchor = getRoomInteriorAssetAnchor(room);
   return findConstrainedInteriorAssetCenter(
@@ -234,6 +293,121 @@ function findConstrainedInteriorAssetCenter(
   }
 
   return bestCandidate;
+}
+
+function getConstrainedResizedStair(
+  room: Room,
+  asset: RoomInteriorAsset,
+  resizedBounds: RoomRectBounds
+): RoomInteriorAsset | null {
+  const normalizedBounds = normalizeInteriorAssetResizeBounds(resizedBounds);
+  const snappedBounds = {
+    minX: normalizedBounds.minX,
+    maxX: normalizedBounds.maxX,
+    minY: normalizedBounds.minY,
+    maxY: normalizedBounds.minY + snapStairDepthMm(normalizedBounds.maxY - normalizedBounds.minY),
+  };
+
+  if (snappedBounds.maxY - snappedBounds.minY < MIN_STAIR_DEPTH_MM) {
+    snappedBounds.maxY = snappedBounds.minY + MIN_STAIR_DEPTH_MM;
+  }
+  if (snappedBounds.maxX - snappedBounds.minX < MIN_STAIR_WIDTH_MM) {
+    snappedBounds.maxX = snappedBounds.minX + MIN_STAIR_WIDTH_MM;
+  }
+
+  const nextAsset = getInteriorAssetFromBounds(asset, snappedBounds);
+  return isInteriorAssetWithinRoom(room, nextAsset) ? nextAsset : null;
+}
+
+function resizeInteriorAssetBoundsForWallDrag(
+  bounds: RoomRectBounds,
+  wall: InteriorAssetResizeWall,
+  cursorWorld: Point
+): RoomRectBounds {
+  if (wall === "left") {
+    return {
+      ...bounds,
+      minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+    };
+  }
+
+  if (wall === "right") {
+    return {
+      ...bounds,
+      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+    };
+  }
+
+  const snappedY = snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+  if (wall === "top") {
+    return {
+      ...bounds,
+      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_DEPTH_MM),
+    };
+  }
+
+  return {
+    ...bounds,
+    maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_DEPTH_MM),
+  };
+}
+
+function resizeInteriorAssetBoundsForCornerDrag(
+  bounds: RoomRectBounds,
+  corner: InteriorAssetResizeCorner,
+  cursorWorld: Point
+): RoomRectBounds {
+  const snappedY = snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+
+  if (corner === "top-left") {
+    return {
+      minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+      maxX: bounds.maxX,
+      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_DEPTH_MM),
+      maxY: bounds.maxY,
+    };
+  }
+
+  if (corner === "top-right") {
+    return {
+      minX: bounds.minX,
+      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_DEPTH_MM),
+      maxY: bounds.maxY,
+    };
+  }
+
+  if (corner === "bottom-right") {
+    return {
+      minX: bounds.minX,
+      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+      minY: bounds.minY,
+      maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_DEPTH_MM),
+    };
+  }
+
+  return {
+    minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+    maxX: bounds.maxX,
+    minY: bounds.minY,
+    maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_DEPTH_MM),
+  };
+}
+
+function normalizeInteriorAssetResizeBounds(bounds: RoomRectBounds): RoomRectBounds {
+  return {
+    minX: Math.min(bounds.minX, bounds.maxX),
+    maxX: Math.max(bounds.minX, bounds.maxX),
+    minY: Math.min(bounds.minY, bounds.maxY),
+    maxY: Math.max(bounds.minY, bounds.maxY),
+  };
+}
+
+function snapStairDepthMm(depthMm: number) {
+  return Math.max(
+    MIN_STAIR_DEPTH_MM,
+    snapToGrid(depthMm, DEFAULT_STAIR_TREAD_SPACING_MM)
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
