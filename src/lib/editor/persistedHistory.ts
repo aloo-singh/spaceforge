@@ -419,6 +419,7 @@ function inferMovedInteriorAsset(
     const didMove = previousAsset.xMm !== nextAsset.xMm || previousAsset.yMm !== nextAsset.yMm;
     const didOtherFieldsChange =
       previousAsset.type !== nextAsset.type ||
+      previousAsset.name !== nextAsset.name ||
       previousAsset.widthMm !== nextAsset.widthMm ||
       previousAsset.depthMm !== nextAsset.depthMm;
     if (didOtherFieldsChange) return null;
@@ -453,6 +454,7 @@ function inferUpdatedInteriorAsset(
     const didOnlyMove = previousAsset.xMm !== nextAsset.xMm || previousAsset.yMm !== nextAsset.yMm;
     const didChange =
       previousAsset.type !== nextAsset.type ||
+      previousAsset.name !== nextAsset.name ||
       previousAsset.xMm !== nextAsset.xMm ||
       previousAsset.yMm !== nextAsset.yMm ||
       previousAsset.widthMm !== nextAsset.widthMm ||

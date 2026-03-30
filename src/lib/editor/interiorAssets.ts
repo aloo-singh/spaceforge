@@ -16,6 +16,7 @@ export const DEFAULT_STAIR_DEPTH_MM = 2700;
 export const DEFAULT_STAIR_TREAD_SPACING_MM = 300;
 export const MIN_STAIR_WIDTH_MM = 300;
 export const MIN_STAIR_DEPTH_MM = DEFAULT_STAIR_TREAD_SPACING_MM;
+export const DEFAULT_STAIR_NAME = "Stairs";
 const INTERIOR_ASSET_HIT_PADDING_PX = 10;
 
 export type RoomInteriorAssetBounds = {
@@ -32,6 +33,7 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
   return {
     id: asset.id,
     type: asset.type,
+    name: asset.name ?? DEFAULT_STAIR_NAME,
     xMm: asset.xMm,
     yMm: asset.yMm,
     widthMm: asset.widthMm,
@@ -55,6 +57,7 @@ export function areRoomInteriorAssetsEqual(
     if (
       assetA.id !== assetB.id ||
       assetA.type !== assetB.type ||
+      assetA.name !== assetB.name ||
       assetA.xMm !== assetB.xMm ||
       assetA.yMm !== assetB.yMm ||
       assetA.widthMm !== assetB.widthMm ||
@@ -102,6 +105,7 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
   return {
     id,
     type: "stairs",
+    name: DEFAULT_STAIR_NAME,
     xMm: center.x,
     yMm: center.y,
     widthMm: DEFAULT_STAIR_WIDTH_MM,
@@ -187,12 +191,14 @@ export function getResizedStairForWallDrag(
   room: Room,
   asset: RoomInteriorAsset,
   wall: InteriorAssetResizeWall,
-  cursorWorld: Point
+  cursorWorld: Point,
+  options?: { widthGridSizeMm?: number }
 ): RoomInteriorAsset | null {
   const nextBounds = resizeInteriorAssetBoundsForWallDrag(
     getInteriorAssetBoundsAsRectBounds(asset),
     wall,
-    cursorWorld
+    cursorWorld,
+    options
   );
   return getConstrainedResizedStair(room, asset, nextBounds);
 }
@@ -201,12 +207,14 @@ export function getResizedStairForCornerDrag(
   room: Room,
   asset: RoomInteriorAsset,
   corner: InteriorAssetResizeCorner,
-  cursorWorld: Point
+  cursorWorld: Point,
+  options?: { widthGridSizeMm?: number }
 ): RoomInteriorAsset | null {
   const nextBounds = resizeInteriorAssetBoundsForCornerDrag(
     getInteriorAssetBoundsAsRectBounds(asset),
     corner,
-    cursorWorld
+    cursorWorld,
+    options
   );
   return getConstrainedResizedStair(room, asset, nextBounds);
 }
@@ -259,6 +267,7 @@ function findConstrainedInteriorAssetCenter(
   const directCandidate = {
     id: "__candidate__",
     type: "stairs" as const,
+    name: DEFAULT_STAIR_NAME,
     xMm: clampedPreferred.x,
     yMm: clampedPreferred.y,
     widthMm,
@@ -277,6 +286,7 @@ function findConstrainedInteriorAssetCenter(
       const candidate = {
         id: "__candidate__",
         type: "stairs" as const,
+        name: DEFAULT_STAIR_NAME,
         xMm: x,
         yMm: y,
         widthMm,
@@ -322,19 +332,24 @@ function getConstrainedResizedStair(
 function resizeInteriorAssetBoundsForWallDrag(
   bounds: RoomRectBounds,
   wall: InteriorAssetResizeWall,
-  cursorWorld: Point
+  cursorWorld: Point,
+  options?: { widthGridSizeMm?: number }
 ): RoomRectBounds {
+  const snappedX =
+    options?.widthGridSizeMm && options.widthGridSizeMm > 0
+      ? snapToGrid(cursorWorld.x, options.widthGridSizeMm)
+      : cursorWorld.x;
   if (wall === "left") {
     return {
       ...bounds,
-      minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+      minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
     };
   }
 
   if (wall === "right") {
     return {
       ...bounds,
-      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
     };
   }
 
@@ -355,13 +370,18 @@ function resizeInteriorAssetBoundsForWallDrag(
 function resizeInteriorAssetBoundsForCornerDrag(
   bounds: RoomRectBounds,
   corner: InteriorAssetResizeCorner,
-  cursorWorld: Point
+  cursorWorld: Point,
+  options?: { widthGridSizeMm?: number }
 ): RoomRectBounds {
+  const snappedX =
+    options?.widthGridSizeMm && options.widthGridSizeMm > 0
+      ? snapToGrid(cursorWorld.x, options.widthGridSizeMm)
+      : cursorWorld.x;
   const snappedY = snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
 
   if (corner === "top-left") {
     return {
-      minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+      minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
       maxX: bounds.maxX,
       minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_DEPTH_MM),
       maxY: bounds.maxY,
@@ -371,7 +391,7 @@ function resizeInteriorAssetBoundsForCornerDrag(
   if (corner === "top-right") {
     return {
       minX: bounds.minX,
-      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
       minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_DEPTH_MM),
       maxY: bounds.maxY,
     };
@@ -380,14 +400,14 @@ function resizeInteriorAssetBoundsForCornerDrag(
   if (corner === "bottom-right") {
     return {
       minX: bounds.minX,
-      maxX: Math.max(cursorWorld.x, bounds.minX + MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
       minY: bounds.minY,
       maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_DEPTH_MM),
     };
   }
 
   return {
-    minX: Math.min(cursorWorld.x, bounds.maxX - MIN_STAIR_WIDTH_MM),
+    minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
     maxX: bounds.maxX,
     minY: bounds.minY,
     maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_DEPTH_MM),

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   );
   const rooms = useEditorStore((state) => state.document.rooms);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
+  const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
@@ -38,6 +40,11 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const resolvedSelectedOpening =
     selectedOpening?.roomId === selectedRoom?.id
       ? selectedRoom?.openings.find((opening) => opening.id === selectedOpeningId) ?? null
+      : null;
+  const selectedInteriorAssetId = selectedInteriorAsset?.assetId ?? null;
+  const resolvedSelectedInteriorAsset =
+    selectedInteriorAsset?.roomId === selectedRoom?.id
+      ? selectedRoom?.interiorAssets.find((asset) => asset.id === selectedInteriorAssetId) ?? null
       : null;
   const canDeleteSelectedRoom = selectedRoom !== null;
 
@@ -207,6 +214,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
         </aside>
       </EditorInspectorSection>
       {resolvedSelectedOpening ? <SelectedOpeningInspector opening={resolvedSelectedOpening} /> : null}
+      {resolvedSelectedInteriorAsset ? (
+        <SelectedInteriorAssetInspector asset={resolvedSelectedInteriorAsset} />
+      ) : null}
     </div>
   );
 }

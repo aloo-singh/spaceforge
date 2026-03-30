@@ -77,6 +77,7 @@ export type InteriorAssetType = "stairs";
 export type RoomInteriorAsset = {
   id: string;
   type: InteriorAssetType;
+  name: string;
   xMm: number;
   yMm: number;
   widthMm: number;

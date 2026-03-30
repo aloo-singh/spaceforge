@@ -56,11 +56,13 @@ import {
   cloneDocumentState,
 } from "@/lib/editor/persistedHistory";
 import {
+  areRoomInteriorAssetsEqual,
   canPlaceDefaultStairInRoom,
   cloneRoomInteriorAsset,
   cloneRoomInteriorAssets,
   constrainInteriorAssetCenter,
   createCenteredDefaultStair,
+  DEFAULT_STAIR_NAME,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
 } from "@/lib/editor/interiorAssets";
@@ -161,6 +163,7 @@ type EditorState = {
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
+  updateSelectedInteriorAssetName: (name: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -414,6 +417,38 @@ function updateRoomInteriorAssetInDocument(
   };
 }
 
+function updateSelectedInteriorAsset(
+  state: Pick<EditorState, "document" | "selectedInteriorAsset" | "history">,
+  updater: (room: Room, asset: Room["interiorAssets"][number]) => Room["interiorAssets"][number] | null
+) {
+  const selectedInteriorAsset = state.selectedInteriorAsset;
+  if (!selectedInteriorAsset) return null;
+
+  const room = state.document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId);
+  const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedInteriorAsset.assetId);
+  if (!room || !asset) return null;
+
+  const nextAsset = updater(room, asset);
+  if (!nextAsset || areRoomInteriorAssetsEqual([asset], [nextAsset])) return null;
+
+  const command: EditorCommand = {
+    type: "update-interior-asset",
+    roomId: room.id,
+    previousAsset: cloneRoomInteriorAsset(asset),
+    nextAsset: cloneRoomInteriorAsset(nextAsset),
+  };
+
+  return {
+    document: updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset),
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
+}
+
 function updateRoomOpeningWidthInDocument(
   document: DocumentState,
   roomId: string,
@@ -654,13 +689,16 @@ function resolveInteriorAssetResizeFromWall(
   roomId: string,
   assetId: string,
   wall: "left" | "right" | "top" | "bottom",
-  cursorWorld: Point
+  cursorWorld: Point,
+  gridSizeMm: number
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForWallDrag(room, asset, wall, cursorWorld);
+  const nextAsset = getResizedStairForWallDrag(room, asset, wall, cursorWorld, {
+    widthGridSizeMm: gridSizeMm,
+  });
   if (!nextAsset) return null;
 
   return {
@@ -675,13 +713,16 @@ function resolveInteriorAssetResizeFromCorner(
   roomId: string,
   assetId: string,
   corner: "top-left" | "top-right" | "bottom-right" | "bottom-left",
-  cursorWorld: Point
+  cursorWorld: Point,
+  gridSizeMm: number
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForCornerDrag(room, asset, corner, cursorWorld);
+  const nextAsset = getResizedStairForCornerDrag(room, asset, corner, cursorWorld, {
+    widthGridSizeMm: gridSizeMm,
+  });
   if (!nextAsset) return null;
 
   return {
@@ -1444,6 +1485,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextState = insertDefaultStairOnSelectedRoom(state);
       return nextState ?? state;
     }),
+  updateSelectedInteriorAssetName: (name) =>
+    set((state) => {
+      const trimmedName = name.trim();
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        const nextName = trimmedName.length > 0 ? trimmedName : DEFAULT_STAIR_NAME;
+        if (asset.name === nextName) return null;
+
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          name: nextName,
+        };
+      });
+      return nextState ?? state;
+    }),
   updateSelectedOpeningWidth: (widthMm) =>
     set((state) => {
       const nextState = updateSelectedOpening(state, (room, opening) =>
@@ -2146,7 +2201,14 @@ export function getInteriorAssetResizeFromWallForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
-  return resolveInteriorAssetResizeFromWall(state.document, roomId, assetId, wall, cursorWorld);
+  return resolveInteriorAssetResizeFromWall(
+    state.document,
+    roomId,
+    assetId,
+    wall,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
 }
 
 export function getInteriorAssetResizeFromCornerForCursor(
@@ -2156,7 +2218,14 @@ export function getInteriorAssetResizeFromCornerForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
-  return resolveInteriorAssetResizeFromCorner(state.document, roomId, assetId, corner, cursorWorld);
+  return resolveInteriorAssetResizeFromCorner(
+    state.document,
+    roomId,
+    assetId,
+    corner,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
 }
 
 export function canInsertDefaultStairInSelectedRoom() {
