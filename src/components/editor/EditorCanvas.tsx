@@ -12,6 +12,11 @@ import {
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
 import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import {
+  DEFAULT_STAIR_TREAD_SPACING_MM,
+  getInteriorAssetBoundsAsRectBounds,
+  getRoomInteriorAssetBounds,
+} from "@/lib/editor/interiorAssets";
 import { getOrthogonalWallHandleLayouts } from "@/lib/editor/orthogonalWallResize";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
@@ -86,6 +91,7 @@ import type {
   CameraState,
   Point,
   Room,
+  RoomInteriorAssetSelection,
   RoomOpeningSelection,
   RoomWall,
   RoomWallSelection,
@@ -671,6 +677,7 @@ export default function EditorCanvas({
       drawOpenings(
         exportOpeningGraphics,
         state.document.rooms,
+        null,
         null,
         exportCamera,
         exportViewport,
@@ -1406,6 +1413,7 @@ function drawScene(
     openingGraphics,
     renderedRooms,
     state.selectedOpening,
+    state.selectedInteriorAsset,
     state.camera,
     state.viewport,
     theme
@@ -1775,6 +1783,7 @@ function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
   selectedOpening: RoomOpeningSelection | null,
+  selectedInteriorAsset: RoomInteriorAssetSelection | null,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -1784,6 +1793,7 @@ function drawOpenings(
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
+    drawRoomInteriorAssets(graphics, room, selectedInteriorAsset, camera, viewport, theme);
   }
 }
 
@@ -1859,12 +1869,18 @@ function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: Transfor
 
   const transformedPoints = getRenderedTransformRoomPoints(transformFeedback);
   if (!transformedPoints) return rooms;
+  const delta = getPointListTranslationDelta(transformFeedback.originalPoints, transformedPoints);
 
   return rooms.map((room) =>
     room.id === transformFeedback.roomId
       ? {
           ...room,
           points: transformedPoints,
+          interiorAssets: room.interiorAssets.map((asset) => ({
+            ...asset,
+            xMm: asset.xMm + delta.x,
+            yMm: asset.yMm + delta.y,
+          })),
         }
       : room
   );
@@ -1881,12 +1897,21 @@ function getRenderedRoomsForLabelTransform(
       ? transformFeedback.previewPoints
       : getRenderedTransformRoomPoints(transformFeedback);
   if (!transformedPoints) return rooms;
+  const delta = getPointListTranslationDelta(transformFeedback.originalPoints, transformedPoints);
 
   return rooms.map((room) =>
     room.id === transformFeedback.roomId
       ? {
           ...room,
           points: transformedPoints,
+          interiorAssets:
+            transformFeedback.mode === "move"
+              ? room.interiorAssets.map((asset) => ({
+                  ...asset,
+                  xMm: asset.xMm + delta.x,
+                  yMm: asset.yMm + delta.y,
+                }))
+              : room.interiorAssets,
         }
       : room
   );
@@ -1913,6 +1938,17 @@ function getTransformRoomEase(transformFeedback: TransformFeedback) {
   return easeOutCubic(
     getTransformSettlingProgress(transformFeedback, performance.now()).roomProgress
   );
+}
+
+function getPointListTranslationDelta(previousPoints: Point[], nextPoints: Point[]): Point {
+  if (previousPoints.length === 0 || nextPoints.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: nextPoints[0].x - previousPoints[0].x,
+    y: nextPoints[0].y - previousPoints[0].y,
+  };
 }
 
 function drawRoomShape(
@@ -2074,6 +2110,107 @@ function drawRoomOpenings(
 
     drawOpeningWidthHandle(graphics, start, selectionColor, theme);
     drawOpeningWidthHandle(graphics, end, selectionColor, theme);
+  }
+}
+
+function drawRoomInteriorAssets(
+  graphics: Graphics,
+  room: Room,
+  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  for (const asset of room.interiorAssets) {
+    const bounds = getRoomInteriorAssetBounds(asset);
+    const topLeft = worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport);
+    const bottomRight = worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport);
+    const left = Math.min(topLeft.x, bottomRight.x);
+    const top = Math.min(topLeft.y, bottomRight.y);
+    const width = Math.abs(bottomRight.x - topLeft.x);
+    const height = Math.abs(bottomRight.y - topLeft.y);
+    const isSelected =
+      selectedInteriorAsset?.roomId === room.id &&
+      selectedInteriorAsset.assetId === asset.id;
+    const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
+    const selectionHaloStrokePx = Math.max(
+      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
+      selectionStrokePx + 2
+    );
+
+    if (isSelected) {
+      graphics.setStrokeStyle({
+        width: selectionHaloStrokePx,
+        color: theme.wallSelectionAccent,
+        alpha: 0.18,
+      });
+      graphics.rect(left, top, width, height);
+      graphics.stroke();
+    }
+
+    graphics.setFillStyle({
+      color: theme.roomOutline,
+      alpha: isSelected ? 0.12 : 0.08,
+    });
+    graphics.rect(left, top, width, height);
+    graphics.fill();
+
+    graphics.setStrokeStyle({
+      width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+      color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+      alpha: isSelected ? 0.96 : 0.9,
+    });
+    graphics.rect(left, top, width, height);
+    graphics.stroke();
+
+    const treadSpacingPx = Math.max(camera.pixelsPerMm * DEFAULT_STAIR_TREAD_SPACING_MM, 8);
+    for (let y = top + treadSpacingPx; y < top + height - 1; y += treadSpacingPx) {
+      graphics.setStrokeStyle({
+        width: Math.max(camera.pixelsPerMm * 10, 1.1),
+        color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+        alpha: isSelected ? 0.88 : 0.72,
+        cap: "round",
+      });
+      graphics.moveTo(left + 4, y);
+      graphics.lineTo(left + width - 4, y);
+      graphics.stroke();
+    }
+
+    if (!isSelected) continue;
+
+    const rectBounds = getInteriorAssetBoundsAsRectBounds(asset);
+    const wallHandles = getWallHandleLayouts(rectBounds, camera, viewport);
+    const cornerHandles = getCornerHandleLayouts(rectBounds, camera, viewport);
+
+    for (const handle of wallHandles) {
+      const radius = Math.min(handle.width, handle.height) / 2;
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.3 });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: 1.5,
+        color: theme.roomOutline,
+        alpha: 0.9,
+      });
+      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
+      graphics.stroke();
+    }
+
+    for (const handle of cornerHandles) {
+      const half = handle.size / 2;
+      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.38 });
+      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: 1.5,
+        color: theme.roomOutline,
+        alpha: 0.92,
+      });
+      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
+      graphics.stroke();
+    }
   }
 }
 
@@ -3143,6 +3280,7 @@ function getDraftPreviewRoom(
     name: "",
     points: draftPoints,
     openings: [],
+    interiorAssets: [],
   };
 }
 

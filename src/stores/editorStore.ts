@@ -56,6 +56,17 @@ import {
   cloneDocumentState,
 } from "@/lib/editor/persistedHistory";
 import {
+  areRoomInteriorAssetsEqual,
+  canPlaceDefaultStairInRoom,
+  cloneRoomInteriorAsset,
+  cloneRoomInteriorAssets,
+  constrainInteriorAssetCenter,
+  createCenteredDefaultStair,
+  DEFAULT_STAIR_NAME,
+  getResizedStairForCornerDrag,
+  getResizedStairForWallDrag,
+} from "@/lib/editor/interiorAssets";
+import {
   areRoomOpeningsEqual,
   cloneRoomOpening,
   cloneRoomOpenings,
@@ -74,6 +85,7 @@ import type {
   OpeningType,
   Point,
   Room,
+  RoomInteriorAssetSelection,
   RoomOpening,
   RoomOpeningSelection,
   RoomWallSelection,
@@ -111,6 +123,7 @@ type EditorState = {
   selectedRoomId: string | null;
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
+  selectedInteriorAsset: RoomInteriorAssetSelection | null;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
@@ -133,7 +146,9 @@ type EditorState = {
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
+  selectInteriorAssetById: (roomId: string, assetId: string) => void;
   clearSelectedOpening: () => void;
+  clearSelectedInteriorAsset: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
@@ -143,9 +158,12 @@ type EditorState = {
   cancelRoomRenameSession: () => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
+  deleteSelectedInteriorAsset: () => void;
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
+  insertDefaultStairInSelectedRoom: () => void;
+  updateSelectedInteriorAssetName: (name: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -162,6 +180,24 @@ type EditorState = {
     openingId: string,
     previousOffsetMm: number,
     nextOffsetMm: number
+  ) => void;
+  previewInteriorAssetMove: (roomId: string, assetId: string, nextCenter: Point) => void;
+  commitInteriorAssetMove: (
+    roomId: string,
+    assetId: string,
+    previousCenter: Point,
+    nextCenter: Point
+  ) => void;
+  previewInteriorAssetResize: (
+    roomId: string,
+    assetId: string,
+    nextAsset: { widthMm: number; depthMm: number; xMm: number; yMm: number }
+  ) => void;
+  commitInteriorAssetResize: (
+    roomId: string,
+    assetId: string,
+    previousAsset: { widthMm: number; depthMm: number; xMm: number; yMm: number },
+    nextAsset: { widthMm: number; depthMm: number; xMm: number; yMm: number }
   ) => void;
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
@@ -214,6 +250,14 @@ function createOpeningId(): string {
   return `opening-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+function createInteriorAssetId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `asset-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
 function updateRoomNameInDocument(document: DocumentState, roomId: string, name: string): DocumentState {
   return {
     ...document,
@@ -240,6 +284,32 @@ function updateRoomPointsInDocument(
         ? {
             ...room,
             points: nextPoints.map((point) => ({ ...point })),
+          }
+        : room
+    ),
+  };
+}
+
+function updateMovedRoomInDocument(
+  document: DocumentState,
+  roomId: string,
+  previousPoints: Point[],
+  nextPoints: Point[]
+): DocumentState {
+  const delta = getRoomTranslationDelta(previousPoints, nextPoints);
+
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            points: nextPoints.map((point) => ({ ...point })),
+            interiorAssets: room.interiorAssets.map((asset) => ({
+              ...cloneRoomInteriorAsset(asset),
+              xMm: asset.xMm + delta.x,
+              yMm: asset.yMm + delta.y,
+            })),
           }
         : room
     ),
@@ -292,6 +362,93 @@ function updateRoomOpeningInDocument(
   };
 }
 
+function updateRoomInteriorAssetPositionInDocument(
+  document: DocumentState,
+  roomId: string,
+  assetId: string,
+  nextCenter: Point
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            interiorAssets: room.interiorAssets.map((asset) =>
+              asset.id === assetId
+                ? {
+                    ...cloneRoomInteriorAsset(asset),
+                    xMm: nextCenter.x,
+                    yMm: nextCenter.y,
+                  }
+                : asset
+            ),
+          }
+        : room
+    ),
+  };
+}
+
+function updateRoomInteriorAssetInDocument(
+  document: DocumentState,
+  roomId: string,
+  nextAsset: { id: string; widthMm: number; depthMm: number; xMm: number; yMm: number }
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            interiorAssets: room.interiorAssets.map((asset) =>
+              asset.id === nextAsset.id
+                ? {
+                    ...cloneRoomInteriorAsset(asset),
+                    widthMm: nextAsset.widthMm,
+                    depthMm: nextAsset.depthMm,
+                    xMm: nextAsset.xMm,
+                    yMm: nextAsset.yMm,
+                  }
+                : asset
+            ),
+          }
+        : room
+    ),
+  };
+}
+
+function updateSelectedInteriorAsset(
+  state: Pick<EditorState, "document" | "selectedInteriorAsset" | "history">,
+  updater: (room: Room, asset: Room["interiorAssets"][number]) => Room["interiorAssets"][number] | null
+) {
+  const selectedInteriorAsset = state.selectedInteriorAsset;
+  if (!selectedInteriorAsset) return null;
+
+  const room = state.document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId);
+  const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedInteriorAsset.assetId);
+  if (!room || !asset) return null;
+
+  const nextAsset = updater(room, asset);
+  if (!nextAsset || areRoomInteriorAssetsEqual([asset], [nextAsset])) return null;
+
+  const command: EditorCommand = {
+    type: "update-interior-asset",
+    roomId: room.id,
+    previousAsset: cloneRoomInteriorAsset(asset),
+    nextAsset: cloneRoomInteriorAsset(nextAsset),
+  };
+
+  return {
+    document: updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset),
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
+}
+
 function updateRoomOpeningWidthInDocument(
   document: DocumentState,
   roomId: string,
@@ -330,6 +487,17 @@ function clonePoints(points: Point[]): Point[] {
   return points.map((point) => ({ ...point }));
 }
 
+function getRoomTranslationDelta(previousPoints: Point[], nextPoints: Point[]): Point {
+  if (previousPoints.length === 0 || nextPoints.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: nextPoints[0].x - previousPoints[0].x,
+    y: nextPoints[0].y - previousPoints[0].y,
+  };
+}
+
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
   return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
 }
@@ -358,6 +526,18 @@ function getSelectedOpeningIfExists(
   if (!room) return null;
   return room.openings.some((opening) => opening.id === selectedOpening.openingId)
     ? selectedOpening
+    : null;
+}
+
+function getSelectedInteriorAssetIfExists(
+  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  document: DocumentState
+): RoomInteriorAssetSelection | null {
+  if (!selectedInteriorAsset) return null;
+  const room = document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId);
+  if (!room) return null;
+  return room.interiorAssets.some((asset) => asset.id === selectedInteriorAsset.assetId)
+    ? selectedInteriorAsset
     : null;
 }
 
@@ -394,6 +574,38 @@ function insertOpeningOnSelectedWall(
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
+    selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
+    selectedInteriorAsset: null,
+    history: {
+      past: pushToPast(state.history.past, command),
+      future: [],
+    },
+    canUndo: true,
+    canRedo: false,
+  };
+}
+
+function insertDefaultStairOnSelectedRoom(
+  state: Pick<EditorState, "document" | "selectedRoomId" | "history">
+) {
+  if (!state.selectedRoomId) return null;
+  const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
+  if (!room) return null;
+
+  const asset = createCenteredDefaultStair(room, createInteriorAssetId());
+  if (!asset) return null;
+
+  const command: EditorCommand = {
+    type: "add-interior-asset",
+    roomId: room.id,
+    asset,
+  };
+
+  return {
+    document: applyEditorCommand(state.document, command, "redo"),
+    selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+    selectedOpening: null,
+    selectedWall: null,
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -449,6 +661,77 @@ function resolveOpeningResizeWidth(
   };
 }
 
+function resolveInteriorAssetMoveCenter(
+  document: DocumentState,
+  roomId: string,
+  assetId: string,
+  cursorWorld: Point,
+  gridSizeMm: number
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+  if (!room || !asset) return null;
+
+  const nextCenter = constrainInteriorAssetCenter(room, asset, cursorWorld, {
+    gridSizeMm,
+  });
+  if (!nextCenter) return null;
+
+  return {
+    room,
+    asset,
+    nextCenter,
+  };
+}
+
+function resolveInteriorAssetResizeFromWall(
+  document: DocumentState,
+  roomId: string,
+  assetId: string,
+  wall: "left" | "right" | "top" | "bottom",
+  cursorWorld: Point,
+  gridSizeMm: number
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+  if (!room || !asset) return null;
+
+  const nextAsset = getResizedStairForWallDrag(room, asset, wall, cursorWorld, {
+    widthGridSizeMm: gridSizeMm,
+  });
+  if (!nextAsset) return null;
+
+  return {
+    room,
+    asset,
+    nextAsset,
+  };
+}
+
+function resolveInteriorAssetResizeFromCorner(
+  document: DocumentState,
+  roomId: string,
+  assetId: string,
+  corner: "top-left" | "top-right" | "bottom-right" | "bottom-left",
+  cursorWorld: Point,
+  gridSizeMm: number
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+  if (!room || !asset) return null;
+
+  const nextAsset = getResizedStairForCornerDrag(room, asset, corner, cursorWorld, {
+    widthGridSizeMm: gridSizeMm,
+  });
+  if (!nextAsset) return null;
+
+  return {
+    room,
+    asset,
+    nextAsset,
+  };
+}
+
 function updateSelectedOpening(
   state: Pick<EditorState, "document" | "selectedOpening" | "history">,
   updater: (room: Room, opening: RoomOpening) => RoomOpening | null
@@ -500,6 +783,7 @@ function getSafePersistedHistorySnapshot(
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
             openings: cloneRoomOpenings(room.openings),
+            interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
           })),
         },
       ],
@@ -597,6 +881,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedRoomId: null,
   selectedWall: null,
   selectedOpening: null,
+  selectedInteriorAsset: null,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
@@ -796,7 +1081,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
-        state.selectedOpening === null
+        state.selectedOpening === null &&
+        state.selectedInteriorAsset === null
       ) {
         return state;
       }
@@ -805,6 +1091,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: roomId,
         selectedWall: null,
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -818,6 +1105,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: roomId,
           selectedWall: null,
           selectedOpening: null,
+          selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -835,6 +1123,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -856,6 +1145,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: roomId,
         selectedWall: null,
         selectedOpening: { roomId, openingId },
+        selectedInteriorAsset: null,
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+      };
+    }),
+  selectInteriorAssetById: (roomId, assetId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+      if (!room.interiorAssets.some((asset) => asset.id === assetId)) return state;
+      if (
+        state.selectedRoomId === roomId &&
+        state.selectedInteriorAsset?.roomId === roomId &&
+        state.selectedInteriorAsset.assetId === assetId
+      ) {
+        return state;
+      }
+
+      return {
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: { roomId, assetId },
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -865,6 +1177,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedOpening === null) return state;
       return {
         selectedOpening: null,
+      };
+    }),
+  clearSelectedInteriorAsset: () =>
+    set((state) => {
+      if (state.selectedInteriorAsset === null) return state;
+      return {
+        selectedInteriorAsset: null,
       };
     }),
   clearSelectedWall: () =>
@@ -879,6 +1198,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedRoomId: null,
       selectedWall: null,
       selectedOpening: null,
+      selectedInteriorAsset: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
     }),
@@ -929,7 +1249,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!renameSession) {
         if (!state.selectedRoomId) return state;
         if (!deselectIfUnchanged) return state;
-        return { selectedRoomId: null, selectedWall: null, selectedOpening: null };
+        return {
+          selectedRoomId: null,
+          selectedWall: null,
+          selectedOpening: null,
+          selectedInteriorAsset: null,
+        };
       }
 
       const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
@@ -938,6 +1263,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: null,
           selectedWall: null,
           selectedOpening: null,
+          selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -954,6 +1280,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: null,
           selectedWall: null,
           selectedOpening: null,
+          selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -970,6 +1297,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -989,6 +1317,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: null,
           selectedWall: null,
           selectedOpening: null,
+          selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
         };
       }
@@ -1004,6 +1333,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
       };
@@ -1019,6 +1349,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: null,
           selectedWall: null,
           selectedOpening: null,
+          selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -1032,6 +1363,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           name: room.name,
           points: room.points.map((point) => ({ ...point })),
           openings: cloneRoomOpenings(room.openings),
+          interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
         },
         previousIndex,
       };
@@ -1042,6 +1374,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -1083,6 +1416,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  deleteSelectedInteriorAsset: () =>
+    set((state) => {
+      const selectedInteriorAsset = state.selectedInteriorAsset;
+      if (!selectedInteriorAsset) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedInteriorAsset.assetId);
+      if (!room || !asset) {
+        return {
+          selectedInteriorAsset: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "delete-interior-asset",
+        roomId: room.id,
+        asset: cloneRoomInteriorAsset(asset),
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedInteriorAsset: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   updateRoomName: (roomId, name) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -1114,6 +1478,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   insertDefaultWindowOnSelectedWall: () =>
     set((state) => {
       const nextState = insertOpeningOnSelectedWall(state, "window");
+      return nextState ?? state;
+    }),
+  insertDefaultStairInSelectedRoom: () =>
+    set((state) => {
+      const nextState = insertDefaultStairOnSelectedRoom(state);
+      return nextState ?? state;
+    }),
+  updateSelectedInteriorAssetName: (name) =>
+    set((state) => {
+      const trimmedName = name.trim();
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        const nextName = trimmedName.length > 0 ? trimmedName : DEFAULT_STAIR_NAME;
+        if (asset.name === nextName) return null;
+
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          name: nextName,
+        };
+      });
       return nextState ?? state;
     }),
   updateSelectedOpeningWidth: (widthMm) =>
@@ -1226,6 +1609,111 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  previewInteriorAssetMove: (roomId, assetId, nextCenter) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (asset.xMm === nextCenter.x && asset.yMm === nextCenter.y) return state;
+
+      return {
+        document: updateRoomInteriorAssetPositionInDocument(state.document, roomId, assetId, nextCenter),
+      };
+    }),
+  commitInteriorAssetMove: (roomId, assetId, previousCenter, nextCenter) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (previousCenter.x === nextCenter.x && previousCenter.y === nextCenter.y) return state;
+
+      const command: EditorCommand = {
+        type: "move-interior-asset",
+        roomId,
+        assetId,
+        previousXmm: previousCenter.x,
+        previousYmm: previousCenter.y,
+        nextXmm: nextCenter.x,
+        nextYmm: nextCenter.y,
+      };
+
+      return {
+        document: updateRoomInteriorAssetPositionInDocument(state.document, roomId, assetId, nextCenter),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  previewInteriorAssetResize: (roomId, assetId, nextAsset) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (
+        asset.widthMm === nextAsset.widthMm &&
+        asset.depthMm === nextAsset.depthMm &&
+        asset.xMm === nextAsset.xMm &&
+        asset.yMm === nextAsset.yMm
+      ) {
+        return state;
+      }
+
+      return {
+        document: updateRoomInteriorAssetInDocument(state.document, roomId, {
+          ...nextAsset,
+          id: assetId,
+        }),
+      };
+    }),
+  commitInteriorAssetResize: (roomId, assetId, previousAsset, nextAsset) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (
+        previousAsset.widthMm === nextAsset.widthMm &&
+        previousAsset.depthMm === nextAsset.depthMm &&
+        previousAsset.xMm === nextAsset.xMm &&
+        previousAsset.yMm === nextAsset.yMm
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId,
+        previousAsset: {
+          ...cloneRoomInteriorAsset(asset),
+          widthMm: previousAsset.widthMm,
+          depthMm: previousAsset.depthMm,
+          xMm: previousAsset.xMm,
+          yMm: previousAsset.yMm,
+        },
+        nextAsset: {
+          ...cloneRoomInteriorAsset(asset),
+          widthMm: nextAsset.widthMm,
+          depthMm: nextAsset.depthMm,
+          xMm: nextAsset.xMm,
+          yMm: nextAsset.yMm,
+        },
+      };
+
+      return {
+        document: updateRoomInteriorAssetInDocument(state.document, roomId, {
+          ...nextAsset,
+          id: assetId,
+        }),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   moveRoomByDelta: (roomId, delta) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -1258,7 +1746,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (arePointListsEqual(room.points, nextPoints)) return state;
 
       return {
-        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+        document: updateMovedRoomInDocument(state.document, roomId, room.points, nextPoints),
       };
     }),
   commitRoomMove: (roomId, previousPoints, nextPoints) =>
@@ -1275,7 +1763,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
 
       return {
-        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+        document: updateMovedRoomInDocument(state.document, roomId, previousPoints, nextPoints),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -1383,6 +1871,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedRoomId: null,
       selectedWall: null,
       selectedOpening: null,
+      selectedInteriorAsset: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       history: {
@@ -1407,6 +1896,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
+          state.selectedInteriorAsset,
+          nextDocument
+        ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -1429,6 +1922,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
+          state.selectedInteriorAsset,
+          nextDocument
+        ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -1485,6 +1982,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
+        selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -1622,6 +2120,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     name: `Room ${state.document.rooms.length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),
     openings: [],
+    interiorAssets: [],
   };
   const command: EditorCommand = {
     type: "complete-room",
@@ -1638,6 +2137,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedRoomId: room.id,
     selectedWall: null,
     selectedOpening: null,
+    selectedInteriorAsset: null,
     shouldFocusSelectedRoomNameInput: true,
     renameSession: null,
     history: {
@@ -1677,6 +2177,63 @@ export function getOpeningResizeWidthForCursor(
     cursorWorld,
     getActiveSnapStepMm(state.camera)
   );
+}
+
+export function getInteriorAssetMoveCenterForCursor(
+  roomId: string,
+  assetId: string,
+  cursorWorld: Point
+) {
+  const state = useEditorStore.getState();
+  return resolveInteriorAssetMoveCenter(
+    state.document,
+    roomId,
+    assetId,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
+}
+
+export function getInteriorAssetResizeFromWallForCursor(
+  roomId: string,
+  assetId: string,
+  wall: "left" | "right" | "top" | "bottom",
+  cursorWorld: Point
+) {
+  const state = useEditorStore.getState();
+  return resolveInteriorAssetResizeFromWall(
+    state.document,
+    roomId,
+    assetId,
+    wall,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
+}
+
+export function getInteriorAssetResizeFromCornerForCursor(
+  roomId: string,
+  assetId: string,
+  corner: "top-left" | "top-right" | "bottom-right" | "bottom-left",
+  cursorWorld: Point
+) {
+  const state = useEditorStore.getState();
+  return resolveInteriorAssetResizeFromCorner(
+    state.document,
+    roomId,
+    assetId,
+    corner,
+    cursorWorld,
+    getActiveSnapStepMm(state.camera)
+  );
+}
+
+export function canInsertDefaultStairInSelectedRoom() {
+  const state = useEditorStore.getState();
+  if (!state.selectedRoomId) return false;
+  const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
+  if (!room) return false;
+  return canPlaceDefaultStairInRoom(room);
 }
 
 function isValidDraftPathProgression(
