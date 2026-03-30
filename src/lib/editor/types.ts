@@ -72,9 +72,26 @@ export type RoomOpeningSelection = {
   openingId: string;
 };
 
+export type InteriorAssetType = "stairs";
+
+export type RoomInteriorAsset = {
+  id: string;
+  type: InteriorAssetType;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  depthMm: number;
+};
+
+export type RoomInteriorAssetSelection = {
+  roomId: string;
+  assetId: string;
+};
+
 export type Room = {
   id: string;
   name: string;
   points: Point[];
   openings: RoomOpening[];
+  interiorAssets: RoomInteriorAsset[];
 };

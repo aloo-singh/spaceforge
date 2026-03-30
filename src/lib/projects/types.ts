@@ -43,6 +43,10 @@ function isOpeningType(value: unknown): value is "door" | "window" {
   return value === "door" || value === "window";
 }
 
+function isInteriorAssetType(value: unknown): value is "stairs" {
+  return value === "stairs";
+}
+
 function isRoomOpening(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -66,6 +70,21 @@ function isRoomOpening(value: unknown): boolean {
   return isFiniteNumber(value.offsetMm) && isFiniteNumber(value.widthMm) && value.widthMm > 0;
 }
 
+function isRoomInteriorAsset(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (!isInteriorAssetType(value.type)) return false;
+
+  return (
+    isFiniteNumber(value.xMm) &&
+    isFiniteNumber(value.yMm) &&
+    isFiniteNumber(value.widthMm) &&
+    value.widthMm > 0 &&
+    isFiniteNumber(value.depthMm) &&
+    value.depthMm > 0
+  );
+}
+
 function isRoom(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -73,6 +92,12 @@ function isRoom(value: unknown): boolean {
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
   if (!value.points.every(isPoint)) return false;
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
+    return false;
+  }
+  if (
+    value.interiorAssets !== undefined &&
+    (!Array.isArray(value.interiorAssets) || !value.interiorAssets.every(isRoomInteriorAsset))
+  ) {
     return false;
   }
 

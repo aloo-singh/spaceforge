@@ -15,6 +15,7 @@ import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
+import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
 import { resolveEditorThemeMode } from "@/lib/editor/theme";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,12 @@ export function HistoryControls({
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
+  const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const selectedRoom = useEditorStore((state) =>
+    state.selectedRoomId
+      ? state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null
+      : null
+  );
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const isCanvasEmpty = useEditorStore(
     (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
@@ -65,11 +72,15 @@ export function HistoryControls({
   const insertDefaultWindowOnSelectedWall = useEditorStore(
     (state) => state.insertDefaultWindowOnSelectedWall
   );
+  const insertDefaultStairInSelectedRoom = useEditorStore(
+    (state) => state.insertDefaultStairInSelectedRoom
+  );
   const isResetCameraDisabled = !hasHydrated || !hasRooms;
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
   const canInsertOpening = hasHydrated && selectedWall !== null;
+  const canInsertStair = hasHydrated && selectedRoom !== null && canPlaceDefaultStairInRoom(selectedRoom);
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
   const currentThemeLabel = resolveEditorThemeMode(resolvedTheme) === "light" ? "Light" : "Dark";
@@ -140,6 +151,24 @@ export function HistoryControls({
             className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
           >
             <span>Window</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={insertDefaultStairInSelectedRoom}
+            disabled={!canInsertStair}
+            aria-label="Add stairs to selected room"
+            title={
+              canInsertStair
+                ? "Add centered stairs to selected room"
+                : selectedRoomId
+                  ? "Selected room is too small for default stairs"
+                  : "Select a room to add stairs"
+            }
+            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+          >
+            <span>Stairs</span>
           </Button>
           <Button
             type="button"

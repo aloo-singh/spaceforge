@@ -1,7 +1,12 @@
 import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
+import {
+  areRoomInteriorAssetsEqual,
+  cloneRoomInteriorAsset,
+  cloneRoomInteriorAssets,
+} from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
-import type { Room, RoomOpening } from "@/lib/editor/types";
+import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
   historyStack: EditorDocumentState[];
@@ -33,7 +38,8 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     const roomB = b.rooms[i];
     if (roomA.id !== roomB.id || roomA.name !== roomB.name) return false;
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
-    if (!areRoomOpeningsEqual(roomA.openings, roomB.openings)) return false;
+    if (!areRoomOpeningsEqual(roomA.openings ?? [], roomB.openings ?? [])) return false;
+    if (!areRoomInteriorAssetsEqual(roomA.interiorAssets ?? [], roomB.interiorAssets ?? [])) return false;
   }
 
   return true;
@@ -53,7 +59,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       id: room.id,
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
-      openings: cloneRoomOpenings(room.openings),
+      openings: cloneRoomOpenings(room.openings ?? []),
+      interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
     })),
   };
 }
@@ -85,8 +92,12 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
 
     const didNameChange = previousRoom.name !== room.name;
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
-    const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings, room.openings);
-    if (!didNameChange && !didPointsChange && !didOpeningsChange) continue;
+    const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings ?? [], room.openings ?? []);
+    const didInteriorAssetsChange = !areRoomInteriorAssetsEqual(
+      previousRoom.interiorAssets ?? [],
+      room.interiorAssets ?? []
+    );
+    if (!didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) continue;
 
     changedRooms.push({
       previous: previousRoom,
@@ -110,7 +121,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         id: deletedRoom.id,
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
-        openings: cloneRoomOpenings(deletedRoom.openings),
+        openings: cloneRoomOpenings(deletedRoom.openings ?? []),
+        interiorAssets: cloneRoomInteriorAssets(deletedRoom.interiorAssets ?? []),
       },
       previousIndex,
     };
@@ -125,7 +137,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         id: addedRooms[0].id,
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),
-        openings: cloneRoomOpenings(addedRooms[0].openings),
+        openings: cloneRoomOpenings(addedRooms[0].openings ?? []),
+        interiorAssets: cloneRoomInteriorAssets(addedRooms[0].interiorAssets ?? []),
       },
     };
   }
@@ -136,8 +149,12 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const didNameChange = changedRoom.previous.name !== changedRoom.next.name;
   const didPointsChange = !arePointListsEqual(changedRoom.previous.points, changedRoom.next.points);
   const didOpeningsChange = !areRoomOpeningsEqual(
-    changedRoom.previous.openings,
-    changedRoom.next.openings
+    changedRoom.previous.openings ?? [],
+    changedRoom.next.openings ?? []
+  );
+  const didInteriorAssetsChange = !areRoomInteriorAssetsEqual(
+    changedRoom.previous.interiorAssets ?? [],
+    changedRoom.next.interiorAssets ?? []
   );
 
   if (didNameChange && !didPointsChange) {
@@ -160,7 +177,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (!didNameChange && !didPointsChange && didOpeningsChange) {
-    const addedOpening = inferAddedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    const addedOpening = inferAddedOpening(
+      changedRoom.previous.openings ?? [],
+      changedRoom.next.openings ?? []
+    );
     if (addedOpening) {
       return {
         type: "add-opening",
@@ -170,8 +190,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     }
 
     const deletedOpening = inferDeletedOpening(
-      changedRoom.previous.openings,
-      changedRoom.next.openings
+      changedRoom.previous.openings ?? [],
+      changedRoom.next.openings ?? []
     );
     if (deletedOpening) {
       return {
@@ -181,7 +201,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       };
     }
 
-    const movedOpening = inferMovedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    const movedOpening = inferMovedOpening(
+      changedRoom.previous.openings ?? [],
+      changedRoom.next.openings ?? []
+    );
     if (movedOpening) {
       return {
         type: "move-opening",
@@ -192,7 +215,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       };
     }
 
-    const updatedOpening = inferUpdatedOpening(changedRoom.previous.openings, changedRoom.next.openings);
+    const updatedOpening = inferUpdatedOpening(
+      changedRoom.previous.openings ?? [],
+      changedRoom.next.openings ?? []
+    );
     if (!updatedOpening) return null;
 
     return {
@@ -200,6 +226,48 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       roomId: changedRoom.next.id,
       previousOpening: updatedOpening.previousOpening,
       nextOpening: updatedOpening.nextOpening,
+    };
+  }
+
+  if (!didNameChange && !didPointsChange && !didOpeningsChange && didInteriorAssetsChange) {
+    const addedAsset = inferAddedInteriorAsset(
+      changedRoom.previous.interiorAssets ?? [],
+      changedRoom.next.interiorAssets ?? []
+    );
+    if (addedAsset) {
+      return {
+        type: "add-interior-asset",
+        roomId: changedRoom.next.id,
+        asset: addedAsset,
+      };
+    }
+
+    const deletedAsset = inferDeletedInteriorAsset(
+      changedRoom.previous.interiorAssets ?? [],
+      changedRoom.next.interiorAssets ?? []
+    );
+    if (deletedAsset) {
+      return {
+        type: "delete-interior-asset",
+        roomId: changedRoom.next.id,
+        asset: deletedAsset,
+      };
+    }
+
+    const movedAsset = inferMovedInteriorAsset(
+      changedRoom.previous.interiorAssets ?? [],
+      changedRoom.next.interiorAssets ?? []
+    );
+    if (!movedAsset) return null;
+
+    return {
+      type: "move-interior-asset",
+      roomId: changedRoom.next.id,
+      assetId: movedAsset.assetId,
+      previousXmm: movedAsset.previousXmm,
+      previousYmm: movedAsset.previousYmm,
+      nextXmm: movedAsset.nextXmm,
+      nextYmm: movedAsset.nextYmm,
     };
   }
 
@@ -278,6 +346,82 @@ function inferMovedOpening(
   }
 
   return movedOpening;
+}
+
+function inferAddedInteriorAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+): RoomInteriorAsset | null {
+  if (nextAssets.length !== previousAssets.length + 1) return null;
+
+  const previousById = new Map(previousAssets.map((asset) => [asset.id, asset]));
+  const addedAssets = nextAssets.filter((asset) => !previousById.has(asset.id));
+  if (addedAssets.length !== 1) return null;
+
+  return cloneRoomInteriorAsset(addedAssets[0]);
+}
+
+function inferDeletedInteriorAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+): RoomInteriorAsset | null {
+  if (previousAssets.length !== nextAssets.length + 1) return null;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  const deletedAssets = previousAssets.filter((asset) => !nextById.has(asset.id));
+  if (deletedAssets.length !== 1) return null;
+
+  return cloneRoomInteriorAsset(deletedAssets[0]);
+}
+
+function inferMovedInteriorAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+):
+  | {
+      assetId: string;
+      previousXmm: number;
+      previousYmm: number;
+      nextXmm: number;
+      nextYmm: number;
+    }
+  | null {
+  if (previousAssets.length !== nextAssets.length) return null;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  let movedAsset:
+    | {
+        assetId: string;
+        previousXmm: number;
+        previousYmm: number;
+        nextXmm: number;
+        nextYmm: number;
+      }
+    | null = null;
+
+  for (const previousAsset of previousAssets) {
+    const nextAsset = nextById.get(previousAsset.id);
+    if (!nextAsset) return null;
+
+    const didMove = previousAsset.xMm !== nextAsset.xMm || previousAsset.yMm !== nextAsset.yMm;
+    const didOtherFieldsChange =
+      previousAsset.type !== nextAsset.type ||
+      previousAsset.widthMm !== nextAsset.widthMm ||
+      previousAsset.depthMm !== nextAsset.depthMm;
+    if (didOtherFieldsChange) return null;
+    if (!didMove) continue;
+    if (movedAsset) return null;
+
+    movedAsset = {
+      assetId: previousAsset.id,
+      previousXmm: previousAsset.xMm,
+      previousYmm: previousAsset.yMm,
+      nextXmm: nextAsset.xMm,
+      nextYmm: nextAsset.yMm,
+    };
+  }
+
+  return movedAsset;
 }
 
 function inferUpdatedOpening(
