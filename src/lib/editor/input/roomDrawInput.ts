@@ -32,7 +32,7 @@ import {
 } from "@/lib/editor/rectRoomResize";
 import {
   getRoomTranslationDelta,
-  translateRoomPoints,
+  translateRoomPointsOnGrid,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 import type { RoomWall } from "@/lib/editor/types";
@@ -516,7 +516,7 @@ export function attachRoomDrawInput(
       );
       const delta = getRoomTranslationDelta(session.startWorldPoint, resolvedCursorWorld);
 
-      const nextPoints = translateRoomPoints(session.startPoints, delta);
+      const nextPoints = translateRoomPointsOnGrid(session.startPoints, delta, activeSnapStepMm);
       session.latestPoints = nextPoints;
       setTransformFeedback(
         getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
@@ -820,6 +820,19 @@ export function attachRoomDrawInput(
     if (labelHitRoom) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
+      const startWorldPoint = getSnappedPointFromGuides(
+        cursorWorld,
+        getActiveSnapStepMm(state.camera),
+        getMagneticSnapGuidesForSettings(
+          state.document.rooms,
+          cursorWorld,
+          state.camera,
+          state.settings,
+          {
+            excludeRoomIds: new Set([labelHitRoom.id]),
+          }
+        )
+      );
 
       const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
       state.selectRoomById(labelHitRoom.id);
@@ -827,7 +840,7 @@ export function attachRoomDrawInput(
         pointerId: event.pointerId,
         roomId: labelHitRoom.id,
         startScreenPoint: screenPoint,
-        startWorldPoint: cursorWorld,
+        startWorldPoint,
         startPoints: labelHitRoom.points.map((point) => ({ ...point })),
         latestPoints: null,
         didDrag: false,

@@ -2,9 +2,25 @@ import { snapToGrid } from "@/lib/editor/geometry";
 import type { Point } from "@/lib/editor/types";
 
 export function translateRoomPoints(points: Point[], delta: Point): Point[] {
+  return translateRoomPointsWithOptionalGrid(points, delta);
+}
+
+export function translateRoomPointsOnGrid(
+  points: Point[],
+  delta: Point,
+  gridSizeMm: number
+): Point[] {
+  return translateRoomPointsWithOptionalGrid(points, delta, gridSizeMm);
+}
+
+function translateRoomPointsWithOptionalGrid(
+  points: Point[],
+  delta: Point,
+  gridSizeMm?: number
+): Point[] {
   return points.map((point) => ({
-    x: point.x + delta.x,
-    y: point.y + delta.y,
+    x: gridSizeMm === undefined ? point.x + delta.x : snapToGrid(point.x + delta.x, gridSizeMm),
+    y: gridSizeMm === undefined ? point.y + delta.y : snapToGrid(point.y + delta.y, gridSizeMm),
   }));
 }
 

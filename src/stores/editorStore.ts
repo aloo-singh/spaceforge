@@ -29,7 +29,7 @@ import {
   isOrthogonalPointPath,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
-import { translateRoomPoints } from "@/lib/editor/roomTranslation";
+import { translateRoomPointsOnGrid } from "@/lib/editor/roomTranslation";
 import {
   PERSISTED_HISTORY_STATE_LIMIT,
   loadEditorSnapshotForHydration,
@@ -1769,7 +1769,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room) return state;
       if (delta.x === 0 && delta.y === 0) return state;
 
-      const nextPoints = translateRoomPoints(room.points, delta);
+      const nextPoints = translateRoomPointsOnGrid(
+        room.points,
+        delta,
+        getEffectiveSnapStepMm(state)
+      );
       const command: EditorCommand = {
         type: "move-room",
         roomId,
