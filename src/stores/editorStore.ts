@@ -76,8 +76,8 @@ import {
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
 import {
-  getPredictiveSnapGuides,
-  getSnapStepForSettings,
+  getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
   getSnappedPointFromGuides,
 } from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
@@ -127,6 +127,7 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  isCanvasInteractionActive: boolean;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
@@ -154,6 +155,7 @@ type EditorState = {
   clearSelectedInteriorAsset: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
+  setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
   updateRoomRenameDraft: (roomId: string, name: string) => void;
@@ -888,8 +890,8 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
 
 function getEffectiveSnapStepMm(
   state: Pick<EditorState, "camera" | "settings">
-): number | null {
-  return getSnapStepForSettings(state.camera, state.settings);
+): number {
+  return getActiveSnapStepMm(state.camera);
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -908,6 +910,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
@@ -1037,28 +1040,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
       const activeSnapStepMm = getEffectiveSnapStepMm(state);
-      const predictiveGuides =
-        activeSnapStepMm !== null
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-          : null;
-      const resolvedCursorWorld =
-        activeSnapStepMm !== null
-          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-          : cursorWorld;
+      const predictiveGuides = getMagneticSnapGuidesForSettings(
+        state.document.rooms,
+        cursorWorld,
+        state.camera,
+        state.settings
+      );
+      const resolvedCursorWorld = getSnappedPointFromGuides(
+        cursorWorld,
+        activeSnapStepMm,
+        predictiveGuides
+      );
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
-            points: [activeSnapStepMm ? resolvedCursorWorld : cursorWorld],
+            points: [resolvedCursorWorld],
             history: [],
           },
         };
       }
 
       const lastPoint = draftPoints[draftPoints.length - 1];
-      const nextPoint = activeSnapStepMm
-        ? projectOrthogonalPoint(lastPoint, resolvedCursorWorld)
-        : projectOrthogonalPoint(lastPoint, cursorWorld);
+      const nextPoint = projectOrthogonalPoint(lastPoint, resolvedCursorWorld);
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
@@ -1238,6 +1242,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
     }),
+  setCanvasInteractionActive: (isActive) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive === isActive) return state;
+      return {
+        isCanvasInteractionActive: isActive,
+      };
+    }),
   consumeSelectedRoomNameInputFocusRequest: () =>
     set((state) => {
       if (!state.shouldFocusSelectedRoomNameInput) return state;
@@ -1247,6 +1258,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   startRoomRenameSession: (roomId) =>
     set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (state.renameSession?.roomId === roomId) return state;
@@ -1260,6 +1272,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   updateRoomRenameDraft: (roomId, name) =>
     set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
 
@@ -2192,14 +2205,13 @@ export function getOpeningMoveOffsetForCursor(
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
-  const predictiveGuides =
-    activeSnapStepMm !== null
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
-  const resolvedCursorWorld =
-    activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-      : cursorWorld;
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveOpeningMoveOffset(
     state.document,
     roomId,
@@ -2216,14 +2228,13 @@ export function getOpeningResizeWidthForCursor(
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
-  const predictiveGuides =
-    activeSnapStepMm !== null
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
-  const resolvedCursorWorld =
-    activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-      : cursorWorld;
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveOpeningResizeWidth(
     state.document,
     roomId,
@@ -2240,14 +2251,13 @@ export function getInteriorAssetMoveCenterForCursor(
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
-  const predictiveGuides =
-    activeSnapStepMm !== null
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
-  const resolvedCursorWorld =
-    activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-      : cursorWorld;
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetMoveCenter(
     state.document,
     roomId,
@@ -2265,14 +2275,13 @@ export function getInteriorAssetResizeFromWallForCursor(
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
-  const predictiveGuides =
-    activeSnapStepMm !== null
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
-  const resolvedCursorWorld =
-    activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-      : cursorWorld;
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetResizeFromWall(
     state.document,
     roomId,
@@ -2291,14 +2300,13 @@ export function getInteriorAssetResizeFromCornerForCursor(
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
-  const predictiveGuides =
-    activeSnapStepMm !== null
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
-  const resolvedCursorWorld =
-    activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-      : cursorWorld;
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetResizeFromCorner(
     state.document,
     roomId,

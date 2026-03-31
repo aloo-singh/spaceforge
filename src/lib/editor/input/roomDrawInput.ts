@@ -10,8 +10,9 @@ import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import {
+  getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
   getPredictiveSnapGuides,
-  getSnapStepForSettings,
   getSnappedPointFromGuides,
   type SnapGuides,
 } from "@/lib/editor/snapping";
@@ -101,6 +102,7 @@ type RoomDrawStoreState = {
   ) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  setCanvasInteractionActive: (isActive: boolean) => void;
 };
 
 type RoomDrawStore = {
@@ -391,6 +393,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeLabelDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -401,6 +404,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -411,6 +415,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningResizeSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -421,6 +426,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -431,6 +437,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetResizeSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -483,37 +490,38 @@ export function attachRoomDrawInput(
         }
 
         session.didDrag = true;
+        store.getState().setCanvasInteractionActive(true);
         clearPendingTransformFeedbackTimeout();
         setTransformFeedback(getMoveTransformFeedback(session.roomId, session.startPoints));
         updateCursor();
       }
 
-      const activeSnapStepMm = getSnapStepForSettings(state.camera, state.settings);
-      const predictiveGuides =
-        activeSnapStepMm !== null
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
-              excludeRoomIds: new Set([session.roomId]),
-            })
-          : null;
-      const resolvedCursorWorld =
-        activeSnapStepMm !== null
-          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-          : cursorWorld;
-      const delta =
-        activeSnapStepMm !== null
-          ? getRoomTranslationDelta(session.startWorldPoint, resolvedCursorWorld)
-          : getRoomTranslationDelta(session.startWorldPoint, cursorWorld);
+      const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+      const visibleGuides = getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+        excludeRoomIds: new Set([session.roomId]),
+      });
+      const magneticGuides = getMagneticSnapGuidesForSettings(
+        state.document.rooms,
+        cursorWorld,
+        state.camera,
+        state.settings,
+        {
+          excludeRoomIds: new Set([session.roomId]),
+        }
+      );
+      const resolvedCursorWorld = getSnappedPointFromGuides(
+        cursorWorld,
+        activeSnapStepMm,
+        magneticGuides
+      );
+      const delta = getRoomTranslationDelta(session.startWorldPoint, resolvedCursorWorld);
 
       const nextPoints = translateRoomPoints(session.startPoints, delta);
       session.latestPoints = nextPoints;
       setTransformFeedback(
         getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
       );
-      setSnapGuides(
-        state.settings.showGuidelines && predictiveGuides
-          ? predictiveGuides
-          : null
-      );
+      setSnapGuides(state.settings.showGuidelines ? visibleGuides : null);
       return;
     }
 
@@ -537,6 +545,7 @@ export function attachRoomDrawInput(
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestOffsetMm = moveTarget.nextOffsetMm;
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
       setSnapGuides(
@@ -572,6 +581,7 @@ export function attachRoomDrawInput(
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestWidthMm = resizeTarget.nextWidthMm;
       store
         .getState()
@@ -618,6 +628,7 @@ export function attachRoomDrawInput(
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestAsset = {
         widthMm: resizeTarget.nextAsset.widthMm,
         depthMm: resizeTarget.nextAsset.depthMm,
@@ -654,6 +665,7 @@ export function attachRoomDrawInput(
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestCenter = moveTarget.nextCenter;
       store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
       setSnapGuides(

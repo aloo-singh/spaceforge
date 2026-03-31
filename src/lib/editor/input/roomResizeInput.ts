@@ -15,8 +15,9 @@ import {
 } from "@/lib/editor/orthogonalWallResize";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
+  getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
   getPredictiveSnapGuides,
-  getSnapStepForSettings,
   getSnappedPointFromGuides,
   type SnapGuides,
 } from "@/lib/editor/snapping";
@@ -55,6 +56,7 @@ type RoomResizeStoreState = {
   clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  setCanvasInteractionActive: (isActive: boolean) => void;
 };
 
 type RoomResizeStore = {
@@ -331,6 +333,7 @@ export function attachRoomResizeInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeSession = null;
+    store.getState().setCanvasInteractionActive(false);
     hoveredWall = null;
     hoveredCorner = null;
     hoveredVertexIndex = null;
@@ -354,15 +357,29 @@ export function attachRoomResizeInput(
       );
       callbacks.onCursorWorldChange?.(cursorWorld);
       const activeState = selected?.state ?? fallbackState;
-      const activeSnapStepMm = getSnapStepForSettings(activeState.camera, activeState.settings);
-      const predictiveGuides =
-        getPredictiveSnapGuides(activeState.document.rooms, cursorWorld, activeState.camera, {
+      const activeSnapStepMm = getActiveSnapStepMm(activeState.camera);
+      const visibleGuides = getPredictiveSnapGuides(
+        activeState.document.rooms,
+        cursorWorld,
+        activeState.camera,
+        {
           excludeRoomIds: new Set([activeSession.roomId]),
-        });
-      const resolvedCursorWorld =
-        activeSnapStepMm !== null
-          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
-          : cursorWorld;
+        }
+      );
+      const magneticGuides = getMagneticSnapGuidesForSettings(
+        activeState.document.rooms,
+        cursorWorld,
+        activeState.camera,
+        activeState.settings,
+        {
+          excludeRoomIds: new Set([activeSession.roomId]),
+        }
+      );
+      const resolvedCursorWorld = getSnappedPointFromGuides(
+        cursorWorld,
+        activeSnapStepMm,
+        magneticGuides
+      );
       if (activeSession.target.type === "vertex") {
         const nextPoints = getConstrainedVertexAdjustmentResult(
           activeSession.startPoints,
@@ -373,11 +390,7 @@ export function attachRoomResizeInput(
 
         activeSession.latestSnappedPoints = nextPoints;
         previewRoomResize(activeSession.roomId, nextPoints);
-        setSnapGuides(
-          activeState.settings.showGuidelines
-            ? predictiveGuides
-            : null
-        );
+        setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
         return;
       }
 
@@ -392,11 +405,7 @@ export function attachRoomResizeInput(
 
         activeSession.latestSnappedPoints = nextPoints;
         previewRoomResize(activeSession.roomId, nextPoints);
-        setSnapGuides(
-          activeState.settings.showGuidelines
-            ? predictiveGuides
-            : null
-        );
+        setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
         return;
       }
 
@@ -414,11 +423,7 @@ export function attachRoomResizeInput(
       const nextPoints = getRoomPointsFromBounds(nextBounds, activeSession.startPoints);
       activeSession.latestSnappedPoints = nextPoints;
       previewRoomResize(activeSession.roomId, nextPoints);
-      setSnapGuides(
-        activeState.settings.showGuidelines
-          ? predictiveGuides
-          : null
-      );
+      setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
       return;
     }
 
@@ -542,6 +547,7 @@ export function attachRoomResizeInput(
       latestSnappedPoints: null,
       latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
     };
+    selected.state.setCanvasInteractionActive(true);
     if (hitWall) {
       track(ANALYTICS_EVENTS.wallSelected, {
         selectionKind: "single",

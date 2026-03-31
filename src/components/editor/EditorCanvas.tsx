@@ -76,9 +76,9 @@ import {
 } from "@/lib/editor/measurements";
 import {
   getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
   getPredictiveSnapGuides,
   getScaleOverlayState,
-  getSnapStepForSettings,
   getSnappedPointFromGuides,
   type SnapGuides,
 } from "@/lib/editor/snapping";
@@ -725,7 +725,7 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         getActiveSnapStepMm(exportCamera),
-        getSnapStepForSettings(exportCamera, state.settings),
+        getActiveSnapStepMm(exportCamera),
         null,
         exportTheme
       );
@@ -1326,7 +1326,9 @@ export default function EditorCanvas({
               className="mt-1 text-[11px] text-white/52"
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
-              {snappingEnabled ? `Snap ${formatMetricWallDimension(activeSnapStepMm)}` : "Snap Off"}
+              {snappingEnabled
+                ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
+                : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
             </div>
           </div>
           {displayedHint && displayedHint.id !== "project-name" ? (
@@ -1434,14 +1436,21 @@ function drawScene(
   theme: EditorCanvasTheme
 ) {
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
-  const activeSnapStepMm = getSnapStepForSettings(state.camera, state.settings);
-  const predictiveGuides =
-    cursorWorld
-      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
-      : null;
+  const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+  const predictiveGuides = cursorWorld
+    ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+    : null;
+  const magneticGuides = cursorWorld
+    ? getMagneticSnapGuidesForSettings(
+        state.document.rooms,
+        cursorWorld,
+        state.camera,
+        state.settings
+      )
+    : null;
   const draftCursorWorld =
-    cursorWorld && activeSnapStepMm !== null
-      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+    cursorWorld
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, magneticGuides)
       : cursorWorld;
   const visibleGuides = state.settings.showGuidelines ? snapGuides ?? predictiveGuides : null;
   drawGrid(gridGraphics, state.camera, state.viewport, theme);

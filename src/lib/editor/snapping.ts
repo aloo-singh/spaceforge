@@ -39,6 +39,17 @@ export function getSnapStepForSettings(
   return settings.snappingEnabled ? getActiveSnapStepMm(camera) : null;
 }
 
+export function getMagneticSnapGuidesForSettings(
+  rooms: Room[],
+  cursorWorld: Point,
+  camera: Pick<CameraState, "pixelsPerMm">,
+  settings: Pick<EditorSettings, "snappingEnabled">,
+  options?: { excludeRoomIds?: Set<string> }
+): SnapGuides | null {
+  if (!settings.snappingEnabled) return null;
+  return getPredictiveSnapGuides(rooms, cursorWorld, camera, options);
+}
+
 export function getPredictiveSnapGuides(
   rooms: Room[],
   cursorWorld: Point,
