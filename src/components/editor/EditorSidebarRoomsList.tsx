@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { cn } from "@/lib/utils";
@@ -18,13 +18,16 @@ export function EditorSidebarRoomsList() {
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const shouldAutoFocusRenameInputRef = useRef(false);
+  const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
 
   useEffect(() => {
-    if (!activeRenameRoomId || isRenameBlocked) return;
+    if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
     inputRef.current?.focus();
     inputRef.current?.select();
+    shouldAutoFocusRenameInputRef.current = false;
   }, [activeRenameRoomId, isRenameBlocked]);
 
   if (rooms.length === 0) {
@@ -39,7 +42,7 @@ export function EditorSidebarRoomsList() {
     <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
       {rooms.map((room) => {
         const isSelected = selectedRoomId === room.id;
-        const isRenaming = activeRenameRoomId === room.id;
+        const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
         const areaLabel = formatMetricRoomAreaForRoom(room);
 
         return (
@@ -48,8 +51,8 @@ export function EditorSidebarRoomsList() {
             className={cn(
               "rounded-lg border transition-colors",
               isSelected
-                ? "border-zinc-300 bg-zinc-200/80 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
-                : "border-transparent text-zinc-700 hover:bg-zinc-100/80 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
+                ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                : "border-transparent text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
             )}
           >
             {isRenaming ? (
@@ -60,6 +63,7 @@ export function EditorSidebarRoomsList() {
                     onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
                     onBlur={() => {
                       commitRoomRenameSession({ deselectIfUnchanged: false });
+                      setSidebarRenameRoomId(null);
                       selectRoomById(room.id);
                     }}
                     onKeyDown={(event) => {
@@ -68,6 +72,7 @@ export function EditorSidebarRoomsList() {
                       if (event.key === "Enter") {
                         event.preventDefault();
                         commitRoomRenameSession({ deselectIfUnchanged: false });
+                        setSidebarRenameRoomId(null);
                         selectRoomById(room.id);
                         return;
                       }
@@ -75,6 +80,7 @@ export function EditorSidebarRoomsList() {
                       if (event.key === "Escape") {
                         event.preventDefault();
                         cancelRoomRenameSession();
+                        setSidebarRenameRoomId(null);
                         selectRoomById(room.id);
                       }
                     }}
@@ -95,6 +101,8 @@ export function EditorSidebarRoomsList() {
                   <span
                     onDoubleClick={(event) => {
                       event.stopPropagation();
+                      setSidebarRenameRoomId(room.id);
+                      shouldAutoFocusRenameInputRef.current = true;
                       selectRoomById(room.id);
                       startRoomRenameSession(room.id);
                     }}

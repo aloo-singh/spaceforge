@@ -30,6 +30,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
+  const selectRoomById = useEditorStore((state) => state.selectRoomById);
   const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
     (state) => state.consumeSelectedRoomNameInputFocusRequest
@@ -61,6 +62,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
       if (isCancelled) return;
       const inputElement = document.getElementById("room-name-input");
       if (inputElement instanceof HTMLInputElement) {
+        startRoomRenameSession(selectedRoom.id);
         inputElement.focus({ preventScroll: true });
         inputElement.select();
         consumeSelectedRoomNameInputFocusRequest();
@@ -115,6 +117,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
     consumeSelectedRoomNameInputFocusRequest,
     isRenameBlocked,
     selectedRoom,
+    startRoomRenameSession,
     shouldFocusSelectedRoomNameInput,
   ]);
 
@@ -161,14 +164,18 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               startRoomRenameSession(selectedRoom.id);
             }}
             onChange={(event) => updateRoomRenameDraft(selectedRoom.id, event.target.value)}
-            onBlur={() => commitRoomRenameSession({ deselectIfUnchanged: false })}
+            onBlur={() => {
+              commitRoomRenameSession({ deselectIfUnchanged: false });
+              selectRoomById(selectedRoom.id);
+            }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
 
               if (event.key === "Enter") {
                 event.preventDefault();
                 event.stopPropagation();
-                commitRoomRenameSession();
+                commitRoomRenameSession({ deselectIfUnchanged: false });
+                selectRoomById(selectedRoom.id);
                 return;
               }
 
@@ -176,6 +183,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                 event.preventDefault();
                 event.stopPropagation();
                 cancelRoomRenameSession();
+                selectRoomById(selectedRoom.id);
               }
             }}
             placeholder="Untitled room"
