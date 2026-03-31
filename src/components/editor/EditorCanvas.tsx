@@ -219,6 +219,7 @@ type EditorCanvasProps = {
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
   onThumbnailGeneratorChange?: (generateThumbnailDataUrl: (() => Promise<string | null>) | null) => void;
   topBarLeadingContent?: ReactNode;
+  leftSidebarContent?: ReactNode;
 };
 
 export default function EditorCanvas({
@@ -227,6 +228,7 @@ export default function EditorCanvas({
   onDisplayedHintChange,
   onThumbnailGeneratorChange,
   topBarLeadingContent,
+  leftSidebarContent,
 }: EditorCanvasProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1304,7 +1306,15 @@ export default function EditorCanvas({
           exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
         />
       </div>
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
+      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
+        {leftSidebarContent ? (
+          <aside
+            className="hidden min-h-0 overflow-hidden rounded-xl border border-border/70 bg-zinc-900/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
+            aria-label="Project sidebar"
+          >
+            {leftSidebarContent}
+          </aside>
+        ) : null}
         <div className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
           <div
             ref={containerRef}
