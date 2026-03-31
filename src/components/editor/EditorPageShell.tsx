@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import type { EditorOnboardingHintId } from "@/lib/editor/onboardingHints";
 import { useEditorStore } from "@/stores/editorStore";
@@ -15,6 +16,8 @@ import { useGamificationStore } from "@/stores/useGamificationStore";
 type EditorPageShellProps = {
   projectId?: string;
 };
+
+const LOADING_OVERLAY_EXIT_DURATION_MS = 240;
 
 export function EditorPageShell({ projectId }: EditorPageShellProps) {
   const [activeProject, setActiveProject] = useState<{
@@ -32,7 +35,11 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const hydrateEarlyExplorer = useGamificationStore((state) => state.hydrateEarlyExplorer);
   const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
-  const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status === "loading";
+  const [isLoadingOverlayVisible, setIsLoadingOverlayVisible] = useState(projectId !== undefined);
+  const loadingOverlayExitTimerRef = useRef<number | null>(null);
+  const isProjectBootstrapLoading = projectId !== undefined && bootstrapState.status === "loading";
+  const shouldRenderLoadingOverlay = projectId !== undefined && isLoadingOverlayVisible;
+  const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status !== "ready";
   const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
     setGenerateThumbnailDataUrl(() => nextGenerator);
   };
@@ -43,6 +50,14 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     hydrateEarlyExplorer();
   }, [hydrateEarlyExplorer]);
 
+  useEffect(() => {
+    return () => {
+      if (loadingOverlayExitTimerRef.current !== null) {
+        window.clearTimeout(loadingOverlayExitTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <main className="relative h-[calc(100vh-3.5rem)] w-screen overflow-hidden bg-neutral-950 text-white">
       <EditorProjectBootstrap
@@ -52,24 +67,42 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           setActiveProject(project);
         }}
         onBootstrapStateChange={(state) => {
+          if (loadingOverlayExitTimerRef.current !== null) {
+            window.clearTimeout(loadingOverlayExitTimerRef.current);
+            loadingOverlayExitTimerRef.current = null;
+          }
+
           setBootstrapState(state);
           if (state.status === "loading") {
+            setIsLoadingOverlayVisible(true);
             setActiveProject(null);
             setBaselineRoomCount(null);
           }
           if (state.status === "error") {
+            setIsLoadingOverlayVisible(false);
             setBaselineRoomCount(null);
           }
           if (state.status === "ready") {
+            setIsLoadingOverlayVisible(true);
             setBaselineRoomCount(useEditorStore.getState().document.rooms.length);
+            loadingOverlayExitTimerRef.current = window.setTimeout(() => {
+              setIsLoadingOverlayVisible(false);
+              loadingOverlayExitTimerRef.current = null;
+            }, LOADING_OVERLAY_EXIT_DURATION_MS);
           }
         }}
       />
-      {shouldHideCanvasDuringBootstrap ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-neutral-950">
+      {shouldRenderLoadingOverlay ? (
+        <div
+          className={`absolute inset-0 z-10 flex items-center justify-center bg-neutral-950 transition-opacity duration-[240ms] ${
+            isProjectBootstrapLoading ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
           <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/72 backdrop-blur">
             <LoaderCircle className="size-4 animate-spin text-white/44" aria-hidden="true" />
-            <span>Loading project...</span>
+            <AnimatedShinyText shimmerWidth={72} className="text-sm text-white/72 dark:via-white/90">
+              Loading project...
+            </AnimatedShinyText>
           </div>
         </div>
       ) : null}
