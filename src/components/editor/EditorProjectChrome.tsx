@@ -77,25 +77,24 @@ export function EditorProjectChrome({
   const isSidebar = variant === "sidebar";
 
   return (
-    <div className={cn("min-w-0", isSidebar ? "flex flex-col items-start gap-3" : "flex items-center gap-1.5")}>
+    <div className={cn("min-w-0", isSidebar ? "flex items-center gap-2" : "flex items-center gap-1.5")}>
       <Button
         asChild
         type="button"
-        variant={isSidebar ? "outline" : "ghost"}
-        size={isSidebar ? "sm" : "icon-sm"}
+        variant="ghost"
+        size="icon-sm"
         className={cn(
           isSidebar
-            ? "text-foreground/72 hover:text-foreground"
+            ? "size-8 rounded-lg text-foreground/72 hover:bg-muted/80 hover:text-foreground"
             : "size-8 text-foreground/64 hover:bg-muted hover:text-foreground"
         )}
       >
         <Link href="/projects" aria-label="Back to projects">
           <ArrowLeft className="size-4" />
-          {isSidebar ? <span>Back to Projects</span> : null}
         </Link>
       </Button>
 
-      <div data-editor-project-name-anchor className={cn("min-w-0", isSidebar && "w-full")}>
+      <div data-editor-project-name-anchor className={cn("min-w-0", isSidebar && "flex-1")}>
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading project...</div>
         ) : isEditingName ? (
@@ -119,7 +118,7 @@ export function EditorProjectChrome({
             disabled={isSavingName}
             aria-label="Rename project"
             className={cn(
-              isSidebar ? "h-9 w-full min-w-0 bg-background" : "h-8 w-[min(18rem,50vw)] bg-background/90",
+              isSidebar ? "h-9 w-full min-w-0 rounded-lg bg-background" : "h-8 w-[min(18rem,50vw)] bg-background/90",
               isNameHighlighted && "border-blue-500/50 bg-blue-500/10 ring-[3px] ring-blue-500/20"
             )}
           />
@@ -137,9 +136,8 @@ export function EditorProjectChrome({
               isNameHighlighted && "bg-blue-500/10 text-white ring-1 ring-blue-500/40"
             )}
             aria-label={`Rename project ${projectName}`}
-            title="Rename project"
           >
-            <span className="block truncate">{projectName}</span>
+            <span className="block">{projectName}</span>
           </button>
         ) : null}
       </div>
