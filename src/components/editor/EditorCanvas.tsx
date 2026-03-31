@@ -1309,7 +1309,7 @@ export default function EditorCanvas({
       <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
         {leftSidebarContent ? (
           <aside
-            className="hidden min-h-0 overflow-hidden rounded-xl border border-border/70 bg-zinc-900/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
+            className="hidden min-h-0 overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
             aria-label="Project sidebar"
           >
             {leftSidebarContent}

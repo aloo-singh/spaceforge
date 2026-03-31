@@ -128,27 +128,29 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           projectRenameCompletionCount={projectRenameCompletionCount}
           leftSidebarContent={
             <div className="flex h-full min-h-0 flex-col">
-              <div className="border-b border-border/70 px-3 py-3 sm:px-4">
-                <EditorProjectChrome
-                  projectId={activeProject?.id ?? null}
-                  projectName={activeProject?.name ?? null}
-                  isLoading={bootstrapState.status === "loading"}
-                  variant="sidebar"
-                  isNameHighlighted={activeHintId === "project-name"}
-                  onProjectRenameCommitted={() => {
-                    setProjectRenameCompletionCount((currentCount) => currentCount + 1);
-                  }}
-                  onProjectNameChange={(name) => {
-                    setActiveProject((currentProject) =>
-                      currentProject
-                        ? {
-                            ...currentProject,
-                            name,
-                          }
-                        : currentProject
-                    );
-                  }}
-                />
+              <div className="border-b border-zinc-200/80 dark:border-border/70">
+                <div className="px-3 py-3 sm:px-4">
+                  <EditorProjectChrome
+                    projectId={activeProject?.id ?? null}
+                    projectName={activeProject?.name ?? null}
+                    isLoading={bootstrapState.status === "loading"}
+                    variant="sidebar"
+                    isNameHighlighted={activeHintId === "project-name"}
+                    onProjectRenameCommitted={() => {
+                      setProjectRenameCompletionCount((currentCount) => currentCount + 1);
+                    }}
+                    onProjectNameChange={(name) => {
+                      setActiveProject((currentProject) =>
+                        currentProject
+                          ? {
+                              ...currentProject,
+                              name,
+                            }
+                          : currentProject
+                      );
+                    }}
+                  />
+                </div>
               </div>
               <div className="flex-1 p-3 sm:p-4" />
             </div>

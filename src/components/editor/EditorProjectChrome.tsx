@@ -118,7 +118,7 @@ export function EditorProjectChrome({
             disabled={isSavingName}
             aria-label="Rename project"
             className={cn(
-              isSidebar ? "h-9 w-full min-w-0 rounded-lg bg-background" : "h-8 w-[min(18rem,50vw)] bg-background/90",
+              isSidebar ? "h-9 w-full min-w-0 rounded-lg border-zinc-300/80 bg-zinc-50/90 dark:border-input dark:bg-background" : "h-8 w-[min(18rem,50vw)] bg-background/90",
               isNameHighlighted && "border-blue-500/50 bg-blue-500/10 ring-[3px] ring-blue-500/20"
             )}
           />
@@ -131,13 +131,13 @@ export function EditorProjectChrome({
             }}
             className={cn(
               isSidebar
-                ? "w-full min-w-0 cursor-text rounded-lg border border-transparent px-3 py-2 text-left text-base font-medium tracking-tight text-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                ? "h-9 w-full min-w-0 cursor-text rounded-lg border border-transparent px-3 text-left text-base font-medium tracking-tight text-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 : "min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               isNameHighlighted && "bg-blue-500/10 text-white ring-1 ring-blue-500/40"
             )}
             aria-label={`Rename project ${projectName}`}
           >
-            <span className="block">{projectName}</span>
+            <span className="block leading-none">{projectName}</span>
           </button>
         ) : null}
       </div>
