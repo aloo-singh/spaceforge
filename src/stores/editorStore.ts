@@ -20,12 +20,10 @@ import {
   applyCandidatePointToDraftPath,
   getDraftLoopClosureResultFromPath,
   getOrthogonalSegmentAxis,
-  getOrthogonalSnappedPoint,
   projectOrthogonalPoint,
   normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
-  snapPointToGrid,
 } from "@/lib/editor/geometry";
 import {
   isOrthogonalPointPath,
@@ -77,7 +75,11 @@ import {
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
-import { getSnapStepForSettings } from "@/lib/editor/snapping";
+import {
+  getPredictiveSnapGuides,
+  getSnapStepForSettings,
+  getSnappedPointFromGuides,
+} from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type {
   CameraState,
@@ -1035,11 +1037,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
       const activeSnapStepMm = getEffectiveSnapStepMm(state);
+      const predictiveGuides =
+        activeSnapStepMm !== null
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          : null;
+      const resolvedCursorWorld =
+        activeSnapStepMm !== null
+          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+          : cursorWorld;
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
-            points: [activeSnapStepMm ? snapPointToGrid(cursorWorld, activeSnapStepMm) : cursorWorld],
+            points: [activeSnapStepMm ? resolvedCursorWorld : cursorWorld],
             history: [],
           },
         };
@@ -1047,7 +1057,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const lastPoint = draftPoints[draftPoints.length - 1];
       const nextPoint = activeSnapStepMm
-        ? getOrthogonalSnappedPoint(lastPoint, cursorWorld, activeSnapStepMm)
+        ? projectOrthogonalPoint(lastPoint, resolvedCursorWorld)
         : projectOrthogonalPoint(lastPoint, cursorWorld);
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
@@ -2181,12 +2191,21 @@ export function getOpeningMoveOffsetForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides =
+    activeSnapStepMm !== null
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const resolvedCursorWorld =
+    activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
   return resolveOpeningMoveOffset(
     state.document,
     roomId,
     openingId,
-    cursorWorld,
-    getEffectiveSnapStepMm(state)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2196,12 +2215,21 @@ export function getOpeningResizeWidthForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides =
+    activeSnapStepMm !== null
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const resolvedCursorWorld =
+    activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
   return resolveOpeningResizeWidth(
     state.document,
     roomId,
     openingId,
-    cursorWorld,
-    getEffectiveSnapStepMm(state)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2211,12 +2239,21 @@ export function getInteriorAssetMoveCenterForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides =
+    activeSnapStepMm !== null
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const resolvedCursorWorld =
+    activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
   return resolveInteriorAssetMoveCenter(
     state.document,
     roomId,
     assetId,
-    cursorWorld,
-    getEffectiveSnapStepMm(state)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2227,13 +2264,22 @@ export function getInteriorAssetResizeFromWallForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides =
+    activeSnapStepMm !== null
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const resolvedCursorWorld =
+    activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
   return resolveInteriorAssetResizeFromWall(
     state.document,
     roomId,
     assetId,
     wall,
-    cursorWorld,
-    getEffectiveSnapStepMm(state)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2244,13 +2290,22 @@ export function getInteriorAssetResizeFromCornerForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides =
+    activeSnapStepMm !== null
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const resolvedCursorWorld =
+    activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
   return resolveInteriorAssetResizeFromCorner(
     state.document,
     roomId,
     assetId,
     corner,
-    cursorWorld,
-    getEffectiveSnapStepMm(state)
+    resolvedCursorWorld,
+    null
   );
 }
 

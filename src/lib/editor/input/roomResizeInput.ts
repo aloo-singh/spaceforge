@@ -14,7 +14,12 @@ import {
   hitTestOrthogonalWallHandle,
 } from "@/lib/editor/orthogonalWallResize";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
-import { getSnapStepForSettings, type SnapGuides } from "@/lib/editor/snapping";
+import {
+  getPredictiveSnapGuides,
+  getSnapStepForSettings,
+  getSnappedPointFromGuides,
+  type SnapGuides,
+} from "@/lib/editor/snapping";
 import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
@@ -41,7 +46,7 @@ import type { Point, Room, RoomWall } from "@/lib/editor/types";
 type RoomResizeStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
   viewport: { width: number; height: number };
-  settings: { snappingEnabled: boolean };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -57,6 +62,7 @@ type RoomResizeStore = {
 };
 
 type RoomResizeInputCallbacks = {
+  onCursorWorldChange?: (cursorWorld: Point | null) => void;
   onHandleStateChange: (state: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -346,26 +352,30 @@ export function attachRoomResizeInput(
         selected?.state.camera ?? fallbackState.camera,
         selected?.state.viewport ?? fallbackState.viewport
       );
+      callbacks.onCursorWorldChange?.(cursorWorld);
       const activeState = selected?.state ?? fallbackState;
       const activeSnapStepMm = getSnapStepForSettings(activeState.camera, activeState.settings);
+      const predictiveGuides =
+        getPredictiveSnapGuides(activeState.document.rooms, cursorWorld, activeState.camera, {
+          excludeRoomIds: new Set([activeSession.roomId]),
+        });
+      const resolvedCursorWorld =
+        activeSnapStepMm !== null
+          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+          : cursorWorld;
       if (activeSession.target.type === "vertex") {
         const nextPoints = getConstrainedVertexAdjustmentResult(
           activeSession.startPoints,
           activeSession.target.vertexIndex,
-          activeSnapStepMm
-            ? {
-                x: Math.round(cursorWorld.x / activeSnapStepMm) * activeSnapStepMm,
-                y: Math.round(cursorWorld.y / activeSnapStepMm) * activeSnapStepMm,
-              }
-            : cursorWorld
+          resolvedCursorWorld
         );
         if (!nextPoints) return;
 
         activeSession.latestSnappedPoints = nextPoints;
         previewRoomResize(activeSession.roomId, nextPoints);
         setSnapGuides(
-          activeSnapStepMm
-            ? { point: nextPoints[activeSession.target.vertexIndex], showVertical: true, showHorizontal: true }
+          activeState.settings.showGuidelines
+            ? predictiveGuides
             : null
         );
         return;
@@ -375,27 +385,16 @@ export function attachRoomResizeInput(
         const nextPoints = getOrthogonalWallAdjustmentResult(
           activeSession.startPoints,
           activeSession.target.wallSegmentIndex,
-          cursorWorld,
-          activeSnapStepMm ? { gridSizeMm: activeSnapStepMm } : undefined
+          resolvedCursorWorld,
+          { gridSizeMm: 0 }
         );
         if (!nextPoints) return;
 
         activeSession.latestSnappedPoints = nextPoints;
         previewRoomResize(activeSession.roomId, nextPoints);
         setSnapGuides(
-          activeSnapStepMm
-            ? (() => {
-                const wall = getRoomWallSegment(
-                  { id: activeSession.roomId, name: "", points: nextPoints, openings: [], interiorAssets: [] },
-                  activeSession.target.wallSegmentIndex
-                );
-                if (!wall) return null;
-                return {
-                  point: wall.axis === "horizontal" ? { x: cursorWorld.x, y: wall.start.y } : { x: wall.start.x, y: cursorWorld.y },
-                  showVertical: wall.axis === "vertical",
-                  showHorizontal: wall.axis === "horizontal",
-                };
-              })()
+          activeState.settings.showGuidelines
+            ? predictiveGuides
             : null
         );
         return;
@@ -404,76 +403,46 @@ export function attachRoomResizeInput(
       if (!activeSession.startBounds) return;
       const nextBounds =
         activeSession.target.type === "corner"
-          ? resizeBoundsForCornerDrag(activeSession.startBounds, activeSession.target.corner, cursorWorld, {
-              ...(activeSnapStepMm ? { gridSizeMm: activeSnapStepMm } : {}),
+          ? resizeBoundsForCornerDrag(activeSession.startBounds, activeSession.target.corner, resolvedCursorWorld, {
+              gridSizeMm: 0,
               minRoomSizeMm: MIN_ROOM_SIZE_MM,
             })
-          : resizeBoundsForWallDrag(activeSession.startBounds, activeSession.target.wall, cursorWorld, {
-              ...(activeSnapStepMm ? { gridSizeMm: activeSnapStepMm } : {}),
+          : resizeBoundsForWallDrag(activeSession.startBounds, activeSession.target.wall, resolvedCursorWorld, {
+              gridSizeMm: 0,
               minRoomSizeMm: MIN_ROOM_SIZE_MM,
             });
       const nextPoints = getRoomPointsFromBounds(nextBounds, activeSession.startPoints);
       activeSession.latestSnappedPoints = nextPoints;
       previewRoomResize(activeSession.roomId, nextPoints);
       setSnapGuides(
-        activeSnapStepMm
-          ? {
-              point:
-                activeSession.target.type === "corner"
-                  ? {
-                      x:
-                        activeSession.target.corner === "top-left" ||
-                        activeSession.target.corner === "bottom-left"
-                          ? nextBounds.minX
-                          : nextBounds.maxX,
-                      y:
-                        activeSession.target.corner === "top-left" ||
-                        activeSession.target.corner === "top-right"
-                          ? nextBounds.minY
-                          : nextBounds.maxY,
-                    }
-                  : {
-                      x:
-                        activeSession.target.wall === "left"
-                          ? nextBounds.minX
-                          : activeSession.target.wall === "right"
-                            ? nextBounds.maxX
-                            : cursorWorld.x,
-                      y:
-                        activeSession.target.wall === "top"
-                          ? nextBounds.minY
-                          : activeSession.target.wall === "bottom"
-                            ? nextBounds.maxY
-                            : cursorWorld.y,
-                    },
-              showVertical:
-                activeSession.target.type === "corner" ||
-                activeSession.target.wall === "left" ||
-                activeSession.target.wall === "right",
-              showHorizontal:
-                activeSession.target.type === "corner" ||
-                activeSession.target.wall === "top" ||
-                activeSession.target.wall === "bottom",
-            }
+        activeState.settings.showGuidelines
+          ? predictiveGuides
           : null
       );
       return;
     }
 
     if (event.buttons !== 0) {
+      callbacks.onCursorWorldChange?.(null);
       setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
     if (isSpaceHeld || !selected) {
+      callbacks.onCursorWorldChange?.(null);
       setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
 
     if (hasSelectedOpeningResizeHandleHit(screenPoint)) {
+      callbacks.onCursorWorldChange?.(null);
       setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
       return;
     }
+
+    callbacks.onCursorWorldChange?.(
+      screenToWorld(screenPoint, selected.state.camera, selected.state.viewport)
+    );
 
     if (selected.isConstrainedVertexRoom) {
       const vertexHandles = getConstrainedVertexHandleLayouts(
@@ -629,11 +598,13 @@ export function attachRoomResizeInput(
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
     stopSession();
+    callbacks.onCursorWorldChange?.(null);
     setSnapGuides(null);
   };
 
   const onPointerLeave = () => {
     if (activeSession) return;
+    callbacks.onCursorWorldChange?.(null);
     setHoveredHandle({ wall: null, corner: null, vertexIndex: null, wallSegmentIndex: null });
   };
 
@@ -662,6 +633,7 @@ export function attachRoomResizeInput(
       clearPendingTransformFeedbackTimeout();
       setTransformFeedback(null);
       stopSession();
+      callbacks.onCursorWorldChange?.(null);
       setSnapGuides(null);
       return;
     }
@@ -689,6 +661,7 @@ export function attachRoomResizeInput(
     window.removeEventListener("blur", onWindowBlur);
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
+    callbacks.onCursorWorldChange?.(null);
     setSnapGuides(null);
     canvas.style.cursor = "";
     document.body.style.cursor = "";

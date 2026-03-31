@@ -75,8 +75,10 @@ import {
 } from "@/lib/editor/measurements";
 import {
   getActiveSnapStepMm,
+  getPredictiveSnapGuides,
   getScaleOverlayState,
   getSnapStepForSettings,
+  getSnappedPointFromGuides,
   type SnapGuides,
 } from "@/lib/editor/snapping";
 import {
@@ -721,6 +723,7 @@ export default function EditorCanvas({
         null,
         exportCamera,
         exportViewport,
+        getActiveSnapStepMm(exportCamera),
         getSnapStepForSettings(exportCamera, state.settings),
         null,
         exportTheme
@@ -1155,6 +1158,9 @@ export default function EditorCanvas({
         },
       });
       const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
+        onCursorWorldChange: (cursorWorld) => {
+          cursorWorldRef.current = cursorWorld;
+        },
         onHandleStateChange: (handleState) => {
           roomResizeUiRef.current = handleState;
         },
@@ -1404,7 +1410,17 @@ function drawScene(
   snapGuides: SnapGuides | null,
   theme: EditorCanvasTheme
 ) {
+  const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
   const activeSnapStepMm = getSnapStepForSettings(state.camera, state.settings);
+  const predictiveGuides =
+    cursorWorld
+      ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+      : null;
+  const draftCursorWorld =
+    cursorWorld && activeSnapStepMm !== null
+      ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+      : cursorWorld;
+  const visibleGuides = state.settings.showGuidelines ? snapGuides ?? predictiveGuides : null;
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
   const showDimensions = shouldShowDimensions(
     state.settings,
@@ -1484,7 +1500,7 @@ function drawScene(
     drawDraftDimensions(
       dimensionOverlayContainer,
       state.roomDraft.points,
-      cursorWorld,
+      draftCursorWorld,
       state.camera,
       state.viewport,
       activeSnapStepMm,
@@ -1495,11 +1511,12 @@ function drawScene(
   drawDraft(
     draftGraphics,
     state.roomDraft.points,
-    cursorWorld,
+    draftCursorWorld,
     state.camera,
     state.viewport,
+    cursorSnapStepMm,
     activeSnapStepMm,
-    snapGuides,
+    visibleGuides,
     theme
   );
 }
@@ -3489,19 +3506,23 @@ function drawSnapGuides(
   theme: EditorCanvasTheme
 ) {
   const screenPoint = worldToScreen(guides.point, camera, viewport);
-  graphics.setStrokeStyle({ width: 1, color: theme.interactiveAccent, alpha: 0.22 });
-
   if (guides.showVertical) {
-    graphics.moveTo(screenPoint.x, 0);
-    graphics.lineTo(screenPoint.x, viewport.height);
+    drawDashedGuideLine(
+      graphics,
+      { x: screenPoint.x, y: 0 },
+      { x: screenPoint.x, y: viewport.height },
+      theme.guidelineAccent
+    );
   }
 
   if (guides.showHorizontal) {
-    graphics.moveTo(0, screenPoint.y);
-    graphics.lineTo(viewport.width, screenPoint.y);
+    drawDashedGuideLine(
+      graphics,
+      { x: 0, y: screenPoint.y },
+      { x: viewport.width, y: screenPoint.y },
+      theme.guidelineAccent
+    );
   }
-
-  graphics.stroke();
 }
 
 function drawDraft(
@@ -3510,11 +3531,14 @@ function drawDraft(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
+  cursorSnapStepMm: number,
   activeSnapStepMm: number | null,
   snapGuides: SnapGuides | null,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
+  const cursorHudWorld = cursorWorld ? snapPointToGrid(cursorWorld, cursorSnapStepMm) : null;
+
   if (draftPoints.length > 0) {
     const screenDraftPoints = draftPoints.map((point) => worldToScreen(point, camera, viewport));
 
@@ -3531,7 +3555,7 @@ function drawDraft(
       graphics.fill();
     }
 
-    if (!cursorWorld) return;
+    if (!cursorWorld || !cursorHudWorld) return;
 
     const previewWorld = getDraftPreviewPoint(
       draftPoints[draftPoints.length - 1],
@@ -3550,45 +3574,51 @@ function drawDraft(
       graphics.stroke();
     }
 
-    if (activeSnapStepMm) {
+    if (snapGuides) {
       drawSnapGuides(
         graphics,
-        snapGuides ?? { point: previewWorld, showVertical: true, showHorizontal: true },
+        snapGuides,
         camera,
         viewport,
         theme
       );
-      drawSnapMarker(graphics, previewScreen, theme, "active");
     }
+    drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "active");
     return;
   }
 
-  if (!cursorWorld) return;
+  if (!cursorWorld || !cursorHudWorld) return;
 
-  if (!activeSnapStepMm) return;
+  if (snapGuides) {
+    drawSnapGuides(graphics, snapGuides, camera, viewport, theme);
+  }
 
-  const firstPointPreviewWorld = snapPointToGrid(cursorWorld, activeSnapStepMm);
-  drawSnapGuides(
-    graphics,
-    snapGuides ?? { point: firstPointPreviewWorld, showVertical: true, showHorizontal: true },
-    camera,
-    viewport,
-    theme
-  );
-  const firstPointPreviewScreen = worldToScreen(firstPointPreviewWorld, camera, viewport);
-  drawSnapMarker(graphics, firstPointPreviewScreen, theme, "idle");
+  drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "idle");
 }
 
-function drawSnapMarker(
+function drawCursorHud(
   graphics: Graphics,
   point: Point,
   theme: EditorCanvasTheme,
   mode: "idle" | "active"
 ) {
+  const crosshairHalfLength = mode === "active" ? 16 : 14;
+  const crosshairGap = 8;
   const radius = mode === "active" ? 6 : 5;
   const dotRadius = mode === "active" ? 2 : 1.75;
   const fillAlpha = mode === "active" ? 0.18 : 0.12;
   const strokeAlpha = mode === "active" ? 0.95 : 0.75;
+
+  graphics.setStrokeStyle({ width: 1.35, color: theme.interactiveAccent, alpha: 0.72 });
+  graphics.moveTo(point.x - crosshairHalfLength, point.y);
+  graphics.lineTo(point.x - crosshairGap, point.y);
+  graphics.moveTo(point.x + crosshairGap, point.y);
+  graphics.lineTo(point.x + crosshairHalfLength, point.y);
+  graphics.moveTo(point.x, point.y - crosshairHalfLength);
+  graphics.lineTo(point.x, point.y - crosshairGap);
+  graphics.moveTo(point.x, point.y + crosshairGap);
+  graphics.lineTo(point.x, point.y + crosshairHalfLength);
+  graphics.stroke();
 
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
   graphics.circle(point.x, point.y, radius);
@@ -3601,6 +3631,32 @@ function drawSnapMarker(
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.9 });
   graphics.circle(point.x, point.y, dotRadius);
   graphics.fill();
+}
+
+function drawDashedGuideLine(
+  graphics: Graphics,
+  start: Point,
+  end: Point,
+  color: number
+) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 0) return;
+
+  const dashLength = 8;
+  const gapLength = 6;
+  const stepX = dx / length;
+  const stepY = dy / length;
+
+  graphics.setStrokeStyle({ width: 1.25, color, alpha: 0.44 });
+  for (let distance = 0; distance < length; distance += dashLength + gapLength) {
+    const dashStart = distance;
+    const dashEnd = Math.min(distance + dashLength, length);
+    graphics.moveTo(start.x + stepX * dashStart, start.y + stepY * dashStart);
+    graphics.lineTo(start.x + stepX * dashEnd, start.y + stepY * dashEnd);
+  }
+  graphics.stroke();
 }
 
 function drawGridLines(

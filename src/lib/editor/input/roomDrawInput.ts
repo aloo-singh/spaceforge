@@ -9,7 +9,12 @@ import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
-import { getSnapStepForSettings, type SnapGuides } from "@/lib/editor/snapping";
+import {
+  getPredictiveSnapGuides,
+  getSnapStepForSettings,
+  getSnappedPointFromGuides,
+  type SnapGuides,
+} from "@/lib/editor/snapping";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
@@ -26,7 +31,6 @@ import {
 } from "@/lib/editor/rectRoomResize";
 import {
   getRoomTranslationDelta,
-  getSnappedRoomTranslationDelta,
   translateRoomPoints,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
@@ -48,7 +52,7 @@ import {
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
   viewport: { width: number; height: number };
-  settings: { snappingEnabled: boolean };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -485,9 +489,20 @@ export function attachRoomDrawInput(
       }
 
       const activeSnapStepMm = getSnapStepForSettings(state.camera, state.settings);
-      const delta = activeSnapStepMm
-        ? getSnappedRoomTranslationDelta(session.startWorldPoint, cursorWorld, activeSnapStepMm)
-        : getRoomTranslationDelta(session.startWorldPoint, cursorWorld);
+      const predictiveGuides =
+        activeSnapStepMm !== null
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+              excludeRoomIds: new Set([session.roomId]),
+            })
+          : null;
+      const resolvedCursorWorld =
+        activeSnapStepMm !== null
+          ? getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides)
+          : cursorWorld;
+      const delta =
+        activeSnapStepMm !== null
+          ? getRoomTranslationDelta(session.startWorldPoint, resolvedCursorWorld)
+          : getRoomTranslationDelta(session.startWorldPoint, cursorWorld);
 
       const nextPoints = translateRoomPoints(session.startPoints, delta);
       session.latestPoints = nextPoints;
@@ -495,15 +510,8 @@ export function attachRoomDrawInput(
         getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
       );
       setSnapGuides(
-        activeSnapStepMm
-          ? {
-              point: {
-                x: session.startWorldPoint.x + delta.x,
-                y: session.startWorldPoint.y + delta.y,
-              },
-              showVertical: true,
-              showHorizontal: true,
-            }
+        state.settings.showGuidelines && predictiveGuides
+          ? predictiveGuides
           : null
       );
       return;
@@ -532,12 +540,8 @@ export function attachRoomDrawInput(
       session.latestOffsetMm = moveTarget.nextOffsetMm;
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
       setSnapGuides(
-        state.settings.snappingEnabled
-          ? {
-              point: cursorWorld,
-              showVertical: true,
-              showHorizontal: true,
-            }
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -573,12 +577,8 @@ export function attachRoomDrawInput(
         .getState()
         .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm);
       setSnapGuides(
-        state.settings.snappingEnabled
-          ? {
-              point: cursorWorld,
-              showVertical: true,
-              showHorizontal: true,
-            }
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -626,12 +626,8 @@ export function attachRoomDrawInput(
       };
       store.getState().previewInteriorAssetResize(session.roomId, session.assetId, session.latestAsset);
       setSnapGuides(
-        state.settings.snappingEnabled
-          ? {
-              point: { x: session.latestAsset.xMm, y: session.latestAsset.yMm },
-              showVertical: true,
-              showHorizontal: true,
-            }
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -661,12 +657,8 @@ export function attachRoomDrawInput(
       session.latestCenter = moveTarget.nextCenter;
       store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
       setSnapGuides(
-        state.settings.snappingEnabled
-          ? {
-              point: moveTarget.nextCenter,
-              showVertical: true,
-              showHorizontal: true,
-            }
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
           : null
       );
       updateCursor();
