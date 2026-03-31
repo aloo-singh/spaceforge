@@ -50,7 +50,7 @@ const EDITOR_CANVAS_THEMES: Record<EditorThemeMode, EditorCanvasTheme> = {
     gridMajor: 0x313944,
     originAxis: 0x4b5868,
     interactiveAccent: 0x60a5fa,
-    guidelineAccent: 0xf59e0b,
+    guidelineAccent: 0x92400e,
     wallSelectionAccent: 0xf59e0b,
     draftWall: 0x60a5fa,
     roomOutline: 0x93c5fd,

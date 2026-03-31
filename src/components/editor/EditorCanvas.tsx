@@ -3523,19 +3523,17 @@ function rectsOverlap(
 
 function drawSnapGuides(
   graphics: Graphics,
-  cursorWorld: Point,
   guides: SnapGuides,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
   const screenPoint = worldToScreen(guides.point, camera, viewport);
-  const cursorPoint = worldToScreen(cursorWorld, camera, viewport);
   if (guides.showVertical) {
     drawDashedGuideLine(
       graphics,
-      { x: screenPoint.x, y: Math.min(screenPoint.y, cursorPoint.y) },
-      { x: screenPoint.x, y: Math.max(screenPoint.y, cursorPoint.y) },
+      { x: screenPoint.x, y: 0 },
+      { x: screenPoint.x, y: viewport.height },
       theme.guidelineAccent
     );
   }
@@ -3543,8 +3541,8 @@ function drawSnapGuides(
   if (guides.showHorizontal) {
     drawDashedGuideLine(
       graphics,
-      { x: Math.min(screenPoint.x, cursorPoint.x), y: screenPoint.y },
-      { x: Math.max(screenPoint.x, cursorPoint.x), y: screenPoint.y },
+      { x: 0, y: screenPoint.y },
+      { x: viewport.width, y: screenPoint.y },
       theme.guidelineAccent
     );
   }
@@ -3599,10 +3597,16 @@ function drawDraft(
       graphics.stroke();
     }
 
+    drawCursorCrosshairGuides(
+      graphics,
+      worldToScreen(cursorHudWorld, camera, viewport),
+      viewport,
+      theme,
+      "active"
+    );
     if (snapGuides) {
       drawSnapGuides(
         graphics,
-        cursorWorld,
         snapGuides,
         camera,
         viewport,
@@ -3615,11 +3619,36 @@ function drawDraft(
 
   if (!cursorWorld || !cursorHudWorld) return;
 
+  drawCursorCrosshairGuides(
+    graphics,
+    worldToScreen(cursorHudWorld, camera, viewport),
+    viewport,
+    theme,
+    "idle"
+  );
   if (snapGuides) {
-    drawSnapGuides(graphics, cursorWorld, snapGuides, camera, viewport, theme);
+    drawSnapGuides(graphics, snapGuides, camera, viewport, theme);
   }
-
   drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "idle");
+}
+
+function drawCursorCrosshairGuides(
+  graphics: Graphics,
+  point: Point,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme,
+  mode: "idle" | "active"
+) {
+  graphics.setStrokeStyle({
+    width: mode === "active" ? 1.1 : 1,
+    color: theme.interactiveAccent,
+    alpha: mode === "active" ? 0.3 : 0.22,
+  });
+  graphics.moveTo(point.x, 0);
+  graphics.lineTo(point.x, viewport.height);
+  graphics.moveTo(0, point.y);
+  graphics.lineTo(viewport.width, point.y);
+  graphics.stroke();
 }
 
 function drawCursorHud(
@@ -3628,23 +3657,10 @@ function drawCursorHud(
   theme: EditorCanvasTheme,
   mode: "idle" | "active"
 ) {
-  const crosshairHalfLength = mode === "active" ? 16 : 14;
-  const crosshairGap = 8;
   const radius = mode === "active" ? 6 : 5;
   const dotRadius = mode === "active" ? 2 : 1.75;
   const fillAlpha = mode === "active" ? 0.18 : 0.12;
   const strokeAlpha = mode === "active" ? 0.95 : 0.75;
-
-  graphics.setStrokeStyle({ width: 1.35, color: theme.interactiveAccent, alpha: 0.72 });
-  graphics.moveTo(point.x - crosshairHalfLength, point.y);
-  graphics.lineTo(point.x - crosshairGap, point.y);
-  graphics.moveTo(point.x + crosshairGap, point.y);
-  graphics.lineTo(point.x + crosshairHalfLength, point.y);
-  graphics.moveTo(point.x, point.y - crosshairHalfLength);
-  graphics.lineTo(point.x, point.y - crosshairGap);
-  graphics.moveTo(point.x, point.y + crosshairGap);
-  graphics.lineTo(point.x, point.y + crosshairHalfLength);
-  graphics.stroke();
 
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
   graphics.circle(point.x, point.y, radius);
