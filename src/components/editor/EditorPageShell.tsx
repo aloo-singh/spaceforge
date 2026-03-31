@@ -127,8 +127,8 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           onThumbnailGeneratorChange={handleThumbnailGeneratorChange}
           projectRenameCompletionCount={projectRenameCompletionCount}
           leftSidebarContent={
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="border-b border-zinc-200/80 dark:border-border/70">
+            <div className="flex h-full min-h-0 w-full flex-col">
+              <div>
                 <div className="px-3 py-3 sm:px-4">
                   <EditorProjectChrome
                     projectId={activeProject?.id ?? null}
@@ -151,6 +151,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
                     }}
                   />
                 </div>
+                <div className="w-full border-t border-border" aria-hidden="true" />
               </div>
               <div className="flex-1 p-3 sm:p-4" />
             </div>
