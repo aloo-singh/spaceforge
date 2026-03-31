@@ -24,6 +24,8 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const rooms = useEditorStore((state) => state.document.rooms);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
+  const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
@@ -47,9 +49,10 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
       ? selectedRoom?.interiorAssets.find((asset) => asset.id === selectedInteriorAssetId) ?? null
       : null;
   const canDeleteSelectedRoom = selectedRoom !== null;
+  const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
 
   useEffect(() => {
-    if (!shouldFocusSelectedRoomNameInput || !selectedRoom) return;
+    if (!shouldFocusSelectedRoomNameInput || !selectedRoom || isRenameBlocked) return;
 
     let attempts = 0;
     let isCancelled = false;
@@ -108,7 +111,20 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
         focusFrameRef.current = null;
       }
     };
-  }, [consumeSelectedRoomNameInputFocusRequest, selectedRoom, shouldFocusSelectedRoomNameInput]);
+  }, [
+    consumeSelectedRoomNameInputFocusRequest,
+    isRenameBlocked,
+    selectedRoom,
+    shouldFocusSelectedRoomNameInput,
+  ]);
+
+  useEffect(() => {
+    if (!isRenameBlocked) return;
+    const inputElement = document.getElementById("room-name-input");
+    if (inputElement instanceof HTMLInputElement && document.activeElement === inputElement) {
+      inputElement.blur();
+    }
+  }, [isRenameBlocked]);
 
   useEffect(() => {
     const panelElement = panelRef.current;
@@ -137,7 +153,13 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
           <Input
             id="room-name-input"
             value={selectedRoom.name}
-            onFocus={() => startRoomRenameSession(selectedRoom.id)}
+            onFocus={(event) => {
+              if (isRenameBlocked) {
+                event.currentTarget.blur();
+                return;
+              }
+              startRoomRenameSession(selectedRoom.id);
+            }}
             onChange={(event) => updateRoomRenameDraft(selectedRoom.id, event.target.value)}
             onBlur={() => commitRoomRenameSession({ deselectIfUnchanged: false })}
             onKeyDown={(event) => {
@@ -158,6 +180,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
             }}
             placeholder="Untitled room"
             autoComplete="off"
+            disabled={isRenameBlocked}
             aria-describedby="room-name-input-hint"
           />
           <p

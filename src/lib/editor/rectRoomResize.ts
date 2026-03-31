@@ -228,10 +228,10 @@ export function resizeBoundsForWallDrag(
 ): RoomRectBounds {
   const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
   const minRoomSizeMm = options?.minRoomSizeMm ?? MIN_ROOM_SIZE_MM;
+  const snappedX = gridSizeMm > 0 ? snapToGrid(cursorWorld.x, gridSizeMm) : cursorWorld.x;
+  const snappedY = gridSizeMm > 0 ? snapToGrid(cursorWorld.y, gridSizeMm) : cursorWorld.y;
 
   if (wall === "left" || wall === "right") {
-    const snappedX = snapToGrid(cursorWorld.x, gridSizeMm);
-
     if (wall === "left") {
       return {
         ...bounds,
@@ -245,7 +245,6 @@ export function resizeBoundsForWallDrag(
     };
   }
 
-  const snappedY = snapToGrid(cursorWorld.y, gridSizeMm);
   if (wall === "top") {
     return {
       ...bounds,
@@ -270,8 +269,8 @@ export function resizeBoundsForCornerDrag(
 ): RoomRectBounds {
   const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
   const minRoomSizeMm = options?.minRoomSizeMm ?? MIN_ROOM_SIZE_MM;
-  const snappedX = snapToGrid(cursorWorld.x, gridSizeMm);
-  const snappedY = snapToGrid(cursorWorld.y, gridSizeMm);
+  const snappedX = gridSizeMm > 0 ? snapToGrid(cursorWorld.x, gridSizeMm) : cursorWorld.x;
+  const snappedY = gridSizeMm > 0 ? snapToGrid(cursorWorld.y, gridSizeMm) : cursorWorld.y;
 
   if (corner === "top-left") {
     return {

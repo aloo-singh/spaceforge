@@ -9,7 +9,13 @@ import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
-import { getActiveSnapStepMm } from "@/lib/editor/snapping";
+import {
+  getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
+  getPredictiveSnapGuides,
+  getSnappedPointFromGuides,
+  type SnapGuides,
+} from "@/lib/editor/snapping";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
@@ -25,8 +31,8 @@ import {
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
 import {
-  getSnappedRoomTranslationDelta,
-  translateRoomPoints,
+  getRoomTranslationDelta,
+  translateRoomPointsOnGrid,
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 import type { RoomWall } from "@/lib/editor/types";
@@ -47,6 +53,7 @@ import {
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number };
   viewport: { width: number; height: number };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -95,6 +102,7 @@ type RoomDrawStoreState = {
   ) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  setCanvasInteractionActive: (isActive: boolean) => void;
 };
 
 type RoomDrawStore = {
@@ -106,6 +114,7 @@ type RoomDrawInputCallbacks = {
   onHoveredRoomLabelChange: (roomId: string | null) => void;
   onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RoomWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
+  onSnapGuidesChange?: (guides: SnapGuides | null) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
@@ -248,6 +257,11 @@ export function attachRoomDrawInput(
     callbacks.requestRender();
   };
 
+  const setSnapGuides = (guides: SnapGuides | null) => {
+    callbacks.onSnapGuidesChange?.(guides);
+    callbacks.requestRender();
+  };
+
   const getMoveTransformFeedback = (
     roomId: string,
     originalPoints: Point[],
@@ -379,6 +393,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeLabelDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -389,6 +404,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -399,6 +415,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningResizeSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -409,6 +426,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -419,6 +437,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetResizeSession = null;
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 
@@ -457,7 +476,7 @@ export function attachRoomDrawInput(
         setHoveredSelectableWall(null);
         setHoveredSelectableRoomId(null);
         setTransformFeedback(null);
-        callbacks.requestRender();
+        setSnapGuides(null);
         return;
       }
 
@@ -471,23 +490,38 @@ export function attachRoomDrawInput(
         }
 
         session.didDrag = true;
+        store.getState().setCanvasInteractionActive(true);
         clearPendingTransformFeedbackTimeout();
         setTransformFeedback(getMoveTransformFeedback(session.roomId, session.startPoints));
         updateCursor();
       }
 
       const activeSnapStepMm = getActiveSnapStepMm(state.camera);
-      const delta = getSnappedRoomTranslationDelta(
-        session.startWorldPoint,
+      const visibleGuides = getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+        excludeRoomIds: new Set([session.roomId]),
+      });
+      const magneticGuides = getMagneticSnapGuidesForSettings(
+        state.document.rooms,
         cursorWorld,
-        activeSnapStepMm
+        state.camera,
+        state.settings,
+        {
+          excludeRoomIds: new Set([session.roomId]),
+        }
       );
+      const resolvedCursorWorld = getSnappedPointFromGuides(
+        cursorWorld,
+        activeSnapStepMm,
+        magneticGuides
+      );
+      const delta = getRoomTranslationDelta(session.startWorldPoint, resolvedCursorWorld);
 
-      const nextPoints = translateRoomPoints(session.startPoints, delta);
+      const nextPoints = translateRoomPointsOnGrid(session.startPoints, delta, activeSnapStepMm);
       session.latestPoints = nextPoints;
       setTransformFeedback(
         getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
       );
+      setSnapGuides(state.settings.showGuidelines ? visibleGuides : null);
       return;
     }
 
@@ -505,15 +539,21 @@ export function attachRoomDrawInput(
 
       const moveTarget = getOpeningMoveOffsetForCursor(session.roomId, session.openingId, cursorWorld);
       if (!moveTarget) {
+        setSnapGuides(null);
         callbacks.requestRender();
         return;
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestOffsetMm = moveTarget.nextOffsetMm;
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
+      setSnapGuides(
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          : null
+      );
       updateCursor();
-      callbacks.requestRender();
       return;
     }
 
@@ -535,17 +575,23 @@ export function attachRoomDrawInput(
         cursorWorld
       );
       if (!resizeTarget) {
+        setSnapGuides(null);
         callbacks.requestRender();
         return;
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestWidthMm = resizeTarget.nextWidthMm;
       store
         .getState()
         .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm);
+      setSnapGuides(
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          : null
+      );
       updateCursor();
-      callbacks.requestRender();
       return;
     }
 
@@ -576,11 +622,13 @@ export function attachRoomDrawInput(
               cursorWorld
             );
       if (!resizeTarget) {
+        setSnapGuides(null);
         callbacks.requestRender();
         return;
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestAsset = {
         widthMm: resizeTarget.nextAsset.widthMm,
         depthMm: resizeTarget.nextAsset.depthMm,
@@ -588,8 +636,12 @@ export function attachRoomDrawInput(
         yMm: resizeTarget.nextAsset.yMm,
       };
       store.getState().previewInteriorAssetResize(session.roomId, session.assetId, session.latestAsset);
+      setSnapGuides(
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          : null
+      );
       updateCursor();
-      callbacks.requestRender();
       return;
     }
 
@@ -607,15 +659,21 @@ export function attachRoomDrawInput(
 
       const moveTarget = getInteriorAssetMoveCenterForCursor(session.roomId, session.assetId, cursorWorld);
       if (!moveTarget) {
+        setSnapGuides(null);
         callbacks.requestRender();
         return;
       }
 
       session.didDrag = true;
+      store.getState().setCanvasInteractionActive(true);
       session.latestCenter = moveTarget.nextCenter;
       store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
+      setSnapGuides(
+        state.settings.showGuidelines
+          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          : null
+      );
       updateCursor();
-      callbacks.requestRender();
       return;
     }
 
@@ -715,6 +773,7 @@ export function attachRoomDrawInput(
       return;
     }
     callbacks.onCursorWorldChange(null);
+    setSnapGuides(null);
     setHoveredRoomLabelId(null);
     hoveredOpeningWidthHandle = null;
     hoveredOpening = null;
@@ -735,6 +794,7 @@ export function attachRoomDrawInput(
         event.preventDefault();
         shouldSuppressNextContextMenu = true;
         state.resetDraft();
+        setSnapGuides(null);
         updateCursor();
       }
       return;
@@ -760,6 +820,19 @@ export function attachRoomDrawInput(
     if (labelHitRoom) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
+      const startWorldPoint = getSnappedPointFromGuides(
+        cursorWorld,
+        getActiveSnapStepMm(state.camera),
+        getMagneticSnapGuidesForSettings(
+          state.document.rooms,
+          cursorWorld,
+          state.camera,
+          state.settings,
+          {
+            excludeRoomIds: new Set([labelHitRoom.id]),
+          }
+        )
+      );
 
       const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
       state.selectRoomById(labelHitRoom.id);
@@ -767,7 +840,7 @@ export function attachRoomDrawInput(
         pointerId: event.pointerId,
         roomId: labelHitRoom.id,
         startScreenPoint: screenPoint,
-        startWorldPoint: cursorWorld,
+        startWorldPoint,
         startPoints: labelHitRoom.points.map((point) => ({ ...point })),
         latestPoints: null,
         didDrag: false,
@@ -999,6 +1072,7 @@ export function attachRoomDrawInput(
         }
       }
       stopOpeningDragSession();
+      setSnapGuides(null);
 
       const state = store.getState();
       const hoveredRoom =
@@ -1025,6 +1099,7 @@ export function attachRoomDrawInput(
         }
       }
       stopOpeningResizeSession();
+      setSnapGuides(null);
 
       const state = store.getState();
       const hoveredRoom =
@@ -1066,6 +1141,7 @@ export function attachRoomDrawInput(
         }
       }
       stopInteriorAssetDragSession();
+      setSnapGuides(null);
 
       const state = store.getState();
       const hoveredRoom =
@@ -1101,6 +1177,7 @@ export function attachRoomDrawInput(
         }
       }
       stopInteriorAssetResizeSession();
+      setSnapGuides(null);
 
       const state = store.getState();
       const hoveredRoom =
@@ -1148,6 +1225,7 @@ export function attachRoomDrawInput(
       setTransformFeedback(null);
     }
     stopLabelDragSession();
+    setSnapGuides(null);
 
     const state = store.getState();
     const hoveredRoom =
@@ -1177,6 +1255,7 @@ export function attachRoomDrawInput(
       }
 
       stopOpeningDragSession();
+      setSnapGuides(null);
       setHoveredRoomLabelId(null);
       hoveredInteriorAssetCornerHandle = null;
       hoveredInteriorAssetWallHandle = null;
@@ -1201,6 +1280,7 @@ export function attachRoomDrawInput(
       }
 
       stopOpeningResizeSession();
+      setSnapGuides(null);
       setHoveredRoomLabelId(null);
       hoveredOpeningWidthHandle = null;
       hoveredOpening = null;
@@ -1225,6 +1305,7 @@ export function attachRoomDrawInput(
       }
 
       stopInteriorAssetDragSession();
+      setSnapGuides(null);
       setHoveredRoomLabelId(null);
       hoveredOpeningWidthHandle = null;
       hoveredOpening = null;
@@ -1247,6 +1328,7 @@ export function attachRoomDrawInput(
       }
 
       stopInteriorAssetResizeSession();
+      setSnapGuides(null);
       setHoveredRoomLabelId(null);
       hoveredOpeningWidthHandle = null;
       hoveredOpening = null;
@@ -1267,6 +1349,7 @@ export function attachRoomDrawInput(
 
     setTransformFeedback(null);
     stopLabelDragSession();
+    setSnapGuides(null);
     setHoveredRoomLabelId(null);
     hoveredInteriorAssetCornerHandle = null;
     hoveredInteriorAssetWallHandle = null;
@@ -1301,6 +1384,7 @@ export function attachRoomDrawInput(
       const state = store.getState();
       if (state.roomDraft.points.length > 0) {
         state.resetDraft();
+        setSnapGuides(null);
         updateCursor();
       } else {
         state.clearRoomSelection();
@@ -1379,6 +1463,7 @@ export function attachRoomDrawInput(
     stopOpeningResizeSession();
     stopInteriorAssetDragSession();
     stopInteriorAssetResizeSession();
+    setSnapGuides(null);
     setHoveredRoomLabelId(null);
     hoveredInteriorAssetCornerHandle = null;
     hoveredInteriorAssetWallHandle = null;
@@ -1417,6 +1502,7 @@ export function attachRoomDrawInput(
     stopOpeningResizeSession();
     stopInteriorAssetDragSession();
     stopInteriorAssetResizeSession();
+    setSnapGuides(null);
     canvas.style.cursor = "";
   };
 }

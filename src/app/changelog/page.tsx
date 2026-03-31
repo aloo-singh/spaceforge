@@ -10,28 +10,30 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.51.0</h2>
-            <span className="text-sm text-muted-foreground">2026-03-30</span>
+            <h2 className="text-2xl font-semibold">v0.52.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-31</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
-                Added (Stairs - Phase 1)
+                Added (Snapping &amp; Guidelines)
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Stairs toolbar button (enabled only when a suitable room is selected)</li>
-                <li>Click to place default 1.2 m × 2.7 m stair block centred in the room</li>
-                <li>Drag to move (constrained inside room bounds)</li>
                 <li>
-                  Resize with side and corner handles (depth snaps to 0.3 m tread multiples, width
-                  snaps to current grid)
+                  Separate toggles in Editor Settings: &ldquo;Show guidelines&rdquo; and
+                  &ldquo;Enable snapping&rdquo; (both default On)
                 </li>
                 <li>
-                  Basic inspector panel when selected (editable name + dimensions + placeholder for
-                  future options)
+                  Short, predictive amber-600 dashed guidelines from cursor to nearest
+                  room/wall/edge (Cities: Skylines style)
                 </li>
-                <li>Stairs appear as interior assets under their parent room</li>
+                <li>Magnetic snapping to guidelines/edges when enabled</li>
+                <li>Permanent blue crosshair + grid-snapped circular cursor always visible</li>
+                <li>
+                  Keyboard shortcuts: G (toggle guidelines), S (toggle snapping) with Keycap
+                  labels in settings
+                </li>
               </ul>
             </div>
           </div>

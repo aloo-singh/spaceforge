@@ -20,17 +20,16 @@ import {
   applyCandidatePointToDraftPath,
   getDraftLoopClosureResultFromPath,
   getOrthogonalSegmentAxis,
-  getOrthogonalSnappedPoint,
+  projectOrthogonalPoint,
   normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
-  snapPointToGrid,
 } from "@/lib/editor/geometry";
 import {
   isOrthogonalPointPath,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
-import { translateRoomPoints } from "@/lib/editor/roomTranslation";
+import { translateRoomPointsOnGrid } from "@/lib/editor/roomTranslation";
 import {
   PERSISTED_HISTORY_STATE_LIMIT,
   loadEditorSnapshotForHydration,
@@ -76,7 +75,11 @@ import {
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
-import { getActiveSnapStepMm } from "@/lib/editor/snapping";
+import {
+  getActiveSnapStepMm,
+  getMagneticSnapGuidesForSettings,
+  getSnappedPointFromGuides,
+} from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type {
   CameraState,
@@ -124,6 +127,7 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  isCanvasInteractionActive: boolean;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   history: {
@@ -151,6 +155,7 @@ type EditorState = {
   clearSelectedInteriorAsset: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
+  setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
   updateRoomRenameDraft: (roomId: string, name: string) => void;
@@ -620,15 +625,18 @@ function resolveOpeningMoveOffset(
   roomId: string,
   openingId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
-  const nextOffsetMm = getOpeningOffsetForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextOffsetMm = getOpeningOffsetForWorldPoint(
+    room,
+    opening,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (nextOffsetMm === null) return null;
 
   return {
@@ -643,15 +651,18 @@ function resolveOpeningResizeWidth(
   roomId: string,
   openingId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
-  const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(
+    room,
+    opening,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (nextWidthMm === null) return null;
 
   return {
@@ -666,15 +677,18 @@ function resolveInteriorAssetMoveCenter(
   roomId: string,
   assetId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextCenter = constrainInteriorAssetCenter(room, asset, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextCenter = constrainInteriorAssetCenter(
+    room,
+    asset,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextCenter) return null;
 
   return {
@@ -690,15 +704,19 @@ function resolveInteriorAssetResizeFromWall(
   assetId: string,
   wall: "left" | "right" | "top" | "bottom",
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForWallDrag(room, asset, wall, cursorWorld, {
-    widthGridSizeMm: gridSizeMm,
-  });
+  const nextAsset = getResizedStairForWallDrag(
+    room,
+    asset,
+    wall,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextAsset) return null;
 
   return {
@@ -714,15 +732,19 @@ function resolveInteriorAssetResizeFromCorner(
   assetId: string,
   corner: "top-left" | "top-right" | "bottom-right" | "bottom-left",
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForCornerDrag(room, asset, corner, cursorWorld, {
-    widthGridSizeMm: gridSizeMm,
-  });
+  const nextAsset = getResizedStairForCornerDrag(
+    room,
+    asset,
+    corner,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextAsset) return null;
 
   return {
@@ -866,6 +888,12 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
   );
 }
 
+function getEffectiveSnapStepMm(
+  state: Pick<EditorState, "camera" | "settings">
+): number {
+  return getActiveSnapStepMm(state.camera);
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
@@ -882,6 +910,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   history: {
@@ -1010,19 +1039,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
-      const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+      const activeSnapStepMm = getEffectiveSnapStepMm(state);
+      const predictiveGuides = getMagneticSnapGuidesForSettings(
+        state.document.rooms,
+        cursorWorld,
+        state.camera,
+        state.settings
+      );
+      const resolvedCursorWorld = getSnappedPointFromGuides(
+        cursorWorld,
+        activeSnapStepMm,
+        predictiveGuides
+      );
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
-            points: [snapPointToGrid(cursorWorld, activeSnapStepMm)],
+            points: [resolvedCursorWorld],
             history: [],
           },
         };
       }
 
       const lastPoint = draftPoints[draftPoints.length - 1];
-      const nextPoint = getOrthogonalSnappedPoint(lastPoint, cursorWorld, activeSnapStepMm);
+      const nextPoint = projectOrthogonalPoint(lastPoint, resolvedCursorWorld);
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
@@ -1202,6 +1242,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
     }),
+  setCanvasInteractionActive: (isActive) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive === isActive) return state;
+      return {
+        isCanvasInteractionActive: isActive,
+      };
+    }),
   consumeSelectedRoomNameInputFocusRequest: () =>
     set((state) => {
       if (!state.shouldFocusSelectedRoomNameInput) return state;
@@ -1211,6 +1258,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   startRoomRenameSession: (roomId) =>
     set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (state.renameSession?.roomId === roomId) return state;
@@ -1224,6 +1272,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   updateRoomRenameDraft: (roomId, name) =>
     set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
 
@@ -1720,7 +1769,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room) return state;
       if (delta.x === 0 && delta.y === 0) return state;
 
-      const nextPoints = translateRoomPoints(room.points, delta);
+      const nextPoints = translateRoomPointsOnGrid(
+        room.points,
+        delta,
+        getEffectiveSnapStepMm(state)
+      );
       const command: EditorCommand = {
         type: "move-room",
         roomId,
@@ -2155,12 +2208,20 @@ export function getOpeningMoveOffsetForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveOpeningMoveOffset(
     state.document,
     roomId,
     openingId,
-    cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2170,12 +2231,20 @@ export function getOpeningResizeWidthForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveOpeningResizeWidth(
     state.document,
     roomId,
     openingId,
-    cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2185,12 +2254,20 @@ export function getInteriorAssetMoveCenterForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetMoveCenter(
     state.document,
     roomId,
     assetId,
-    cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2201,13 +2278,21 @@ export function getInteriorAssetResizeFromWallForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetResizeFromWall(
     state.document,
     roomId,
     assetId,
     wall,
-    cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    resolvedCursorWorld,
+    null
   );
 }
 
@@ -2218,13 +2303,21 @@ export function getInteriorAssetResizeFromCornerForCursor(
   cursorWorld: Point
 ) {
   const state = useEditorStore.getState();
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const predictiveGuides = getMagneticSnapGuidesForSettings(
+    state.document.rooms,
+    cursorWorld,
+    state.camera,
+    state.settings
+  );
+  const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
   return resolveInteriorAssetResizeFromCorner(
     state.document,
     roomId,
     assetId,
     corner,
-    cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    resolvedCursorWorld,
+    null
   );
 }
 
