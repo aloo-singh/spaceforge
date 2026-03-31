@@ -1,18 +1,50 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
+import type { Room, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
+
+const DEFAULT_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
+
+function getWallLabel(wall: RoomWall): string {
+  switch (wall) {
+    case "top":
+      return "North wall";
+    case "right":
+      return "East wall";
+    case "bottom":
+      return "South wall";
+    case "left":
+      return "West wall";
+    default:
+      return `Wall ${wall + 1}`;
+  }
+}
+
+function getOpeningLabel(opening: RoomOpening): string {
+  return opening.type === "door" ? "Door" : "Window";
+}
+
+function getRoomWalls(room: Room): RoomWall[] {
+  if (room.points.length === 4) return DEFAULT_WALLS;
+  return room.points.map((_, index) => index);
+}
 
 export function EditorSidebarRoomsList() {
   const rooms = useEditorStore((state) => state.document.rooms);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const selectedWall = useEditorStore((state) => state.selectedWall);
+  const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const renameSession = useEditorStore((state) => state.renameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
+  const selectWallByRoomId = useEditorStore((state) => state.selectWallByRoomId);
+  const selectOpeningById = useEditorStore((state) => state.selectOpeningById);
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
@@ -20,6 +52,8 @@ export function EditorSidebarRoomsList() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoFocusRenameInputRef = useRef(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
+  const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
+  const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
 
@@ -44,6 +78,8 @@ export function EditorSidebarRoomsList() {
         const isSelected = selectedRoomId === room.id;
         const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
         const areaLabel = formatMetricRoomAreaForRoom(room);
+        const roomWalls = getRoomWalls(room);
+        const isRoomExpanded = expandedRoomIds.includes(room.id);
 
         return (
           <div
@@ -115,6 +151,102 @@ export function EditorSidebarRoomsList() {
                 </div>
               </button>
             )}
+            <div className="px-2 pb-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedRoomIds((current) =>
+                    current.includes(room.id)
+                      ? current.filter((roomId) => roomId !== room.id)
+                      : [...current, room.id]
+                  )
+                }
+                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs font-medium tracking-[0.04em] text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+              >
+                <ChevronRight
+                  className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
+                />
+                <span>Walls</span>
+              </button>
+              {isRoomExpanded ? (
+                <div className="mt-1 flex flex-col gap-1 pl-2">
+                  {roomWalls.map((wall) => {
+                    const wallKey = `${room.id}:${wall}`;
+                    const isWallExpanded = expandedWallKeys.includes(wallKey);
+                    const wallOpenings = room.openings.filter((opening) => opening.wall === wall);
+                    const isWallSelected =
+                      selectedWall?.roomId === room.id && selectedWall.wall === wall;
+
+                    return (
+                      <div key={wallKey} className="flex flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => selectWallByRoomId(room.id, wall)}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                            isWallSelected
+                              ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                              : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                          )}
+                        >
+                          <span className="truncate">{getWallLabel(wall)}</span>
+                          {wallOpenings.length > 0 ? (
+                            <span className="ml-auto text-[11px] text-inherit/70">
+                              {wallOpenings.length}
+                            </span>
+                          ) : null}
+                        </button>
+                        {wallOpenings.length > 0 ? (
+                          <div className="pl-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedWallKeys((current) =>
+                                  current.includes(wallKey)
+                                    ? current.filter((key) => key !== wallKey)
+                                    : [...current, wallKey]
+                                )
+                              }
+                              className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] font-medium tracking-[0.04em] text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                            >
+                              <ChevronRight
+                                className={cn("size-3 transition-transform", isWallExpanded && "rotate-90")}
+                              />
+                              <span>Openings</span>
+                            </button>
+                            {isWallExpanded ? (
+                              <div className="mt-1 flex flex-col gap-1 pl-2">
+                                {wallOpenings.map((opening) => {
+                                  const isOpeningSelected =
+                                    selectedOpening?.roomId === room.id &&
+                                    selectedOpening.openingId === opening.id;
+
+                                  return (
+                                    <button
+                                      key={opening.id}
+                                      type="button"
+                                      onClick={() => selectOpeningById(room.id, opening.id)}
+                                      className={cn(
+                                        "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                        isOpeningSelected
+                                          ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                          : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                                      )}
+                                    >
+                                      {getOpeningLabel(opening)}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
         );
       })}
