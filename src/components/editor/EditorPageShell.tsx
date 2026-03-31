@@ -151,7 +151,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
                     }}
                   />
                 </div>
-                <div className="w-full border-t border-border" aria-hidden="true" />
+                <div className="w-full border-t border-zinc-300 dark:border-border" aria-hidden="true" />
               </div>
               <div className="flex-1 p-3 sm:p-4" />
             </div>
