@@ -79,7 +79,7 @@ export function EditorSidebarRoomsList() {
                       }
                     }}
                     aria-label={`Rename ${room.name}`}
-                    className="h-8 min-w-0 flex-1 border-zinc-300/80 bg-white/90 text-sm dark:border-input dark:bg-background"
+                    className="h-5 min-w-0 flex-1 border-zinc-300/80 bg-white/90 py-0 leading-none dark:border-input dark:bg-background"
                     disabled={isRenameBlocked}
                   />
                   <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">-</span>
