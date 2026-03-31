@@ -9,6 +9,7 @@ export type EditorSettings = {
   dimensionsVisibility: EditorDimensionsVisibility;
   measurementFontSize: EditorMeasurementFontSize;
   wallMeasurementPosition: EditorWallMeasurementPosition;
+  snappingEnabled: boolean;
   exportSignatureText: string;
 };
 
@@ -17,6 +18,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   dimensionsVisibility: "visible",
   measurementFontSize: "normal",
   wallMeasurementPosition: "inside",
+  snappingEnabled: true,
   exportSignatureText: "",
 };
 
@@ -26,6 +28,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     dimensionsVisibility: settings.dimensionsVisibility,
     measurementFontSize: settings.measurementFontSize,
     wallMeasurementPosition: settings.wallMeasurementPosition,
+    snappingEnabled: settings.snappingEnabled,
     exportSignatureText: settings.exportSignatureText,
   };
 }
@@ -36,6 +39,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.dimensionsVisibility === b.dimensionsVisibility &&
     a.measurementFontSize === b.measurementFontSize &&
     a.wallMeasurementPosition === b.wallMeasurementPosition &&
+    a.snappingEnabled === b.snappingEnabled &&
     a.exportSignatureText === b.exportSignatureText
   );
 }
@@ -100,6 +104,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       isEditorWallMeasurementPosition(value.wallMeasurementPosition)
         ? value.wallMeasurementPosition
         : DEFAULT_EDITOR_SETTINGS.wallMeasurementPosition,
+    snappingEnabled:
+      "snappingEnabled" in value && typeof value.snappingEnabled === "boolean"
+        ? value.snappingEnabled
+        : DEFAULT_EDITOR_SETTINGS.snappingEnabled,
     exportSignatureText:
       "exportSignatureText" in value && typeof value.exportSignatureText === "string"
         ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)

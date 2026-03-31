@@ -8,6 +8,7 @@ import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/e
 import {
   getOrthogonalSnappedPoint,
   pointsEqual,
+  projectOrthogonalPoint,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
@@ -72,7 +73,12 @@ import {
   getCornerResizeMeasurements,
   getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
-import { getActiveSnapStepMm, getScaleOverlayState } from "@/lib/editor/snapping";
+import {
+  getActiveSnapStepMm,
+  getScaleOverlayState,
+  getSnapStepForSettings,
+  type SnapGuides,
+} from "@/lib/editor/snapping";
 import {
   getMeasurementTextScale,
   normalizeEditorExportSignature,
@@ -248,6 +254,7 @@ export default function EditorCanvas({
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
+  const snapGuidesRef = useRef<SnapGuides | null>(null);
   const transformAnimationFrameRef = useRef<number | null>(null);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
@@ -337,6 +344,7 @@ export default function EditorCanvas({
       hoveredSelectableWallRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
+      snapGuidesRef.current,
       editorThemeRef.current
     );
   }, []);
@@ -713,7 +721,8 @@ export default function EditorCanvas({
         null,
         exportCamera,
         exportViewport,
-        getActiveSnapStepMm(exportCamera),
+        getSnapStepForSettings(exportCamera, state.settings),
+        null,
         exportTheme
       );
 
@@ -1152,6 +1161,9 @@ export default function EditorCanvas({
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
         },
+        onSnapGuidesChange: (guides) => {
+          snapGuidesRef.current = guides;
+        },
         onRoomResizeCommitted: () => {
           if (activeHintIdRef.current !== "resize-room-by-dragging-edges") return;
           completeHint("resize-room-by-dragging-edges");
@@ -1172,6 +1184,9 @@ export default function EditorCanvas({
         },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
+        },
+        onSnapGuidesChange: (guides) => {
+          snapGuidesRef.current = guides;
         },
         requestRender: () => {
           drawCurrentScene();
@@ -1231,6 +1246,7 @@ export default function EditorCanvas({
   );
   const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
+  const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
 
   return (
     <section
@@ -1281,7 +1297,7 @@ export default function EditorCanvas({
               className="mt-1 text-[11px] text-white/52"
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
-              Snap {formatMetricWallDimension(activeSnapStepMm)}
+              {snappingEnabled ? `Snap ${formatMetricWallDimension(activeSnapStepMm)}` : "Snap Off"}
             </div>
           </div>
           {displayedHint && displayedHint.id !== "project-name" ? (
@@ -1385,9 +1401,10 @@ function drawScene(
     activeRoomId: string | null;
   },
   transformFeedback: TransformFeedback | null,
+  snapGuides: SnapGuides | null,
   theme: EditorCanvasTheme
 ) {
-  const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+  const activeSnapStepMm = getSnapStepForSettings(state.camera, state.settings);
   drawGrid(gridGraphics, state.camera, state.viewport, theme);
   const showDimensions = shouldShowDimensions(
     state.settings,
@@ -1482,6 +1499,7 @@ function drawScene(
     state.camera,
     state.viewport,
     activeSnapStepMm,
+    snapGuides,
     theme
   );
 }
@@ -2662,7 +2680,7 @@ function drawDraftDimensions(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
-  activeSnapStepMm: number,
+  activeSnapStepMm: number | null,
   settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
@@ -3257,15 +3275,25 @@ function nudgeResizeDimensionLabel(
   };
 }
 
+function getDraftPreviewPoint(
+  anchorPoint: Point,
+  cursorWorld: Point,
+  activeSnapStepMm: number | null
+): Point {
+  return activeSnapStepMm
+    ? getOrthogonalSnappedPoint(anchorPoint, cursorWorld, activeSnapStepMm)
+    : projectOrthogonalPoint(anchorPoint, cursorWorld);
+}
+
 function getDraftPreviewRoom(
   draftPoints: Point[],
   cursorWorld: Point | null,
-  activeSnapStepMm: number
+  activeSnapStepMm: number | null
 ): Room | null {
   if (!cursorWorld) return null;
   if (draftPoints.length < 4) return null;
 
-  const previewPoint = getOrthogonalSnappedPoint(
+  const previewPoint = getDraftPreviewPoint(
     draftPoints[draftPoints.length - 1],
     cursorWorld,
     activeSnapStepMm
@@ -3371,12 +3399,12 @@ function getDraftActiveSegmentDimensionLabelSpec(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
-  activeSnapStepMm: number
+  activeSnapStepMm: number | null
 ): ResizeDimensionLabelSpec | null {
   if (!cursorWorld || draftPoints.length === 0) return null;
 
   const anchorPoint = draftPoints[draftPoints.length - 1];
-  const previewPoint = getOrthogonalSnappedPoint(anchorPoint, cursorWorld, activeSnapStepMm);
+  const previewPoint = getDraftPreviewPoint(anchorPoint, cursorWorld, activeSnapStepMm);
   if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
   if (draftPoints.length >= 4 && pointsEqual(previewPoint, draftPoints[0])) return null;
 
@@ -3453,13 +3481,37 @@ function rectsOverlap(
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
+function drawSnapGuides(
+  graphics: Graphics,
+  guides: SnapGuides,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const screenPoint = worldToScreen(guides.point, camera, viewport);
+  graphics.setStrokeStyle({ width: 1, color: theme.interactiveAccent, alpha: 0.22 });
+
+  if (guides.showVertical) {
+    graphics.moveTo(screenPoint.x, 0);
+    graphics.lineTo(screenPoint.x, viewport.height);
+  }
+
+  if (guides.showHorizontal) {
+    graphics.moveTo(0, screenPoint.y);
+    graphics.lineTo(viewport.width, screenPoint.y);
+  }
+
+  graphics.stroke();
+}
+
 function drawDraft(
   graphics: Graphics,
   draftPoints: Point[],
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
-  activeSnapStepMm: number,
+  activeSnapStepMm: number | null,
+  snapGuides: SnapGuides | null,
   theme: EditorCanvasTheme
 ) {
   graphics.clear();
@@ -3481,7 +3533,7 @@ function drawDraft(
 
     if (!cursorWorld) return;
 
-    const previewWorld = getOrthogonalSnappedPoint(
+    const previewWorld = getDraftPreviewPoint(
       draftPoints[draftPoints.length - 1],
       cursorWorld,
       activeSnapStepMm
@@ -3498,13 +3550,31 @@ function drawDraft(
       graphics.stroke();
     }
 
-    drawSnapMarker(graphics, previewScreen, theme, "active");
+    if (activeSnapStepMm) {
+      drawSnapGuides(
+        graphics,
+        snapGuides ?? { point: previewWorld, showVertical: true, showHorizontal: true },
+        camera,
+        viewport,
+        theme
+      );
+      drawSnapMarker(graphics, previewScreen, theme, "active");
+    }
     return;
   }
 
   if (!cursorWorld) return;
 
+  if (!activeSnapStepMm) return;
+
   const firstPointPreviewWorld = snapPointToGrid(cursorWorld, activeSnapStepMm);
+  drawSnapGuides(
+    graphics,
+    snapGuides ?? { point: firstPointPreviewWorld, showVertical: true, showHorizontal: true },
+    camera,
+    viewport,
+    theme
+  );
   const firstPointPreviewScreen = worldToScreen(firstPointPreviewWorld, camera, viewport);
   drawSnapMarker(graphics, firstPointPreviewScreen, theme, "idle");
 }

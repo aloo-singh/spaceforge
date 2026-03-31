@@ -18,3 +18,13 @@ export function getSnappedRoomTranslationDelta(
     y: snapToGrid(currentWorldPoint.y - startWorldPoint.y, gridSizeMm),
   };
 }
+
+export function getRoomTranslationDelta(
+  startWorldPoint: Point,
+  currentWorldPoint: Point
+): Point {
+  return {
+    x: currentWorldPoint.x - startWorldPoint.x,
+    y: currentWorldPoint.y - startWorldPoint.y,
+  };
+}

@@ -98,13 +98,13 @@ export function getOrthogonalWallAdjustmentResult(
 
   const gridSizeMm = options?.gridSizeMm ?? 1;
   const nextPoints = points.map((point) => ({ ...point }));
+  const snappedX = gridSizeMm > 0 ? snapToGrid(cursorWorld.x, gridSizeMm) : cursorWorld.x;
+  const snappedY = gridSizeMm > 0 ? snapToGrid(cursorWorld.y, gridSizeMm) : cursorWorld.y;
 
   if (axis === "horizontal") {
-    const snappedY = snapToGrid(cursorWorld.y, gridSizeMm);
     nextPoints[wallIndex] = { ...start, y: snappedY };
     nextPoints[(wallIndex + 1) % points.length] = { ...end, y: snappedY };
   } else {
-    const snappedX = snapToGrid(cursorWorld.x, gridSizeMm);
     nextPoints[wallIndex] = { ...start, x: snappedX };
     nextPoints[(wallIndex + 1) % points.length] = { ...end, x: snappedX };
   }

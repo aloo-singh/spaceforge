@@ -21,6 +21,7 @@ import {
   getDraftLoopClosureResultFromPath,
   getOrthogonalSegmentAxis,
   getOrthogonalSnappedPoint,
+  projectOrthogonalPoint,
   normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
@@ -76,7 +77,7 @@ import {
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
-import { getActiveSnapStepMm } from "@/lib/editor/snapping";
+import { getSnapStepForSettings } from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type {
   CameraState,
@@ -620,15 +621,18 @@ function resolveOpeningMoveOffset(
   roomId: string,
   openingId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
-  const nextOffsetMm = getOpeningOffsetForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextOffsetMm = getOpeningOffsetForWorldPoint(
+    room,
+    opening,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (nextOffsetMm === null) return null;
 
   return {
@@ -643,15 +647,18 @@ function resolveOpeningResizeWidth(
   roomId: string,
   openingId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const opening = room?.openings.find((candidate) => candidate.id === openingId);
   if (!room || !opening) return null;
 
-  const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(room, opening, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextWidthMm = getSymmetricOpeningWidthForWorldPoint(
+    room,
+    opening,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (nextWidthMm === null) return null;
 
   return {
@@ -666,15 +673,18 @@ function resolveInteriorAssetMoveCenter(
   roomId: string,
   assetId: string,
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextCenter = constrainInteriorAssetCenter(room, asset, cursorWorld, {
-    gridSizeMm,
-  });
+  const nextCenter = constrainInteriorAssetCenter(
+    room,
+    asset,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextCenter) return null;
 
   return {
@@ -690,15 +700,19 @@ function resolveInteriorAssetResizeFromWall(
   assetId: string,
   wall: "left" | "right" | "top" | "bottom",
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForWallDrag(room, asset, wall, cursorWorld, {
-    widthGridSizeMm: gridSizeMm,
-  });
+  const nextAsset = getResizedStairForWallDrag(
+    room,
+    asset,
+    wall,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextAsset) return null;
 
   return {
@@ -714,15 +728,19 @@ function resolveInteriorAssetResizeFromCorner(
   assetId: string,
   corner: "top-left" | "top-right" | "bottom-right" | "bottom-left",
   cursorWorld: Point,
-  gridSizeMm: number
+  gridSizeMm: number | null
 ) {
   const room = document.rooms.find((candidate) => candidate.id === roomId);
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = getResizedStairForCornerDrag(room, asset, corner, cursorWorld, {
-    widthGridSizeMm: gridSizeMm,
-  });
+  const nextAsset = getResizedStairForCornerDrag(
+    room,
+    asset,
+    corner,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
   if (!nextAsset) return null;
 
   return {
@@ -864,6 +882,12 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
     activeResetCameraAnimation !== null &&
     areCamerasEqual(activeResetCameraAnimation.targetCamera, targetCamera)
   );
+}
+
+function getEffectiveSnapStepMm(
+  state: Pick<EditorState, "camera" | "settings">
+): number | null {
+  return getSnapStepForSettings(state.camera, state.settings);
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -1010,19 +1034,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   placeDraftPointFromCursor: (cursorWorld) =>
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
-      const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+      const activeSnapStepMm = getEffectiveSnapStepMm(state);
 
       if (draftPoints.length === 0) {
         return {
           roomDraft: {
-            points: [snapPointToGrid(cursorWorld, activeSnapStepMm)],
+            points: [activeSnapStepMm ? snapPointToGrid(cursorWorld, activeSnapStepMm) : cursorWorld],
             history: [],
           },
         };
       }
 
       const lastPoint = draftPoints[draftPoints.length - 1];
-      const nextPoint = getOrthogonalSnappedPoint(lastPoint, cursorWorld, activeSnapStepMm);
+      const nextPoint = activeSnapStepMm
+        ? getOrthogonalSnappedPoint(lastPoint, cursorWorld, activeSnapStepMm)
+        : projectOrthogonalPoint(lastPoint, cursorWorld);
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
@@ -2160,7 +2186,7 @@ export function getOpeningMoveOffsetForCursor(
     roomId,
     openingId,
     cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    getEffectiveSnapStepMm(state)
   );
 }
 
@@ -2175,7 +2201,7 @@ export function getOpeningResizeWidthForCursor(
     roomId,
     openingId,
     cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    getEffectiveSnapStepMm(state)
   );
 }
 
@@ -2190,7 +2216,7 @@ export function getInteriorAssetMoveCenterForCursor(
     roomId,
     assetId,
     cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    getEffectiveSnapStepMm(state)
   );
 }
 
@@ -2207,7 +2233,7 @@ export function getInteriorAssetResizeFromWallForCursor(
     assetId,
     wall,
     cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    getEffectiveSnapStepMm(state)
   );
 }
 
@@ -2224,7 +2250,7 @@ export function getInteriorAssetResizeFromCornerForCursor(
     assetId,
     corner,
     cursorWorld,
-    getActiveSnapStepMm(state.camera)
+    getEffectiveSnapStepMm(state)
   );
 }
 

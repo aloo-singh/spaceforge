@@ -192,7 +192,7 @@ export function getResizedStairForWallDrag(
   asset: RoomInteriorAsset,
   wall: InteriorAssetResizeWall,
   cursorWorld: Point,
-  options?: { widthGridSizeMm?: number }
+  options?: { gridSizeMm?: number }
 ): RoomInteriorAsset | null {
   const nextBounds = resizeInteriorAssetBoundsForWallDrag(
     getInteriorAssetBoundsAsRectBounds(asset),
@@ -200,7 +200,7 @@ export function getResizedStairForWallDrag(
     cursorWorld,
     options
   );
-  return getConstrainedResizedStair(room, asset, nextBounds);
+  return getConstrainedResizedStair(room, asset, nextBounds, options);
 }
 
 export function getResizedStairForCornerDrag(
@@ -208,7 +208,7 @@ export function getResizedStairForCornerDrag(
   asset: RoomInteriorAsset,
   corner: InteriorAssetResizeCorner,
   cursorWorld: Point,
-  options?: { widthGridSizeMm?: number }
+  options?: { gridSizeMm?: number }
 ): RoomInteriorAsset | null {
   const nextBounds = resizeInteriorAssetBoundsForCornerDrag(
     getInteriorAssetBoundsAsRectBounds(asset),
@@ -216,7 +216,7 @@ export function getResizedStairForCornerDrag(
     cursorWorld,
     options
   );
-  return getConstrainedResizedStair(room, asset, nextBounds);
+  return getConstrainedResizedStair(room, asset, nextBounds, options);
 }
 
 function findDefaultStairPlacement(room: Room): Point | null {
@@ -308,14 +308,17 @@ function findConstrainedInteriorAssetCenter(
 function getConstrainedResizedStair(
   room: Room,
   asset: RoomInteriorAsset,
-  resizedBounds: RoomRectBounds
+  resizedBounds: RoomRectBounds,
+  options?: { gridSizeMm?: number }
 ): RoomInteriorAsset | null {
   const normalizedBounds = normalizeInteriorAssetResizeBounds(resizedBounds);
   const snappedBounds = {
     minX: normalizedBounds.minX,
     maxX: normalizedBounds.maxX,
     minY: normalizedBounds.minY,
-    maxY: normalizedBounds.minY + snapStairDepthMm(normalizedBounds.maxY - normalizedBounds.minY),
+    maxY:
+      normalizedBounds.minY +
+      snapStairDepthMm(normalizedBounds.maxY - normalizedBounds.minY, options?.gridSizeMm),
   };
 
   if (snappedBounds.maxY - snappedBounds.minY < MIN_STAIR_DEPTH_MM) {
@@ -333,11 +336,11 @@ function resizeInteriorAssetBoundsForWallDrag(
   bounds: RoomRectBounds,
   wall: InteriorAssetResizeWall,
   cursorWorld: Point,
-  options?: { widthGridSizeMm?: number }
+  options?: { gridSizeMm?: number }
 ): RoomRectBounds {
   const snappedX =
-    options?.widthGridSizeMm && options.widthGridSizeMm > 0
-      ? snapToGrid(cursorWorld.x, options.widthGridSizeMm)
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(cursorWorld.x, options.gridSizeMm)
       : cursorWorld.x;
   if (wall === "left") {
     return {
@@ -353,7 +356,10 @@ function resizeInteriorAssetBoundsForWallDrag(
     };
   }
 
-  const snappedY = snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+  const snappedY =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(cursorWorld.y, options.gridSizeMm)
+      : cursorWorld.y;
   if (wall === "top") {
     return {
       ...bounds,
@@ -371,13 +377,16 @@ function resizeInteriorAssetBoundsForCornerDrag(
   bounds: RoomRectBounds,
   corner: InteriorAssetResizeCorner,
   cursorWorld: Point,
-  options?: { widthGridSizeMm?: number }
+  options?: { gridSizeMm?: number }
 ): RoomRectBounds {
   const snappedX =
-    options?.widthGridSizeMm && options.widthGridSizeMm > 0
-      ? snapToGrid(cursorWorld.x, options.widthGridSizeMm)
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(cursorWorld.x, options.gridSizeMm)
       : cursorWorld.x;
-  const snappedY = snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+  const snappedY =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(cursorWorld.y, options.gridSizeMm)
+      : cursorWorld.y;
 
   if (corner === "top-left") {
     return {
@@ -423,10 +432,10 @@ function normalizeInteriorAssetResizeBounds(bounds: RoomRectBounds): RoomRectBou
   };
 }
 
-function snapStairDepthMm(depthMm: number) {
+function snapStairDepthMm(depthMm: number, gridSizeMm?: number) {
   return Math.max(
     MIN_STAIR_DEPTH_MM,
-    snapToGrid(depthMm, DEFAULT_STAIR_TREAD_SPACING_MM)
+    gridSizeMm && gridSizeMm > 0 ? snapToGrid(depthMm, gridSizeMm) : depthMm
   );
 }
 
