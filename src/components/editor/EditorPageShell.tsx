@@ -6,6 +6,7 @@ import { LoaderCircle } from "lucide-react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
+import { EditorSidebarRoomsList } from "@/components/editor/EditorSidebarRoomsList";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
@@ -153,7 +154,9 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
                 </div>
                 <div className="w-full border-t border-zinc-300 dark:border-border" aria-hidden="true" />
               </div>
-              <div className="flex-1 p-3 sm:p-4" />
+              <div className="flex-1 p-3 sm:p-4">
+                <EditorSidebarRoomsList />
+              </div>
             </div>
           }
         />
