@@ -128,12 +128,28 @@ export function EditorSidebarRoomsList() {
                   <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => selectRoomById(room.id)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left"
-              >
-                <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedRoomIds((current) =>
+                      current.includes(room.id)
+                        ? current.filter((roomId) => roomId !== room.id)
+                        : [...current, room.id]
+                    )
+                  }
+                  className="rounded-md p-0.5 text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                  aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
+                >
+                  <ChevronRight
+                    className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectRoomById(room.id)}
+                  className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left"
+                >
                   <span
                     onDoubleClick={(event) => {
                       event.stopPropagation();
@@ -148,26 +164,10 @@ export function EditorSidebarRoomsList() {
                   </span>
                   <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">-</span>
                   <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
-                </div>
-              </button>
+                </button>
+              </div>
             )}
             <div className="px-2 pb-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setExpandedRoomIds((current) =>
-                    current.includes(room.id)
-                      ? current.filter((roomId) => roomId !== room.id)
-                      : [...current, room.id]
-                  )
-                }
-                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs font-medium tracking-[0.04em] text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
-              >
-                <ChevronRight
-                  className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
-                />
-                <span>Walls</span>
-              </button>
               {isRoomExpanded ? (
                 <div className="mt-1 flex flex-col gap-1 pl-2">
                   {roomWalls.map((wall) => {
@@ -179,25 +179,15 @@ export function EditorSidebarRoomsList() {
 
                     return (
                       <div key={wallKey} className="flex flex-col gap-1">
-                        <button
-                          type="button"
-                          onClick={() => selectWallByRoomId(room.id, wall)}
+                        <div
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                            "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                             isWallSelected
                               ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                               : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                           )}
                         >
-                          <span className="truncate">{getWallLabel(wall)}</span>
                           {wallOpenings.length > 0 ? (
-                            <span className="ml-auto text-[11px] text-inherit/70">
-                              {wallOpenings.length}
-                            </span>
-                          ) : null}
-                        </button>
-                        {wallOpenings.length > 0 ? (
-                          <div className="pl-2">
                             <button
                               type="button"
                               onClick={() =>
@@ -207,13 +197,35 @@ export function EditorSidebarRoomsList() {
                                     : [...current, wallKey]
                                 )
                               }
-                              className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] font-medium tracking-[0.04em] text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                              className="rounded-md p-0.5 text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
+                              aria-label={
+                                isWallExpanded
+                                  ? `Collapse ${getWallLabel(wall)}`
+                                  : `Expand ${getWallLabel(wall)}`
+                              }
                             >
                               <ChevronRight
                                 className={cn("size-3 transition-transform", isWallExpanded && "rotate-90")}
                               />
-                              <span>Openings</span>
                             </button>
+                          ) : (
+                            <span className="size-4 shrink-0" aria-hidden="true" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => selectWallByRoomId(room.id, wall)}
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          >
+                            <span className="truncate">{getWallLabel(wall)}</span>
+                            {wallOpenings.length > 0 ? (
+                              <span className="ml-auto text-[11px] text-inherit/70">
+                                {wallOpenings.length}
+                              </span>
+                            ) : null}
+                          </button>
+                        </div>
+                        {wallOpenings.length > 0 ? (
+                          <div className="pl-2">
                             {isWallExpanded ? (
                               <div className="mt-1 flex flex-col gap-1 pl-2">
                                 {wallOpenings.map((opening) => {
