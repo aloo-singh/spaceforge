@@ -141,6 +141,17 @@ body,
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --animate-shiny-text: shiny-text 2.5s linear infinite;
+  @keyframes shiny-text {
+  0%,
+  20% {
+    background-position: calc(-100% - var(--shiny-width)) 0;
+  }
+  80%,
+  100% {
+    background-position: calc(100% + var(--shiny-width)) 0;
+  }
+  }
 }
 
 @layer base {
