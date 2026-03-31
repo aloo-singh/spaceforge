@@ -35,6 +35,7 @@ import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
+import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
@@ -1039,6 +1040,28 @@ export default function EditorCanvas({
 
     const onKeyDown = (event: KeyboardEvent) => {
       syncDimensionsOverride(event.getModifierState("Alt"));
+
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      const store = useEditorStore.getState();
+
+      if (event.key === "g" || event.key === "G") {
+        store.updateSettings({ showGuidelines: !store.settings.showGuidelines });
+        return;
+      }
+
+      if (event.key === "s" || event.key === "S") {
+        store.updateSettings({ snappingEnabled: !store.settings.snappingEnabled });
+      }
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -3500,17 +3523,19 @@ function rectsOverlap(
 
 function drawSnapGuides(
   graphics: Graphics,
+  cursorWorld: Point,
   guides: SnapGuides,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
   const screenPoint = worldToScreen(guides.point, camera, viewport);
+  const cursorPoint = worldToScreen(cursorWorld, camera, viewport);
   if (guides.showVertical) {
     drawDashedGuideLine(
       graphics,
-      { x: screenPoint.x, y: 0 },
-      { x: screenPoint.x, y: viewport.height },
+      { x: screenPoint.x, y: Math.min(screenPoint.y, cursorPoint.y) },
+      { x: screenPoint.x, y: Math.max(screenPoint.y, cursorPoint.y) },
       theme.guidelineAccent
     );
   }
@@ -3518,8 +3543,8 @@ function drawSnapGuides(
   if (guides.showHorizontal) {
     drawDashedGuideLine(
       graphics,
-      { x: 0, y: screenPoint.y },
-      { x: viewport.width, y: screenPoint.y },
+      { x: Math.min(screenPoint.x, cursorPoint.x), y: screenPoint.y },
+      { x: Math.max(screenPoint.x, cursorPoint.x), y: screenPoint.y },
       theme.guidelineAccent
     );
   }
@@ -3577,6 +3602,7 @@ function drawDraft(
     if (snapGuides) {
       drawSnapGuides(
         graphics,
+        cursorWorld,
         snapGuides,
         camera,
         viewport,
@@ -3590,7 +3616,7 @@ function drawDraft(
   if (!cursorWorld || !cursorHudWorld) return;
 
   if (snapGuides) {
-    drawSnapGuides(graphics, snapGuides, camera, viewport, theme);
+    drawSnapGuides(graphics, cursorWorld, snapGuides, camera, viewport, theme);
   }
 
   drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "idle");

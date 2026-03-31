@@ -3,6 +3,7 @@
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import {
   EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
@@ -263,9 +264,17 @@ export function EditorSettingsDialog({
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
-              <h3 id="editor-settings-guidelines-title" className="text-sm font-medium text-foreground">
-                Show guidelines
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 id="editor-settings-guidelines-title" className="text-sm font-medium text-foreground">
+                  Show guidelines
+                </h3>
+                <Keycap
+                  aria-hidden="true"
+                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
+                >
+                  G
+                </Keycap>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Show predictive muted guides from nearby room edges while moving, drawing, and resizing.
               </p>
@@ -312,9 +321,17 @@ export function EditorSettingsDialog({
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
-              <h3 id="editor-settings-snapping-title" className="text-sm font-medium text-foreground">
-                Enable snapping
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 id="editor-settings-snapping-title" className="text-sm font-medium text-foreground">
+                  Enable snapping
+                </h3>
+                <Keycap
+                  aria-hidden="true"
+                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
+                >
+                  S
+                </Keycap>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Magnetically snap active edits to the current grid and nearby predictive guides.
               </p>
