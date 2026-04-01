@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 
 const DEFAULT_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
+const SIDEBAR_CHEVRON_BUTTON_CLASS =
+  "flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5";
 
 function getWallLabel(wall: RoomWall): string {
   switch (wall) {
@@ -130,7 +132,7 @@ export function EditorSidebarRoomsList() {
             )}
           >
             {isRenaming ? (
-              <div className="flex items-center gap-2 px-3 py-2">
+              <div className="flex min-h-10 items-center gap-2 px-3 py-2">
                   <EditorSidebarRenameInput
                     ref={inputRef}
                     value={room.name}
@@ -163,10 +165,10 @@ export function EditorSidebarRoomsList() {
                     disabled={isRenameBlocked}
                   />
                   <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">-</span>
-                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
+                  <span className="shrink-0 text-xs leading-none text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-3 py-2">
+              <div className="flex min-h-10 items-center gap-2 px-3 py-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -176,11 +178,11 @@ export function EditorSidebarRoomsList() {
                         : [...current, room.id]
                     )
                   }
-                  className="flex size-4 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
                   aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                 >
                     <ChevronRight
-                      className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
+                      className={cn("size-3.5 transition-transform", isRoomExpanded && "rotate-90")}
                     />
                   </button>
                 <button
@@ -200,12 +202,12 @@ export function EditorSidebarRoomsList() {
                   >
                     {room.name}
                   </span>
-                  <span className="w-14 shrink-0 text-right text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
+                  <span className="w-14 shrink-0 text-right text-xs leading-none text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
                 </button>
               </div>
             )}
-            <div className="px-3 pb-2">
-              {isRoomExpanded ? (
+            {isRoomExpanded ? (
+              <div className="px-3 pb-2">
                 <div className="mt-1 flex flex-col gap-1">
                   {roomWalls.map((wall) => {
                     const wallKey = `${room.id}:${wall}`;
@@ -218,7 +220,7 @@ export function EditorSidebarRoomsList() {
                       <div key={wallKey} className="flex flex-col gap-1">
                         <div
                           className={cn(
-                            "ml-2 flex items-center gap-2 rounded-md py-1.5 pr-2 text-sm transition-colors",
+                            "ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm transition-colors",
                             isWallSelected
                               ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                               : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -234,7 +236,7 @@ export function EditorSidebarRoomsList() {
                                     : [...current, wallKey]
                                 )
                               }
-                              className="flex size-4 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
+                              className={SIDEBAR_CHEVRON_BUTTON_CLASS}
                               aria-label={
                                 isWallExpanded
                                   ? `Collapse ${getWallLabel(wall)}`
@@ -242,11 +244,11 @@ export function EditorSidebarRoomsList() {
                               }
                             >
                               <ChevronRight
-                                className={cn("size-3 transition-transform", isWallExpanded && "rotate-90")}
+                                className={cn("size-3.5 transition-transform", isWallExpanded && "rotate-90")}
                               />
                             </button>
                           ) : (
-                            <span className="size-4 shrink-0" aria-hidden="true" />
+                            <span className="size-6 shrink-0" aria-hidden="true" />
                           )}
                           <button
                             type="button"
@@ -276,7 +278,7 @@ export function EditorSidebarRoomsList() {
                                       type="button"
                                       onClick={() => selectOpeningById(room.id, opening.id)}
                                       className={cn(
-                                        "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                        "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                                         isOpeningSelected
                                           ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                           : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -295,7 +297,7 @@ export function EditorSidebarRoomsList() {
                   })}
                   {hasInteriorAssets ? (
                     <div className="flex flex-col gap-1">
-                      <div className="ml-2 flex items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
+                      <div className="ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
                         <button
                           type="button"
                           onClick={() =>
@@ -305,7 +307,7 @@ export function EditorSidebarRoomsList() {
                                 : [...current, room.id]
                             )
                           }
-                          className="flex size-4 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
+                          className={SIDEBAR_CHEVRON_BUTTON_CLASS}
                           aria-label={
                             isAssetSectionExpanded
                               ? `Collapse interior assets for ${room.name}`
@@ -313,7 +315,7 @@ export function EditorSidebarRoomsList() {
                           }
                         >
                           <ChevronRight
-                            className={cn("size-3 transition-transform", isAssetSectionExpanded && "rotate-90")}
+                            className={cn("size-3.5 transition-transform", isAssetSectionExpanded && "rotate-90")}
                           />
                         </button>
                         <span className="flex-1 text-left">Interior Assets</span>
@@ -378,7 +380,7 @@ export function EditorSidebarRoomsList() {
                                     type="button"
                                     onClick={() => selectInteriorAssetById(room.id, asset.id)}
                                     className={cn(
-                                      "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                      "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                                       isAssetSelected
                                         ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                         : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -406,8 +408,8 @@ export function EditorSidebarRoomsList() {
                     </div>
                   ) : null}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         );
       })}
