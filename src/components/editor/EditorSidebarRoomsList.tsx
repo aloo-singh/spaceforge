@@ -39,12 +39,14 @@ export function EditorSidebarRoomsList() {
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
+  const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const renameSession = useEditorStore((state) => state.renameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
   const selectWallByRoomId = useEditorStore((state) => state.selectWallByRoomId);
   const selectOpeningById = useEditorStore((state) => state.selectOpeningById);
+  const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
@@ -54,6 +56,7 @@ export function EditorSidebarRoomsList() {
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
+  const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
 
@@ -80,6 +83,8 @@ export function EditorSidebarRoomsList() {
         const areaLabel = formatMetricRoomAreaForRoom(room);
         const roomWalls = getRoomWalls(room);
         const isRoomExpanded = expandedRoomIds.includes(room.id);
+        const hasInteriorAssets = room.interiorAssets.length > 0;
+        const isAssetSectionExpanded = expandedAssetRoomIds.includes(room.id);
 
         return (
           <div
@@ -255,6 +260,61 @@ export function EditorSidebarRoomsList() {
                       </div>
                     );
                   })}
+                  {hasInteriorAssets ? (
+                    <div className="flex flex-col gap-1">
+                      <div className="ml-2 flex items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedAssetRoomIds((current) =>
+                              current.includes(room.id)
+                                ? current.filter((roomId) => roomId !== room.id)
+                                : [...current, room.id]
+                            )
+                          }
+                          className="flex size-4 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
+                          aria-label={
+                            isAssetSectionExpanded
+                              ? `Collapse interior assets for ${room.name}`
+                              : `Expand interior assets for ${room.name}`
+                          }
+                        >
+                          <ChevronRight
+                            className={cn("size-3 transition-transform", isAssetSectionExpanded && "rotate-90")}
+                          />
+                        </button>
+                        <span className="flex-1 text-left">Interior Assets</span>
+                        <span className="ml-auto text-[11px] text-inherit/70">
+                          {room.interiorAssets.length}
+                        </span>
+                      </div>
+                      {isAssetSectionExpanded ? (
+                        <div className="ml-8 mt-1 flex flex-col gap-1">
+                          {room.interiorAssets.map((asset) => {
+                            const isAssetSelected =
+                              selectedInteriorAsset?.roomId === room.id &&
+                              selectedInteriorAsset.assetId === asset.id;
+
+                            return (
+                              <button
+                                key={asset.id}
+                                type="button"
+                                onClick={() => selectInteriorAssetById(room.id, asset.id)}
+                                className={cn(
+                                  "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                  isAssetSelected
+                                    ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                    : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                                )}
+                              >
+                                Stairs
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
