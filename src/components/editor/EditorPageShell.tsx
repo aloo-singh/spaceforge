@@ -6,6 +6,7 @@ import { LoaderCircle } from "lucide-react";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
+import { EditorSidebarRoomsList } from "@/components/editor/EditorSidebarRoomsList";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
@@ -126,26 +127,37 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           onDisplayedHintChange={setActiveHintId}
           onThumbnailGeneratorChange={handleThumbnailGeneratorChange}
           projectRenameCompletionCount={projectRenameCompletionCount}
-          topBarLeadingContent={
-            <EditorProjectChrome
-              projectId={activeProject?.id ?? null}
-              projectName={activeProject?.name ?? null}
-              isLoading={bootstrapState.status === "loading"}
-              isNameHighlighted={activeHintId === "project-name"}
-              onProjectRenameCommitted={() => {
-                setProjectRenameCompletionCount((currentCount) => currentCount + 1);
-              }}
-              onProjectNameChange={(name) => {
-                setActiveProject((currentProject) =>
-                  currentProject
-                    ? {
-                        ...currentProject,
-                        name,
-                      }
-                    : currentProject
-                );
-              }}
-            />
+          leftSidebarContent={
+            <div className="flex h-full min-h-0 w-full flex-col">
+              <div>
+                <div className="px-3 py-3 sm:px-4">
+                  <EditorProjectChrome
+                    projectId={activeProject?.id ?? null}
+                    projectName={activeProject?.name ?? null}
+                    isLoading={bootstrapState.status === "loading"}
+                    variant="sidebar"
+                    isNameHighlighted={activeHintId === "project-name"}
+                    onProjectRenameCommitted={() => {
+                      setProjectRenameCompletionCount((currentCount) => currentCount + 1);
+                    }}
+                    onProjectNameChange={(name) => {
+                      setActiveProject((currentProject) =>
+                        currentProject
+                          ? {
+                              ...currentProject,
+                              name,
+                            }
+                          : currentProject
+                      );
+                    }}
+                  />
+                </div>
+                <div className="w-full border-t border-zinc-300 dark:border-border" aria-hidden="true" />
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
+                <EditorSidebarRoomsList />
+              </div>
+            </div>
           }
         />
       ) : null}
