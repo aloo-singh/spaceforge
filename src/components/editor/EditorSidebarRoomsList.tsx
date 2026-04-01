@@ -138,17 +138,17 @@ export function EditorSidebarRoomsList() {
                         : [...current, room.id]
                     )
                   }
-                  className="rounded-md p-0.5 text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                  className="flex size-4 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
                   aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                 >
-                  <ChevronRight
-                    className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
-                  />
-                </button>
+                    <ChevronRight
+                      className={cn("size-3 transition-transform", isRoomExpanded && "rotate-90")}
+                    />
+                  </button>
                 <button
                   type="button"
                   onClick={() => selectRoomById(room.id)}
-                  className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span
                     onDoubleClick={(event) => {
@@ -158,18 +158,17 @@ export function EditorSidebarRoomsList() {
                       selectRoomById(room.id);
                       startRoomRenameSession(room.id);
                     }}
-                    className="truncate text-sm font-medium text-inherit"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-inherit"
                   >
                     {room.name}
                   </span>
-                  <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">-</span>
-                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
+                  <span className="w-14 shrink-0 text-right text-xs text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
                 </button>
               </div>
             )}
-            <div className="px-2 pb-2">
+            <div className="px-3 pb-2">
               {isRoomExpanded ? (
-                <div className="mt-1 flex flex-col gap-1 pl-2">
+                <div className="mt-1 flex flex-col gap-1">
                   {roomWalls.map((wall) => {
                     const wallKey = `${room.id}:${wall}`;
                     const isWallExpanded = expandedWallKeys.includes(wallKey);
@@ -181,7 +180,7 @@ export function EditorSidebarRoomsList() {
                       <div key={wallKey} className="flex flex-col gap-1">
                         <div
                           className={cn(
-                            "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                            "ml-2 flex items-center gap-2 rounded-md py-1.5 pr-2 text-sm transition-colors",
                             isWallSelected
                               ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                               : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -197,7 +196,7 @@ export function EditorSidebarRoomsList() {
                                     : [...current, wallKey]
                                 )
                               }
-                              className="rounded-md p-0.5 text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
+                              className="flex size-4 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5"
                               aria-label={
                                 isWallExpanded
                                   ? `Collapse ${getWallLabel(wall)}`
@@ -225,9 +224,9 @@ export function EditorSidebarRoomsList() {
                           </button>
                         </div>
                         {wallOpenings.length > 0 ? (
-                          <div className="pl-2">
+                          <div className="ml-8">
                             {isWallExpanded ? (
-                              <div className="mt-1 flex flex-col gap-1 pl-2">
+                              <div className="mt-1 flex flex-col gap-1">
                                 {wallOpenings.map((opening) => {
                                   const isOpeningSelected =
                                     selectedOpening?.roomId === room.id &&
