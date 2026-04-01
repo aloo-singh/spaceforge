@@ -10,19 +10,22 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.52.1</h2>
-            <span className="text-sm text-muted-foreground">2026-03-31</span>
+            <h2 className="text-2xl font-semibold">v0.53.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-01</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Added (Sidebar Hierarchy)
+              </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>
-                  Project open loading screen now features a subtle left-to-right animated shine on
-                  &ldquo;Loading project...&rdquo;
-                </li>
-                <li>Keeps the experience light and calm while adding a small moment of delight</li>
+                <li>Left sidebar with project header (back button + editable project name)</li>
+                <li>Hierarchical rooms list with click-to-select and inline rename</li>
+                <li>Nested walls → openings → interior assets (stairs) with collapsible chevrons</li>
+                <li>Full row clickability (except chevron) for better UX</li>
+                <li>Consistent dark/light mode styling with rounded corners</li>
+                <li>Selection syncs between sidebar, canvas, and right inspector</li>
               </ul>
             </div>
           </div>

@@ -168,16 +168,20 @@ export function EditorSidebarRoomsList() {
                   <span className="shrink-0 text-xs leading-none text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
               </div>
             ) : (
-              <div className="flex min-h-10 items-center gap-2 px-3 py-2">
+              <div
+                className="flex min-h-10 items-center gap-2 px-3 py-2"
+                onClick={() => selectRoomById(room.id)}
+              >
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setExpandedRoomIds((current) =>
                       current.includes(room.id)
                         ? current.filter((roomId) => roomId !== room.id)
                         : [...current, room.id]
-                    )
-                  }
+                    );
+                  }}
                   className="flex size-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
                   aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                 >
@@ -185,11 +189,7 @@ export function EditorSidebarRoomsList() {
                       className={cn("size-3.5 transition-transform", isRoomExpanded && "rotate-90")}
                     />
                   </button>
-                <button
-                  type="button"
-                  onClick={() => selectRoomById(room.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                >
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   <span
                     onDoubleClick={(event) => {
                       event.stopPropagation();
@@ -203,7 +203,7 @@ export function EditorSidebarRoomsList() {
                     {room.name}
                   </span>
                   <span className="w-14 shrink-0 text-right text-xs leading-none text-zinc-500 dark:text-zinc-400">{areaLabel}</span>
-                </button>
+                </div>
               </div>
             )}
             {isRoomExpanded ? (
@@ -225,17 +225,19 @@ export function EditorSidebarRoomsList() {
                               ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                               : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                           )}
+                          onClick={() => selectWallByRoomId(room.id, wall)}
                         >
                           {wallOpenings.length > 0 ? (
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 setExpandedWallKeys((current) =>
                                   current.includes(wallKey)
                                     ? current.filter((key) => key !== wallKey)
                                     : [...current, wallKey]
-                                )
-                              }
+                                );
+                              }}
                               className={SIDEBAR_CHEVRON_BUTTON_CLASS}
                               aria-label={
                                 isWallExpanded
@@ -250,18 +252,14 @@ export function EditorSidebarRoomsList() {
                           ) : (
                             <span className="size-6 shrink-0" aria-hidden="true" />
                           )}
-                          <button
-                            type="button"
-                            onClick={() => selectWallByRoomId(room.id, wall)}
-                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          >
+                          <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
                             <span className="truncate">{getWallLabel(wall)}</span>
                             {wallOpenings.length > 0 ? (
                               <span className="ml-auto text-[11px] text-inherit/70">
                                 {wallOpenings.length}
                               </span>
                             ) : null}
-                          </button>
+                          </div>
                         </div>
                         {wallOpenings.length > 0 ? (
                           <div className="ml-8">
