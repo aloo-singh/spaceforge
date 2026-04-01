@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
-import type { Room, RoomOpening, RoomWall } from "@/lib/editor/types";
+import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -34,6 +34,10 @@ function getRoomWalls(room: Room): RoomWall[] {
   return room.points.map((_, index) => index);
 }
 
+function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
+  return asset.name || "Stairs";
+}
+
 export function EditorSidebarRoomsList() {
   const rooms = useEditorStore((state) => state.document.rooms);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
@@ -41,19 +45,35 @@ export function EditorSidebarRoomsList() {
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const renameSession = useEditorStore((state) => state.renameSession);
+  const interiorAssetRenameSession = useEditorStore((state) => state.interiorAssetRenameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
   const selectWallByRoomId = useEditorStore((state) => state.selectWallByRoomId);
   const selectOpeningById = useEditorStore((state) => state.selectOpeningById);
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const startInteriorAssetRenameSession = useEditorStore(
+    (state) => state.startInteriorAssetRenameSession
+  );
+  const updateInteriorAssetRenameDraft = useEditorStore(
+    (state) => state.updateInteriorAssetRenameDraft
+  );
+  const commitInteriorAssetRenameSession = useEditorStore(
+    (state) => state.commitInteriorAssetRenameSession
+  );
+  const cancelInteriorAssetRenameSession = useEditorStore(
+    (state) => state.cancelInteriorAssetRenameSession
+  );
   const startRoomRenameSession = useEditorStore((state) => state.startRoomRenameSession);
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const interiorAssetInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoFocusRenameInputRef = useRef(false);
+  const shouldAutoFocusInteriorAssetRenameInputRef = useRef(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
+  const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -66,6 +86,19 @@ export function EditorSidebarRoomsList() {
     inputRef.current?.select();
     shouldAutoFocusRenameInputRef.current = false;
   }, [activeRenameRoomId, isRenameBlocked]);
+
+  useEffect(() => {
+    if (
+      !interiorAssetRenameSession ||
+      isRenameBlocked ||
+      !shouldAutoFocusInteriorAssetRenameInputRef.current
+    ) {
+      return;
+    }
+    interiorAssetInputRef.current?.focus();
+    interiorAssetInputRef.current?.select();
+    shouldAutoFocusInteriorAssetRenameInputRef.current = false;
+  }, [interiorAssetRenameSession, isRenameBlocked]);
 
   if (rooms.length === 0) {
     return (
@@ -294,21 +327,73 @@ export function EditorSidebarRoomsList() {
                             const isAssetSelected =
                               selectedInteriorAsset?.roomId === room.id &&
                               selectedInteriorAsset.assetId === asset.id;
+                            const isAssetRenaming =
+                              interiorAssetRenameSession?.roomId === room.id &&
+                              interiorAssetRenameSession.assetId === asset.id &&
+                              sidebarRenameInteriorAssetId === asset.id;
 
                             return (
-                              <button
-                                key={asset.id}
-                                type="button"
-                                onClick={() => selectInteriorAssetById(room.id, asset.id)}
-                                className={cn(
-                                  "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-                                  isAssetSelected
-                                    ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
-                                    : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                              <div key={asset.id}>
+                                {isAssetRenaming ? (
+                                  <Input
+                                    ref={interiorAssetInputRef}
+                                    value={asset.name}
+                                    onChange={(event) =>
+                                      updateInteriorAssetRenameDraft(room.id, asset.id, event.target.value)
+                                    }
+                                    onBlur={() => {
+                                      commitInteriorAssetRenameSession();
+                                      setSidebarRenameInteriorAssetId(null);
+                                      selectInteriorAssetById(room.id, asset.id);
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.nativeEvent.isComposing) return;
+
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        commitInteriorAssetRenameSession();
+                                        setSidebarRenameInteriorAssetId(null);
+                                        selectInteriorAssetById(room.id, asset.id);
+                                        return;
+                                      }
+
+                                      if (event.key === "Escape") {
+                                        event.preventDefault();
+                                        cancelInteriorAssetRenameSession();
+                                        setSidebarRenameInteriorAssetId(null);
+                                        selectInteriorAssetById(room.id, asset.id);
+                                      }
+                                    }}
+                                    aria-label={`Rename ${asset.name}`}
+                                    className="h-5 min-w-0 border-zinc-300/80 bg-white/90 py-0 leading-none dark:border-input dark:bg-background"
+                                    disabled={isRenameBlocked}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => selectInteriorAssetById(room.id, asset.id)}
+                                    className={cn(
+                                      "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                      isAssetSelected
+                                        ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                        : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                                    )}
+                                  >
+                                    <span
+                                      onDoubleClick={(event) => {
+                                        event.stopPropagation();
+                                        setSidebarRenameInteriorAssetId(asset.id);
+                                        shouldAutoFocusInteriorAssetRenameInputRef.current = true;
+                                        selectInteriorAssetById(room.id, asset.id);
+                                        startInteriorAssetRenameSession(room.id, asset.id);
+                                      }}
+                                      className="block truncate"
+                                    >
+                                      {getInteriorAssetLabel(asset)}
+                                    </span>
+                                  </button>
                                 )}
-                              >
-                                Stairs
-                              </button>
+                              </div>
                             );
                           })}
                         </div>

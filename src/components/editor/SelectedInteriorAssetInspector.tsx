@@ -15,13 +15,22 @@ export function SelectedInteriorAssetInspector({
   asset,
   className,
 }: SelectedInteriorAssetInspectorProps) {
-  const updateSelectedInteriorAssetName = useEditorStore(
-    (state) => state.updateSelectedInteriorAssetName
+  const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const startInteriorAssetRenameSession = useEditorStore(
+    (state) => state.startInteriorAssetRenameSession
   );
-
-  const commitNameDraft = (nameValue: string) => {
-    updateSelectedInteriorAssetName(nameValue);
-  };
+  const updateInteriorAssetRenameDraft = useEditorStore(
+    (state) => state.updateInteriorAssetRenameDraft
+  );
+  const commitInteriorAssetRenameSession = useEditorStore(
+    (state) => state.commitInteriorAssetRenameSession
+  );
+  const cancelInteriorAssetRenameSession = useEditorStore(
+    (state) => state.cancelInteriorAssetRenameSession
+  );
+  const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
+  const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
 
   return (
     <EditorInspectorSection
@@ -36,21 +45,36 @@ export function SelectedInteriorAssetInspector({
           </label>
           <Input
             id="stair-name-input"
-            key={`${asset.id}-${asset.name}`}
-            defaultValue={asset.name}
-            onBlur={(event) => commitNameDraft(event.target.value)}
+            value={asset.name}
+            onFocus={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              startInteriorAssetRenameSession(selectedAssetRoomId, selectedAssetId);
+            }}
+            onChange={(event) => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              updateInteriorAssetRenameDraft(selectedAssetRoomId, selectedAssetId, event.target.value);
+            }}
+            onBlur={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              commitInteriorAssetRenameSession();
+              selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+            }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
 
               if (event.key === "Enter") {
                 event.preventDefault();
-                commitNameDraft(event.currentTarget.value);
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                commitInteriorAssetRenameSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
                 return;
               }
 
               if (event.key === "Escape") {
                 event.preventDefault();
-                event.currentTarget.value = asset.name;
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                cancelInteriorAssetRenameSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
               }
             }}
             aria-describedby="stair-name-hint"

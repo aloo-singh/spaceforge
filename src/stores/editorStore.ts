@@ -114,6 +114,12 @@ type RenameSessionState = {
   initialName: string;
 } | null;
 
+type InteriorAssetRenameSessionState = {
+  roomId: string;
+  assetId: string;
+  initialName: string;
+} | null;
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
@@ -130,6 +136,7 @@ type EditorState = {
   isCanvasInteractionActive: boolean;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
+  interiorAssetRenameSession: InteriorAssetRenameSessionState;
   history: {
     past: EditorCommand[];
     future: EditorCommand[];
@@ -161,6 +168,10 @@ type EditorState = {
   updateRoomRenameDraft: (roomId: string, name: string) => void;
   commitRoomRenameSession: (options?: { deselectIfUnchanged?: boolean }) => void;
   cancelRoomRenameSession: () => void;
+  startInteriorAssetRenameSession: (roomId: string, assetId: string) => void;
+  updateInteriorAssetRenameDraft: (roomId: string, assetId: string, name: string) => void;
+  commitInteriorAssetRenameSession: () => void;
+  cancelInteriorAssetRenameSession: () => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
@@ -271,6 +282,32 @@ function updateRoomNameInDocument(document: DocumentState, roomId: string, name:
         ? {
             ...room,
             name,
+          }
+        : room
+    ),
+  };
+}
+
+function updateInteriorAssetNameInDocument(
+  document: DocumentState,
+  roomId: string,
+  assetId: string,
+  name: string
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            interiorAssets: room.interiorAssets.map((asset) =>
+              asset.id === assetId
+                ? {
+                    ...cloneRoomInteriorAsset(asset),
+                    name,
+                  }
+                : asset
+            ),
           }
         : room
     ),
@@ -913,6 +950,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
+  interiorAssetRenameSession: null,
   history: {
     past: hydratedHistoryState.past,
     future: hydratedHistoryState.future,
@@ -1134,6 +1172,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
       };
     }),
   selectWallByRoomId: (roomId, wall) =>
@@ -1148,6 +1187,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedInteriorAsset: null,
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
+          interiorAssetRenameSession: null,
         };
       }
 
@@ -1166,6 +1206,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
       };
     }),
   selectOpeningById: (roomId, openingId) =>
@@ -1188,6 +1229,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
       };
     }),
   selectInteriorAssetById: (roomId, assetId) =>
@@ -1210,6 +1252,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: { roomId, assetId },
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
       };
     }),
   clearSelectedOpening: () =>
@@ -1241,6 +1284,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedInteriorAsset: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
+      interiorAssetRenameSession: null,
     }),
   setCanvasInteractionActive: (isActive) =>
     set((state) => {
@@ -1377,7 +1421,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? updateRoomNameInDocument(state.document, renameSession.roomId, renameSession.initialName)
           : state.document;
 
-    return {
+      return {
       document: nextDocument,
         selectedRoomId: null,
         selectedWall: null,
@@ -1385,6 +1429,120 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+      };
+    }),
+  startInteriorAssetRenameSession: (roomId, assetId) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (
+        state.interiorAssetRenameSession?.roomId === roomId &&
+        state.interiorAssetRenameSession.assetId === assetId
+      ) {
+        return state;
+      }
+
+      return {
+        interiorAssetRenameSession: {
+          roomId,
+          assetId,
+          initialName: asset.name,
+        },
+      };
+    }),
+  updateInteriorAssetRenameDraft: (roomId, assetId, name) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+
+      const trimmedName = name.trim();
+      const nextName = trimmedName.length > 0 ? trimmedName : DEFAULT_STAIR_NAME;
+      const interiorAssetRenameSession =
+        state.interiorAssetRenameSession?.roomId === roomId &&
+        state.interiorAssetRenameSession.assetId === assetId
+          ? state.interiorAssetRenameSession
+          : {
+              roomId,
+              assetId,
+              initialName: asset.name,
+            };
+
+      if (
+        asset.name === nextName &&
+        state.interiorAssetRenameSession?.roomId === roomId &&
+        state.interiorAssetRenameSession.assetId === assetId
+      ) {
+        return state;
+      }
+
+      return {
+        document: updateInteriorAssetNameInDocument(state.document, roomId, assetId, nextName),
+        interiorAssetRenameSession,
+      };
+    }),
+  commitInteriorAssetRenameSession: () =>
+    set((state) => {
+      const renameSession = state.interiorAssetRenameSession;
+      if (!renameSession) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === renameSession.assetId);
+      if (!room || !asset) {
+        return {
+          interiorAssetRenameSession: null,
+        };
+      }
+
+      if (asset.name === renameSession.initialName) {
+        return {
+          interiorAssetRenameSession: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId: room.id,
+        previousAsset: {
+          ...cloneRoomInteriorAsset(asset),
+          name: renameSession.initialName,
+        },
+        nextAsset: cloneRoomInteriorAsset(asset),
+      };
+
+      return {
+        interiorAssetRenameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  cancelInteriorAssetRenameSession: () =>
+    set((state) => {
+      const renameSession = state.interiorAssetRenameSession;
+      if (!renameSession) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === renameSession.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === renameSession.assetId);
+      const nextDocument =
+        room && asset && asset.name !== renameSession.initialName
+          ? updateInteriorAssetNameInDocument(
+              state.document,
+              renameSession.roomId,
+              renameSession.assetId,
+              renameSession.initialName
+            )
+          : state.document;
+
+      return {
+        document: nextDocument,
+        interiorAssetRenameSession: null,
       };
     }),
   deleteSelectedRoom: () =>
