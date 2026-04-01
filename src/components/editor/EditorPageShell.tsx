@@ -154,7 +154,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
                 </div>
                 <div className="w-full border-t border-zinc-300 dark:border-border" aria-hidden="true" />
               </div>
-              <div className="flex-1 p-3 sm:p-4">
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
                 <EditorSidebarRoomsList />
               </div>
             </div>

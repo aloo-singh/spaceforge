@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
@@ -109,7 +109,7 @@ export function EditorSidebarRoomsList() {
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
+    <div className="flex flex-col gap-1">
       {rooms.map((room) => {
         const isSelected = selectedRoomId === room.id;
         const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
@@ -131,7 +131,7 @@ export function EditorSidebarRoomsList() {
           >
             {isRenaming ? (
               <div className="flex items-center gap-2 px-3 py-2">
-                  <Input
+                  <EditorSidebarRenameInput
                     ref={inputRef}
                     value={room.name}
                     onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
@@ -159,7 +159,7 @@ export function EditorSidebarRoomsList() {
                       }
                     }}
                     aria-label={`Rename ${room.name}`}
-                    className="h-5 min-w-0 flex-1 border-zinc-300/80 bg-white/90 py-0 leading-none dark:border-input dark:bg-background"
+                    className="flex-1"
                     disabled={isRenameBlocked}
                   />
                   <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">-</span>
@@ -335,39 +335,44 @@ export function EditorSidebarRoomsList() {
                             return (
                               <div key={asset.id}>
                                 {isAssetRenaming ? (
-                                  <Input
-                                    ref={interiorAssetInputRef}
-                                    value={asset.name}
-                                    onChange={(event) =>
-                                      updateInteriorAssetRenameDraft(room.id, asset.id, event.target.value)
-                                    }
-                                    onBlur={() => {
-                                      commitInteriorAssetRenameSession();
-                                      setSidebarRenameInteriorAssetId(null);
-                                      selectInteriorAssetById(room.id, asset.id);
-                                    }}
-                                    onKeyDown={(event) => {
-                                      if (event.nativeEvent.isComposing) return;
-
-                                      if (event.key === "Enter") {
-                                        event.preventDefault();
+                                  <div className="rounded-md px-2 py-1.5">
+                                    <EditorSidebarRenameInput
+                                      ref={interiorAssetInputRef}
+                                      value={asset.name}
+                                      onChange={(event) =>
+                                        updateInteriorAssetRenameDraft(
+                                          room.id,
+                                          asset.id,
+                                          event.target.value
+                                        )
+                                      }
+                                      onBlur={() => {
                                         commitInteriorAssetRenameSession();
                                         setSidebarRenameInteriorAssetId(null);
                                         selectInteriorAssetById(room.id, asset.id);
-                                        return;
-                                      }
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.nativeEvent.isComposing) return;
 
-                                      if (event.key === "Escape") {
-                                        event.preventDefault();
-                                        cancelInteriorAssetRenameSession();
-                                        setSidebarRenameInteriorAssetId(null);
-                                        selectInteriorAssetById(room.id, asset.id);
-                                      }
-                                    }}
-                                    aria-label={`Rename ${asset.name}`}
-                                    className="h-5 min-w-0 border-zinc-300/80 bg-white/90 py-0 leading-none dark:border-input dark:bg-background"
-                                    disabled={isRenameBlocked}
-                                  />
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          commitInteriorAssetRenameSession();
+                                          setSidebarRenameInteriorAssetId(null);
+                                          selectInteriorAssetById(room.id, asset.id);
+                                          return;
+                                        }
+
+                                        if (event.key === "Escape") {
+                                          event.preventDefault();
+                                          cancelInteriorAssetRenameSession();
+                                          setSidebarRenameInteriorAssetId(null);
+                                          selectInteriorAssetById(room.id, asset.id);
+                                        }
+                                      }}
+                                      aria-label={`Rename ${asset.name}`}
+                                      disabled={isRenameBlocked}
+                                    />
+                                  </div>
                                 ) : (
                                   <button
                                     type="button"
