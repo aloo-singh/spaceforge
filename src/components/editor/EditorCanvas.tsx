@@ -1069,6 +1069,11 @@ export default function EditorCanvas({
         return;
       }
 
+      if (event.key === "h" || event.key === "H") {
+        store.updateSettings({ showCanvasHud: !store.settings.showCanvasHud });
+        return;
+      }
+
       if (event.key === "s" || event.key === "S") {
         store.updateSettings({ snappingEnabled: !store.settings.snappingEnabled });
       }

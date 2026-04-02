@@ -265,9 +265,17 @@ export function EditorSettingsDialog({
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
-              <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
-                Show canvas HUD
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
+                  Show canvas HUD
+                </h3>
+                <Keycap
+                  aria-hidden="true"
+                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
+                >
+                  H
+                </Keycap>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Keep the scale and north instruments visible on the canvas as a calm orientation aid.
               </p>
