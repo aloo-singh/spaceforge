@@ -29,6 +29,7 @@ export function EditorSettingsDialog({
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
   const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
+  const isCanvasHudVisible = settings.showCanvasHud;
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
@@ -256,6 +257,63 @@ export function EditorSettingsDialog({
             Applies to room area beneath the label pill and live draw or resize dimensions on both
             desktop and mobile settings surfaces.
           </p>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-canvas-hud-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
+                  Show canvas HUD
+                </h3>
+                <Keycap
+                  aria-hidden="true"
+                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
+                >
+                  H
+                </Keycap>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Keep the scale and north instruments visible on the canvas as a calm orientation aid.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Canvas HUD status</dt>
+                <dd>{isCanvasHudVisible ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Show canvas HUD"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={isCanvasHudVisible ? "secondary" : "ghost"}
+              aria-pressed={isCanvasHudVisible}
+              onClick={() => updateSettings({ showCanvasHud: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!isCanvasHudVisible ? "secondary" : "ghost"}
+              aria-pressed={!isCanvasHudVisible}
+              onClick={() => updateSettings({ showCanvasHud: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
         </div>
 
         <div

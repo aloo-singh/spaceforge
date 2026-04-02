@@ -9,6 +9,7 @@ export type EditorSettings = {
   dimensionsVisibility: EditorDimensionsVisibility;
   measurementFontSize: EditorMeasurementFontSize;
   wallMeasurementPosition: EditorWallMeasurementPosition;
+  showCanvasHud: boolean;
   showGuidelines: boolean;
   snappingEnabled: boolean;
   exportSignatureText: string;
@@ -19,6 +20,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   dimensionsVisibility: "visible",
   measurementFontSize: "normal",
   wallMeasurementPosition: "inside",
+  showCanvasHud: true,
   showGuidelines: true,
   snappingEnabled: true,
   exportSignatureText: "",
@@ -30,6 +32,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     dimensionsVisibility: settings.dimensionsVisibility,
     measurementFontSize: settings.measurementFontSize,
     wallMeasurementPosition: settings.wallMeasurementPosition,
+    showCanvasHud: settings.showCanvasHud,
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     exportSignatureText: settings.exportSignatureText,
@@ -42,6 +45,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.dimensionsVisibility === b.dimensionsVisibility &&
     a.measurementFontSize === b.measurementFontSize &&
     a.wallMeasurementPosition === b.wallMeasurementPosition &&
+    a.showCanvasHud === b.showCanvasHud &&
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.exportSignatureText === b.exportSignatureText
@@ -108,6 +112,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       isEditorWallMeasurementPosition(value.wallMeasurementPosition)
         ? value.wallMeasurementPosition
         : DEFAULT_EDITOR_SETTINGS.wallMeasurementPosition,
+    showCanvasHud:
+      "showCanvasHud" in value && typeof value.showCanvasHud === "boolean"
+        ? value.showCanvasHud
+        : DEFAULT_EDITOR_SETTINGS.showCanvasHud,
     showGuidelines:
       "showGuidelines" in value && typeof value.showGuidelines === "boolean"
         ? value.showGuidelines
