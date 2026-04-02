@@ -10,31 +10,26 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.53.1</h2>
+            <h2 className="text-2xl font-semibold">v0.53.2</h2>
             <span className="text-sm text-muted-foreground">2026-04-02</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>
-                  Canvas HUD foundation
+                  North indicator (feature/north-indicator)
                   <ul className="mt-2 list-disc space-y-2 pl-5">
-                    <li>
-                      Toggle in Editor Settings (&ldquo;Show canvas HUD&rdquo;, default On) with
-                      {' '}<code>H</code>{' '}keyboard shortcut + Keycap
-                    </li>
-                    <li>Persistent session-level setting</li>
-                    <li>
-                      Basic HUD cluster on canvas containing scale indicator + static north
-                      indicator (contrasting &lsquo;N&rsquo; + red triangular arrow)
-                    </li>
-                    <li>Clean dark/light mode support</li>
-                    <li>
-                      Minimal, calm, instrument-like appearance respecting the left sidebar and
-                      rounded aesthetic
-                    </li>
+                    <li>Draggable on canvas with live degree tooltip</li>
+                    <li>SHIFT snap to 5&deg;/10&deg; increments</li>
+                    <li>Single-click selects in inspector for manual entry</li>
+                    <li>Shortest-path rotation (no more jump across 0&deg;/360&deg;)</li>
+                    <li>Subtle grey ticks around N (longer at 90&deg; increments)</li>
+                    <li>Blue canvas cursor hidden during drag</li>
+                    <li>Background + ticks fade in on hover/interaction, fade out after short delay</li>
+                    <li>Background height matches scale HUD exactly</li>
+                    <li>Persisted with project, dark/light mode consistent</li>
                   </ul>
                 </li>
               </ul>

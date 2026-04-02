@@ -3,6 +3,7 @@ import {
   cloneRoomInteriorAssets,
 } from "@/lib/editor/interiorAssets";
 import { cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
+import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
@@ -13,9 +14,15 @@ import {
 export type EditorDocumentState = {
   rooms: Room[];
   exportConfig: ProjectExportConfig;
+  northBearingDegrees: number;
 };
 
 export type EditorCommand =
+  | {
+      type: "update-north-bearing";
+      previousBearingDegrees: number;
+      nextBearingDegrees: number;
+    }
   | {
       type: "complete-room";
       room: Room;
@@ -97,6 +104,15 @@ export function applyEditorCommand(
   command: EditorCommand,
   direction: "undo" | "redo"
 ): EditorDocumentState {
+  if (command.type === "update-north-bearing") {
+    return {
+      ...document,
+      northBearingDegrees: normalizeNorthBearingDegrees(
+        direction === "undo" ? command.previousBearingDegrees : command.nextBearingDegrees
+      ),
+    };
+  }
+
   if (command.type === "complete-room") {
     if (direction === "undo") {
       return {
@@ -356,6 +372,7 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
     rooms: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
+    northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,
   };
 }
 
