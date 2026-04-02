@@ -10,22 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.53.0</h2>
-            <span className="text-sm text-muted-foreground">2026-04-01</span>
+            <h2 className="text-2xl font-semibold">v0.53.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-02</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
-                Added (Sidebar Hierarchy)
-              </h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Left sidebar with project header (back button + editable project name)</li>
-                <li>Hierarchical rooms list with click-to-select and inline rename</li>
-                <li>Nested walls → openings → interior assets (stairs) with collapsible chevrons</li>
-                <li>Full row clickability (except chevron) for better UX</li>
-                <li>Consistent dark/light mode styling with rounded corners</li>
-                <li>Selection syncs between sidebar, canvas, and right inspector</li>
+                <li>
+                  Canvas HUD foundation
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>
+                      Toggle in Editor Settings (&ldquo;Show canvas HUD&rdquo;, default On) with
+                      {' '}<code>H</code>{' '}keyboard shortcut + Keycap
+                    </li>
+                    <li>Persistent session-level setting</li>
+                    <li>
+                      Basic HUD cluster on canvas containing scale indicator + static north
+                      indicator (contrasting &lsquo;N&rsquo; + red triangular arrow)
+                    </li>
+                    <li>Clean dark/light mode support</li>
+                    <li>
+                      Minimal, calm, instrument-like appearance respecting the left sidebar and
+                      rounded aesthetic
+                    </li>
+                  </ul>
+                </li>
               </ul>
             </div>
           </div>
