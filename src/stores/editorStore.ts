@@ -47,6 +47,7 @@ import {
   DEFAULT_EDITOR_SETTINGS,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import {
   buildPersistedHistorySnapshot,
   type PersistedHistorySnapshot,
@@ -129,6 +130,7 @@ type EditorState = {
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
   roomDraft: RoomDraftState;
+  selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
@@ -148,6 +150,11 @@ type EditorState = {
   updateSettings: (settings: Partial<EditorSettings>) => void;
   updateExportPreferences: (preferences: Partial<EditorExportPreferences>) => void;
   updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
+  selectNorthIndicator: () => void;
+  clearNorthIndicatorSelection: () => void;
+  previewNorthBearingDegrees: (degrees: number) => void;
+  commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
+  updateNorthBearingDegrees: (degrees: number) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
@@ -232,6 +239,7 @@ const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = {
   rooms: [],
   exportConfig: normalizeProjectExportConfig(null),
+  northBearingDegrees: 0,
 };
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
@@ -837,6 +845,7 @@ function getSafePersistedHistorySnapshot(
             titlePosition: document.exportConfig.titlePosition,
             descriptionPosition: document.exportConfig.descriptionPosition,
           },
+          northBearingDegrees: document.northBearingDegrees,
           rooms: document.rooms.map((room) => ({
             id: room.id,
             name: room.name,
@@ -943,6 +952,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     height: 1,
   },
   roomDraft: EMPTY_ROOM_DRAFT,
+  selectedNorthIndicator: false,
   selectedRoomId: null,
   selectedWall: null,
   selectedOpening: null,
@@ -1036,6 +1046,90 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ...state.document,
           exportConfig: nextExportConfig,
         },
+      };
+    }),
+  selectNorthIndicator: () =>
+    set((state) => {
+      if (
+        state.selectedNorthIndicator &&
+        state.selectedRoomId === null &&
+        state.selectedWall === null &&
+        state.selectedOpening === null &&
+        state.selectedInteriorAsset === null
+      ) {
+        return state;
+      }
+
+      return {
+        selectedNorthIndicator: true,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+      };
+    }),
+  clearNorthIndicatorSelection: () =>
+    set((state) => {
+      if (!state.selectedNorthIndicator) return state;
+      return {
+        selectedNorthIndicator: false,
+      };
+    }),
+  previewNorthBearingDegrees: (degrees) =>
+    set((state) => {
+      const nextNorthBearingDegrees = normalizeNorthBearingDegrees(degrees);
+      if (state.document.northBearingDegrees === nextNorthBearingDegrees) return state;
+
+      return {
+        document: {
+          ...state.document,
+          northBearingDegrees: nextNorthBearingDegrees,
+        },
+      };
+    }),
+  commitNorthBearingDegrees: (previousDegrees, nextDegrees) =>
+    set((state) => {
+      const previousBearingDegrees = normalizeNorthBearingDegrees(previousDegrees);
+      const nextBearingDegrees = normalizeNorthBearingDegrees(nextDegrees);
+      if (previousBearingDegrees === nextBearingDegrees) return state;
+
+      return {
+        history: {
+          past: pushToPast(state.history.past, {
+            type: "update-north-bearing",
+            previousBearingDegrees,
+            nextBearingDegrees,
+          }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  updateNorthBearingDegrees: (degrees) =>
+    set((state) => {
+      const previousBearingDegrees = normalizeNorthBearingDegrees(state.document.northBearingDegrees);
+      const nextBearingDegrees = normalizeNorthBearingDegrees(degrees);
+      if (previousBearingDegrees === nextBearingDegrees) return state;
+
+      return {
+        document: {
+          ...state.document,
+          northBearingDegrees: nextBearingDegrees,
+        },
+        history: {
+          past: pushToPast(state.history.past, {
+            type: "update-north-bearing",
+            previousBearingDegrees,
+            nextBearingDegrees,
+          }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
       };
     }),
   panCameraByPx: (delta) => {
@@ -1166,6 +1260,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return {
+        selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
         selectedOpening: null,
@@ -1181,6 +1276,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room) return state;
       if (!getRoomWallSegment(room, wall)) {
         return {
+          selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
           selectedOpening: null,
@@ -1200,6 +1296,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return {
+        selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
         selectedOpening: null,
@@ -1223,6 +1320,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return {
+        selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
         selectedOpening: { roomId, openingId },
@@ -1246,6 +1344,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return {
+        selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
         selectedOpening: null,
@@ -1278,6 +1377,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearRoomSelection: () =>
     set({
+      selectedNorthIndicator: false,
       selectedRoomId: null,
       selectedWall: null,
       selectedOpening: null,
@@ -2079,6 +2179,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         points: [],
         history: [],
       },
+      selectedNorthIndicator: false,
       selectedRoomId: null,
       selectedWall: null,
       selectedOpening: null,
@@ -2104,6 +2205,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: nextDocument,
+        selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
@@ -2130,6 +2232,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: nextDocument,
+        selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
@@ -2190,6 +2293,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           : getProjectOpenCamera(nextDocument, state.viewport),
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
         roomDraft: EMPTY_ROOM_DRAFT,
+        selectedNorthIndicator: false,
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,

@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
@@ -88,6 +97,12 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  formatNorthBearingDegrees,
+  getNorthBearingDegreesFromScreenDelta,
+  normalizeNorthBearingDegrees,
+  snapNorthBearingDegrees,
+} from "@/lib/editor/north";
 import { detectMacPlatform } from "@/lib/platform";
 import {
   easeOutCubic,
@@ -110,6 +125,7 @@ import type {
 import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
+import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
@@ -149,6 +165,7 @@ const ANCHORED_HINT_MAX_WIDTH_PX = 352;
 const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
+const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -230,6 +247,109 @@ function CanvasHudCard({ children }: { children: ReactNode }) {
   );
 }
 
+type NorthDragTooltipState = {
+  left: number;
+  top: number;
+  bearingDegrees: number;
+};
+
+type NorthIndicatorSurfaceState = "hidden" | "visible";
+
+type ActiveNorthDrag = {
+  pointerId: number;
+  indicatorCenter: ScreenPoint;
+  startingBearingDegrees: number;
+  currentBearingDegrees: number;
+  startPointer: ScreenPoint;
+  didDrag: boolean;
+};
+
+function NorthIndicatorControl({
+  bearingDegrees,
+  surfaceState,
+  isDragging,
+  onPointerDown,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  bearingDegrees: number;
+  surfaceState: NorthIndicatorSurfaceState;
+  isDragging: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+}) {
+  const [displayBearingDegrees, setDisplayBearingDegrees] = useState(bearingDegrees);
+  const previousBearingRef = useRef(bearingDegrees);
+
+  useEffect(() => {
+    const previousBearingDegrees = previousBearingRef.current;
+    const delta = ((bearingDegrees - previousBearingDegrees + 540) % 360) - 180;
+    const nextDisplayBearingDegrees = previousBearingDegrees + delta;
+    previousBearingRef.current = nextDisplayBearingDegrees;
+    setDisplayBearingDegrees(nextDisplayBearingDegrees);
+  }, [bearingDegrees]);
+
+  const showSurface = surfaceState === "visible";
+
+  return (
+    <button
+      type="button"
+      aria-label={`North indicator ${formatNorthBearingDegrees(bearingDegrees)}`}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 rounded-md border border-border/70 bg-background/86 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm transition-opacity duration-150 ease-out dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)] ${
+          showSurface ? "opacity-100" : "opacity-0"
+        }`}
+        style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
+      />
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 transition-opacity duration-150 ease-out ${
+          showSurface ? "opacity-100" : "opacity-0"
+        }`}
+        style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
+      >
+        {Array.from({ length: 12 }).map((_, index) => {
+          const angle = index * 30;
+          const isMajorTick = angle % 90 === 0;
+          return (
+            <div
+              key={angle}
+              className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
+              style={{
+                transform: `translate(-50%, -100%) rotate(${angle}deg)`,
+                height: "21px",
+              }}
+            >
+              <div
+                className={`mx-auto rounded-full bg-foreground/28 ${isMajorTick ? "h-2.5 w-px" : "h-1.5 w-px"}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 transition-transform ease-out ${isDragging ? "duration-75" : "duration-200"}`}
+        style={{ transform: `rotate(${displayBearingDegrees}deg)` }}
+      >
+        <div className="absolute top-1.5 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" />
+      </div>
+      <div
+        className="relative text-xs font-semibold tracking-[0.2em] text-foreground/86"
+        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+      >
+        N
+      </div>
+    </button>
+  );
+}
 export default function EditorCanvas({
   hasResolvedProject = false,
   projectRenameCompletionCount = 0,
@@ -283,7 +403,13 @@ export default function EditorCanvas({
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
+  const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
+  const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
+  const previewNorthBearingDegrees = useEditorStore((state) => state.previewNorthBearingDegrees);
+  const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
+  const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
@@ -310,6 +436,12 @@ export default function EditorCanvas({
     width: number;
     arrowLeft: number;
   } | null>(null);
+  const activeNorthDragRef = useRef<ActiveNorthDrag | null>(null);
+  const [northDragTooltip, setNorthDragTooltip] = useState<NorthDragTooltipState | null>(null);
+  const [isNorthIndicatorHovered, setIsNorthIndicatorHovered] = useState(false);
+  const [northIndicatorSurfaceState, setNorthIndicatorSurfaceState] =
+    useState<NorthIndicatorSurfaceState>("hidden");
+  const northIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHintFlowPaused = hintPauseUntilMs > Date.now();
   const activeHint = useMemo(() => {
     if (!hasHydratedHints || isHintFlowPaused) return null;
@@ -358,7 +490,8 @@ export default function EditorCanvas({
       roomResizeUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
-      editorThemeRef.current
+      editorThemeRef.current,
+      Boolean(activeNorthDragRef.current?.didDrag)
     );
   }, []);
 
@@ -406,6 +539,10 @@ export default function EditorCanvas({
   useEffect(() => {
     latestEligibleHintRef.current = activeHint;
   }, [activeHint]);
+
+  useEffect(() => {
+    drawCurrentScene();
+  }, [drawCurrentScene, northDragTooltip]);
 
   useEffect(() => {
     return () => {
@@ -737,7 +874,8 @@ export default function EditorCanvas({
         getActiveSnapStepMm(exportCamera),
         getActiveSnapStepMm(exportCamera),
         null,
-        exportTheme
+        exportTheme,
+        false
       );
 
       return {
@@ -1121,6 +1259,158 @@ export default function EditorCanvas({
     };
   }, []);
 
+  const updateNorthDragFromPointer = useCallback(
+    (pointer: ScreenPoint, shouldSnap: boolean) => {
+      const dragSession = activeNorthDragRef.current;
+      const containerElement = containerRef.current;
+      if (!dragSession || !containerElement) return;
+
+      const rawBearingDegrees = getNorthBearingDegreesFromScreenDelta({
+        x: pointer.x - dragSession.indicatorCenter.x,
+        y: pointer.y - dragSession.indicatorCenter.y,
+      });
+      const nextBearingDegrees = shouldSnap
+        ? snapNorthBearingDegrees(rawBearingDegrees)
+        : normalizeNorthBearingDegrees(rawBearingDegrees);
+
+      dragSession.currentBearingDegrees = nextBearingDegrees;
+      previewNorthBearingDegrees(nextBearingDegrees);
+
+      const containerBounds = containerElement.getBoundingClientRect();
+      const tooltipWidthPx = 72;
+      const tooltipHeightPx = 28;
+      const tooltipOffsetPx = 14;
+      setNorthDragTooltip({
+        left: clampValue(
+          pointer.x - containerBounds.left + tooltipOffsetPx,
+          8,
+          Math.max(containerBounds.width - tooltipWidthPx - 8, 8)
+        ),
+        top: clampValue(
+          pointer.y - containerBounds.top - tooltipHeightPx - tooltipOffsetPx,
+          8,
+          Math.max(containerBounds.height - tooltipHeightPx - 8, 8)
+        ),
+        bearingDegrees: nextBearingDegrees,
+      });
+    },
+    [previewNorthBearingDegrees]
+  );
+
+  useEffect(() => {
+    const shouldShowNorthSurface = isNorthIndicatorHovered || northDragTooltip !== null;
+
+    if (northIndicatorFadeTimeoutRef.current !== null) {
+      clearTimeout(northIndicatorFadeTimeoutRef.current);
+      northIndicatorFadeTimeoutRef.current = null;
+    }
+
+    if (shouldShowNorthSurface) {
+      setNorthIndicatorSurfaceState("visible");
+      return;
+    }
+
+    northIndicatorFadeTimeoutRef.current = setTimeout(() => {
+      setNorthIndicatorSurfaceState("hidden");
+      northIndicatorFadeTimeoutRef.current = null;
+    }, NORTH_INDICATOR_SURFACE_FADE_DELAY_MS);
+
+    return () => {
+      if (northIndicatorFadeTimeoutRef.current !== null) {
+        clearTimeout(northIndicatorFadeTimeoutRef.current);
+        northIndicatorFadeTimeoutRef.current = null;
+      }
+    };
+  }, [isNorthIndicatorHovered, northDragTooltip]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragSession = activeNorthDragRef.current;
+      if (!dragSession || event.pointerId !== dragSession.pointerId) return;
+
+      const nextPointer = { x: event.clientX, y: event.clientY };
+      if (!dragSession.didDrag) {
+        const deltaX = nextPointer.x - dragSession.startPointer.x;
+        const deltaY = nextPointer.y - dragSession.startPointer.y;
+        if (deltaX * deltaX + deltaY * deltaY < 16) return;
+
+        dragSession.didDrag = true;
+        setCanvasInteractionActive(true);
+      }
+
+      updateNorthDragFromPointer(nextPointer, event.shiftKey);
+    };
+
+    const finishNorthDrag = (pointerId: number | null) => {
+      const dragSession = activeNorthDragRef.current;
+      if (!dragSession) return;
+      if (pointerId !== null && pointerId !== dragSession.pointerId) return;
+
+      activeNorthDragRef.current = null;
+      setNorthDragTooltip(null);
+      setCanvasInteractionActive(false);
+      selectNorthIndicator();
+
+      if (!dragSession.didDrag) {
+        previewNorthBearingDegrees(dragSession.startingBearingDegrees);
+        return;
+      }
+
+      commitNorthBearingDegrees(
+        dragSession.startingBearingDegrees,
+        dragSession.currentBearingDegrees
+      );
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      finishNorthDrag(event.pointerId);
+    };
+
+    const handleWindowBlur = () => {
+      finishNorthDrag(null);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { capture: true });
+    window.addEventListener("pointerup", handlePointerUp, { capture: true });
+    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove, { capture: true });
+      window.removeEventListener("pointerup", handlePointerUp, { capture: true });
+      window.removeEventListener("pointercancel", handlePointerUp, { capture: true });
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [
+    commitNorthBearingDegrees,
+    previewNorthBearingDegrees,
+    selectNorthIndicator,
+    setCanvasInteractionActive,
+    updateNorthDragFromPointer,
+  ]);
+
+  const handleNorthIndicatorPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+
+      const indicatorBounds = event.currentTarget.getBoundingClientRect();
+      activeNorthDragRef.current = {
+        pointerId: event.pointerId,
+        indicatorCenter: {
+          x: indicatorBounds.left + indicatorBounds.width / 2,
+          y: indicatorBounds.top + indicatorBounds.height / 2,
+        },
+        startingBearingDegrees: northBearingDegrees,
+        currentBearingDegrees: northBearingDegrees,
+        startPointer: { x: event.clientX, y: event.clientY },
+        didDrag: false,
+      };
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [northBearingDegrees]
+  );
+
   useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
@@ -1296,6 +1586,20 @@ export default function EditorCanvas({
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
+  const inspectorContent = selectedNorthIndicator ? (
+    <SelectedNorthInspector className="h-full" />
+  ) : selectedRoomId ? (
+    <SelectedRoomNamePanel className="h-full" />
+  ) : (
+    <EditorInspectorEmptyState className="h-full" />
+  );
+  const compactInspectorContent = selectedNorthIndicator ? (
+    <SelectedNorthInspector />
+  ) : selectedRoomId ? (
+    <SelectedRoomNamePanel />
+  ) : (
+    <EditorInspectorEmptyState />
+  );
 
   return (
     <section
@@ -1361,20 +1665,26 @@ export default function EditorCanvas({
                     : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
                 </div>
               </CanvasHudCard>
-              <CanvasHudCard>
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    aria-hidden="true"
-                    className="h-0 w-0 border-x-[5px] border-b-[8px] border-x-transparent border-b-red-500"
-                  />
-                  <div
-                    className="text-xs font-semibold tracking-[0.2em] text-foreground/86"
-                    style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
-                  >
-                    N
-                  </div>
-                </div>
-              </CanvasHudCard>
+              <NorthIndicatorControl
+                bearingDegrees={northBearingDegrees}
+                surfaceState={northIndicatorSurfaceState}
+                isDragging={northDragTooltip !== null}
+                onPointerDown={handleNorthIndicatorPointerDown}
+                onPointerEnter={() => setIsNorthIndicatorHovered(true)}
+                onPointerLeave={() => setIsNorthIndicatorHovered(false)}
+              />
+            </div>
+          ) : null}
+          {northDragTooltip ? (
+            <div
+              className="pointer-events-none absolute z-20 rounded-md border border-border/70 bg-background/94 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-[0_6px_20px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:shadow-[0_6px_20px_rgba(0,0,0,0.24)]"
+              style={{
+                left: `${northDragTooltip.left}px`,
+                top: `${northDragTooltip.top}px`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+            >
+              {formatNorthBearingDegrees(northDragTooltip.bearingDegrees)}
             </div>
           ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (
@@ -1397,21 +1707,11 @@ export default function EditorCanvas({
           ) : null}
         </div>
         <aside className="hidden min-h-0 overflow-hidden lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
-          {selectedRoomId ? (
-            <SelectedRoomNamePanel className="h-full" />
-          ) : (
-            <EditorInspectorEmptyState className="h-full" />
-          )}
+          {inspectorContent}
         </aside>
-        {selectedRoomId ? (
-          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
-            <SelectedRoomNamePanel />
-          </aside>
-        ) : (
-          <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
-            <EditorInspectorEmptyState />
-          </aside>
-        )}
+        <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
+          {compactInspectorContent}
+        </aside>
       </div>
       {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
         <aside
@@ -1479,7 +1779,8 @@ function drawScene(
   },
   transformFeedback: TransformFeedback | null,
   snapGuides: SnapGuides | null,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  hideCursorHud: boolean
 ) {
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
   const activeSnapStepMm = getActiveSnapStepMm(state.camera);
@@ -1595,7 +1896,8 @@ function drawScene(
     cursorSnapStepMm,
     activeSnapStepMm,
     visibleGuides,
-    theme
+    theme,
+    hideCursorHud
   );
 }
 
@@ -3612,7 +3914,8 @@ function drawDraft(
   cursorSnapStepMm: number,
   activeSnapStepMm: number | null,
   snapGuides: SnapGuides | null,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  hideCursorHud = false
 ) {
   graphics.clear();
   const cursorHudWorld = cursorWorld ? snapPointToGrid(cursorWorld, cursorSnapStepMm) : null;
@@ -3652,13 +3955,15 @@ function drawDraft(
       graphics.stroke();
     }
 
-    drawCursorCrosshairGuides(
-      graphics,
-      worldToScreen(cursorHudWorld, camera, viewport),
-      viewport,
-      theme,
-      "active"
-    );
+    if (!hideCursorHud) {
+      drawCursorCrosshairGuides(
+        graphics,
+        worldToScreen(cursorHudWorld, camera, viewport),
+        viewport,
+        theme,
+        "active"
+      );
+    }
     if (snapGuides) {
       drawSnapGuides(
         graphics,
@@ -3668,23 +3973,29 @@ function drawDraft(
         theme
       );
     }
-    drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "active");
+    if (!hideCursorHud) {
+      drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "active");
+    }
     return;
   }
 
   if (!cursorWorld || !cursorHudWorld) return;
 
-  drawCursorCrosshairGuides(
-    graphics,
-    worldToScreen(cursorHudWorld, camera, viewport),
-    viewport,
-    theme,
-    "idle"
-  );
+  if (!hideCursorHud) {
+    drawCursorCrosshairGuides(
+      graphics,
+      worldToScreen(cursorHudWorld, camera, viewport),
+      viewport,
+      theme,
+      "idle"
+    );
+  }
   if (snapGuides) {
     drawSnapGuides(graphics, snapGuides, camera, viewport, theme);
   }
-  drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "idle");
+  if (!hideCursorHud) {
+    drawCursorHud(graphics, worldToScreen(cursorHudWorld, camera, viewport), theme, "idle");
+  }
 }
 
 function drawCursorCrosshairGuides(

@@ -6,6 +6,7 @@ import {
 } from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
@@ -26,7 +27,9 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     exportConfigA.title !== exportConfigB.title ||
     exportConfigA.description !== exportConfigB.description ||
     exportConfigA.titlePosition !== exportConfigB.titlePosition ||
-    exportConfigA.descriptionPosition !== exportConfigB.descriptionPosition
+    exportConfigA.descriptionPosition !== exportConfigB.descriptionPosition ||
+    normalizeNorthBearingDegrees(a.northBearingDegrees) !==
+      normalizeNorthBearingDegrees(b.northBearingDegrees)
   ) {
     return false;
   }
@@ -55,6 +58,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       titlePosition: exportConfig.titlePosition,
       descriptionPosition: exportConfig.descriptionPosition,
     },
+    northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
       name: room.name,
@@ -76,6 +80,8 @@ function arePointListsEqual(a: Room["points"], b: Room["points"]): boolean {
 }
 
 function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentState): EditorCommand | null {
+  const previousNorthBearing = normalizeNorthBearingDegrees(previous.northBearingDegrees);
+  const nextNorthBearing = normalizeNorthBearingDegrees(next.northBearingDegrees);
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
@@ -129,6 +135,19 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (removedRooms.length > 0) return null;
+
+  if (
+    previousNorthBearing !== nextNorthBearing &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0
+  ) {
+    return {
+      type: "update-north-bearing",
+      previousBearingDegrees: previousNorthBearing,
+      nextBearingDegrees: nextNorthBearing,
+    };
+  }
 
   if (addedRooms.length === 1 && changedRooms.length === 0 && previous.rooms.length + 1 === next.rooms.length) {
     return {

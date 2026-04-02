@@ -13,6 +13,10 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
+  DEFAULT_NORTH_BEARING_DEGREES,
+  normalizeNorthBearingDegrees,
+} from "@/lib/editor/north";
+import {
   cloneEditorExportPreferences,
   DEFAULT_EDITOR_EXPORT_PREFERENCES,
   normalizeEditorExportPreferences,
@@ -50,6 +54,7 @@ type PersistedRoom = {
 type PersistedDocument = {
   rooms: PersistedRoom[];
   exportConfig?: EditorDocumentState["exportConfig"];
+  northBearingDegrees?: number;
 };
 
 export type PersistedEditorSnapshot = {
@@ -272,6 +277,12 @@ function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
   if (!Array.isArray(value.rooms)) return false;
   if (value.exportConfig !== undefined && !isObject(value.exportConfig)) return false;
+  if (
+    value.northBearingDegrees !== undefined &&
+    (!isFiniteNumber(value.northBearingDegrees) || !Number.isFinite(value.northBearingDegrees))
+  ) {
+    return false;
+  }
   return value.rooms.every((room) => isRoom(room));
 }
 
@@ -308,6 +319,9 @@ function cloneRoom(room: PersistedRoom | Room): Room {
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
   return {
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
+    northBearingDegrees: normalizeNorthBearingDegrees(
+      document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
+    ),
     rooms: document.rooms.map(cloneRoom),
   };
 }
@@ -347,6 +361,9 @@ function normalizeDocumentForSegmentAnchoring(
 
   return {
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
+    northBearingDegrees: normalizeNorthBearingDegrees(
+      document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
+    ),
     rooms: document.rooms.map((room) => {
       const clonedRoom = cloneRoom(room);
       if (!migrateNumericSegmentOffsets || clonedRoom.openings.length === 0) {
