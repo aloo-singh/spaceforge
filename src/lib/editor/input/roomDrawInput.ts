@@ -51,7 +51,7 @@ import {
 } from "@/lib/editor/transformFeedback";
 
 type RoomDrawStoreState = {
-  camera: { xMm: number; yMm: number; pixelsPerMm: number };
+  camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };

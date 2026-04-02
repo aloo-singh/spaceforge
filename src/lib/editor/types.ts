@@ -18,6 +18,10 @@ export type CameraState = {
    * Screen scale in pixels per millimetre.
    */
   pixelsPerMm: number;
+  /**
+   * View rotation in degrees, clockwise on screen.
+   */
+  rotationDegrees: number;
 };
 
 export type ScreenPoint = {

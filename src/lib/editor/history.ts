@@ -3,6 +3,10 @@ import {
   cloneRoomInteriorAssets,
 } from "@/lib/editor/interiorAssets";
 import { cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
+import {
+  DEFAULT_CANVAS_ROTATION_DEGREES,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 import {
@@ -15,9 +19,15 @@ export type EditorDocumentState = {
   rooms: Room[];
   exportConfig: ProjectExportConfig;
   northBearingDegrees: number;
+  canvasRotationDegrees: number;
 };
 
 export type EditorCommand =
+  | {
+      type: "update-canvas-rotation";
+      previousRotationDegrees: number;
+      nextRotationDegrees: number;
+    }
   | {
       type: "update-north-bearing";
       previousBearingDegrees: number;
@@ -104,6 +114,15 @@ export function applyEditorCommand(
   command: EditorCommand,
   direction: "undo" | "redo"
 ): EditorDocumentState {
+  if (command.type === "update-canvas-rotation") {
+    return {
+      ...document,
+      canvasRotationDegrees: normalizeCanvasRotationDegrees(
+        direction === "undo" ? command.previousRotationDegrees : command.nextRotationDegrees
+      ),
+    };
+  }
+
   if (command.type === "update-north-bearing") {
     return {
       ...document,
@@ -373,6 +392,7 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
     rooms: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,
+    canvasRotationDegrees: DEFAULT_CANVAS_ROTATION_DEGREES,
   };
 }
 

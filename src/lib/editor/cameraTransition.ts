@@ -1,4 +1,8 @@
 import type { CameraState } from "@/lib/editor/types";
+import {
+  getShortestCanvasRotationDeltaDegrees,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 
 export const RESET_CAMERA_TRANSITION_DURATION_MS = 240;
 
@@ -20,5 +24,13 @@ export function interpolateCamera(
     yMm: fromCamera.yMm + (toCamera.yMm - fromCamera.yMm) * clampedProgress,
     pixelsPerMm:
       fromCamera.pixelsPerMm + (toCamera.pixelsPerMm - fromCamera.pixelsPerMm) * clampedProgress,
+    rotationDegrees: normalizeCanvasRotationDegrees(
+      fromCamera.rotationDegrees +
+        getShortestCanvasRotationDeltaDegrees(
+          fromCamera.rotationDegrees,
+          toCamera.rotationDegrees
+        ) *
+          clampedProgress
+    ),
   };
 }

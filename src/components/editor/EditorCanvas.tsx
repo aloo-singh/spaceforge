@@ -21,17 +21,31 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
-import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import {
+  getConstrainedVertexHandleLayouts,
+  hitTestConstrainedVertexHandle,
+  isNonRectangularOrthogonalRoom,
+} from "@/lib/editor/constrainedVertexAdjustments";
 import {
   DEFAULT_STAIR_TREAD_SPACING_MM,
+  findInteriorAssetAtScreenPoint,
   getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
 } from "@/lib/editor/interiorAssets";
-import { getOrthogonalWallHandleLayouts } from "@/lib/editor/orthogonalWallResize";
-import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
-import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
+import {
+  getOrthogonalWallHandleLayouts,
+  hitTestOrthogonalWallHandle,
+} from "@/lib/editor/orthogonalWallResize";
+import {
+  findOpeningAtScreenPoint,
+  findSelectedOpeningWidthHandleAtScreenPoint,
+  getResolvedRoomOpeningLayout,
+  getRoomWallMeasurement,
+  getRoomWallSegment,
+} from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
+  findRoomLabelAtScreenPoint,
   getRoomLabelLayout,
   ROOM_LABEL_AREA_FONT_FAMILY,
   ROOM_LABEL_AREA_FONT_SIZE_PX,
@@ -51,6 +65,7 @@ import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import {
+  findRoomAtPoint,
   isAxisAlignedRectangle,
   isOrthogonalPointPath,
   isPointInPolygon,
@@ -70,6 +85,8 @@ import {
 import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
+  hitTestCornerHandle,
+  hitTestWallHandle,
   getWallHandleLayouts,
   type RectCorner,
   type RectWall,
@@ -97,6 +114,11 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  formatCanvasRotationDegrees,
+  formatCanvasRotationShortcutLabel,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 import {
   formatNorthBearingDegrees,
   getNorthBearingDegreesFromScreenDelta,
@@ -253,6 +275,12 @@ type NorthDragTooltipState = {
   bearingDegrees: number;
 };
 
+type CanvasRotationTooltipState = {
+  left: number;
+  top: number;
+  rotationDegrees: number;
+};
+
 type NorthIndicatorSurfaceState = "hidden" | "visible";
 
 type ActiveNorthDrag = {
@@ -264,8 +292,63 @@ type ActiveNorthDrag = {
   didDrag: boolean;
 };
 
+function CanvasRotationIndicatorControl({
+  rotationDegrees,
+  northBearingDegrees,
+  onReset,
+}: {
+  rotationDegrees: number;
+  northBearingDegrees: number;
+  onReset: () => void;
+}) {
+  const normalizedRotationDegrees = normalizeCanvasRotationDegrees(rotationDegrees);
+  const visible = Math.abs(normalizedRotationDegrees) > 0.01;
+
+  if (!visible) {
+    return null;
+  }
+
+  const northMarkerDegrees = normalizeNorthBearingDegrees(northBearingDegrees + normalizedRotationDegrees);
+
+  return (
+    <button
+      type="button"
+      onClick={onReset}
+      aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
+      title={`Reset rotation to 0°. ${formatCanvasRotationShortcutLabel()}.`}
+      className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)]"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-[10px] transition-transform duration-75 ease-out"
+        style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
+      >
+        <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
+      </div>
+      <div
+        aria-hidden="true"
+        className="absolute inset-[10px] transition-transform duration-75 ease-out"
+        style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
+      >
+        <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
+      </div>
+      <div
+        className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
+        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+      >
+        {formatCanvasRotationDegrees(normalizedRotationDegrees)}
+      </div>
+    </button>
+  );
+}
+
 function NorthIndicatorControl({
   bearingDegrees,
+  viewRotationDegrees,
   surfaceState,
   isDragging,
   onPointerDown,
@@ -273,29 +356,33 @@ function NorthIndicatorControl({
   onPointerLeave,
 }: {
   bearingDegrees: number;
+  viewRotationDegrees: number;
   surfaceState: NorthIndicatorSurfaceState;
   isDragging: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }) {
-  const [displayBearingDegrees, setDisplayBearingDegrees] = useState(bearingDegrees);
-  const previousBearingRef = useRef(bearingDegrees);
+  const initialVisibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
+  const [displayBearingDegrees, setDisplayBearingDegrees] = useState(initialVisibleBearingDegrees);
+  const previousBearingRef = useRef(initialVisibleBearingDegrees);
+
+  const visibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
 
   useEffect(() => {
     const previousBearingDegrees = previousBearingRef.current;
-    const delta = ((bearingDegrees - previousBearingDegrees + 540) % 360) - 180;
+    const delta = ((visibleBearingDegrees - previousBearingDegrees + 540) % 360) - 180;
     const nextDisplayBearingDegrees = previousBearingDegrees + delta;
     previousBearingRef.current = nextDisplayBearingDegrees;
     setDisplayBearingDegrees(nextDisplayBearingDegrees);
-  }, [bearingDegrees]);
+  }, [visibleBearingDegrees]);
 
   const showSurface = surfaceState === "visible";
 
   return (
     <button
       type="button"
-      aria-label={`North indicator ${formatNorthBearingDegrees(bearingDegrees)}`}
+      aria-label={`North indicator ${formatNorthBearingDegrees(visibleBearingDegrees)}`}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -403,10 +490,12 @@ export default function EditorCanvas({
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
+  const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
+  const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
   const previewNorthBearingDegrees = useEditorStore((state) => state.previewNorthBearingDegrees);
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
@@ -438,6 +527,8 @@ export default function EditorCanvas({
   } | null>(null);
   const activeNorthDragRef = useRef<ActiveNorthDrag | null>(null);
   const [northDragTooltip, setNorthDragTooltip] = useState<NorthDragTooltipState | null>(null);
+  const [canvasRotationTooltip, setCanvasRotationTooltip] =
+    useState<CanvasRotationTooltipState | null>(null);
   const [isNorthIndicatorHovered, setIsNorthIndicatorHovered] = useState(false);
   const [northIndicatorSurfaceState, setNorthIndicatorSurfaceState] =
     useState<NorthIndicatorSurfaceState>("hidden");
@@ -1269,9 +1360,12 @@ export default function EditorCanvas({
         x: pointer.x - dragSession.indicatorCenter.x,
         y: pointer.y - dragSession.indicatorCenter.y,
       });
+      const adjustedBearingDegrees = normalizeNorthBearingDegrees(
+        rawBearingDegrees - camera.rotationDegrees
+      );
       const nextBearingDegrees = shouldSnap
-        ? snapNorthBearingDegrees(rawBearingDegrees)
-        : normalizeNorthBearingDegrees(rawBearingDegrees);
+        ? snapNorthBearingDegrees(adjustedBearingDegrees)
+        : adjustedBearingDegrees;
 
       dragSession.currentBearingDegrees = nextBearingDegrees;
       previewNorthBearingDegrees(nextBearingDegrees);
@@ -1294,7 +1388,7 @@ export default function EditorCanvas({
         bearingDegrees: nextBearingDegrees,
       });
     },
-    [previewNorthBearingDegrees]
+    [camera.rotationDegrees, previewNorthBearingDegrees]
   );
 
   useEffect(() => {
@@ -1411,6 +1505,118 @@ export default function EditorCanvas({
     [northBearingDegrees]
   );
 
+  const updateCanvasRotationTooltip = useCallback((degrees: number, pointer: ScreenPoint | null) => {
+    const containerElement = containerRef.current;
+    if (!containerElement || !pointer) {
+      setCanvasRotationTooltip((current) =>
+        current && Math.abs(current.rotationDegrees - degrees) < 0.001
+          ? current
+          : current
+            ? { ...current, rotationDegrees: degrees }
+            : null
+      );
+      return;
+    }
+
+    const containerBounds = containerElement.getBoundingClientRect();
+    const tooltipWidthPx = 116;
+    const tooltipHeightPx = 28;
+    const tooltipOffsetPx = 14;
+    setCanvasRotationTooltip({
+      left: clampValue(
+        pointer.x - containerBounds.left + tooltipOffsetPx,
+        8,
+        Math.max(containerBounds.width - tooltipWidthPx - 8, 8)
+      ),
+      top: clampValue(
+        pointer.y - containerBounds.top - tooltipHeightPx - tooltipOffsetPx,
+        8,
+        Math.max(containerBounds.height - tooltipHeightPx - 8, 8)
+      ),
+      rotationDegrees: degrees,
+    });
+  }, []);
+
+  const canStartCanvasRotation = useCallback((screenPoint: ScreenPoint) => {
+    const state = useEditorStore.getState();
+    if (state.roomDraft.points.length > 0) return false;
+    if (hoveredRoomLabelIdRef.current) return false;
+    if (hoveredSelectableWallRef.current) return false;
+    if (
+      roomResizeUiRef.current.hoveredWall ||
+      roomResizeUiRef.current.hoveredCorner ||
+      roomResizeUiRef.current.hoveredVertexIndex !== null ||
+      roomResizeUiRef.current.hoveredWallSegmentIndex !== null
+    ) {
+      return false;
+    }
+
+    if (
+      findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
+      findSelectedOpeningWidthHandleAtScreenPoint(
+        state.document.rooms,
+        state.selectedOpening,
+        screenPoint,
+        state.camera,
+        state.viewport
+      ) ||
+      findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
+      findInteriorAssetAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+    ) {
+      return false;
+    }
+
+    if (state.selectedInteriorAsset) {
+      const room =
+        state.document.rooms.find((candidate) => candidate.id === state.selectedInteriorAsset?.roomId) ?? null;
+      const asset =
+        room?.interiorAssets.find((candidate) => candidate.id === state.selectedInteriorAsset?.assetId) ?? null;
+      if (asset) {
+        const bounds = getInteriorAssetBoundsAsRectBounds(asset);
+        if (
+          hitTestCornerHandle(getCornerHandleLayouts(bounds, state.camera, state.viewport), screenPoint) ||
+          hitTestWallHandle(getWallHandleLayouts(bounds, state.camera, state.viewport), screenPoint)
+        ) {
+          return false;
+        }
+      }
+    }
+
+    if (state.selectedRoomId) {
+      const selectedRoom =
+        state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId) ?? null;
+      if (selectedRoom) {
+        const bounds = getAxisAlignedRoomBounds(selectedRoom);
+        if (bounds) {
+          if (
+            hitTestCornerHandle(getCornerHandleLayouts(bounds, state.camera, state.viewport), screenPoint) ||
+            hitTestWallHandle(getWallHandleLayouts(bounds, state.camera, state.viewport), screenPoint)
+          ) {
+            return false;
+          }
+        }
+
+        if (isNonRectangularOrthogonalRoom(selectedRoom)) {
+          if (
+            hitTestConstrainedVertexHandle(
+              getConstrainedVertexHandleLayouts(selectedRoom, state.camera, state.viewport),
+              screenPoint
+            ) !== null ||
+            hitTestOrthogonalWallHandle(
+              getOrthogonalWallHandleLayouts(selectedRoom, state.camera, state.viewport),
+              screenPoint
+            ) !== null
+          ) {
+            return false;
+          }
+        }
+      }
+    }
+
+    const worldPoint = screenToWorld(screenPoint, state.camera, state.viewport);
+    return !findRoomAtPoint(state.document.rooms, worldPoint);
+  }, []);
+
   useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
@@ -1488,6 +1694,13 @@ export default function EditorCanvas({
           if (activeHintIdRef.current !== "pan-canvas") return;
           completeHint("pan-canvas");
         },
+        canStartRotation: canStartCanvasRotation,
+        onRotationPreview: (degrees, pointer) => {
+          updateCanvasRotationTooltip(degrees, pointer);
+        },
+        onRotationEnd: () => {
+          setCanvasRotationTooltip(null);
+        },
       });
       const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
         onCursorWorldChange: (cursorWorld) => {
@@ -1563,7 +1776,14 @@ export default function EditorCanvas({
         app.destroy(true, { children: true });
       }
     };
-  }, [completeHint, drawCurrentScene, setTransformFeedback, stopTransformAnimation]);
+  }, [
+    canStartCanvasRotation,
+    completeHint,
+    drawCurrentScene,
+    setTransformFeedback,
+    stopTransformAnimation,
+    updateCanvasRotationTooltip,
+  ]);
 
   useEffect(() => {
     const app = appRef.current;
@@ -1579,6 +1799,7 @@ export default function EditorCanvas({
         ? camera
         : {
             pixelsPerMm: INITIAL_PIXELS_PER_MM,
+            rotationDegrees: 0,
           },
     [camera, hasHydratedClient]
   );
@@ -1614,9 +1835,9 @@ export default function EditorCanvas({
         room body to select that room. When a room is selected, click near one of that room&apos;s
         wall edges to select that wall. Clicking outside a selected room clears selection first,
         then a following click can start drawing. Hold Space and drag to pan, middle mouse drag
-        also pans, mouse wheel zooms, and Escape cancels the current room draft or clears
-        selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
-        and redo is Shift+Cmd+Z or Ctrl+Y.
+        also pans, mouse wheel zooms, right click and drag empty canvas to rotate the view, and
+        Escape cancels the current room draft or clears selection. Right click also cancels the
+        current room draft. Undo is Cmd or Ctrl plus Z, and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div className="border-b border-border/70 bg-background/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
@@ -1665,8 +1886,14 @@ export default function EditorCanvas({
                     : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
                 </div>
               </CanvasHudCard>
+              <CanvasRotationIndicatorControl
+                rotationDegrees={canvasRotationDegrees}
+                northBearingDegrees={northBearingDegrees}
+                onReset={() => updateCanvasRotationDegrees(0)}
+              />
               <NorthIndicatorControl
                 bearingDegrees={northBearingDegrees}
+                viewRotationDegrees={canvasRotationDegrees}
                 surfaceState={northIndicatorSurfaceState}
                 isDragging={northDragTooltip !== null}
                 onPointerDown={handleNorthIndicatorPointerDown}
@@ -1685,6 +1912,18 @@ export default function EditorCanvas({
               }}
             >
               {formatNorthBearingDegrees(northDragTooltip.bearingDegrees)}
+            </div>
+          ) : null}
+          {canvasRotationTooltip ? (
+            <div
+              className="pointer-events-none absolute z-20 rounded-md border border-border/70 bg-background/94 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-[0_6px_20px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:shadow-[0_6px_20px_rgba(0,0,0,0.24)]"
+              style={{
+                left: `${canvasRotationTooltip.left}px`,
+                top: `${canvasRotationTooltip.top}px`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+            >
+              {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 5°
             </div>
           ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (

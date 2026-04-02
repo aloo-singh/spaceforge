@@ -13,6 +13,10 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
+  DEFAULT_CANVAS_ROTATION_DEGREES,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
+import {
   DEFAULT_NORTH_BEARING_DEGREES,
   normalizeNorthBearingDegrees,
 } from "@/lib/editor/north";
@@ -35,10 +39,11 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 // - v7 payloads also preserve canonical segment-local opening offsets for numeric wall hosts.
 // - v8 payloads also persist opening-side and hinge-side fields for inspector editing.
 // - v9 payloads also persist export dialog session preferences.
+// - v10 payloads also persist canvas rotation with document + camera state.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 9;
+export const EDITOR_PERSISTENCE_VERSION = 10;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -55,6 +60,7 @@ type PersistedDocument = {
   rooms: PersistedRoom[];
   exportConfig?: EditorDocumentState["exportConfig"];
   northBearingDegrees?: number;
+  canvasRotationDegrees?: number;
 };
 
 export type PersistedEditorSnapshot = {
@@ -157,7 +163,7 @@ export type PersistedEditorPayloadV8 = {
   };
 };
 
-export type PersistedEditorPayloadV9 = {
+export type PersistedEditorPayloadV10 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -269,7 +275,8 @@ function isCameraState(value: unknown): value is CameraState {
     isFiniteNumber(value.xMm) &&
     isFiniteNumber(value.yMm) &&
     isFiniteNumber(value.pixelsPerMm) &&
-    value.pixelsPerMm > 0
+    value.pixelsPerMm > 0 &&
+    (value.rotationDegrees === undefined || isFiniteNumber(value.rotationDegrees))
   );
 }
 
@@ -280,6 +287,12 @@ function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (
     value.northBearingDegrees !== undefined &&
     (!isFiniteNumber(value.northBearingDegrees) || !Number.isFinite(value.northBearingDegrees))
+  ) {
+    return false;
+  }
+  if (
+    value.canvasRotationDegrees !== undefined &&
+    (!isFiniteNumber(value.canvasRotationDegrees) || !Number.isFinite(value.canvasRotationDegrees))
   ) {
     return false;
   }
@@ -319,6 +332,9 @@ function cloneRoom(room: PersistedRoom | Room): Room {
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
   return {
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(
+      document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
+    ),
     northBearingDegrees: normalizeNorthBearingDegrees(
       document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
     ),
@@ -331,6 +347,9 @@ function cloneCamera(camera: CameraState): CameraState {
     xMm: camera.xMm,
     yMm: camera.yMm,
     pixelsPerMm: camera.pixelsPerMm,
+    rotationDegrees: normalizeCanvasRotationDegrees(
+      camera.rotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
+    ),
   };
 }
 
@@ -361,6 +380,9 @@ function normalizeDocumentForSegmentAnchoring(
 
   return {
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(
+      document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
+    ),
     northBearingDegrees: normalizeNorthBearingDegrees(
       document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
     ),
@@ -411,6 +433,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 6 &&
         parsed.version !== 7 &&
         parsed.version !== 8 &&
+        parsed.version !== 9 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -474,7 +497,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV9 = {
+  const payload: PersistedEditorPayloadV10 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),

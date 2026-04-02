@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
   applyEditorCommand,
+  createEmptyEditorDocumentState,
   type EditorCommand,
   type EditorDocumentState,
 } from "@/lib/editor/history";
@@ -9,6 +10,10 @@ import {
   panCameraByScreenDelta,
   zoomCameraToScreenPoint,
 } from "@/lib/editor/camera";
+import {
+  DEFAULT_CANVAS_ROTATION_DEGREES,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 import { getCameraFitTarget, getDrawingAwareMinPixelsPerMm } from "@/lib/editor/cameraFit";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
@@ -152,6 +157,9 @@ type EditorState = {
   updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
   selectNorthIndicator: () => void;
   clearNorthIndicatorSelection: () => void;
+  previewCanvasRotationDegrees: (degrees: number) => void;
+  commitCanvasRotationDegrees: (previousDegrees: number, nextDegrees: number) => void;
+  updateCanvasRotationDegrees: (degrees: number) => void;
   previewNorthBearingDegrees: (degrees: number) => void;
   commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateNorthBearingDegrees: (degrees: number) => void;
@@ -236,15 +244,12 @@ type EditorState = {
 };
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
-const DEFAULT_DOCUMENT_STATE: DocumentState = {
-  rooms: [],
-  exportConfig: normalizeProjectExportConfig(null),
-  northBearingDegrees: 0,
-};
+const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
   yMm: 0,
   pixelsPerMm: INITIAL_PIXELS_PER_MM,
+  rotationDegrees: DEFAULT_CANVAS_ROTATION_DEGREES,
 };
 const EMPTY_ROOM_DRAFT: RoomDraftState = {
   points: [],
@@ -549,7 +554,25 @@ function getRoomTranslationDelta(previousPoints: Point[], nextPoints: Point[]): 
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
-  return a.xMm === b.xMm && a.yMm === b.yMm && a.pixelsPerMm === b.pixelsPerMm;
+  return (
+    a.xMm === b.xMm &&
+    a.yMm === b.yMm &&
+    a.pixelsPerMm === b.pixelsPerMm &&
+    normalizeCanvasRotationDegrees(a.rotationDegrees) ===
+      normalizeCanvasRotationDegrees(b.rotationDegrees)
+  );
+}
+
+function syncCameraRotationToDocument(camera: CameraState, document: DocumentState): CameraState {
+  const nextRotationDegrees = normalizeCanvasRotationDegrees(document.canvasRotationDegrees);
+  if (normalizeCanvasRotationDegrees(camera.rotationDegrees) === nextRotationDegrees) {
+    return camera;
+  }
+
+  return {
+    ...camera,
+    rotationDegrees: nextRotationDegrees,
+  };
 }
 
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
@@ -845,6 +868,7 @@ function getSafePersistedHistorySnapshot(
             titlePosition: document.exportConfig.titlePosition,
             descriptionPosition: document.exportConfig.descriptionPosition,
           },
+          canvasRotationDegrees: document.canvasRotationDegrees,
           northBearingDegrees: document.northBearingDegrees,
           rooms: document.rooms.map((room) => ({
             id: room.id,
@@ -883,7 +907,21 @@ function createInitialDocumentState(): DocumentState {
 }
 
 function createInitialCameraState(): CameraState {
-  return hydrationSnapshot?.camera ?? DEFAULT_CAMERA_STATE;
+  if (hydrationSnapshot?.camera) {
+    return {
+      ...hydrationSnapshot.camera,
+      rotationDegrees: normalizeCanvasRotationDegrees(
+        hydrationSnapshot.camera.rotationDegrees ?? hydrationSnapshot.document.canvasRotationDegrees
+      ),
+    };
+  }
+
+  return {
+    ...DEFAULT_CAMERA_STATE,
+    rotationDegrees: normalizeCanvasRotationDegrees(
+      hydrationSnapshot?.document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
+    ),
+  };
 }
 
 function createInitialEditorSettings(): EditorSettings {
@@ -902,7 +940,10 @@ function getProjectOpenCamera(document: DocumentState, viewport: ViewportSize): 
   return getCameraFitTarget({
     rooms: document.rooms,
     viewport,
-    emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+    emptyLayoutCamera: {
+      ...DEFAULT_CAMERA_STATE,
+      rotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
+    },
   }).camera;
 }
 
@@ -1076,6 +1117,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!state.selectedNorthIndicator) return state;
       return {
         selectedNorthIndicator: false,
+      };
+    }),
+  previewCanvasRotationDegrees: (degrees) =>
+    set((state) => {
+      const nextCanvasRotationDegrees = normalizeCanvasRotationDegrees(degrees);
+      if (state.document.canvasRotationDegrees === nextCanvasRotationDegrees) return state;
+
+      return {
+        document: {
+          ...state.document,
+          canvasRotationDegrees: nextCanvasRotationDegrees,
+        },
+        camera: {
+          ...state.camera,
+          rotationDegrees: nextCanvasRotationDegrees,
+        },
+      };
+    }),
+  commitCanvasRotationDegrees: (previousDegrees, nextDegrees) =>
+    set((state) => {
+      const previousRotationDegrees = normalizeCanvasRotationDegrees(previousDegrees);
+      const nextRotationDegrees = normalizeCanvasRotationDegrees(nextDegrees);
+      if (previousRotationDegrees === nextRotationDegrees) return state;
+
+      return {
+        history: {
+          past: pushToPast(state.history.past, {
+            type: "update-canvas-rotation",
+            previousRotationDegrees,
+            nextRotationDegrees,
+          }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  updateCanvasRotationDegrees: (degrees) =>
+    set((state) => {
+      const previousRotationDegrees = normalizeCanvasRotationDegrees(
+        state.document.canvasRotationDegrees
+      );
+      const nextRotationDegrees = normalizeCanvasRotationDegrees(degrees);
+      if (previousRotationDegrees === nextRotationDegrees) return state;
+
+      return {
+        document: {
+          ...state.document,
+          canvasRotationDegrees: nextRotationDegrees,
+        },
+        camera: {
+          ...state.camera,
+          rotationDegrees: nextRotationDegrees,
+        },
+        history: {
+          past: pushToPast(state.history.past, {
+            type: "update-canvas-rotation",
+            previousRotationDegrees,
+            nextRotationDegrees,
+          }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
       };
     }),
   previewNorthBearingDegrees: (degrees) =>
@@ -2121,7 +2226,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const targetCamera = getCameraFitTarget({
       rooms: state.document.rooms,
       viewport: state.viewport,
-      emptyLayoutCamera: DEFAULT_CAMERA_STATE,
+      emptyLayoutCamera: syncCameraRotationToDocument(DEFAULT_CAMERA_STATE, state.document),
     }).camera;
 
     if (areCamerasEqual(state.camera, targetCamera)) return;
@@ -2173,7 +2278,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     stopResetCameraAnimation();
     set((state) => ({
       document: cloneDocumentState(DEFAULT_DOCUMENT_STATE),
-      camera: { ...DEFAULT_CAMERA_STATE },
+      camera: syncCameraRotationToDocument({ ...DEFAULT_CAMERA_STATE }, DEFAULT_DOCUMENT_STATE),
       pendingProjectOpenCameraFit: false,
       roomDraft: {
         points: [],
@@ -2205,6 +2310,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: nextDocument,
+        camera: syncCameraRotationToDocument(state.camera, nextDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
@@ -2232,6 +2338,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: nextDocument,
+        camera: syncCameraRotationToDocument(state.camera, nextDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
@@ -2289,7 +2396,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         camera: shouldDeferCameraFit
-          ? state.camera
+          ? syncCameraRotationToDocument(state.camera, nextDocument)
           : getProjectOpenCamera(nextDocument, state.viewport),
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
         roomDraft: EMPTY_ROOM_DRAFT,

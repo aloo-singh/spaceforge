@@ -45,7 +45,7 @@ import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openin
 import type { Point, Room, RoomWall } from "@/lib/editor/types";
 
 type RoomResizeStoreState = {
-  camera: { xMm: number; yMm: number; pixelsPerMm: number };
+  camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };
