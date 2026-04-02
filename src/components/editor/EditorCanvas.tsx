@@ -1063,18 +1063,20 @@ export default function EditorCanvas({
       }
 
       const store = useEditorStore.getState();
+      const key = event.key.toLowerCase();
+      const code = event.code;
 
-      if (event.key === "g" || event.key === "G") {
+      if (key === "g" || code === "KeyG") {
         store.updateSettings({ showGuidelines: !store.settings.showGuidelines });
         return;
       }
 
-      if (event.key === "h" || event.key === "H") {
+      if (key === "h" || code === "KeyH") {
         store.updateSettings({ showCanvasHud: !store.settings.showCanvasHud });
         return;
       }
 
-      if (event.key === "s" || event.key === "S") {
+      if (key === "s" || code === "KeyS") {
         store.updateSettings({ snappingEnabled: !store.settings.snappingEnabled });
       }
     };
@@ -1097,7 +1099,9 @@ export default function EditorCanvas({
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    const listenerOptions: AddEventListenerOptions = { capture: true };
+
+    window.addEventListener("keydown", onKeyDown, listenerOptions);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("pointerdown", onPointerEvent, true);
     window.addEventListener("pointermove", onPointerEvent, true);
@@ -1106,7 +1110,7 @@ export default function EditorCanvas({
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onKeyDown, listenerOptions);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("pointerdown", onPointerEvent, true);
       window.removeEventListener("pointermove", onPointerEvent, true);
