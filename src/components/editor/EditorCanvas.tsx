@@ -222,6 +222,14 @@ type EditorCanvasProps = {
   leftSidebarContent?: ReactNode;
 };
 
+function CanvasHudCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-border/70 bg-background/86 px-3 py-2 text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
+      {children}
+    </div>
+  );
+}
+
 export default function EditorCanvas({
   hasResolvedProject = false,
   projectRenameCompletionCount = 0,
@@ -1278,6 +1286,7 @@ export default function EditorCanvas({
   const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
+  const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
 
   return (
     <section
@@ -1321,26 +1330,44 @@ export default function EditorCanvas({
             tabIndex={-1}
             className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
-          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-white/10 bg-neutral-950/78 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.24)] backdrop-blur-sm sm:bottom-4 sm:left-4">
-            <div
-              className="text-[11px] font-medium tracking-[0.04em] text-white/72"
-              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
-            >
-              {scaleOverlay.label}
+          {showCanvasHud ? (
+            <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 sm:bottom-4 sm:left-4">
+              <CanvasHudCard>
+                <div
+                  className="text-[11px] font-medium tracking-[0.04em] text-foreground/72"
+                  style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+                >
+                  {scaleOverlay.label}
+                </div>
+                <div
+                  className="mt-1 h-2 border-x border-t border-foreground/70"
+                  style={{ width: `${scaleOverlay.widthPx}px` }}
+                />
+                <div
+                  className="mt-1 text-[11px] text-muted-foreground"
+                  style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+                >
+                  {snappingEnabled
+                    ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
+                    : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
+                </div>
+              </CanvasHudCard>
+              <CanvasHudCard>
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    aria-hidden="true"
+                    className="h-0 w-0 border-x-[5px] border-b-[8px] border-x-transparent border-b-red-500"
+                  />
+                  <div
+                    className="text-xs font-semibold tracking-[0.2em] text-foreground/86"
+                    style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+                  >
+                    N
+                  </div>
+                </div>
+              </CanvasHudCard>
             </div>
-            <div
-              className="mt-1 h-2 border-x border-t border-white/70"
-              style={{ width: `${scaleOverlay.widthPx}px` }}
-            />
-            <div
-              className="mt-1 text-[11px] text-white/52"
-              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
-            >
-              {snappingEnabled
-                ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
-                : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
-            </div>
-          </div>
+          ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (
             <aside
               className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
