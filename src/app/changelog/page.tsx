@@ -39,6 +39,205 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-02</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Canvas HUD foundation
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>
+                      Toggle in Editor Settings (&ldquo;Show canvas HUD&rdquo;, default On) with{" "}
+                      <code>H</code> keyboard shortcut + Keycap
+                    </li>
+                    <li>Persistent session-level setting</li>
+                    <li>
+                      Basic HUD cluster on canvas containing scale indicator + static north
+                      indicator (contrasting &lsquo;N&rsquo; + red triangular arrow)
+                    </li>
+                    <li>Clean dark/light mode support</li>
+                    <li>
+                      Minimal, calm, instrument-like appearance respecting the left sidebar and
+                      rounded aesthetic
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Added (Sidebar Hierarchy)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Left sidebar with project header (back button + editable project name)</li>
+                <li>Hierarchical rooms list with click-to-select and inline rename</li>
+                <li>Nested walls → openings → interior assets (stairs) with collapsible chevrons</li>
+                <li>Full row clickability (except chevron) for better UX</li>
+                <li>Consistent dark/light mode styling with rounded corners</li>
+                <li>Selection syncs between sidebar, canvas, and right inspector</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.52.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-31</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Project open loading screen now features a subtle left-to-right animated shine on
+                  &ldquo;Loading project...&rdquo;
+                </li>
+                <li>Keeps the experience light and calm while adding a small moment of delight</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.52.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-31</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Added (Snapping &amp; Guidelines)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Separate toggles in Editor Settings: &ldquo;Show guidelines&rdquo; and
+                  &ldquo;Enable snapping&rdquo; (both default On)
+                </li>
+                <li>
+                  Short, predictive amber-600 dashed guidelines from cursor to nearest
+                  room/wall/edge (Cities: Skylines style)
+                </li>
+                <li>Magnetic snapping to guidelines/edges when enabled</li>
+                <li>Permanent blue crosshair + grid-snapped circular cursor always visible</li>
+                <li>
+                  Keyboard shortcuts: G (toggle guidelines), S (toggle snapping) with Keycap
+                  labels in settings
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.51.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Added (Stairs - Phase 1)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Stairs toolbar button (enabled only when a suitable room is selected)</li>
+                <li>Click to place default 1.2 m × 2.7 m stair block centred in the room</li>
+                <li>Drag to move (constrained inside room bounds)</li>
+                <li>
+                  Resize with side and corner handles (depth snaps to 0.3 m tread multiples, width
+                  snaps to current grid)
+                </li>
+                <li>
+                  Basic inspector panel when selected (editable name + dimensions + placeholder for
+                  future options)
+                </li>
+                <li>Stairs appear as interior assets under their parent room</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.50.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-27</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Export)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Simplified positioning controls in Export dialog</li>
+                <li>Legend now uses a single control with Bottom, Right side, or None</li>
+                <li>Scale bar now uses a single control with Bottom-left or None</li>
+                <li>Removed redundant &quot;Show&quot; toggles</li>
+                <li>Cleaner, less noisy UI while keeping full flexibility</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.50.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-27</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Wall midpoint resizing for non-rectangular orthogonal rooms</li>
+                <li>
+                  Consistent behaviour with rectangular rooms (drag middle of wall to
+                  lengthen/shorten while keeping orthogonality)
+                </li>
+                <li>Wall measurement pills now sit cleanly inside walls for all room types</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.49.4</h2>
+            <span className="text-sm text-muted-foreground">2026-03-27</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Project open loading screen now shows a subtle spinner alongside the existing
+                  text
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.49.5</h2>
             <span className="text-sm text-muted-foreground">2026-03-27</span>
           </div>
@@ -113,6 +312,54 @@ export default function ChangelogPage() {
                 <li>Added clear breakdown cards showing what those sessions actually did</li>
                 <li>Subtle red accent when drop-off rate is high</li>
                 <li>Detail page now provides immediate insight</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.49.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-26</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Analytics sidebar sub-items under a collapsible &quot;Analytics&quot; section</li>
+                <li>Direct links from the sidebar to Overview</li>
+                <li>Direct links from the sidebar to Sessions per day</li>
+                <li>Direct links from the sidebar to % drawing at least one room</li>
+                <li>Direct links from the sidebar to Average time to first room</li>
+                <li>Direct links from the sidebar to Total rooms created</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.48.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-26</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Dedicated full-page feedback submissions graph at
+                  <code>/admin/analytics/feedback-graph</code> (large calm area/line chart, last
+                  90 days)
+                </li>
+                <li>
+                  Small sparkline in the Feedback Inbox header that links to the full graph page
+                </li>
+                <li>
+                  Reused and extended the shared shadcn chart primitive for both full graph and
+                  sparkline
+                </li>
               </ul>
             </div>
           </div>
@@ -225,6 +472,51 @@ export default function ChangelogPage() {
                   &quot;1h 12m&quot; (smallest populated unit only)
                 </li>
                 <li>Both use consistent measurement typography</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.45.2</h2>
+            <span className="text-sm text-muted-foreground">2026-03-26</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Feedback Inbox Phase 3)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Subtle left accent + tint for unread rows</li>
+                <li>&quot;Last updated&quot; timestamp in header</li>
+                <li>Keyboard hint (<code>r</code> key) for marking focused row as read</li>
+                <li>Clearer &quot;Expand&quot;/&quot;Collapse&quot; affordance on rows</li>
+                <li>Calm confirmation after &quot;Mark all as read&quot;</li>
+                <li>Minor table hover/focus improvements via shared primitive</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.45.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-26</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved (Export Live Preview Polish)
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Better preview image scaling and aspect ratio for clean framing</li>
+                <li>Subtle, calm refresh overlay during updates (non-jarring)</li>
+                <li>Rebalanced desktop split layout (wider preview, tighter settings pane)</li>
+                <li>Smoother mobile stacked spacing</li>
+                <li>Sticky Export button preserved</li>
               </ul>
             </div>
           </div>
@@ -450,6 +742,53 @@ export default function ChangelogPage() {
                 <li>Subtle &quot;Designed with [s]paceforge&quot; signature in exported images</li>
                 <li>Responsive dialog (desktop) / drawer (mobile) using shared primitives</li>
                 <li>Final polish to keep Export theme subtitle on a single line</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.38.2</h2>
+            <span className="text-sm text-muted-foreground">2026-03-24</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Low-contrast selected states in light mode across shared shadcn primitives,
+                  including segmented controls, pills, buttons, and toggles
+                </li>
+                <li>
+                  Selected surfaces now use stronger, calm contrast in light mode while dark mode
+                  remains unchanged
+                </li>
+                <li>
+                  Fix applied at the shared token and primitive level through{" "}
+                  <code>globals.css</code> and the shared button and badge components
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.38.1</h2>
+            <span className="text-sm text-muted-foreground">2026-03-24</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Private &quot;You found this early 🌀&quot; badge in the editor header
+                  (localStorage flag, visible only to the user)
+                </li>
+                <li>Minimal gamification foundation for private pride (Phase 1)</li>
               </ul>
             </div>
           </div>
@@ -720,6 +1059,65 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.32.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-22</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project deletion from <code>/projects</code></li>
+                <li>Explicit delete confirmation flow</li>
+                <li>
+                  Responsive delete confirmation surface with a dialog on desktop and a drawer on
+                  mobile
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improved
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project card actions now use compact icon controls</li>
+                <li>Delete flow no longer disrupts project card height or grid layout</li>
+                <li>Deletion interaction feels tidier and more deliberate</li>
+                <li>
+                  Accessibility improved for icon-only project actions with labels and hover hints
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Changed
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  If the deleted project was the active one, stale local active-project state is
+                  cleared
+                </li>
+                <li>
+                  Deleting the last remaining project now falls through cleanly to the existing
+                  empty state
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Notes</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Deletion remains confined to <code>/projects</code></li>
+                <li>No trash, archive, or undo-delete system was introduced</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.31.0</h2>
             <span className="text-sm text-muted-foreground">2026-03-21</span>
           </div>
@@ -864,6 +1262,61 @@ export default function ChangelogPage() {
               <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>Existing local editor persistence remains intact as a fallback</li>
                 <li>No account/auth system introduced yet (anonymous users only)</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.28.0</h2>
+            <span className="text-sm text-muted-foreground">2026-03-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">New</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Added adaptive snap-step resolution so editing precision now scales with zoom
+                  level instead of staying fixed to one grid increment
+                </li>
+                <li>
+                  Added a lightweight live scale overlay in the canvas with the current snap
+                  increment shown alongside the scale bar
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Behaviour
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Room drawing, whole-room movement, rectangular resize, constrained vertex drag,
+                  and opening drag or resize now share one central active snap step
+                </li>
+                <li>
+                  The snap tiers are tuned so 0.5 m remains the main working mode, 0.1 m activates
+                  earlier for detail work, and 1.0 m is reserved for genuinely far-out views
+                </li>
+                <li>
+                  The scale overlay now avoids hydration mismatch by staying server and client
+                  stable until editor state hydration completes
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">
+                Improvements
+              </h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Adaptive snapping now feels more consistent across the editor&apos;s direct
+                  manipulation paths without adding new settings or heavy UI
+                </li>
               </ul>
             </div>
           </div>
