@@ -34,19 +34,7 @@ type ActiveRotationSession =
       startRotationDegrees: number;
       currentRotationDegrees: number;
       startAngleDegrees: number;
-    }
-  | {
-      type: "gesture";
-      startRotationDegrees: number;
-      currentRotationDegrees: number;
     };
-
-type GestureEventLike = Event & {
-  clientX?: number;
-  clientY?: number;
-  rotation?: number;
-  shiftKey?: boolean;
-};
 
 /**
  * Handles editor camera pan/zoom input and cursor feedback.
@@ -103,6 +91,14 @@ export function attachPanZoomInput(
     );
   };
 
+  const getCanvasPointFromClientPoint = (clientX: number, clientY: number): ScreenPoint => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
   const updateRotationPreview = (degrees: number, pointer: ScreenPoint | null, shouldSnap: boolean) => {
     const nextDegrees = shouldSnap
       ? snapCanvasRotationDegrees(degrees, CANVAS_ROTATION_SNAP_FINE_DEGREES)
@@ -140,11 +136,7 @@ export function attachPanZoomInput(
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    const rect = canvas.getBoundingClientRect();
-    const screenPoint = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
+    const screenPoint = getCanvasPointFromClientPoint(event.clientX, event.clientY);
 
     if (canStartRotation(event.button, screenPoint)) {
       event.preventDefault();
@@ -222,35 +214,10 @@ export function attachPanZoomInput(
   };
 
   const onWheel = (event: WheelEvent) => {
-    const deltaZ = typeof event.deltaZ === "number" ? event.deltaZ : 0;
-    if (Math.abs(deltaZ) > 0) {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const pointer = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
-      const currentRotationDegrees = normalizeCanvasRotationDegrees(store.getState().camera.rotationDegrees);
-      const nextRotationDegrees = updateRotationPreview(
-        currentRotationDegrees + deltaZ * 0.05,
-        pointer,
-        event.shiftKey
-      );
-      store
-        .getState()
-        .commitCanvasRotationDegrees(currentRotationDegrees, nextRotationDegrees);
-      callbacks.onRotationEnd?.();
-      return;
-    }
-
+    const pointer = getCanvasPointFromClientPoint(event.clientX, event.clientY);
     event.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const cursorInCanvas = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
     const scaleFactor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-    store.getState().zoomAtScreenPoint(cursorInCanvas, scaleFactor);
+    store.getState().zoomAtScreenPoint(pointer, scaleFactor);
   };
 
   const isTypingTarget = (target: EventTarget | null) => {
@@ -289,53 +256,12 @@ export function attachPanZoomInput(
     event.preventDefault();
   };
 
-  const onGestureStart = (event: Event) => {
-    const gestureEvent = event as GestureEventLike;
-    event.preventDefault();
-    const startRotationDegrees = normalizeCanvasRotationDegrees(store.getState().camera.rotationDegrees);
-    activeRotationSession = {
-      type: "gesture",
-      startRotationDegrees,
-      currentRotationDegrees: startRotationDegrees,
-    };
-    store.getState().setCanvasInteractionActive(true);
-    callbacks.onRotationPreview?.(startRotationDegrees, {
-      x: gestureEvent.clientX ?? getViewportCenter().x,
-      y: gestureEvent.clientY ?? getViewportCenter().y,
-    });
-    updateCursor();
-  };
-
-  const onGestureChange = (event: Event) => {
-    const gestureEvent = event as GestureEventLike;
-    if (activeRotationSession?.type !== "gesture") return;
-    event.preventDefault();
-    const pointer = {
-      x: gestureEvent.clientX ?? getViewportCenter().x,
-      y: gestureEvent.clientY ?? getViewportCenter().y,
-    };
-    const nextDegrees = updateRotationPreview(
-      activeRotationSession.startRotationDegrees + (gestureEvent.rotation ?? 0),
-      pointer,
-      gestureEvent.shiftKey ?? false
-    );
-    activeRotationSession.currentRotationDegrees = nextDegrees;
-  };
-
-  const onGestureEnd = () => {
-    if (activeRotationSession?.type !== "gesture") return;
-    finishRotation();
-  };
-
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointercancel", onPointerUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("contextmenu", onContextMenu);
-  canvas.addEventListener("gesturestart", onGestureStart as EventListener, { passive: false });
-  canvas.addEventListener("gesturechange", onGestureChange as EventListener, { passive: false });
-  canvas.addEventListener("gestureend", onGestureEnd as EventListener);
   // Future keyboard shortcuts (draw/select/etc.) should hook into this same lifecycle.
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
@@ -349,9 +275,6 @@ export function attachPanZoomInput(
     canvas.removeEventListener("pointercancel", onPointerUp);
     canvas.removeEventListener("wheel", onWheel);
     canvas.removeEventListener("contextmenu", onContextMenu);
-    canvas.removeEventListener("gesturestart", onGestureStart as EventListener);
-    canvas.removeEventListener("gesturechange", onGestureChange as EventListener);
-    canvas.removeEventListener("gestureend", onGestureEnd as EventListener);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);

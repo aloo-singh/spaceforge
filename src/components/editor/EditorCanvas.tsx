@@ -151,6 +151,12 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
@@ -311,38 +317,46 @@ function CanvasRotationIndicatorControl({
   const northMarkerDegrees = normalizeNorthBearingDegrees(northBearingDegrees + normalizedRotationDegrees);
 
   return (
-    <button
-      type="button"
-      onClick={onReset}
-      aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
-      title={`Reset rotation to 0°. ${formatCanvasRotationShortcutLabel()}.`}
-      className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)]"
-    >
-      <div
-        aria-hidden="true"
-        className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-[10px] transition-transform duration-75 ease-out"
-        style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
-      >
-        <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
-      </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-[10px] transition-transform duration-75 ease-out"
-        style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
-      >
-        <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
-      </div>
-      <div
-        className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
-        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
-      >
-        {formatCanvasRotationDegrees(normalizedRotationDegrees)}
-      </div>
-    </button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
+            className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)]"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
+            >
+              <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
+            </div>
+            <div
+              aria-hidden="true"
+              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
+            >
+              <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
+            </div>
+            <div
+              className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
+              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+            >
+              {formatCanvasRotationDegrees(normalizedRotationDegrees)}
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="center">
+          {formatCanvasRotationDegrees(normalizedRotationDegrees)}. {formatCanvasRotationShortcutLabel()}. Click to reset.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -526,6 +540,7 @@ export default function EditorCanvas({
     arrowLeft: number;
   } | null>(null);
   const activeNorthDragRef = useRef<ActiveNorthDrag | null>(null);
+  const canvasRotationIndicatorSlotRef = useRef<HTMLDivElement | null>(null);
   const [northDragTooltip, setNorthDragTooltip] = useState<NorthDragTooltipState | null>(null);
   const [canvasRotationTooltip, setCanvasRotationTooltip] =
     useState<CanvasRotationTooltipState | null>(null);
@@ -1506,8 +1521,10 @@ export default function EditorCanvas({
   );
 
   const updateCanvasRotationTooltip = useCallback((degrees: number, pointer: ScreenPoint | null) => {
+    void pointer;
     const containerElement = containerRef.current;
-    if (!containerElement || !pointer) {
+    const indicatorSlotElement = canvasRotationIndicatorSlotRef.current;
+    if (!containerElement || !indicatorSlotElement) {
       setCanvasRotationTooltip((current) =>
         current && Math.abs(current.rotationDegrees - degrees) < 0.001
           ? current
@@ -1519,17 +1536,18 @@ export default function EditorCanvas({
     }
 
     const containerBounds = containerElement.getBoundingClientRect();
+    const indicatorBounds = indicatorSlotElement.getBoundingClientRect();
     const tooltipWidthPx = 116;
     const tooltipHeightPx = 28;
-    const tooltipOffsetPx = 14;
+    const tooltipOffsetPx = 8;
     setCanvasRotationTooltip({
       left: clampValue(
-        pointer.x - containerBounds.left + tooltipOffsetPx,
+        indicatorBounds.left - containerBounds.left,
         8,
         Math.max(containerBounds.width - tooltipWidthPx - 8, 8)
       ),
       top: clampValue(
-        pointer.y - containerBounds.top - tooltipHeightPx - tooltipOffsetPx,
+        indicatorBounds.top - containerBounds.top - tooltipHeightPx - tooltipOffsetPx,
         8,
         Math.max(containerBounds.height - tooltipHeightPx - 8, 8)
       ),
@@ -1886,11 +1904,6 @@ export default function EditorCanvas({
                     : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
                 </div>
               </CanvasHudCard>
-              <CanvasRotationIndicatorControl
-                rotationDegrees={canvasRotationDegrees}
-                northBearingDegrees={northBearingDegrees}
-                onReset={() => updateCanvasRotationDegrees(0)}
-              />
               <NorthIndicatorControl
                 bearingDegrees={northBearingDegrees}
                 viewRotationDegrees={canvasRotationDegrees}
@@ -1900,6 +1913,15 @@ export default function EditorCanvas({
                 onPointerEnter={() => setIsNorthIndicatorHovered(true)}
                 onPointerLeave={() => setIsNorthIndicatorHovered(false)}
               />
+              <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <CanvasRotationIndicatorControl
+                    rotationDegrees={canvasRotationDegrees}
+                    northBearingDegrees={northBearingDegrees}
+                    onReset={() => updateCanvasRotationDegrees(0)}
+                  />
+                </div>
+              </div>
             </div>
           ) : null}
           {northDragTooltip ? (
@@ -2173,13 +2195,15 @@ function drawGrid(
     alpha: 1,
   });
 
-  const originX = (0 - camera.xMm) * camera.pixelsPerMm + width / 2;
-  const originY = (0 - camera.yMm) * camera.pixelsPerMm + height / 2;
+  const verticalOriginStart = worldToScreen({ x: 0, y: minY }, camera, viewport);
+  const verticalOriginEnd = worldToScreen({ x: 0, y: maxY }, camera, viewport);
+  const horizontalOriginStart = worldToScreen({ x: minX, y: 0 }, camera, viewport);
+  const horizontalOriginEnd = worldToScreen({ x: maxX, y: 0 }, camera, viewport);
   graphics.setStrokeStyle({ width: 1.5, color: theme.originAxis, alpha: 1 });
-  graphics.moveTo(originX, 0);
-  graphics.lineTo(originX, height);
-  graphics.moveTo(0, originY);
-  graphics.lineTo(width, originY);
+  graphics.moveTo(verticalOriginStart.x, verticalOriginStart.y);
+  graphics.lineTo(verticalOriginEnd.x, verticalOriginEnd.y);
+  graphics.moveTo(horizontalOriginStart.x, horizontalOriginStart.y);
+  graphics.lineTo(horizontalOriginEnd.x, horizontalOriginEnd.y);
   graphics.stroke();
 }
 
@@ -2656,10 +2680,24 @@ function drawRoomOpenings(
     const start = worldToScreen(layout.start, camera, viewport);
     const end = worldToScreen(layout.end, camera, viewport);
     const center = worldToScreen(layout.center, camera, viewport);
-    const tangent = layout.axis === "horizontal" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const tangentLength = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+    const tangent = {
+      x: (end.x - start.x) / tangentLength,
+      y: (end.y - start.y) / tangentLength,
+    };
+    const interiorNormalTarget = worldToScreen(
+      {
+        x: layout.center.x + layout.interiorNormal.x * 100,
+        y: layout.center.y + layout.interiorNormal.y * 100,
+      },
+      camera,
+      viewport
+    );
+    const interiorNormalLength =
+      Math.hypot(interiorNormalTarget.x - center.x, interiorNormalTarget.y - center.y) || 1;
     const interiorNormal = {
-      x: layout.interiorNormal.x,
-      y: layout.interiorNormal.y,
+      x: (interiorNormalTarget.x - center.x) / interiorNormalLength,
+      y: (interiorNormalTarget.y - center.y) / interiorNormalLength,
     };
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
     const isSelected =
@@ -2778,11 +2816,10 @@ function drawRoomInteriorAssets(
   for (const asset of room.interiorAssets) {
     const bounds = getRoomInteriorAssetBounds(asset);
     const topLeft = worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport);
+    const topRight = worldToScreen({ x: bounds.right, y: bounds.top }, camera, viewport);
     const bottomRight = worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport);
-    const left = Math.min(topLeft.x, bottomRight.x);
-    const top = Math.min(topLeft.y, bottomRight.y);
-    const width = Math.abs(bottomRight.x - topLeft.x);
-    const height = Math.abs(bottomRight.y - topLeft.y);
+    const bottomLeft = worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport);
+    const corners = [topLeft, topRight, bottomRight, bottomLeft];
     const isSelected =
       selectedInteriorAsset?.roomId === room.id &&
       selectedInteriorAsset.assetId === asset.id;
@@ -2798,7 +2835,11 @@ function drawRoomInteriorAssets(
         color: theme.wallSelectionAccent,
         alpha: 0.18,
       });
-      graphics.rect(left, top, width, height);
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
       graphics.stroke();
     }
 
@@ -2806,7 +2847,11 @@ function drawRoomInteriorAssets(
       color: theme.roomOutline,
       alpha: isSelected ? 0.12 : 0.08,
     });
-    graphics.rect(left, top, width, height);
+    graphics.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i += 1) {
+      graphics.lineTo(corners[i].x, corners[i].y);
+    }
+    graphics.closePath();
     graphics.fill();
 
     graphics.setStrokeStyle({
@@ -2814,19 +2859,37 @@ function drawRoomInteriorAssets(
       color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
       alpha: isSelected ? 0.96 : 0.9,
     });
-    graphics.rect(left, top, width, height);
+    graphics.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i += 1) {
+      graphics.lineTo(corners[i].x, corners[i].y);
+    }
+    graphics.closePath();
     graphics.stroke();
 
-    const treadSpacingPx = Math.max(camera.pixelsPerMm * DEFAULT_STAIR_TREAD_SPACING_MM, 8);
-    for (let y = top + treadSpacingPx; y < top + height - 1; y += treadSpacingPx) {
+    const assetDepthMm = Math.max(bounds.bottom - bounds.top, 1);
+    const treadCount = Math.max(
+      0,
+      Math.floor(assetDepthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+    );
+    for (let index = 1; index <= treadCount; index += 1) {
+      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / assetDepthMm;
+      if (progress <= 0 || progress >= 1) continue;
+      const start = {
+        x: topLeft.x + (bottomLeft.x - topLeft.x) * progress,
+        y: topLeft.y + (bottomLeft.y - topLeft.y) * progress,
+      };
+      const end = {
+        x: topRight.x + (bottomRight.x - topRight.x) * progress,
+        y: topRight.y + (bottomRight.y - topRight.y) * progress,
+      };
       graphics.setStrokeStyle({
         width: Math.max(camera.pixelsPerMm * 10, 1.1),
         color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
         alpha: isSelected ? 0.88 : 0.72,
         cap: "round",
       });
-      graphics.moveTo(left + 4, y);
-      graphics.lineTo(left + width - 4, y);
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
       graphics.stroke();
     }
 
@@ -4319,20 +4382,21 @@ function drawGridLines(
 ) {
   const firstX = Math.floor(minX / stepMm) * stepMm;
   const firstY = Math.floor(minY / stepMm) * stepMm;
-  const { width, height } = viewport;
 
   graphics.setStrokeStyle(stroke);
 
   for (let xMm = firstX; xMm <= maxX; xMm += stepMm) {
-    const x = (xMm - camera.xMm) * camera.pixelsPerMm + width / 2;
-    graphics.moveTo(x, 0);
-    graphics.lineTo(x, height);
+    const start = worldToScreen({ x: xMm, y: minY }, camera, viewport);
+    const end = worldToScreen({ x: xMm, y: maxY }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
   }
 
   for (let yMm = firstY; yMm <= maxY; yMm += stepMm) {
-    const y = (yMm - camera.yMm) * camera.pixelsPerMm + height / 2;
-    graphics.moveTo(0, y);
-    graphics.lineTo(width, y);
+    const start = worldToScreen({ x: minX, y: yMm }, camera, viewport);
+    const end = worldToScreen({ x: maxX, y: yMm }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
   }
 
   graphics.stroke();
