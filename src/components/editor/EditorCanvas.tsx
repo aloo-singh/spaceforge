@@ -2211,13 +2211,8 @@ function drawGrid(
 
   if (width <= 0 || height <= 0) return;
 
-  const topLeftWorld = screenToWorld({ x: 0, y: 0 }, camera, viewport);
-  const bottomRightWorld = screenToWorld({ x: width, y: height }, camera, viewport);
-
-  const minX = Math.min(topLeftWorld.x, bottomRightWorld.x);
-  const maxX = Math.max(topLeftWorld.x, bottomRightWorld.x);
-  const minY = Math.min(topLeftWorld.y, bottomRightWorld.y);
-  const maxY = Math.max(topLeftWorld.y, bottomRightWorld.y);
+  const gridBoundsPaddingMm = GRID_SIZE_MM;
+  const { minX, maxX, minY, maxY } = getViewportWorldBounds(camera, viewport, gridBoundsPaddingMm);
 
   if (GRID_MINOR_SIZE_MM * camera.pixelsPerMm >= 8) {
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
@@ -2342,6 +2337,8 @@ function drawRooms(
 
     if (vertexHandles.length > 0) {
       for (const handle of wallSegmentHandles) {
+        const segment = getRoomWallSegment(room, handle.wallIndex);
+        if (!segment) continue;
         const isHovered =
           roomResizeUi.hoveredRoomId === room.id &&
           roomResizeUi.hoveredWallSegmentIndex === handle.wallIndex;
@@ -2351,33 +2348,28 @@ function drawRooms(
         const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
         const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
         const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
-        const radius = Math.min(handle.width, handle.height) / 2;
-        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-        const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
+        const start = worldToScreen(segment.originalStart, camera, viewport);
+        const end = worldToScreen(segment.originalEnd, camera, viewport);
 
-        if (haloPadding > 0) {
-          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
-          graphics.roundRect(
-            handle.left - haloPadding,
-            handle.top - haloPadding,
-            handle.width + haloPadding * 2,
-            handle.height + haloPadding * 2,
-            radius + haloPadding
-          );
-          graphics.fill();
-        }
-
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-        graphics.fill();
-
-        graphics.setStrokeStyle({
-          width: strokeWidth,
-          color: theme.roomOutline,
-          alpha: strokeAlpha,
+        drawCapsuleHandle(graphics, {
+          center: {
+            x: (start.x + end.x) / 2,
+            y: (start.y + end.y) / 2,
+          },
+          tangent: {
+            x: end.x - start.x,
+            y: end.y - start.y,
+          },
+          length: Math.max(handle.width, handle.height),
+          thickness: Math.min(handle.width, handle.height),
+          fillColor: theme.interactiveAccent,
+          fillAlpha,
+          strokeColor: theme.roomOutline,
+          strokeAlpha,
+          strokeWidth,
+          haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+          haloAlpha: isActive ? 0.2 : isHovered ? 0.12 : 0,
         });
-        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-        graphics.stroke();
       }
 
       for (const handle of vertexHandles) {
@@ -2388,29 +2380,18 @@ function drawRooms(
           roomResizeUi.activeRoomId === room.id &&
           roomResizeUi.activeVertexIndex === handle.vertexIndex;
         const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
-        const radius = size / 2;
-        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-
-        if (haloPadding > 0) {
-          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
-          graphics.circle(handle.center.x, handle.center.y, radius + haloPadding);
-          graphics.fill();
-        }
-
-        graphics.setFillStyle({
-          color: theme.interactiveAccent,
-          alpha: isActive ? 0.5 : isHovered ? 0.38 : 0.28,
+        drawRotatedSquareHandle(graphics, {
+          center: handle.center,
+          size,
+          rotationDegrees: camera.rotationDegrees,
+          fillColor: theme.interactiveAccent,
+          fillAlpha: isActive ? 0.5 : isHovered ? 0.38 : 0.28,
+          strokeColor: theme.roomOutline,
+          strokeAlpha: isActive ? 1 : isHovered ? 0.97 : 0.92,
+          strokeWidth: isActive ? 2 : isHovered ? 1.8 : 1.6,
+          haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+          haloAlpha: isActive ? 0.22 : isHovered ? 0.14 : 0,
         });
-        graphics.circle(handle.center.x, handle.center.y, radius);
-        graphics.fill();
-
-        graphics.setStrokeStyle({
-          width: isActive ? 2 : isHovered ? 1.8 : 1.6,
-          color: theme.roomOutline,
-          alpha: isActive ? 1 : isHovered ? 0.97 : 0.92,
-        });
-        graphics.circle(handle.center.x, handle.center.y, radius);
-        graphics.stroke();
       }
     }
 
@@ -2418,6 +2399,10 @@ function drawRooms(
     if (!bounds) continue;
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
+    const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+    const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+    const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+    const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
 
     for (const handle of handles) {
       const isHovered =
@@ -2427,34 +2412,34 @@ function drawRooms(
       const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
       const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
       const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
-      const radius = Math.min(handle.width, handle.height) / 2;
-      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-      const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
-      const handleStrokeColor = theme.roomOutline;
+      const [start, end] =
+        handle.wall === "top"
+          ? [topLeft, topRight]
+          : handle.wall === "right"
+            ? [topRight, bottomRight]
+            : handle.wall === "bottom"
+              ? [bottomLeft, bottomRight]
+              : [topLeft, bottomLeft];
 
-      if (haloPadding > 0) {
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
-        graphics.roundRect(
-          handle.left - haloPadding,
-          handle.top - haloPadding,
-          handle.width + haloPadding * 2,
-          handle.height + haloPadding * 2,
-          radius + haloPadding
-        );
-        graphics.fill();
-      }
-
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: strokeWidth,
-        color: handleStrokeColor,
-        alpha: strokeAlpha,
+      drawCapsuleHandle(graphics, {
+        center: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+        },
+        tangent: {
+          x: end.x - start.x,
+          y: end.y - start.y,
+        },
+        length: Math.max(handle.width, handle.height),
+        thickness: Math.min(handle.width, handle.height),
+        fillColor: theme.interactiveAccent,
+        fillAlpha,
+        strokeColor: theme.roomOutline,
+        strokeAlpha,
+        strokeWidth,
+        haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+        haloAlpha: isActive ? 0.2 : isHovered ? 0.12 : 0,
       });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.stroke();
     }
 
     for (const handle of cornerHandles) {
@@ -2463,34 +2448,22 @@ function drawRooms(
       const isActive =
         roomResizeUi.activeRoomId === room.id && roomResizeUi.activeCorner === handle.corner;
       const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
-      const half = size / 2;
-      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
       const fillAlpha = isActive ? 0.54 : isHovered ? 0.42 : 0.3;
       const strokeAlpha = isActive ? 1 : isHovered ? 0.98 : 0.9;
       const strokeWidth = isActive ? 2.1 : isHovered ? 1.8 : 1.5;
 
-      if (haloPadding > 0) {
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
-        graphics.rect(
-          handle.center.x - half - haloPadding,
-          handle.center.y - half - haloPadding,
-          size + haloPadding * 2,
-          size + haloPadding * 2
-        );
-        graphics.fill();
-      }
-
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: strokeWidth,
-        color: theme.roomOutline,
-        alpha: strokeAlpha,
+      drawRotatedSquareHandle(graphics, {
+        center: handle.center,
+        size,
+        rotationDegrees: camera.rotationDegrees,
+        fillColor: theme.interactiveAccent,
+        fillAlpha,
+        strokeColor: theme.roomOutline,
+        strokeAlpha,
+        strokeWidth,
+        haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+        haloAlpha: isActive ? 0.22 : isHovered ? 0.14 : 0,
       });
-      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
-      graphics.stroke();
     }
   }
 }
@@ -2938,33 +2911,49 @@ function drawRoomInteriorAssets(
     const cornerHandles = getCornerHandleLayouts(rectBounds, camera, viewport);
 
     for (const handle of wallHandles) {
-      const radius = Math.min(handle.width, handle.height) / 2;
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.3 });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.fill();
+      const [start, end] =
+        handle.wall === "top"
+          ? [topLeft, topRight]
+          : handle.wall === "right"
+            ? [topRight, bottomRight]
+            : handle.wall === "bottom"
+              ? [bottomLeft, bottomRight]
+              : [topLeft, bottomLeft];
 
-      graphics.setStrokeStyle({
-        width: 1.5,
-        color: theme.roomOutline,
-        alpha: 0.9,
+      drawCapsuleHandle(graphics, {
+        center: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+        },
+        tangent: {
+          x: end.x - start.x,
+          y: end.y - start.y,
+        },
+        length: Math.max(handle.width, handle.height),
+        thickness: Math.min(handle.width, handle.height),
+        fillColor: theme.interactiveAccent,
+        fillAlpha: 0.3,
+        strokeColor: theme.roomOutline,
+        strokeAlpha: 0.9,
+        strokeWidth: 1.5,
+        haloPadding: 0,
+        haloAlpha: 0,
       });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.stroke();
     }
 
     for (const handle of cornerHandles) {
-      const half = handle.size / 2;
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.38 });
-      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: 1.5,
-        color: theme.roomOutline,
-        alpha: 0.92,
+      drawRotatedSquareHandle(graphics, {
+        center: handle.center,
+        size: handle.size,
+        rotationDegrees: camera.rotationDegrees,
+        fillColor: theme.interactiveAccent,
+        fillAlpha: 0.38,
+        strokeColor: theme.roomOutline,
+        strokeAlpha: 0.92,
+        strokeWidth: 1.5,
+        haloPadding: 0,
+        haloAlpha: 0,
       });
-      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
-      graphics.stroke();
     }
   }
 }
@@ -4438,6 +4427,252 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function getViewportWorldBounds(
+  camera: CameraState,
+  viewport: ViewportSize,
+  paddingMm = 0
+) {
+  const viewportCorners = [
+    screenToWorld({ x: 0, y: 0 }, camera, viewport),
+    screenToWorld({ x: viewport.width, y: 0 }, camera, viewport),
+    screenToWorld({ x: viewport.width, y: viewport.height }, camera, viewport),
+    screenToWorld({ x: 0, y: viewport.height }, camera, viewport),
+  ];
+  const minX = Math.min(...viewportCorners.map((corner) => corner.x)) - paddingMm;
+  const maxX = Math.max(...viewportCorners.map((corner) => corner.x)) + paddingMm;
+  const minY = Math.min(...viewportCorners.map((corner) => corner.y)) - paddingMm;
+  const maxY = Math.max(...viewportCorners.map((corner) => corner.y)) + paddingMm;
+
+  return { minX, maxX, minY, maxY };
+}
+
+function drawCapsuleHandle(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    tangent: ScreenPoint;
+    length: number;
+    thickness: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+    haloPadding: number;
+    haloAlpha: number;
+  }
+) {
+  const tangentLength = Math.hypot(options.tangent.x, options.tangent.y);
+  if (tangentLength < 0.001) return;
+
+  const tangent = {
+    x: options.tangent.x / tangentLength,
+    y: options.tangent.y / tangentLength,
+  };
+  const normal = {
+    x: -tangent.y,
+    y: tangent.x,
+  };
+
+  if (options.haloPadding > 0 && options.haloAlpha > 0) {
+    drawCapsuleHandleShape(graphics, {
+      center: options.center,
+      tangent,
+      normal,
+      length: options.length + options.haloPadding * 2,
+      thickness: options.thickness + options.haloPadding * 2,
+      fillColor: options.fillColor,
+      fillAlpha: options.haloAlpha,
+      strokeColor: options.fillColor,
+      strokeAlpha: 0,
+      strokeWidth: 0,
+    });
+  }
+
+  drawCapsuleHandleShape(graphics, {
+    center: options.center,
+    tangent,
+    normal,
+    length: options.length,
+    thickness: options.thickness,
+    fillColor: options.fillColor,
+    fillAlpha: options.fillAlpha,
+    strokeColor: options.strokeColor,
+    strokeAlpha: options.strokeAlpha,
+    strokeWidth: options.strokeWidth,
+  });
+}
+
+function drawCapsuleHandleShape(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    tangent: ScreenPoint;
+    normal: ScreenPoint;
+    length: number;
+    thickness: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+  }
+) {
+  const radius = options.thickness / 2;
+  const halfBodyLength = Math.max(options.length / 2 - radius, 0);
+  const startCenter = {
+    x: options.center.x - options.tangent.x * halfBodyLength,
+    y: options.center.y - options.tangent.y * halfBodyLength,
+  };
+  const endCenter = {
+    x: options.center.x + options.tangent.x * halfBodyLength,
+    y: options.center.y + options.tangent.y * halfBodyLength,
+  };
+  const corners = [
+    {
+      x: startCenter.x + options.normal.x * radius,
+      y: startCenter.y + options.normal.y * radius,
+    },
+    {
+      x: endCenter.x + options.normal.x * radius,
+      y: endCenter.y + options.normal.y * radius,
+    },
+    {
+      x: endCenter.x - options.normal.x * radius,
+      y: endCenter.y - options.normal.y * radius,
+    },
+    {
+      x: startCenter.x - options.normal.x * radius,
+      y: startCenter.y - options.normal.y * radius,
+    },
+  ];
+
+  graphics.setFillStyle({ color: options.fillColor, alpha: options.fillAlpha });
+  graphics.moveTo(corners[0].x, corners[0].y);
+  for (let index = 1; index < corners.length; index += 1) {
+    graphics.lineTo(corners[index].x, corners[index].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+  graphics.circle(startCenter.x, startCenter.y, radius);
+  graphics.fill();
+  graphics.circle(endCenter.x, endCenter.y, radius);
+  graphics.fill();
+
+  if (options.strokeWidth <= 0 || options.strokeAlpha <= 0) return;
+
+  graphics.setStrokeStyle({
+    width: options.strokeWidth,
+    color: options.strokeColor,
+    alpha: options.strokeAlpha,
+    join: "round",
+  });
+  graphics.moveTo(corners[0].x, corners[0].y);
+  for (let index = 1; index < corners.length; index += 1) {
+    graphics.lineTo(corners[index].x, corners[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+  graphics.circle(startCenter.x, startCenter.y, radius);
+  graphics.stroke();
+  graphics.circle(endCenter.x, endCenter.y, radius);
+  graphics.stroke();
+}
+
+function drawRotatedSquareHandle(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    size: number;
+    rotationDegrees: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+    haloPadding: number;
+    haloAlpha: number;
+  }
+) {
+  if (options.haloPadding > 0 && options.haloAlpha > 0) {
+    drawPolygonHandle(graphics, {
+      points: getRotatedSquarePoints(options.center, options.size + options.haloPadding * 2, options.rotationDegrees),
+      fillColor: options.fillColor,
+      fillAlpha: options.haloAlpha,
+      strokeColor: options.fillColor,
+      strokeAlpha: 0,
+      strokeWidth: 0,
+    });
+  }
+
+  drawPolygonHandle(graphics, {
+    points: getRotatedSquarePoints(options.center, options.size, options.rotationDegrees),
+    fillColor: options.fillColor,
+    fillAlpha: options.fillAlpha,
+    strokeColor: options.strokeColor,
+    strokeAlpha: options.strokeAlpha,
+    strokeWidth: options.strokeWidth,
+  });
+}
+
+function drawPolygonHandle(
+  graphics: Graphics,
+  options: {
+    points: ScreenPoint[];
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+  }
+) {
+  if (options.points.length < 3) return;
+
+  graphics.setFillStyle({ color: options.fillColor, alpha: options.fillAlpha });
+  graphics.moveTo(options.points[0].x, options.points[0].y);
+  for (let index = 1; index < options.points.length; index += 1) {
+    graphics.lineTo(options.points[index].x, options.points[index].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+
+  if (options.strokeWidth <= 0 || options.strokeAlpha <= 0) return;
+
+  graphics.setStrokeStyle({
+    width: options.strokeWidth,
+    color: options.strokeColor,
+    alpha: options.strokeAlpha,
+  });
+  graphics.moveTo(options.points[0].x, options.points[0].y);
+  for (let index = 1; index < options.points.length; index += 1) {
+    graphics.lineTo(options.points[index].x, options.points[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+}
+
+function getRotatedSquarePoints(
+  center: ScreenPoint,
+  size: number,
+  rotationDegrees: number
+): ScreenPoint[] {
+  const half = size / 2;
+  const radians = (normalizeCanvasRotationDegrees(rotationDegrees) * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const corners = [
+    { x: -half, y: -half },
+    { x: half, y: -half },
+    { x: half, y: half },
+    { x: -half, y: half },
+  ];
+
+  return corners.map((corner) => ({
+    x: center.x + corner.x * cos - corner.y * sin,
+    y: center.y + corner.x * sin + corner.y * cos,
+  }));
 }
 
 function getTextResolution(): number {
