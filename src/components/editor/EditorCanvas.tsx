@@ -156,7 +156,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  tooltipContentClassName,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
@@ -1938,7 +1940,7 @@ export default function EditorCanvas({
           ) : null}
           {canvasRotationTooltip ? (
             <div
-              className="pointer-events-none absolute z-20 rounded-md border border-border/70 bg-background/94 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-[0_6px_20px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:shadow-[0_6px_20px_rgba(0,0,0,0.24)]"
+              className={cn("pointer-events-none absolute", tooltipContentClassName)}
               style={{
                 left: `${canvasRotationTooltip.left}px`,
                 top: `${canvasRotationTooltip.top}px`,
