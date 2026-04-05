@@ -1,5 +1,9 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
 import {
+  DEFAULT_CANVAS_ROTATION_DEGREES,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
+import {
   DEFAULT_NORTH_BEARING_DEGREES,
   normalizeNorthBearingDegrees,
 } from "@/lib/editor/north";
@@ -119,6 +123,12 @@ export function isProjectDocument(value: unknown): value is EditorDocumentState 
   ) {
     return false;
   }
+  if (
+    value.canvasRotationDegrees !== undefined &&
+    (!isFiniteNumber(value.canvasRotationDegrees) || !Number.isFinite(value.canvasRotationDegrees))
+  ) {
+    return false;
+  }
   if (!("exportConfig" in value) || value.exportConfig === undefined) return true;
   if (!isObject(value.exportConfig)) return false;
   if (
@@ -171,6 +181,9 @@ export function isProjectThumbnailDataUrl(value: unknown): value is string | nul
 export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {
   return cloneDocumentState({
     ...document,
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(
+      document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
+    ),
     northBearingDegrees: normalizeNorthBearingDegrees(
       document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
     ),

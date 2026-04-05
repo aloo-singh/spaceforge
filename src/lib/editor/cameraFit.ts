@@ -3,6 +3,7 @@ import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { clampPixelsPerMm } from "@/lib/editor/camera";
 import { MIN_PIXELS_PER_MM } from "@/lib/editor/constants";
 import type { CameraState, Room, ViewportSize } from "@/lib/editor/types";
+import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 
 const DEFAULT_FIT_CAMERA_PADDING_PX = 96;
 const MIN_FIT_CAMERA_SPAN_MM = 1200;
@@ -28,13 +29,22 @@ function getFitPixelsPerMmForBounds(options: {
   layoutBounds: LayoutBounds2d;
   viewport: ViewportSize;
   paddingPx: number;
+  rotationDegrees?: number;
 }) {
   const paddedWidthMm = Math.max(options.layoutBounds.width, MIN_FIT_CAMERA_SPAN_MM);
   const paddedHeightMm = Math.max(options.layoutBounds.height, MIN_FIT_CAMERA_SPAN_MM);
+  const rotationRadians =
+    (Math.abs(normalizeCanvasRotationDegrees(options.rotationDegrees ?? 0)) * Math.PI) / 180;
+  const rotatedWidthMm =
+    Math.abs(paddedWidthMm * Math.cos(rotationRadians)) +
+    Math.abs(paddedHeightMm * Math.sin(rotationRadians));
+  const rotatedHeightMm =
+    Math.abs(paddedWidthMm * Math.sin(rotationRadians)) +
+    Math.abs(paddedHeightMm * Math.cos(rotationRadians));
   const availableWidthPx = Math.max(1, options.viewport.width - options.paddingPx * 2);
   const availableHeightPx = Math.max(1, options.viewport.height - options.paddingPx * 2);
 
-  return Math.min(availableWidthPx / paddedWidthMm, availableHeightPx / paddedHeightMm);
+  return Math.min(availableWidthPx / rotatedWidthMm, availableHeightPx / rotatedHeightMm);
 }
 
 export function getDrawingAwareMinPixelsPerMm(options: {
@@ -53,6 +63,7 @@ export function getDrawingAwareMinPixelsPerMm(options: {
     layoutBounds: options.layoutBounds,
     viewport: getNormalizedViewport(options.viewport),
     paddingPx: getNormalizedPaddingPx(options.paddingPx),
+    rotationDegrees: 0,
   });
   const zoomOutHeadroom = Math.max(0.1, Math.min(1, options.zoomOutHeadroom ?? DYNAMIC_MIN_ZOOM_HEADROOM));
 
@@ -93,6 +104,7 @@ export function getCameraFitTargetForBounds(options: {
     layoutBounds: options.layoutBounds,
     viewport,
     paddingPx,
+    rotationDegrees: options.emptyLayoutCamera.rotationDegrees,
   });
   const minimumPixelsPerMm = getDrawingAwareMinPixelsPerMm({
     layoutBounds: options.layoutBounds,
@@ -105,6 +117,7 @@ export function getCameraFitTargetForBounds(options: {
       xMm: options.layoutBounds.centerX,
       yMm: options.layoutBounds.centerY,
       pixelsPerMm: clampPixelsPerMm(fitPixelsPerMm, minimumPixelsPerMm),
+      rotationDegrees: normalizeCanvasRotationDegrees(options.emptyLayoutCamera.rotationDegrees),
     },
     didFitToRooms: true,
   };

@@ -7,6 +7,7 @@ import {
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
+import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 
 export type PersistedHistorySnapshot = {
@@ -28,6 +29,8 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     exportConfigA.description !== exportConfigB.description ||
     exportConfigA.titlePosition !== exportConfigB.titlePosition ||
     exportConfigA.descriptionPosition !== exportConfigB.descriptionPosition ||
+    normalizeCanvasRotationDegrees(a.canvasRotationDegrees) !==
+      normalizeCanvasRotationDegrees(b.canvasRotationDegrees) ||
     normalizeNorthBearingDegrees(a.northBearingDegrees) !==
       normalizeNorthBearingDegrees(b.northBearingDegrees)
   ) {
@@ -58,6 +61,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       titlePosition: exportConfig.titlePosition,
       descriptionPosition: exportConfig.descriptionPosition,
     },
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
@@ -80,6 +84,8 @@ function arePointListsEqual(a: Room["points"], b: Room["points"]): boolean {
 }
 
 function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentState): EditorCommand | null {
+  const previousCanvasRotation = normalizeCanvasRotationDegrees(previous.canvasRotationDegrees);
+  const nextCanvasRotation = normalizeCanvasRotationDegrees(next.canvasRotationDegrees);
   const previousNorthBearing = normalizeNorthBearingDegrees(previous.northBearingDegrees);
   const nextNorthBearing = normalizeNorthBearingDegrees(next.northBearingDegrees);
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
@@ -135,6 +141,20 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (removedRooms.length > 0) return null;
+
+  if (
+    previousCanvasRotation !== nextCanvasRotation &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    return {
+      type: "update-canvas-rotation",
+      previousRotationDegrees: previousCanvasRotation,
+      nextRotationDegrees: nextCanvasRotation,
+    };
+  }
 
   if (
     previousNorthBearing !== nextNorthBearing &&

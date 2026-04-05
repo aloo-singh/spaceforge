@@ -1,4 +1,4 @@
-import { screenToWorld } from "@/lib/editor/camera";
+import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import {
@@ -45,7 +45,7 @@ import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openin
 import type { Point, Room, RoomWall } from "@/lib/editor/types";
 
 type RoomResizeStoreState = {
-  camera: { xMm: number; yMm: number; pixelsPerMm: number };
+  camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean };
   document: { rooms: Room[] };
@@ -125,8 +125,145 @@ function getCursorForCorner(corner: RectCorner): string {
     : NWSE_RESIZE_CURSOR;
 }
 
-function getCursorForVertex(): string {
-  return "move";
+function getCursorForConstrainedVertex(room: Room, vertexIndex: number): string {
+  const pointCount = room.points.length;
+  const point = room.points[vertexIndex];
+  const previousPoint = room.points[(vertexIndex - 1 + pointCount) % pointCount];
+  const nextPoint = room.points[(vertexIndex + 1) % pointCount];
+  const hasLeft = previousPoint.x < point.x || nextPoint.x < point.x;
+  const hasRight = previousPoint.x > point.x || nextPoint.x > point.x;
+  const hasUp = previousPoint.y < point.y || nextPoint.y < point.y;
+  const hasDown = previousPoint.y > point.y || nextPoint.y > point.y;
+
+  return (hasLeft && hasUp) || (hasRight && hasDown)
+    ? NESW_RESIZE_CURSOR
+    : NWSE_RESIZE_CURSOR;
+}
+
+function hitTestRotatedHandleSegment(options: {
+  point: Point;
+  start: Point;
+  end: Point;
+  handleLengthPx: number;
+  handleThicknessPx: number;
+  hitPaddingPx: number;
+}): boolean {
+  const segmentDelta = {
+    x: options.end.x - options.start.x,
+    y: options.end.y - options.start.y,
+  };
+  const segmentLength = Math.hypot(segmentDelta.x, segmentDelta.y);
+  if (segmentLength < 0.001) return false;
+
+  const tangent = {
+    x: segmentDelta.x / segmentLength,
+    y: segmentDelta.y / segmentLength,
+  };
+  const normal = {
+    x: -tangent.y,
+    y: tangent.x,
+  };
+  const center = {
+    x: (options.start.x + options.end.x) / 2,
+    y: (options.start.y + options.end.y) / 2,
+  };
+  const relative = {
+    x: options.point.x - center.x,
+    y: options.point.y - center.y,
+  };
+  const tangentDistance = relative.x * tangent.x + relative.y * tangent.y;
+  const normalDistance = relative.x * normal.x + relative.y * normal.y;
+  const halfLength = options.handleLengthPx / 2 + options.hitPaddingPx;
+  const halfThickness = options.handleThicknessPx / 2 + options.hitPaddingPx;
+
+  return Math.abs(tangentDistance) <= halfLength && Math.abs(normalDistance) <= halfThickness;
+}
+
+function hitTestRectWallHandle(
+  bounds: RoomRectBounds,
+  wall: RectWall,
+  point: Point,
+  camera: RoomResizeStoreState["camera"],
+  viewport: RoomResizeStoreState["viewport"]
+): boolean {
+  const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+  const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+  const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+  const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
+  const [start, end] =
+    wall === "top"
+      ? [topLeft, topRight]
+      : wall === "right"
+        ? [topRight, bottomRight]
+        : wall === "bottom"
+          ? [bottomLeft, bottomRight]
+          : [topLeft, bottomLeft];
+
+  return hitTestRotatedHandleSegment({
+    point,
+    start,
+    end,
+    handleLengthPx: Math.min(40, Math.max(14, Math.hypot(end.x - start.x, end.y - start.y))),
+    handleThicknessPx: 8,
+    hitPaddingPx: 8,
+  });
+}
+
+function hitTestOrthogonalWallSegmentHandle(
+  room: Room,
+  wallSegmentIndex: number,
+  point: Point,
+  camera: RoomResizeStoreState["camera"],
+  viewport: RoomResizeStoreState["viewport"]
+): boolean {
+  const segment = getRoomWallSegment(room, wallSegmentIndex);
+  if (!segment) return false;
+
+  const start = worldToScreen(segment.originalStart, camera, viewport);
+  const end = worldToScreen(segment.originalEnd, camera, viewport);
+
+  return hitTestRotatedHandleSegment({
+    point,
+    start,
+    end,
+    handleLengthPx: Math.min(40, Math.max(14, Math.hypot(end.x - start.x, end.y - start.y))),
+    handleThicknessPx: 8,
+    hitPaddingPx: 8,
+  });
+}
+
+function getHitRectWall(
+  bounds: RoomRectBounds,
+  point: Point,
+  camera: RoomResizeStoreState["camera"],
+  viewport: RoomResizeStoreState["viewport"]
+): RectWall | null {
+  const handles = getWallHandleLayouts(bounds, camera, viewport);
+
+  for (const handle of handles) {
+    if (hitTestRectWallHandle(bounds, handle.wall, point, camera, viewport)) {
+      return handle.wall;
+    }
+  }
+
+  return null;
+}
+
+function getHitOrthogonalWallSegment(
+  room: Room,
+  point: Point,
+  camera: RoomResizeStoreState["camera"],
+  viewport: RoomResizeStoreState["viewport"]
+): number | null {
+  const handles = getOrthogonalWallHandleLayouts(room, camera, viewport);
+
+  for (const handle of handles) {
+    if (hitTestOrthogonalWallSegmentHandle(room, handle.wallIndex, point, camera, viewport)) {
+      return handle.wallIndex;
+    }
+  }
+
+  return null;
 }
 
 export function attachRoomResizeInput(
@@ -266,7 +403,10 @@ export function attachRoomResizeInput(
       if (activeSession.target.type === "corner") {
         setCursor(getCursorForCorner(activeSession.target.corner));
       } else if (activeSession.target.type === "vertex") {
-        setCursor(getCursorForVertex());
+        const selected = getSelectedEditableRoom();
+        setCursor(
+          selected ? getCursorForConstrainedVertex(selected.room, activeSession.target.vertexIndex) : ""
+        );
       } else if (activeSession.target.type === "wall-segment") {
         const selected = getSelectedEditableRoom();
         setCursor(
@@ -284,7 +424,8 @@ export function attachRoomResizeInput(
     }
 
     if (hoveredVertexIndex !== null && !isSpaceHeld) {
-      setCursor(getCursorForVertex());
+      const selected = getSelectedEditableRoom();
+      setCursor(selected ? getCursorForConstrainedVertex(selected.room, hoveredVertexIndex) : "");
       return;
     }
 
@@ -462,7 +603,14 @@ export function attachRoomResizeInput(
         selected.state.viewport
       );
       const hitWallSegmentIndex =
-        hitVertexIndex === null ? hitTestOrthogonalWallHandle(wallHandles, screenPoint) : null;
+        hitVertexIndex === null
+          ? getHitOrthogonalWallSegment(
+              selected.room,
+              screenPoint,
+              selected.state.camera,
+              selected.state.viewport
+            ) ?? hitTestOrthogonalWallHandle(wallHandles, screenPoint)
+          : null;
       setHoveredHandle({
         wall: null,
         corner: null,
@@ -485,7 +633,9 @@ export function attachRoomResizeInput(
       return;
     }
     setHoveredHandle({
-      wall: hitTestWallHandle(handles, screenPoint),
+      wall:
+        getHitRectWall(selected.bounds, screenPoint, selected.state.camera, selected.state.viewport) ??
+        hitTestWallHandle(handles, screenPoint),
       corner: null,
       vertexIndex: null,
       wallSegmentIndex: null,
@@ -510,7 +660,13 @@ export function attachRoomResizeInput(
       : null;
     const hitWallSegmentIndex =
       selected.isConstrainedVertexRoom && hitVertexIndex === null
-        ? hitTestOrthogonalWallHandle(
+        ? getHitOrthogonalWallSegment(
+            selected.room,
+            screenPoint,
+            selected.state.camera,
+            selected.state.viewport
+          ) ??
+          hitTestOrthogonalWallHandle(
             getOrthogonalWallHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),
             screenPoint
           )
@@ -524,7 +680,11 @@ export function attachRoomResizeInput(
       hitVertexIndex === null && !hitCorner && selected.bounds
         ? getWallHandleLayouts(selected.bounds, selected.state.camera, selected.state.viewport)
         : [];
-    const hitWall = hitVertexIndex === null && hitCorner === null ? hitTestWallHandle(wallHandles, screenPoint) : null;
+    const hitWall =
+      hitVertexIndex === null && hitCorner === null
+        ? getHitRectWall(selected.bounds!, screenPoint, selected.state.camera, selected.state.viewport) ??
+          hitTestWallHandle(wallHandles, screenPoint)
+        : null;
     if (hitVertexIndex === null && hitWallSegmentIndex === null && !hitCorner && !hitWall) return;
 
     event.preventDefault();

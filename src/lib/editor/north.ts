@@ -1,5 +1,5 @@
 export const DEFAULT_NORTH_BEARING_DEGREES = 0;
-export const NORTH_BEARING_SNAP_DEGREES = 5;
+export const NORTH_BEARING_SNAP_DEGREES = 15;
 
 export function normalizeNorthBearingDegrees(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_NORTH_BEARING_DEGREES;

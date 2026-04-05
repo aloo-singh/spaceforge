@@ -21,17 +21,31 @@ import {
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
-import { getConstrainedVertexHandleLayouts } from "@/lib/editor/constrainedVertexAdjustments";
+import {
+  getConstrainedVertexHandleLayouts,
+  hitTestConstrainedVertexHandle,
+  isNonRectangularOrthogonalRoom,
+} from "@/lib/editor/constrainedVertexAdjustments";
 import {
   DEFAULT_STAIR_TREAD_SPACING_MM,
+  findInteriorAssetAtScreenPoint,
   getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
 } from "@/lib/editor/interiorAssets";
-import { getOrthogonalWallHandleLayouts } from "@/lib/editor/orthogonalWallResize";
-import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
-import { getRoomWallMeasurement, getRoomWallSegment } from "@/lib/editor/openings";
+import {
+  getOrthogonalWallHandleLayouts,
+  hitTestOrthogonalWallHandle,
+} from "@/lib/editor/orthogonalWallResize";
+import {
+  findOpeningAtScreenPoint,
+  findSelectedOpeningWidthHandleAtScreenPoint,
+  getResolvedRoomOpeningLayout,
+  getRoomWallMeasurement,
+  getRoomWallSegment,
+} from "@/lib/editor/openings";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
+  findRoomLabelAtScreenPoint,
   getRoomLabelLayout,
   ROOM_LABEL_AREA_FONT_FAMILY,
   ROOM_LABEL_AREA_FONT_SIZE_PX,
@@ -51,6 +65,7 @@ import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import {
+  findRoomAtPoint,
   isAxisAlignedRectangle,
   isOrthogonalPointPath,
   isPointInPolygon,
@@ -70,6 +85,8 @@ import {
 import {
   getAxisAlignedRoomBounds,
   getCornerHandleLayouts,
+  hitTestCornerHandle,
+  hitTestWallHandle,
   getWallHandleLayouts,
   type RectCorner,
   type RectWall,
@@ -97,6 +114,11 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  formatCanvasRotationDegrees,
+  formatCanvasRotationShortcutLabel,
+  normalizeCanvasRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 import {
   formatNorthBearingDegrees,
   getNorthBearingDegreesFromScreenDelta,
@@ -129,6 +151,14 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  tooltipContentClassName,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   track,
@@ -197,6 +227,7 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
+const CANVAS_ROTATION_ENABLED = false;
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
 }
@@ -253,6 +284,12 @@ type NorthDragTooltipState = {
   bearingDegrees: number;
 };
 
+type CanvasRotationTooltipState = {
+  left: number;
+  top: number;
+  rotationDegrees: number;
+};
+
 type NorthIndicatorSurfaceState = "hidden" | "visible";
 
 type ActiveNorthDrag = {
@@ -264,8 +301,74 @@ type ActiveNorthDrag = {
   didDrag: boolean;
 };
 
+function CanvasRotationIndicatorControl({
+  rotationDegrees,
+  northBearingDegrees,
+  surfaceState,
+  onReset,
+}: {
+  rotationDegrees: number;
+  northBearingDegrees: number;
+  surfaceState: NorthIndicatorSurfaceState;
+  onReset: () => void;
+}) {
+  const normalizedRotationDegrees = normalizeCanvasRotationDegrees(rotationDegrees);
+  const showSurface = surfaceState === "visible";
+
+  const northMarkerDegrees = normalizeNorthBearingDegrees(northBearingDegrees + normalizedRotationDegrees);
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
+            className={`group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
+              showSurface ? "pointer-events-auto" : "pointer-events-none"
+            } ${
+              showSurface ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
+          >
+            <div
+              aria-hidden="true"
+              className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
+            >
+              <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
+            </div>
+            <div
+              aria-hidden="true"
+              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
+            >
+              <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
+            </div>
+            <div
+              className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
+              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+            >
+              {formatCanvasRotationDegrees(normalizedRotationDegrees)}
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="center">
+          {formatCanvasRotationDegrees(normalizedRotationDegrees)}. {formatCanvasRotationShortcutLabel()}. Click to reset.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function NorthIndicatorControl({
   bearingDegrees,
+  viewRotationDegrees,
   surfaceState,
   isDragging,
   onPointerDown,
@@ -273,29 +376,33 @@ function NorthIndicatorControl({
   onPointerLeave,
 }: {
   bearingDegrees: number;
+  viewRotationDegrees: number;
   surfaceState: NorthIndicatorSurfaceState;
   isDragging: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }) {
-  const [displayBearingDegrees, setDisplayBearingDegrees] = useState(bearingDegrees);
-  const previousBearingRef = useRef(bearingDegrees);
+  const initialVisibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
+  const [displayBearingDegrees, setDisplayBearingDegrees] = useState(initialVisibleBearingDegrees);
+  const previousBearingRef = useRef(initialVisibleBearingDegrees);
+
+  const visibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
 
   useEffect(() => {
     const previousBearingDegrees = previousBearingRef.current;
-    const delta = ((bearingDegrees - previousBearingDegrees + 540) % 360) - 180;
+    const delta = ((visibleBearingDegrees - previousBearingDegrees + 540) % 360) - 180;
     const nextDisplayBearingDegrees = previousBearingDegrees + delta;
     previousBearingRef.current = nextDisplayBearingDegrees;
     setDisplayBearingDegrees(nextDisplayBearingDegrees);
-  }, [bearingDegrees]);
+  }, [visibleBearingDegrees]);
 
   const showSurface = surfaceState === "visible";
 
   return (
     <button
       type="button"
-      aria-label={`North indicator ${formatNorthBearingDegrees(bearingDegrees)}`}
+      aria-label={`North indicator ${formatNorthBearingDegrees(visibleBearingDegrees)}`}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -403,10 +510,13 @@ export default function EditorCanvas({
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
+  const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
+  const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
+  const resetCanvasRotation = useEditorStore((state) => state.resetCanvasRotation);
   const previewNorthBearingDegrees = useEditorStore((state) => state.previewNorthBearingDegrees);
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
@@ -437,11 +547,19 @@ export default function EditorCanvas({
     arrowLeft: number;
   } | null>(null);
   const activeNorthDragRef = useRef<ActiveNorthDrag | null>(null);
+  const canvasRotationIndicatorSlotRef = useRef<HTMLDivElement | null>(null);
   const [northDragTooltip, setNorthDragTooltip] = useState<NorthDragTooltipState | null>(null);
+  const [canvasRotationTooltip, setCanvasRotationTooltip] =
+    useState<CanvasRotationTooltipState | null>(null);
   const [isNorthIndicatorHovered, setIsNorthIndicatorHovered] = useState(false);
   const [northIndicatorSurfaceState, setNorthIndicatorSurfaceState] =
     useState<NorthIndicatorSurfaceState>("hidden");
+  const [canvasRotationIndicatorSurfaceState, setCanvasRotationIndicatorSurfaceState] =
+    useState<NorthIndicatorSurfaceState>(
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01 ? "visible" : "hidden"
+    );
   const northIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasRotationIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHintFlowPaused = hintPauseUntilMs > Date.now();
   const activeHint = useMemo(() => {
     if (!hasHydratedHints || isHintFlowPaused) return null;
@@ -1269,9 +1387,12 @@ export default function EditorCanvas({
         x: pointer.x - dragSession.indicatorCenter.x,
         y: pointer.y - dragSession.indicatorCenter.y,
       });
+      const adjustedBearingDegrees = normalizeNorthBearingDegrees(
+        rawBearingDegrees - camera.rotationDegrees
+      );
       const nextBearingDegrees = shouldSnap
-        ? snapNorthBearingDegrees(rawBearingDegrees)
-        : normalizeNorthBearingDegrees(rawBearingDegrees);
+        ? snapNorthBearingDegrees(adjustedBearingDegrees)
+        : adjustedBearingDegrees;
 
       dragSession.currentBearingDegrees = nextBearingDegrees;
       previewNorthBearingDegrees(nextBearingDegrees);
@@ -1294,7 +1415,7 @@ export default function EditorCanvas({
         bearingDegrees: nextBearingDegrees,
       });
     },
-    [previewNorthBearingDegrees]
+    [camera.rotationDegrees, previewNorthBearingDegrees]
   );
 
   useEffect(() => {
@@ -1322,6 +1443,44 @@ export default function EditorCanvas({
       }
     };
   }, [isNorthIndicatorHovered, northDragTooltip]);
+
+  useEffect(() => {
+    if (
+      CANVAS_ROTATION_ENABLED ||
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) <= 0.01
+    ) {
+      return;
+    }
+
+    updateCanvasRotationDegrees(0);
+  }, [canvasRotationDegrees, updateCanvasRotationDegrees]);
+
+  useEffect(() => {
+    const shouldShowCanvasRotationSurface =
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01;
+
+    if (canvasRotationIndicatorFadeTimeoutRef.current !== null) {
+      clearTimeout(canvasRotationIndicatorFadeTimeoutRef.current);
+      canvasRotationIndicatorFadeTimeoutRef.current = null;
+    }
+
+    if (shouldShowCanvasRotationSurface) {
+      setCanvasRotationIndicatorSurfaceState("visible");
+      return;
+    }
+
+    canvasRotationIndicatorFadeTimeoutRef.current = setTimeout(() => {
+      setCanvasRotationIndicatorSurfaceState("hidden");
+      canvasRotationIndicatorFadeTimeoutRef.current = null;
+    }, NORTH_INDICATOR_SURFACE_FADE_DELAY_MS);
+
+    return () => {
+      if (canvasRotationIndicatorFadeTimeoutRef.current !== null) {
+        clearTimeout(canvasRotationIndicatorFadeTimeoutRef.current);
+        canvasRotationIndicatorFadeTimeoutRef.current = null;
+      }
+    };
+  }, [canvasRotationDegrees]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -1411,6 +1570,125 @@ export default function EditorCanvas({
     [northBearingDegrees]
   );
 
+  const updateCanvasRotationTooltip = useCallback((degrees: number, pointer: ScreenPoint | null) => {
+    void pointer;
+    const containerElement = containerRef.current;
+    const indicatorSlotElement = canvasRotationIndicatorSlotRef.current;
+    if (!containerElement || !indicatorSlotElement) {
+      setCanvasRotationTooltip((current) =>
+        current && Math.abs(current.rotationDegrees - degrees) < 0.001
+          ? current
+          : current
+            ? { ...current, rotationDegrees: degrees }
+            : null
+      );
+      return;
+    }
+
+    const containerBounds = containerElement.getBoundingClientRect();
+    const indicatorBounds = indicatorSlotElement.getBoundingClientRect();
+    const tooltipWidthPx = 116;
+    const tooltipHeightPx = 28;
+    const tooltipOffsetPx = 8;
+    setCanvasRotationTooltip({
+      left: clampValue(
+        indicatorBounds.left - containerBounds.left,
+        8,
+        Math.max(containerBounds.width - tooltipWidthPx - 8, 8)
+      ),
+      top: clampValue(
+        indicatorBounds.top - containerBounds.top - tooltipHeightPx - tooltipOffsetPx,
+        8,
+        Math.max(containerBounds.height - tooltipHeightPx - 8, 8)
+      ),
+      rotationDegrees: degrees,
+    });
+  }, []);
+
+  const canStartCanvasRotation = useCallback((screenPoint: ScreenPoint) => {
+    if (!CANVAS_ROTATION_ENABLED) {
+      return false;
+    }
+
+    const state = useEditorStore.getState();
+    if (state.roomDraft.points.length > 0) return false;
+    if (hoveredRoomLabelIdRef.current) return false;
+    if (hoveredSelectableWallRef.current) return false;
+    if (
+      roomResizeUiRef.current.hoveredWall ||
+      roomResizeUiRef.current.hoveredCorner ||
+      roomResizeUiRef.current.hoveredVertexIndex !== null ||
+      roomResizeUiRef.current.hoveredWallSegmentIndex !== null
+    ) {
+      return false;
+    }
+
+    if (
+      findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
+      findSelectedOpeningWidthHandleAtScreenPoint(
+        state.document.rooms,
+        state.selectedOpening,
+        screenPoint,
+        state.camera,
+        state.viewport
+      ) ||
+      findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
+      findInteriorAssetAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+    ) {
+      return false;
+    }
+
+    if (state.selectedInteriorAsset) {
+      const room =
+        state.document.rooms.find((candidate) => candidate.id === state.selectedInteriorAsset?.roomId) ?? null;
+      const asset =
+        room?.interiorAssets.find((candidate) => candidate.id === state.selectedInteriorAsset?.assetId) ?? null;
+      if (asset) {
+        const bounds = getInteriorAssetBoundsAsRectBounds(asset);
+        if (
+          hitTestCornerHandle(getCornerHandleLayouts(bounds, state.camera, state.viewport), screenPoint) ||
+          hitTestWallHandle(getWallHandleLayouts(bounds, state.camera, state.viewport), screenPoint)
+        ) {
+          return false;
+        }
+      }
+    }
+
+    if (state.selectedRoomId) {
+      const selectedRoom =
+        state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId) ?? null;
+      if (selectedRoom) {
+        const bounds = getAxisAlignedRoomBounds(selectedRoom);
+        if (bounds) {
+          if (
+            hitTestCornerHandle(getCornerHandleLayouts(bounds, state.camera, state.viewport), screenPoint) ||
+            hitTestWallHandle(getWallHandleLayouts(bounds, state.camera, state.viewport), screenPoint)
+          ) {
+            return false;
+          }
+        }
+
+        if (isNonRectangularOrthogonalRoom(selectedRoom)) {
+          if (
+            hitTestConstrainedVertexHandle(
+              getConstrainedVertexHandleLayouts(selectedRoom, state.camera, state.viewport),
+              screenPoint
+            ) !== null ||
+            hitTestOrthogonalWallHandle(
+              getOrthogonalWallHandleLayouts(selectedRoom, state.camera, state.viewport),
+              screenPoint
+            ) !== null
+          ) {
+            return false;
+          }
+        }
+      }
+    }
+
+    const worldPoint = screenToWorld(screenPoint, state.camera, state.viewport);
+    return !findRoomAtPoint(state.document.rooms, worldPoint);
+  }, []);
+
   useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
@@ -1488,6 +1766,13 @@ export default function EditorCanvas({
           if (activeHintIdRef.current !== "pan-canvas") return;
           completeHint("pan-canvas");
         },
+        canStartRotation: canStartCanvasRotation,
+        onRotationPreview: (degrees, pointer) => {
+          updateCanvasRotationTooltip(degrees, pointer);
+        },
+        onRotationEnd: () => {
+          setCanvasRotationTooltip(null);
+        },
       });
       const detachRoomResizeInput = attachRoomResizeInput(app.canvas, useEditorStore, {
         onCursorWorldChange: (cursorWorld) => {
@@ -1563,7 +1848,14 @@ export default function EditorCanvas({
         app.destroy(true, { children: true });
       }
     };
-  }, [completeHint, drawCurrentScene, setTransformFeedback, stopTransformAnimation]);
+  }, [
+    canStartCanvasRotation,
+    completeHint,
+    drawCurrentScene,
+    setTransformFeedback,
+    stopTransformAnimation,
+    updateCanvasRotationTooltip,
+  ]);
 
   useEffect(() => {
     const app = appRef.current;
@@ -1579,6 +1871,7 @@ export default function EditorCanvas({
         ? camera
         : {
             pixelsPerMm: INITIAL_PIXELS_PER_MM,
+            rotationDegrees: 0,
           },
     [camera, hasHydratedClient]
   );
@@ -1667,12 +1960,25 @@ export default function EditorCanvas({
               </CanvasHudCard>
               <NorthIndicatorControl
                 bearingDegrees={northBearingDegrees}
+                viewRotationDegrees={canvasRotationDegrees}
                 surfaceState={northIndicatorSurfaceState}
                 isDragging={northDragTooltip !== null}
                 onPointerDown={handleNorthIndicatorPointerDown}
                 onPointerEnter={() => setIsNorthIndicatorHovered(true)}
                 onPointerLeave={() => setIsNorthIndicatorHovered(false)}
               />
+              {CANVAS_ROTATION_ENABLED ? (
+                <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <CanvasRotationIndicatorControl
+                      rotationDegrees={canvasRotationDegrees}
+                      northBearingDegrees={northBearingDegrees}
+                      surfaceState={canvasRotationIndicatorSurfaceState}
+                      onReset={resetCanvasRotation}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {northDragTooltip ? (
@@ -1685,6 +1991,18 @@ export default function EditorCanvas({
               }}
             >
               {formatNorthBearingDegrees(northDragTooltip.bearingDegrees)}
+            </div>
+          ) : null}
+          {CANVAS_ROTATION_ENABLED && canvasRotationTooltip ? (
+            <div
+              className={cn("pointer-events-none absolute", tooltipContentClassName)}
+              style={{
+                left: `${canvasRotationTooltip.left}px`,
+                top: `${canvasRotationTooltip.top}px`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+            >
+              {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 15°
             </div>
           ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (
@@ -1912,13 +2230,8 @@ function drawGrid(
 
   if (width <= 0 || height <= 0) return;
 
-  const topLeftWorld = screenToWorld({ x: 0, y: 0 }, camera, viewport);
-  const bottomRightWorld = screenToWorld({ x: width, y: height }, camera, viewport);
-
-  const minX = Math.min(topLeftWorld.x, bottomRightWorld.x);
-  const maxX = Math.max(topLeftWorld.x, bottomRightWorld.x);
-  const minY = Math.min(topLeftWorld.y, bottomRightWorld.y);
-  const maxY = Math.max(topLeftWorld.y, bottomRightWorld.y);
+  const gridBoundsPaddingMm = GRID_SIZE_MM;
+  const { minX, maxX, minY, maxY } = getViewportWorldBounds(camera, viewport, gridBoundsPaddingMm);
 
   if (GRID_MINOR_SIZE_MM * camera.pixelsPerMm >= 8) {
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
@@ -1934,13 +2247,15 @@ function drawGrid(
     alpha: 1,
   });
 
-  const originX = (0 - camera.xMm) * camera.pixelsPerMm + width / 2;
-  const originY = (0 - camera.yMm) * camera.pixelsPerMm + height / 2;
+  const verticalOriginStart = worldToScreen({ x: 0, y: minY }, camera, viewport);
+  const verticalOriginEnd = worldToScreen({ x: 0, y: maxY }, camera, viewport);
+  const horizontalOriginStart = worldToScreen({ x: minX, y: 0 }, camera, viewport);
+  const horizontalOriginEnd = worldToScreen({ x: maxX, y: 0 }, camera, viewport);
   graphics.setStrokeStyle({ width: 1.5, color: theme.originAxis, alpha: 1 });
-  graphics.moveTo(originX, 0);
-  graphics.lineTo(originX, height);
-  graphics.moveTo(0, originY);
-  graphics.lineTo(width, originY);
+  graphics.moveTo(verticalOriginStart.x, verticalOriginStart.y);
+  graphics.lineTo(verticalOriginEnd.x, verticalOriginEnd.y);
+  graphics.moveTo(horizontalOriginStart.x, horizontalOriginStart.y);
+  graphics.lineTo(horizontalOriginEnd.x, horizontalOriginEnd.y);
   graphics.stroke();
 }
 
@@ -2041,6 +2356,8 @@ function drawRooms(
 
     if (vertexHandles.length > 0) {
       for (const handle of wallSegmentHandles) {
+        const segment = getRoomWallSegment(room, handle.wallIndex);
+        if (!segment) continue;
         const isHovered =
           roomResizeUi.hoveredRoomId === room.id &&
           roomResizeUi.hoveredWallSegmentIndex === handle.wallIndex;
@@ -2050,33 +2367,28 @@ function drawRooms(
         const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
         const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
         const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
-        const radius = Math.min(handle.width, handle.height) / 2;
-        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-        const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
+        const start = worldToScreen(segment.originalStart, camera, viewport);
+        const end = worldToScreen(segment.originalEnd, camera, viewport);
 
-        if (haloPadding > 0) {
-          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
-          graphics.roundRect(
-            handle.left - haloPadding,
-            handle.top - haloPadding,
-            handle.width + haloPadding * 2,
-            handle.height + haloPadding * 2,
-            radius + haloPadding
-          );
-          graphics.fill();
-        }
-
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-        graphics.fill();
-
-        graphics.setStrokeStyle({
-          width: strokeWidth,
-          color: theme.roomOutline,
-          alpha: strokeAlpha,
+        drawCapsuleHandle(graphics, {
+          center: {
+            x: (start.x + end.x) / 2,
+            y: (start.y + end.y) / 2,
+          },
+          tangent: {
+            x: end.x - start.x,
+            y: end.y - start.y,
+          },
+          length: Math.max(handle.width, handle.height),
+          thickness: Math.min(handle.width, handle.height),
+          fillColor: theme.interactiveAccent,
+          fillAlpha,
+          strokeColor: theme.roomOutline,
+          strokeAlpha,
+          strokeWidth,
+          haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+          haloAlpha: isActive ? 0.2 : isHovered ? 0.12 : 0,
         });
-        graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-        graphics.stroke();
       }
 
       for (const handle of vertexHandles) {
@@ -2087,29 +2399,18 @@ function drawRooms(
           roomResizeUi.activeRoomId === room.id &&
           roomResizeUi.activeVertexIndex === handle.vertexIndex;
         const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
-        const radius = size / 2;
-        const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-
-        if (haloPadding > 0) {
-          graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
-          graphics.circle(handle.center.x, handle.center.y, radius + haloPadding);
-          graphics.fill();
-        }
-
-        graphics.setFillStyle({
-          color: theme.interactiveAccent,
-          alpha: isActive ? 0.5 : isHovered ? 0.38 : 0.28,
+        drawRotatedSquareHandle(graphics, {
+          center: handle.center,
+          size,
+          rotationDegrees: camera.rotationDegrees,
+          fillColor: theme.interactiveAccent,
+          fillAlpha: isActive ? 0.5 : isHovered ? 0.38 : 0.28,
+          strokeColor: theme.roomOutline,
+          strokeAlpha: isActive ? 1 : isHovered ? 0.97 : 0.92,
+          strokeWidth: isActive ? 2 : isHovered ? 1.8 : 1.6,
+          haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+          haloAlpha: isActive ? 0.22 : isHovered ? 0.14 : 0,
         });
-        graphics.circle(handle.center.x, handle.center.y, radius);
-        graphics.fill();
-
-        graphics.setStrokeStyle({
-          width: isActive ? 2 : isHovered ? 1.8 : 1.6,
-          color: theme.roomOutline,
-          alpha: isActive ? 1 : isHovered ? 0.97 : 0.92,
-        });
-        graphics.circle(handle.center.x, handle.center.y, radius);
-        graphics.stroke();
       }
     }
 
@@ -2117,6 +2418,10 @@ function drawRooms(
     if (!bounds) continue;
     const handles = getWallHandleLayouts(bounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(bounds, camera, viewport);
+    const topLeft = worldToScreen({ x: bounds.minX, y: bounds.minY }, camera, viewport);
+    const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
+    const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
+    const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
 
     for (const handle of handles) {
       const isHovered =
@@ -2126,34 +2431,34 @@ function drawRooms(
       const fillAlpha = isActive ? 0.46 : isHovered ? 0.34 : 0.2;
       const strokeAlpha = isActive ? 1 : isHovered ? 0.96 : 0.82;
       const strokeWidth = isActive ? 2.2 : isHovered ? 1.8 : 1.45;
-      const radius = Math.min(handle.width, handle.height) / 2;
-      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
-      const haloAlpha = isActive ? 0.2 : isHovered ? 0.12 : 0;
-      const handleStrokeColor = theme.roomOutline;
+      const [start, end] =
+        handle.wall === "top"
+          ? [topLeft, topRight]
+          : handle.wall === "right"
+            ? [topRight, bottomRight]
+            : handle.wall === "bottom"
+              ? [bottomLeft, bottomRight]
+              : [topLeft, bottomLeft];
 
-      if (haloPadding > 0) {
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: haloAlpha });
-        graphics.roundRect(
-          handle.left - haloPadding,
-          handle.top - haloPadding,
-          handle.width + haloPadding * 2,
-          handle.height + haloPadding * 2,
-          radius + haloPadding
-        );
-        graphics.fill();
-      }
-
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: strokeWidth,
-        color: handleStrokeColor,
-        alpha: strokeAlpha,
+      drawCapsuleHandle(graphics, {
+        center: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+        },
+        tangent: {
+          x: end.x - start.x,
+          y: end.y - start.y,
+        },
+        length: Math.max(handle.width, handle.height),
+        thickness: Math.min(handle.width, handle.height),
+        fillColor: theme.interactiveAccent,
+        fillAlpha,
+        strokeColor: theme.roomOutline,
+        strokeAlpha,
+        strokeWidth,
+        haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+        haloAlpha: isActive ? 0.2 : isHovered ? 0.12 : 0,
       });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.stroke();
     }
 
     for (const handle of cornerHandles) {
@@ -2162,34 +2467,22 @@ function drawRooms(
       const isActive =
         roomResizeUi.activeRoomId === room.id && roomResizeUi.activeCorner === handle.corner;
       const size = isActive ? handle.size + 2 : isHovered ? handle.size + 1 : handle.size;
-      const half = size / 2;
-      const haloPadding = isActive ? 3 : isHovered ? 2 : 0;
       const fillAlpha = isActive ? 0.54 : isHovered ? 0.42 : 0.3;
       const strokeAlpha = isActive ? 1 : isHovered ? 0.98 : 0.9;
       const strokeWidth = isActive ? 2.1 : isHovered ? 1.8 : 1.5;
 
-      if (haloPadding > 0) {
-        graphics.setFillStyle({ color: theme.interactiveAccent, alpha: isActive ? 0.22 : 0.14 });
-        graphics.rect(
-          handle.center.x - half - haloPadding,
-          handle.center.y - half - haloPadding,
-          size + haloPadding * 2,
-          size + haloPadding * 2
-        );
-        graphics.fill();
-      }
-
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: fillAlpha });
-      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: strokeWidth,
-        color: theme.roomOutline,
-        alpha: strokeAlpha,
+      drawRotatedSquareHandle(graphics, {
+        center: handle.center,
+        size,
+        rotationDegrees: camera.rotationDegrees,
+        fillColor: theme.interactiveAccent,
+        fillAlpha,
+        strokeColor: theme.roomOutline,
+        strokeAlpha,
+        strokeWidth,
+        haloPadding: isActive ? 3 : isHovered ? 2 : 0,
+        haloAlpha: isActive ? 0.22 : isHovered ? 0.14 : 0,
       });
-      graphics.rect(handle.center.x - half, handle.center.y - half, size, size);
-      graphics.stroke();
     }
   }
 }
@@ -2417,10 +2710,24 @@ function drawRoomOpenings(
     const start = worldToScreen(layout.start, camera, viewport);
     const end = worldToScreen(layout.end, camera, viewport);
     const center = worldToScreen(layout.center, camera, viewport);
-    const tangent = layout.axis === "horizontal" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const tangentLength = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+    const tangent = {
+      x: (end.x - start.x) / tangentLength,
+      y: (end.y - start.y) / tangentLength,
+    };
+    const interiorNormalTarget = worldToScreen(
+      {
+        x: layout.center.x + layout.interiorNormal.x * 100,
+        y: layout.center.y + layout.interiorNormal.y * 100,
+      },
+      camera,
+      viewport
+    );
+    const interiorNormalLength =
+      Math.hypot(interiorNormalTarget.x - center.x, interiorNormalTarget.y - center.y) || 1;
     const interiorNormal = {
-      x: layout.interiorNormal.x,
-      y: layout.interiorNormal.y,
+      x: (interiorNormalTarget.x - center.x) / interiorNormalLength,
+      y: (interiorNormalTarget.y - center.y) / interiorNormalLength,
     };
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
     const isSelected =
@@ -2539,11 +2846,10 @@ function drawRoomInteriorAssets(
   for (const asset of room.interiorAssets) {
     const bounds = getRoomInteriorAssetBounds(asset);
     const topLeft = worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport);
+    const topRight = worldToScreen({ x: bounds.right, y: bounds.top }, camera, viewport);
     const bottomRight = worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport);
-    const left = Math.min(topLeft.x, bottomRight.x);
-    const top = Math.min(topLeft.y, bottomRight.y);
-    const width = Math.abs(bottomRight.x - topLeft.x);
-    const height = Math.abs(bottomRight.y - topLeft.y);
+    const bottomLeft = worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport);
+    const corners = [topLeft, topRight, bottomRight, bottomLeft];
     const isSelected =
       selectedInteriorAsset?.roomId === room.id &&
       selectedInteriorAsset.assetId === asset.id;
@@ -2559,7 +2865,11 @@ function drawRoomInteriorAssets(
         color: theme.wallSelectionAccent,
         alpha: 0.18,
       });
-      graphics.rect(left, top, width, height);
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
       graphics.stroke();
     }
 
@@ -2567,7 +2877,11 @@ function drawRoomInteriorAssets(
       color: theme.roomOutline,
       alpha: isSelected ? 0.12 : 0.08,
     });
-    graphics.rect(left, top, width, height);
+    graphics.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i += 1) {
+      graphics.lineTo(corners[i].x, corners[i].y);
+    }
+    graphics.closePath();
     graphics.fill();
 
     graphics.setStrokeStyle({
@@ -2575,19 +2889,37 @@ function drawRoomInteriorAssets(
       color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
       alpha: isSelected ? 0.96 : 0.9,
     });
-    graphics.rect(left, top, width, height);
+    graphics.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i += 1) {
+      graphics.lineTo(corners[i].x, corners[i].y);
+    }
+    graphics.closePath();
     graphics.stroke();
 
-    const treadSpacingPx = Math.max(camera.pixelsPerMm * DEFAULT_STAIR_TREAD_SPACING_MM, 8);
-    for (let y = top + treadSpacingPx; y < top + height - 1; y += treadSpacingPx) {
+    const assetDepthMm = Math.max(bounds.bottom - bounds.top, 1);
+    const treadCount = Math.max(
+      0,
+      Math.floor(assetDepthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+    );
+    for (let index = 1; index <= treadCount; index += 1) {
+      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / assetDepthMm;
+      if (progress <= 0 || progress >= 1) continue;
+      const start = {
+        x: topLeft.x + (bottomLeft.x - topLeft.x) * progress,
+        y: topLeft.y + (bottomLeft.y - topLeft.y) * progress,
+      };
+      const end = {
+        x: topRight.x + (bottomRight.x - topRight.x) * progress,
+        y: topRight.y + (bottomRight.y - topRight.y) * progress,
+      };
       graphics.setStrokeStyle({
         width: Math.max(camera.pixelsPerMm * 10, 1.1),
         color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
         alpha: isSelected ? 0.88 : 0.72,
         cap: "round",
       });
-      graphics.moveTo(left + 4, y);
-      graphics.lineTo(left + width - 4, y);
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
       graphics.stroke();
     }
 
@@ -2598,33 +2930,49 @@ function drawRoomInteriorAssets(
     const cornerHandles = getCornerHandleLayouts(rectBounds, camera, viewport);
 
     for (const handle of wallHandles) {
-      const radius = Math.min(handle.width, handle.height) / 2;
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.3 });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.fill();
+      const [start, end] =
+        handle.wall === "top"
+          ? [topLeft, topRight]
+          : handle.wall === "right"
+            ? [topRight, bottomRight]
+            : handle.wall === "bottom"
+              ? [bottomLeft, bottomRight]
+              : [topLeft, bottomLeft];
 
-      graphics.setStrokeStyle({
-        width: 1.5,
-        color: theme.roomOutline,
-        alpha: 0.9,
+      drawCapsuleHandle(graphics, {
+        center: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+        },
+        tangent: {
+          x: end.x - start.x,
+          y: end.y - start.y,
+        },
+        length: Math.max(handle.width, handle.height),
+        thickness: Math.min(handle.width, handle.height),
+        fillColor: theme.interactiveAccent,
+        fillAlpha: 0.3,
+        strokeColor: theme.roomOutline,
+        strokeAlpha: 0.9,
+        strokeWidth: 1.5,
+        haloPadding: 0,
+        haloAlpha: 0,
       });
-      graphics.roundRect(handle.left, handle.top, handle.width, handle.height, radius);
-      graphics.stroke();
     }
 
     for (const handle of cornerHandles) {
-      const half = handle.size / 2;
-      graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.38 });
-      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
-      graphics.fill();
-
-      graphics.setStrokeStyle({
-        width: 1.5,
-        color: theme.roomOutline,
-        alpha: 0.92,
+      drawRotatedSquareHandle(graphics, {
+        center: handle.center,
+        size: handle.size,
+        rotationDegrees: camera.rotationDegrees,
+        fillColor: theme.interactiveAccent,
+        fillAlpha: 0.38,
+        strokeColor: theme.roomOutline,
+        strokeAlpha: 0.92,
+        strokeWidth: 1.5,
+        haloPadding: 0,
+        haloAlpha: 0,
       });
-      graphics.rect(handle.center.x - half, handle.center.y - half, handle.size, handle.size);
-      graphics.stroke();
     }
   }
 }
@@ -3297,9 +3645,14 @@ function getResizeDimensionAnchorForWall(
   const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
   const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
   const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
-  const horizontalWallLengthPx = Math.abs(topRight.x - topLeft.x);
-  const verticalWallLengthPx = Math.abs(bottomLeft.y - topLeft.y);
-
+  const roomCenter = worldToScreen(
+    {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    },
+    camera,
+    viewport
+  );
   const getEdgeOffsetPx = (wallLengthPx: number) =>
     wallLengthPx < RESIZE_DIMENSION_MIN_SHORT_WALL_PX
       ? getScaledMeasurementPx(
@@ -3307,58 +3660,37 @@ function getResizeDimensionAnchorForWall(
           settings
         )
       : getScaledMeasurementPx(RESIZE_DIMENSION_EDGE_OFFSET_PX, settings);
-
-  switch (wall) {
-    case "top":
-      return {
-        center: {
-          x: (topLeft.x + topRight.x) / 2,
-          y: topLeft.y - getEdgeOffsetPx(horizontalWallLengthPx),
-        },
-        outwardDirection: { x: 0, y: -1 },
-        tangentDirection: { x: 1, y: 0 },
-        wallLengthPx: horizontalWallLengthPx,
-      };
-    case "right":
-      return {
-        center: {
-          x: topRight.x + getEdgeOffsetPx(verticalWallLengthPx),
-          y: (topRight.y + bottomRight.y) / 2,
-        },
-        outwardDirection: { x: 1, y: 0 },
-        tangentDirection: { x: 0, y: 1 },
-        wallLengthPx: verticalWallLengthPx,
-      };
-    case "bottom":
-      return {
-        center: {
-          x: (bottomLeft.x + bottomRight.x) / 2,
-          y: bottomLeft.y + getEdgeOffsetPx(horizontalWallLengthPx),
-        },
-        outwardDirection: { x: 0, y: 1 },
-        tangentDirection: { x: 1, y: 0 },
-        wallLengthPx: horizontalWallLengthPx,
-      };
-    case "left":
-      return {
-        center: {
-          x: topLeft.x - getEdgeOffsetPx(verticalWallLengthPx),
-          y: (topLeft.y + bottomLeft.y) / 2,
-        },
-        outwardDirection: { x: -1, y: 0 },
-        tangentDirection: { x: 0, y: 1 },
-        wallLengthPx: verticalWallLengthPx,
-      };
-  }
+  const [start, end] =
+    wall === "top"
+      ? [topLeft, topRight]
+      : wall === "right"
+        ? [topRight, bottomRight]
+        : wall === "bottom"
+          ? [bottomLeft, bottomRight]
+          : [topLeft, bottomLeft];
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const outwardDirection = normalizeScreenDirection({
+    x: midpoint.x - roomCenter.x,
+    y: midpoint.y - roomCenter.y,
+  });
+  const tangentDirection = normalizeScreenDirection({
+    x: end.x - start.x,
+    y: end.y - start.y,
+  });
+  const wallLengthPx = Math.hypot(end.x - start.x, end.y - start.y);
+  const center = {
+    x: midpoint.x + outwardDirection.x * getEdgeOffsetPx(wallLengthPx),
+    y: midpoint.y + outwardDirection.y * getEdgeOffsetPx(wallLengthPx),
+  };
 
   return {
-    center: {
-      x: (topLeft.x + bottomRight.x) / 2,
-      y: (topLeft.y + bottomRight.y) / 2,
-    },
-    outwardDirection: { x: 0, y: -1 },
-    tangentDirection: { x: 1, y: 0 },
-    wallLengthPx: 0,
+    center,
+    outwardDirection,
+    tangentDirection,
+    wallLengthPx,
   };
 }
 
@@ -3435,9 +3767,9 @@ function createDimensionLabelSpecForEdgeMeasurement(
     wall: edge.start.y === edge.end.y ? "top" : "left",
     axis: edge.start.y === edge.end.y ? "horizontal" : "vertical",
     center: midpointScreen,
-    outwardDirection: normalizeAxisAlignedScreenDirection(outwardVector),
-    tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
-    wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
+    outwardDirection: normalizeScreenDirection(outwardVector),
+    tangentDirection: normalizeScreenDirection(tangentVector),
+    wallLengthPx: Math.hypot(endScreen.x - startScreen.x, endScreen.y - startScreen.y),
     normalPlacement: settings.wallMeasurementPosition,
     normalOffsetBiasPx: isNonRectangularRoom ? RESIZE_DIMENSION_NON_RECT_EDGE_EXTRA_PADDING_PX : 0,
   };
@@ -3478,12 +3810,29 @@ function getOrthogonalEdgeOutwardOffsetWorld(
   return null;
 }
 
-function normalizeAxisAlignedScreenDirection(vector: ScreenPoint): ScreenPoint {
-  if (Math.abs(vector.x) >= Math.abs(vector.y)) {
-    return { x: vector.x >= 0 ? 1 : -1, y: 0 };
+function normalizeScreenDirection(vector: ScreenPoint): ScreenPoint {
+  const length = Math.hypot(vector.x, vector.y);
+  if (length < 0.001) {
+    return { x: 0, y: -1 };
   }
 
-  return { x: 0, y: vector.y >= 0 ? 1 : -1 };
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+  };
+}
+
+function getFixedEdgeGapLabelOffsetPx(options: {
+  width: number;
+  height: number;
+  direction: ScreenPoint;
+  edgeGapPx: number;
+}): number {
+  const projectedHalfExtentPx =
+    (Math.abs(options.direction.x) * options.width) / 2 +
+    (Math.abs(options.direction.y) * options.height) / 2;
+
+  return projectedHalfExtentPx + options.edgeGapPx;
 }
 
 function getResolvedResizeDimensionLabelLayouts(
@@ -3522,12 +3871,6 @@ function getResolvedResizeDimensionLabelLayouts(
     const width = measurementText.width + dimensionPaddingXPx * 2;
     const height = measurementText.height + dimensionPaddingYPx * 2;
     measurementText.destroy();
-    const normalOffsetPx =
-      labelSpec.normalPlacement === "center"
-        ? 0
-        : height / 2 +
-          insideEdgePaddingPx +
-          getScaledMeasurementPx(labelSpec.normalOffsetBiasPx, settings);
     const avoidanceDirection =
       labelSpec.normalPlacement === "inside"
         ? {
@@ -3542,6 +3885,16 @@ function getResolvedResizeDimensionLabelLayouts(
             y: -labelSpec.outwardDirection.y,
           }
         : labelSpec.outwardDirection;
+    const normalOffsetPx =
+      labelSpec.normalPlacement === "center"
+        ? 0
+        : getFixedEdgeGapLabelOffsetPx({
+            width,
+            height,
+            direction: placementDirection,
+            edgeGapPx:
+              insideEdgePaddingPx + getScaledMeasurementPx(labelSpec.normalOffsetBiasPx, settings),
+          });
     const shiftedCenter = {
       x: labelSpec.center.x + placementDirection.x * normalOffsetPx,
       y: labelSpec.center.y + placementDirection.y * normalOffsetPx,
@@ -4080,23 +4433,270 @@ function drawGridLines(
 ) {
   const firstX = Math.floor(minX / stepMm) * stepMm;
   const firstY = Math.floor(minY / stepMm) * stepMm;
-  const { width, height } = viewport;
 
   graphics.setStrokeStyle(stroke);
 
   for (let xMm = firstX; xMm <= maxX; xMm += stepMm) {
-    const x = (xMm - camera.xMm) * camera.pixelsPerMm + width / 2;
-    graphics.moveTo(x, 0);
-    graphics.lineTo(x, height);
+    const start = worldToScreen({ x: xMm, y: minY }, camera, viewport);
+    const end = worldToScreen({ x: xMm, y: maxY }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
   }
 
   for (let yMm = firstY; yMm <= maxY; yMm += stepMm) {
-    const y = (yMm - camera.yMm) * camera.pixelsPerMm + height / 2;
-    graphics.moveTo(0, y);
-    graphics.lineTo(width, y);
+    const start = worldToScreen({ x: minX, y: yMm }, camera, viewport);
+    const end = worldToScreen({ x: maxX, y: yMm }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
   }
 
   graphics.stroke();
+}
+
+function getViewportWorldBounds(
+  camera: CameraState,
+  viewport: ViewportSize,
+  paddingMm = 0
+) {
+  const viewportCorners = [
+    screenToWorld({ x: 0, y: 0 }, camera, viewport),
+    screenToWorld({ x: viewport.width, y: 0 }, camera, viewport),
+    screenToWorld({ x: viewport.width, y: viewport.height }, camera, viewport),
+    screenToWorld({ x: 0, y: viewport.height }, camera, viewport),
+  ];
+  const minX = Math.min(...viewportCorners.map((corner) => corner.x)) - paddingMm;
+  const maxX = Math.max(...viewportCorners.map((corner) => corner.x)) + paddingMm;
+  const minY = Math.min(...viewportCorners.map((corner) => corner.y)) - paddingMm;
+  const maxY = Math.max(...viewportCorners.map((corner) => corner.y)) + paddingMm;
+
+  return { minX, maxX, minY, maxY };
+}
+
+function drawCapsuleHandle(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    tangent: ScreenPoint;
+    length: number;
+    thickness: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+    haloPadding: number;
+    haloAlpha: number;
+  }
+) {
+  const tangentLength = Math.hypot(options.tangent.x, options.tangent.y);
+  if (tangentLength < 0.001) return;
+
+  const tangent = {
+    x: options.tangent.x / tangentLength,
+    y: options.tangent.y / tangentLength,
+  };
+  const normal = {
+    x: -tangent.y,
+    y: tangent.x,
+  };
+
+  if (options.haloPadding > 0 && options.haloAlpha > 0) {
+    drawCapsuleHandleShape(graphics, {
+      center: options.center,
+      tangent,
+      normal,
+      length: options.length + options.haloPadding * 2,
+      thickness: options.thickness + options.haloPadding * 2,
+      fillColor: options.fillColor,
+      fillAlpha: options.haloAlpha,
+      strokeColor: options.fillColor,
+      strokeAlpha: 0,
+      strokeWidth: 0,
+    });
+  }
+
+  drawCapsuleHandleShape(graphics, {
+    center: options.center,
+    tangent,
+    normal,
+    length: options.length,
+    thickness: options.thickness,
+    fillColor: options.fillColor,
+    fillAlpha: options.fillAlpha,
+    strokeColor: options.strokeColor,
+    strokeAlpha: options.strokeAlpha,
+    strokeWidth: options.strokeWidth,
+  });
+}
+
+function drawCapsuleHandleShape(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    tangent: ScreenPoint;
+    normal: ScreenPoint;
+    length: number;
+    thickness: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+  }
+) {
+  const radius = options.thickness / 2;
+  const halfBodyLength = Math.max(options.length / 2 - radius, 0);
+  const startCenter = {
+    x: options.center.x - options.tangent.x * halfBodyLength,
+    y: options.center.y - options.tangent.y * halfBodyLength,
+  };
+  const endCenter = {
+    x: options.center.x + options.tangent.x * halfBodyLength,
+    y: options.center.y + options.tangent.y * halfBodyLength,
+  };
+  const corners = [
+    {
+      x: startCenter.x + options.normal.x * radius,
+      y: startCenter.y + options.normal.y * radius,
+    },
+    {
+      x: endCenter.x + options.normal.x * radius,
+      y: endCenter.y + options.normal.y * radius,
+    },
+    {
+      x: endCenter.x - options.normal.x * radius,
+      y: endCenter.y - options.normal.y * radius,
+    },
+    {
+      x: startCenter.x - options.normal.x * radius,
+      y: startCenter.y - options.normal.y * radius,
+    },
+  ];
+
+  graphics.setFillStyle({ color: options.fillColor, alpha: options.fillAlpha });
+  graphics.moveTo(corners[0].x, corners[0].y);
+  for (let index = 1; index < corners.length; index += 1) {
+    graphics.lineTo(corners[index].x, corners[index].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+  graphics.circle(startCenter.x, startCenter.y, radius);
+  graphics.fill();
+  graphics.circle(endCenter.x, endCenter.y, radius);
+  graphics.fill();
+
+  if (options.strokeWidth <= 0 || options.strokeAlpha <= 0) return;
+
+  graphics.setStrokeStyle({
+    width: options.strokeWidth,
+    color: options.strokeColor,
+    alpha: options.strokeAlpha,
+    join: "round",
+  });
+  graphics.moveTo(corners[0].x, corners[0].y);
+  for (let index = 1; index < corners.length; index += 1) {
+    graphics.lineTo(corners[index].x, corners[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+  graphics.circle(startCenter.x, startCenter.y, radius);
+  graphics.stroke();
+  graphics.circle(endCenter.x, endCenter.y, radius);
+  graphics.stroke();
+}
+
+function drawRotatedSquareHandle(
+  graphics: Graphics,
+  options: {
+    center: ScreenPoint;
+    size: number;
+    rotationDegrees: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+    haloPadding: number;
+    haloAlpha: number;
+  }
+) {
+  if (options.haloPadding > 0 && options.haloAlpha > 0) {
+    drawPolygonHandle(graphics, {
+      points: getRotatedSquarePoints(options.center, options.size + options.haloPadding * 2, options.rotationDegrees),
+      fillColor: options.fillColor,
+      fillAlpha: options.haloAlpha,
+      strokeColor: options.fillColor,
+      strokeAlpha: 0,
+      strokeWidth: 0,
+    });
+  }
+
+  drawPolygonHandle(graphics, {
+    points: getRotatedSquarePoints(options.center, options.size, options.rotationDegrees),
+    fillColor: options.fillColor,
+    fillAlpha: options.fillAlpha,
+    strokeColor: options.strokeColor,
+    strokeAlpha: options.strokeAlpha,
+    strokeWidth: options.strokeWidth,
+  });
+}
+
+function drawPolygonHandle(
+  graphics: Graphics,
+  options: {
+    points: ScreenPoint[];
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+    strokeWidth: number;
+  }
+) {
+  if (options.points.length < 3) return;
+
+  graphics.setFillStyle({ color: options.fillColor, alpha: options.fillAlpha });
+  graphics.moveTo(options.points[0].x, options.points[0].y);
+  for (let index = 1; index < options.points.length; index += 1) {
+    graphics.lineTo(options.points[index].x, options.points[index].y);
+  }
+  graphics.closePath();
+  graphics.fill();
+
+  if (options.strokeWidth <= 0 || options.strokeAlpha <= 0) return;
+
+  graphics.setStrokeStyle({
+    width: options.strokeWidth,
+    color: options.strokeColor,
+    alpha: options.strokeAlpha,
+  });
+  graphics.moveTo(options.points[0].x, options.points[0].y);
+  for (let index = 1; index < options.points.length; index += 1) {
+    graphics.lineTo(options.points[index].x, options.points[index].y);
+  }
+  graphics.closePath();
+  graphics.stroke();
+}
+
+function getRotatedSquarePoints(
+  center: ScreenPoint,
+  size: number,
+  rotationDegrees: number
+): ScreenPoint[] {
+  const half = size / 2;
+  const radians = (normalizeCanvasRotationDegrees(rotationDegrees) * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const corners = [
+    { x: -half, y: -half },
+    { x: half, y: -half },
+    { x: half, y: half },
+    { x: -half, y: half },
+  ];
+
+  return corners.map((corner) => ({
+    x: center.x + corner.x * cos - corner.y * sin,
+    y: center.y + corner.x * sin + corner.y * cos,
+  }));
 }
 
 function getTextResolution(): number {
