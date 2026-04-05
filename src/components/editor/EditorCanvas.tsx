@@ -61,7 +61,7 @@ import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
-import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
+import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import {
@@ -276,6 +276,122 @@ function CanvasHudCard({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+const MINI_MAP_WIDTH_PX = 172;
+const MINI_MAP_HEIGHT_PX = 128;
+const MINI_MAP_INSET_PX = 10;
+const MINI_MAP_WORLD_PADDING_RATIO = 0.08;
+const MINI_MAP_WORLD_PADDING_MIN_MM = 320;
+
+function CanvasMiniMap({
+  rooms,
+  camera,
+  viewport,
+  themeMode,
+}: {
+  rooms: Room[];
+  camera: CameraState;
+  viewport: ViewportSize;
+  themeMode: "light" | "dark";
+}) {
+  const layoutBounds = useMemo(() => getLayoutBoundsFromRooms(rooms), [rooms]);
+  const miniMapState = useMemo(() => {
+    if (!layoutBounds) return null;
+
+    const dominantDimensionMm = Math.max(layoutBounds.width, layoutBounds.height, 1);
+    const worldPaddingMm = Math.max(
+      MINI_MAP_WORLD_PADDING_MIN_MM,
+      dominantDimensionMm * MINI_MAP_WORLD_PADDING_RATIO
+    );
+    const worldMinX = layoutBounds.minX - worldPaddingMm;
+    const worldMinY = layoutBounds.minY - worldPaddingMm;
+    const worldWidth = Math.max(layoutBounds.width + worldPaddingMm * 2, 1);
+    const worldHeight = Math.max(layoutBounds.height + worldPaddingMm * 2, 1);
+    const drawableWidthPx = MINI_MAP_WIDTH_PX - MINI_MAP_INSET_PX * 2;
+    const drawableHeightPx = MINI_MAP_HEIGHT_PX - MINI_MAP_INSET_PX * 2;
+    const scale = Math.min(drawableWidthPx / worldWidth, drawableHeightPx / worldHeight);
+    const offsetX = (MINI_MAP_WIDTH_PX - worldWidth * scale) / 2;
+    const offsetY = (MINI_MAP_HEIGHT_PX - worldHeight * scale) / 2;
+    const mapPoint = (point: Point) => ({
+      x: offsetX + (point.x - worldMinX) * scale,
+      y: offsetY + (point.y - worldMinY) * scale,
+    });
+    const viewportBounds = getViewportWorldBounds(camera, viewport);
+    const viewportTopLeft = mapPoint({ x: viewportBounds.minX, y: viewportBounds.minY });
+    const viewportBottomRight = mapPoint({ x: viewportBounds.maxX, y: viewportBounds.maxY });
+
+    return {
+      roomPaths: rooms
+        .filter((room) => room.points.length > 1)
+        .map((room) => ({
+          id: room.id,
+          path: buildMiniMapRoomPath(room.points, mapPoint),
+        })),
+      viewportRect: {
+        x: viewportTopLeft.x,
+        y: viewportTopLeft.y,
+        width: viewportBottomRight.x - viewportTopLeft.x,
+        height: viewportBottomRight.y - viewportTopLeft.y,
+      },
+    };
+  }, [camera, layoutBounds, rooms, viewport]);
+
+  if (!miniMapState) return null;
+
+  const roomFill = themeMode === "light" ? "rgba(82, 82, 91, 0.24)" : "rgba(212, 212, 216, 0.14)";
+  const roomStroke = themeMode === "light" ? "rgba(63, 63, 70, 0.66)" : "rgba(228, 228, 231, 0.42)";
+  const frameStroke = themeMode === "light" ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.98)";
+
+  return (
+    <CanvasHudCard>
+      <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        Mini-map
+      </div>
+      <div className="overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <svg
+          width={MINI_MAP_WIDTH_PX}
+          height={MINI_MAP_HEIGHT_PX}
+          viewBox={`0 0 ${MINI_MAP_WIDTH_PX} ${MINI_MAP_HEIGHT_PX}`}
+          aria-hidden="true"
+          className="block"
+        >
+          {miniMapState.roomPaths.map((room) => (
+            <path
+              key={room.id}
+              d={room.path}
+              fill={roomFill}
+              stroke={roomStroke}
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+            />
+          ))}
+          <rect
+            x={miniMapState.viewportRect.x}
+            y={miniMapState.viewportRect.y}
+            width={miniMapState.viewportRect.width}
+            height={miniMapState.viewportRect.height}
+            rx={8}
+            fill="none"
+            stroke={frameStroke}
+            strokeWidth={1.5}
+          />
+        </svg>
+      </div>
+    </CanvasHudCard>
+  );
+}
+
+function buildMiniMapRoomPath(points: Point[], mapPoint: (point: Point) => ScreenPoint) {
+  if (points.length === 0) return "";
+
+  return points
+    .map((point, index) => {
+      const mappedPoint = mapPoint(point);
+      return `${index === 0 ? "M" : "L"} ${mappedPoint.x} ${mappedPoint.y}`;
+    })
+    .join(" ")
+    .concat(" Z");
 }
 
 type NorthDragTooltipState = {
@@ -509,6 +625,7 @@ export default function EditorCanvas({
     () => false
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const rooms = useEditorStore((state) => state.document.rooms);
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
@@ -521,6 +638,7 @@ export default function EditorCanvas({
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
+  const viewport = useEditorStore((state) => state.viewport);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -1979,6 +2097,16 @@ export default function EditorCanvas({
                   </div>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {showCanvasHud && hasRooms ? (
+            <div className="pointer-events-none absolute bottom-3 right-3 z-10 sm:bottom-4 sm:right-4">
+              <CanvasMiniMap
+                rooms={rooms}
+                camera={camera}
+                viewport={viewport}
+                themeMode={editorThemeMode}
+              />
             </div>
           ) : null}
           {northDragTooltip ? (

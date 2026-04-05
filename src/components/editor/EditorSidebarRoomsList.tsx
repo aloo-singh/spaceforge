@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronRight } from "lucide-react";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
@@ -41,6 +41,11 @@ function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
 }
 
 export function EditorSidebarRoomsList() {
+  const hasHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
   const rooms = useEditorStore((state) => state.document.rooms);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
@@ -102,7 +107,7 @@ export function EditorSidebarRoomsList() {
     shouldAutoFocusInteriorAssetRenameInputRef.current = false;
   }, [interiorAssetRenameSession, isRenameBlocked]);
 
-  if (rooms.length === 0) {
+  if (!hasHydrated || rooms.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 p-3 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
         Rooms will appear here as you draw them.
