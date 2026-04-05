@@ -289,12 +289,17 @@ function CanvasMiniMap({
   camera,
   viewport,
   themeMode,
+  onPanToWorldPoint,
+  onInteractionActiveChange,
 }: {
   rooms: Room[];
   camera: CameraState;
   viewport: ViewportSize;
   themeMode: "light" | "dark";
+  onPanToWorldPoint: (point: Point) => void;
+  onInteractionActiveChange: (isActive: boolean) => void;
 }) {
+  const dragPointerIdRef = useRef<number | null>(null);
   const layoutBounds = useMemo(() => getLayoutBoundsFromRooms(rooms), [rooms]);
   const miniMapState = useMemo(() => {
     if (!layoutBounds) return null;
@@ -317,11 +322,16 @@ function CanvasMiniMap({
       x: offsetX + (point.x - worldMinX) * scale,
       y: offsetY + (point.y - worldMinY) * scale,
     });
-    const viewportBounds = getViewportWorldBounds(camera, viewport);
+    const mapScreenPointToWorld = (screenPoint: ScreenPoint) => ({
+      x: worldMinX + (screenPoint.x - offsetX) / scale,
+      y: worldMinY + (screenPoint.y - offsetY) / scale,
+    });
+    const viewportBounds = getMiniMapViewportWorldBounds(camera, viewport);
     const viewportTopLeft = mapPoint({ x: viewportBounds.minX, y: viewportBounds.minY });
     const viewportBottomRight = mapPoint({ x: viewportBounds.maxX, y: viewportBounds.maxY });
 
     return {
+      screenToWorld: mapScreenPointToWorld,
       roomPaths: rooms
         .filter((room) => room.points.length > 1)
         .map((room) => ({
@@ -339,6 +349,18 @@ function CanvasMiniMap({
 
   if (!miniMapState) return null;
 
+  const updateCameraFromPointer = (
+    event: ReactPointerEvent<HTMLDivElement> | PointerEvent,
+    element: HTMLDivElement
+  ) => {
+    const rect = element.getBoundingClientRect();
+    const localPoint = {
+      x: ((event.clientX - rect.left) / rect.width) * MINI_MAP_WIDTH_PX,
+      y: ((event.clientY - rect.top) / rect.height) * MINI_MAP_HEIGHT_PX,
+    };
+    onPanToWorldPoint(miniMapState.screenToWorld(localPoint));
+  };
+
   const roomFill = themeMode === "light" ? "rgba(82, 82, 91, 0.24)" : "rgba(212, 212, 216, 0.14)";
   const roomStroke = themeMode === "light" ? "rgba(63, 63, 70, 0.66)" : "rgba(228, 228, 231, 0.42)";
   const frameStroke = themeMode === "light" ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.98)";
@@ -348,7 +370,36 @@ function CanvasMiniMap({
       <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
         Mini-map
       </div>
-      <div className="overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div
+        className="pointer-events-auto cursor-pointer touch-none overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        onPointerDown={(event) => {
+          const element = event.currentTarget;
+          dragPointerIdRef.current = event.pointerId;
+          element.setPointerCapture(event.pointerId);
+          onInteractionActiveChange(true);
+          updateCameraFromPointer(event, element);
+        }}
+        onPointerMove={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          updateCameraFromPointer(event, event.currentTarget);
+        }}
+        onPointerUp={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          dragPointerIdRef.current = null;
+          onInteractionActiveChange(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onPointerCancel={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          dragPointerIdRef.current = null;
+          onInteractionActiveChange(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+      >
         <svg
           width={MINI_MAP_WIDTH_PX}
           height={MINI_MAP_HEIGHT_PX}
@@ -392,6 +443,22 @@ function buildMiniMapRoomPath(points: Point[], mapPoint: (point: Point) => Scree
     })
     .join(" ")
     .concat(" Z");
+}
+
+function getMiniMapViewportWorldBounds(camera: CameraState, viewport: ViewportSize) {
+  if (Math.abs(normalizeCanvasRotationDegrees(camera.rotationDegrees)) <= 0.01) {
+    const halfWidthMm = viewport.width / camera.pixelsPerMm / 2;
+    const halfHeightMm = viewport.height / camera.pixelsPerMm / 2;
+
+    return {
+      minX: camera.xMm - halfWidthMm,
+      maxX: camera.xMm + halfWidthMm,
+      minY: camera.yMm - halfHeightMm,
+      maxY: camera.yMm + halfHeightMm,
+    };
+  }
+
+  return getViewportWorldBounds(camera, viewport);
 }
 
 type NorthDragTooltipState = {
@@ -639,6 +706,7 @@ export default function EditorCanvas({
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
   const viewport = useEditorStore((state) => state.viewport);
+  const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -2106,6 +2174,8 @@ export default function EditorCanvas({
                 camera={camera}
                 viewport={viewport}
                 themeMode={editorThemeMode}
+                onPanToWorldPoint={(point) => setCameraCenterMm(point.x, point.y)}
+                onInteractionActiveChange={setCanvasInteractionActive}
               />
             </div>
           ) : null}
