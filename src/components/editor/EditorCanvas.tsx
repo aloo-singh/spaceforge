@@ -515,6 +515,7 @@ export default function EditorCanvas({
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
+  const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
   const resetCanvasRotation = useEditorStore((state) => state.resetCanvasRotation);
   const previewNorthBearingDegrees = useEditorStore((state) => state.previewNorthBearingDegrees);
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
@@ -1442,6 +1443,17 @@ export default function EditorCanvas({
       }
     };
   }, [isNorthIndicatorHovered, northDragTooltip]);
+
+  useEffect(() => {
+    if (
+      CANVAS_ROTATION_ENABLED ||
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) <= 0.01
+    ) {
+      return;
+    }
+
+    updateCanvasRotationDegrees(0);
+  }, [canvasRotationDegrees, updateCanvasRotationDegrees]);
 
   useEffect(() => {
     const shouldShowCanvasRotationSurface =
