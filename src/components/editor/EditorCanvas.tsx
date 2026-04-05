@@ -1983,7 +1983,7 @@ export default function EditorCanvas({
                 fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
               }}
             >
-              {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 5°
+              {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 15°
             </div>
           ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (

@@ -1,5 +1,5 @@
 export const DEFAULT_CANVAS_ROTATION_DEGREES = 0;
-export const CANVAS_ROTATION_SNAP_FINE_DEGREES = 5;
+export const CANVAS_ROTATION_SNAP_FINE_DEGREES = 15;
 export const CANVAS_ROTATION_SNAP_COARSE_DEGREES = 15;
 
 export function normalizeCanvasRotationDegrees(value: number): number {
