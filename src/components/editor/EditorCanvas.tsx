@@ -227,6 +227,7 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
+const CANVAS_ROTATION_ENABLED = false;
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
 }
@@ -1593,6 +1594,10 @@ export default function EditorCanvas({
   }, []);
 
   const canStartCanvasRotation = useCallback((screenPoint: ScreenPoint) => {
+    if (!CANVAS_ROTATION_ENABLED) {
+      return false;
+    }
+
     const state = useEditorStore.getState();
     if (state.roomDraft.points.length > 0) return false;
     if (hoveredRoomLabelIdRef.current) return false;
@@ -1890,9 +1895,9 @@ export default function EditorCanvas({
         room body to select that room. When a room is selected, click near one of that room&apos;s
         wall edges to select that wall. Clicking outside a selected room clears selection first,
         then a following click can start drawing. Hold Space and drag to pan, middle mouse drag
-        also pans, mouse wheel zooms, right click and drag empty canvas to rotate the view, and
-        Escape cancels the current room draft or clears selection. Right click also cancels the
-        current room draft. Undo is Cmd or Ctrl plus Z, and redo is Shift+Cmd+Z or Ctrl+Y.
+        also pans, mouse wheel zooms, and Escape cancels the current room draft or clears
+        selection. Right click also cancels the current room draft. Undo is Cmd or Ctrl plus Z,
+        and redo is Shift+Cmd+Z or Ctrl+Y.
       </p>
       <div className="border-b border-border/70 bg-background/95 px-3 py-3 backdrop-blur-sm sm:px-4 [@media(max-height:540px)_and_(orientation:landscape)]:px-3 [@media(max-height:540px)_and_(orientation:landscape)]:py-2">
         <HistoryControls
@@ -1950,16 +1955,18 @@ export default function EditorCanvas({
                 onPointerEnter={() => setIsNorthIndicatorHovered(true)}
                 onPointerLeave={() => setIsNorthIndicatorHovered(false)}
               />
-              <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <CanvasRotationIndicatorControl
-                    rotationDegrees={canvasRotationDegrees}
-                    northBearingDegrees={northBearingDegrees}
-                    surfaceState={canvasRotationIndicatorSurfaceState}
-                    onReset={resetCanvasRotation}
-                  />
+              {CANVAS_ROTATION_ENABLED ? (
+                <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <CanvasRotationIndicatorControl
+                      rotationDegrees={canvasRotationDegrees}
+                      northBearingDegrees={northBearingDegrees}
+                      surfaceState={canvasRotationIndicatorSurfaceState}
+                      onReset={resetCanvasRotation}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           ) : null}
           {northDragTooltip ? (
@@ -1974,7 +1981,7 @@ export default function EditorCanvas({
               {formatNorthBearingDegrees(northDragTooltip.bearingDegrees)}
             </div>
           ) : null}
-          {canvasRotationTooltip ? (
+          {CANVAS_ROTATION_ENABLED && canvasRotationTooltip ? (
             <div
               className={cn("pointer-events-none absolute", tooltipContentClassName)}
               style={{
