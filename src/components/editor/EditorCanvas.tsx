@@ -2065,6 +2065,7 @@ export default function EditorCanvas({
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
+  const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2167,7 +2168,7 @@ export default function EditorCanvas({
               ) : null}
             </div>
           ) : null}
-          {showCanvasHud && hasRooms ? (
+          {showCanvasHud && showMiniMap && hasRooms ? (
             <div className="pointer-events-none absolute bottom-3 right-3 z-10 sm:bottom-4 sm:right-4">
               <CanvasMiniMap
                 rooms={rooms}
