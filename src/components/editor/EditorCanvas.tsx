@@ -514,7 +514,7 @@ export default function EditorCanvas({
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
-  const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
+  const resetCanvasRotation = useEditorStore((state) => state.resetCanvasRotation);
   const previewNorthBearingDegrees = useEditorStore((state) => state.previewNorthBearingDegrees);
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
@@ -1956,7 +1956,7 @@ export default function EditorCanvas({
                     rotationDegrees={canvasRotationDegrees}
                     northBearingDegrees={northBearingDegrees}
                     surfaceState={canvasRotationIndicatorSurfaceState}
-                    onReset={() => updateCanvasRotationDegrees(0)}
+                    onReset={resetCanvasRotation}
                   />
                 </div>
               </div>

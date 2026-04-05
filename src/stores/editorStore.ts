@@ -160,6 +160,7 @@ type EditorState = {
   previewCanvasRotationDegrees: (degrees: number) => void;
   commitCanvasRotationDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateCanvasRotationDegrees: (degrees: number) => void;
+  resetCanvasRotation: () => void;
   previewNorthBearingDegrees: (degrees: number) => void;
   commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateNorthBearingDegrees: (degrees: number) => void;
@@ -1183,6 +1184,97 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  resetCanvasRotation: () => {
+    const state = get();
+    const previousRotationDegrees = normalizeCanvasRotationDegrees(
+      state.document.canvasRotationDegrees
+    );
+    const nextRotationDegrees = DEFAULT_CANVAS_ROTATION_DEGREES;
+    if (previousRotationDegrees === nextRotationDegrees) return;
+
+    const targetCamera: CameraState = {
+      ...state.camera,
+      rotationDegrees: nextRotationDegrees,
+    };
+
+    stopResetCameraAnimation();
+
+    if (typeof window === "undefined") {
+      set((currentState) => ({
+        document: {
+          ...currentState.document,
+          canvasRotationDegrees: nextRotationDegrees,
+        },
+        camera: targetCamera,
+        history: {
+          past: pushToPast(currentState.history.past, {
+            type: "update-canvas-rotation",
+            previousRotationDegrees,
+            nextRotationDegrees,
+          }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      }));
+      return;
+    }
+
+    const startCamera = state.camera;
+    const startTime = window.performance.now();
+    const sequence = nextResetCameraAnimationSequence;
+
+    const step = (now: number) => {
+      if (activeResetCameraAnimation?.sequence !== sequence) return;
+
+      const elapsedMs = now - startTime;
+      const progress = Math.min(1, elapsedMs / RESET_CAMERA_TRANSITION_DURATION_MS);
+      const easedProgress = easeResetCameraTransition(progress);
+      const nextCamera =
+        progress >= 1
+          ? targetCamera
+          : interpolateCamera(startCamera, targetCamera, easedProgress);
+
+      set((currentState) => ({
+        document: {
+          ...currentState.document,
+          canvasRotationDegrees: nextCamera.rotationDegrees,
+        },
+        camera: nextCamera,
+        ...(progress >= 1
+          ? {
+              history: {
+                past: pushToPast(currentState.history.past, {
+                  type: "update-canvas-rotation",
+                  previousRotationDegrees,
+                  nextRotationDegrees,
+                }),
+                future: [],
+              },
+              canUndo: true,
+              canRedo: false,
+            }
+          : null),
+      }));
+
+      if (progress >= 1) {
+        activeResetCameraAnimation = null;
+        return;
+      }
+
+      activeResetCameraAnimation = {
+        frameId: window.requestAnimationFrame(step),
+        sequence,
+        targetCamera,
+      };
+    };
+
+    activeResetCameraAnimation = {
+      frameId: window.requestAnimationFrame(step),
+      sequence,
+      targetCamera,
+    };
+  },
   previewNorthBearingDegrees: (degrees) =>
     set((state) => {
       const nextNorthBearingDegrees = normalizeNorthBearingDegrees(degrees);
