@@ -303,18 +303,16 @@ type ActiveNorthDrag = {
 function CanvasRotationIndicatorControl({
   rotationDegrees,
   northBearingDegrees,
+  surfaceState,
   onReset,
 }: {
   rotationDegrees: number;
   northBearingDegrees: number;
+  surfaceState: NorthIndicatorSurfaceState;
   onReset: () => void;
 }) {
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(rotationDegrees);
-  const visible = Math.abs(normalizedRotationDegrees) > 0.01;
-
-  if (!visible) {
-    return null;
-  }
+  const showSurface = surfaceState === "visible";
 
   const northMarkerDegrees = normalizeNorthBearingDegrees(northBearingDegrees + normalizedRotationDegrees);
 
@@ -326,7 +324,12 @@ function CanvasRotationIndicatorControl({
             type="button"
             onClick={onReset}
             aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
-            className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)]"
+            className={`group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
+              showSurface ? "pointer-events-auto" : "pointer-events-none"
+            } ${
+              showSurface ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
           >
             <div
               aria-hidden="true"
@@ -549,7 +552,12 @@ export default function EditorCanvas({
   const [isNorthIndicatorHovered, setIsNorthIndicatorHovered] = useState(false);
   const [northIndicatorSurfaceState, setNorthIndicatorSurfaceState] =
     useState<NorthIndicatorSurfaceState>("hidden");
+  const [canvasRotationIndicatorSurfaceState, setCanvasRotationIndicatorSurfaceState] =
+    useState<NorthIndicatorSurfaceState>(
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01 ? "visible" : "hidden"
+    );
   const northIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasRotationIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHintFlowPaused = hintPauseUntilMs > Date.now();
   const activeHint = useMemo(() => {
     if (!hasHydratedHints || isHintFlowPaused) return null;
@@ -1435,6 +1443,33 @@ export default function EditorCanvas({
   }, [isNorthIndicatorHovered, northDragTooltip]);
 
   useEffect(() => {
+    const shouldShowCanvasRotationSurface =
+      Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01;
+
+    if (canvasRotationIndicatorFadeTimeoutRef.current !== null) {
+      clearTimeout(canvasRotationIndicatorFadeTimeoutRef.current);
+      canvasRotationIndicatorFadeTimeoutRef.current = null;
+    }
+
+    if (shouldShowCanvasRotationSurface) {
+      setCanvasRotationIndicatorSurfaceState("visible");
+      return;
+    }
+
+    canvasRotationIndicatorFadeTimeoutRef.current = setTimeout(() => {
+      setCanvasRotationIndicatorSurfaceState("hidden");
+      canvasRotationIndicatorFadeTimeoutRef.current = null;
+    }, NORTH_INDICATOR_SURFACE_FADE_DELAY_MS);
+
+    return () => {
+      if (canvasRotationIndicatorFadeTimeoutRef.current !== null) {
+        clearTimeout(canvasRotationIndicatorFadeTimeoutRef.current);
+        canvasRotationIndicatorFadeTimeoutRef.current = null;
+      }
+    };
+  }, [canvasRotationDegrees]);
+
+  useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
       const dragSession = activeNorthDragRef.current;
       if (!dragSession || event.pointerId !== dragSession.pointerId) return;
@@ -1920,6 +1955,7 @@ export default function EditorCanvas({
                   <CanvasRotationIndicatorControl
                     rotationDegrees={canvasRotationDegrees}
                     northBearingDegrees={northBearingDegrees}
+                    surfaceState={canvasRotationIndicatorSurfaceState}
                     onReset={() => updateCanvasRotationDegrees(0)}
                   />
                 </div>
