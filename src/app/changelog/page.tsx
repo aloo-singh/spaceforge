@@ -10,6 +10,34 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.3</h2>
+            <span className="text-sm text-muted-foreground">2026-04-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Canvas rotation (feature/canvas-rotation)
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Temporarily disabled behind a feature flag (<code>CANVAS_ROTATION_ENABLED = false</code>)</li>
+                    <li>Right-click drag and rotation indicator are inert</li>
+                    <li>All rotation code preserved for easy re-enablement</li>
+                    <li>North indicator and HUD foundation remain fully active and polished</li>
+                    <li>
+                      Bugs noted for later: wall length distance on rotate, resize handles during
+                      rotation, cursor orientation, stairs resize
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.53.2</h2>
             <span className="text-sm text-muted-foreground">2026-04-02</span>
           </div>
