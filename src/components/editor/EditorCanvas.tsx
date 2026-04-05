@@ -3626,9 +3626,14 @@ function getResizeDimensionAnchorForWall(
   const topRight = worldToScreen({ x: bounds.maxX, y: bounds.minY }, camera, viewport);
   const bottomRight = worldToScreen({ x: bounds.maxX, y: bounds.maxY }, camera, viewport);
   const bottomLeft = worldToScreen({ x: bounds.minX, y: bounds.maxY }, camera, viewport);
-  const horizontalWallLengthPx = Math.abs(topRight.x - topLeft.x);
-  const verticalWallLengthPx = Math.abs(bottomLeft.y - topLeft.y);
-
+  const roomCenter = worldToScreen(
+    {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    },
+    camera,
+    viewport
+  );
   const getEdgeOffsetPx = (wallLengthPx: number) =>
     wallLengthPx < RESIZE_DIMENSION_MIN_SHORT_WALL_PX
       ? getScaledMeasurementPx(
@@ -3636,58 +3641,37 @@ function getResizeDimensionAnchorForWall(
           settings
         )
       : getScaledMeasurementPx(RESIZE_DIMENSION_EDGE_OFFSET_PX, settings);
-
-  switch (wall) {
-    case "top":
-      return {
-        center: {
-          x: (topLeft.x + topRight.x) / 2,
-          y: topLeft.y - getEdgeOffsetPx(horizontalWallLengthPx),
-        },
-        outwardDirection: { x: 0, y: -1 },
-        tangentDirection: { x: 1, y: 0 },
-        wallLengthPx: horizontalWallLengthPx,
-      };
-    case "right":
-      return {
-        center: {
-          x: topRight.x + getEdgeOffsetPx(verticalWallLengthPx),
-          y: (topRight.y + bottomRight.y) / 2,
-        },
-        outwardDirection: { x: 1, y: 0 },
-        tangentDirection: { x: 0, y: 1 },
-        wallLengthPx: verticalWallLengthPx,
-      };
-    case "bottom":
-      return {
-        center: {
-          x: (bottomLeft.x + bottomRight.x) / 2,
-          y: bottomLeft.y + getEdgeOffsetPx(horizontalWallLengthPx),
-        },
-        outwardDirection: { x: 0, y: 1 },
-        tangentDirection: { x: 1, y: 0 },
-        wallLengthPx: horizontalWallLengthPx,
-      };
-    case "left":
-      return {
-        center: {
-          x: topLeft.x - getEdgeOffsetPx(verticalWallLengthPx),
-          y: (topLeft.y + bottomLeft.y) / 2,
-        },
-        outwardDirection: { x: -1, y: 0 },
-        tangentDirection: { x: 0, y: 1 },
-        wallLengthPx: verticalWallLengthPx,
-      };
-  }
+  const [start, end] =
+    wall === "top"
+      ? [topLeft, topRight]
+      : wall === "right"
+        ? [topRight, bottomRight]
+        : wall === "bottom"
+          ? [bottomLeft, bottomRight]
+          : [topLeft, bottomLeft];
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const outwardDirection = normalizeScreenDirection({
+    x: midpoint.x - roomCenter.x,
+    y: midpoint.y - roomCenter.y,
+  });
+  const tangentDirection = normalizeScreenDirection({
+    x: end.x - start.x,
+    y: end.y - start.y,
+  });
+  const wallLengthPx = Math.hypot(end.x - start.x, end.y - start.y);
+  const center = {
+    x: midpoint.x + outwardDirection.x * getEdgeOffsetPx(wallLengthPx),
+    y: midpoint.y + outwardDirection.y * getEdgeOffsetPx(wallLengthPx),
+  };
 
   return {
-    center: {
-      x: (topLeft.x + bottomRight.x) / 2,
-      y: (topLeft.y + bottomRight.y) / 2,
-    },
-    outwardDirection: { x: 0, y: -1 },
-    tangentDirection: { x: 1, y: 0 },
-    wallLengthPx: 0,
+    center,
+    outwardDirection,
+    tangentDirection,
+    wallLengthPx,
   };
 }
 
@@ -3764,9 +3748,9 @@ function createDimensionLabelSpecForEdgeMeasurement(
     wall: edge.start.y === edge.end.y ? "top" : "left",
     axis: edge.start.y === edge.end.y ? "horizontal" : "vertical",
     center: midpointScreen,
-    outwardDirection: normalizeAxisAlignedScreenDirection(outwardVector),
-    tangentDirection: normalizeAxisAlignedScreenDirection(tangentVector),
-    wallLengthPx: Math.abs(endScreen.x - startScreen.x) + Math.abs(endScreen.y - startScreen.y),
+    outwardDirection: normalizeScreenDirection(outwardVector),
+    tangentDirection: normalizeScreenDirection(tangentVector),
+    wallLengthPx: Math.hypot(endScreen.x - startScreen.x, endScreen.y - startScreen.y),
     normalPlacement: settings.wallMeasurementPosition,
     normalOffsetBiasPx: isNonRectangularRoom ? RESIZE_DIMENSION_NON_RECT_EDGE_EXTRA_PADDING_PX : 0,
   };
@@ -3807,12 +3791,29 @@ function getOrthogonalEdgeOutwardOffsetWorld(
   return null;
 }
 
-function normalizeAxisAlignedScreenDirection(vector: ScreenPoint): ScreenPoint {
-  if (Math.abs(vector.x) >= Math.abs(vector.y)) {
-    return { x: vector.x >= 0 ? 1 : -1, y: 0 };
+function normalizeScreenDirection(vector: ScreenPoint): ScreenPoint {
+  const length = Math.hypot(vector.x, vector.y);
+  if (length < 0.001) {
+    return { x: 0, y: -1 };
   }
 
-  return { x: 0, y: vector.y >= 0 ? 1 : -1 };
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+  };
+}
+
+function getFixedEdgeGapLabelOffsetPx(options: {
+  width: number;
+  height: number;
+  direction: ScreenPoint;
+  edgeGapPx: number;
+}): number {
+  const projectedHalfExtentPx =
+    (Math.abs(options.direction.x) * options.width) / 2 +
+    (Math.abs(options.direction.y) * options.height) / 2;
+
+  return projectedHalfExtentPx + options.edgeGapPx;
 }
 
 function getResolvedResizeDimensionLabelLayouts(
@@ -3851,12 +3852,6 @@ function getResolvedResizeDimensionLabelLayouts(
     const width = measurementText.width + dimensionPaddingXPx * 2;
     const height = measurementText.height + dimensionPaddingYPx * 2;
     measurementText.destroy();
-    const normalOffsetPx =
-      labelSpec.normalPlacement === "center"
-        ? 0
-        : height / 2 +
-          insideEdgePaddingPx +
-          getScaledMeasurementPx(labelSpec.normalOffsetBiasPx, settings);
     const avoidanceDirection =
       labelSpec.normalPlacement === "inside"
         ? {
@@ -3871,6 +3866,16 @@ function getResolvedResizeDimensionLabelLayouts(
             y: -labelSpec.outwardDirection.y,
           }
         : labelSpec.outwardDirection;
+    const normalOffsetPx =
+      labelSpec.normalPlacement === "center"
+        ? 0
+        : getFixedEdgeGapLabelOffsetPx({
+            width,
+            height,
+            direction: placementDirection,
+            edgeGapPx:
+              insideEdgePaddingPx + getScaledMeasurementPx(labelSpec.normalOffsetBiasPx, settings),
+          });
     const shiftedCenter = {
       x: labelSpec.center.x + placementDirection.x * normalOffsetPx,
       y: labelSpec.center.y + placementDirection.y * normalOffsetPx,
