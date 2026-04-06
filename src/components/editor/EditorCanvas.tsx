@@ -61,9 +61,10 @@ import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
-import { getLayoutBoundsFromDocument } from "@/lib/editor/exportLayoutBounds";
+import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
+import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
@@ -276,6 +277,212 @@ function CanvasHudCard({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+const MINI_MAP_WIDTH_PX = 172;
+const MINI_MAP_HEIGHT_PX = 128;
+const MINI_MAP_INSET_PX = 10;
+const MINI_MAP_WORLD_PADDING_RATIO = 0.08;
+const MINI_MAP_WORLD_PADDING_MIN_MM = 320;
+const CANVAS_HUD_HIDE_TRANSITION_MS = 220;
+
+function CanvasMiniMap({
+  rooms,
+  camera,
+  viewport,
+  themeMode,
+  onPanToWorldPoint,
+  onInteractionActiveChange,
+}: {
+  rooms: Room[];
+  camera: CameraState;
+  viewport: ViewportSize;
+  themeMode: "light" | "dark";
+  onPanToWorldPoint: (point: Point) => void;
+  onInteractionActiveChange: (isActive: boolean) => void;
+}) {
+  const dragPointerIdRef = useRef<number | null>(null);
+  const layoutBounds = useMemo(() => getLayoutBoundsFromRooms(rooms), [rooms]);
+  const miniMapState = useMemo(() => {
+    if (!layoutBounds) return null;
+
+    const fitViewportBounds = getMiniMapFitViewportWorldBounds(layoutBounds, camera, viewport);
+    const framingMinX = Math.min(layoutBounds.minX, fitViewportBounds.minX);
+    const framingMinY = Math.min(layoutBounds.minY, fitViewportBounds.minY);
+    const framingMaxX = Math.max(layoutBounds.maxX, fitViewportBounds.maxX);
+    const framingMaxY = Math.max(layoutBounds.maxY, fitViewportBounds.maxY);
+    const framingWidthMm = Math.max(framingMaxX - framingMinX, 1);
+    const framingHeightMm = Math.max(framingMaxY - framingMinY, 1);
+    const dominantDimensionMm = Math.max(framingWidthMm, framingHeightMm, 1);
+    const worldPaddingMm = Math.max(
+      MINI_MAP_WORLD_PADDING_MIN_MM,
+      dominantDimensionMm * MINI_MAP_WORLD_PADDING_RATIO
+    );
+    const worldMinX = framingMinX - worldPaddingMm;
+    const worldMinY = framingMinY - worldPaddingMm;
+    const worldWidth = Math.max(framingWidthMm + worldPaddingMm * 2, 1);
+    const worldHeight = Math.max(framingHeightMm + worldPaddingMm * 2, 1);
+    const drawableWidthPx = MINI_MAP_WIDTH_PX - MINI_MAP_INSET_PX * 2;
+    const drawableHeightPx = MINI_MAP_HEIGHT_PX - MINI_MAP_INSET_PX * 2;
+    const scale = Math.min(drawableWidthPx / worldWidth, drawableHeightPx / worldHeight);
+    const offsetX = (MINI_MAP_WIDTH_PX - worldWidth * scale) / 2;
+    const offsetY = (MINI_MAP_HEIGHT_PX - worldHeight * scale) / 2;
+    const mapPoint = (point: Point) => ({
+      x: offsetX + (point.x - worldMinX) * scale,
+      y: offsetY + (point.y - worldMinY) * scale,
+    });
+    const mapScreenPointToWorld = (screenPoint: ScreenPoint) => ({
+      x: worldMinX + (screenPoint.x - offsetX) / scale,
+      y: worldMinY + (screenPoint.y - offsetY) / scale,
+    });
+    const viewportBounds = getMiniMapViewportWorldBounds(camera, viewport);
+    const viewportTopLeft = mapPoint({ x: viewportBounds.minX, y: viewportBounds.minY });
+    const viewportBottomRight = mapPoint({ x: viewportBounds.maxX, y: viewportBounds.maxY });
+
+    return {
+      screenToWorld: mapScreenPointToWorld,
+      roomPaths: rooms
+        .filter((room) => room.points.length > 1)
+        .map((room) => ({
+          id: room.id,
+          path: buildMiniMapRoomPath(room.points, mapPoint),
+        })),
+      viewportRect: {
+        x: viewportTopLeft.x,
+        y: viewportTopLeft.y,
+        width: viewportBottomRight.x - viewportTopLeft.x,
+        height: viewportBottomRight.y - viewportTopLeft.y,
+      },
+    };
+  }, [camera, layoutBounds, rooms, viewport]);
+
+  if (!miniMapState) return null;
+
+  const updateCameraFromPointer = (
+    event: ReactPointerEvent<HTMLDivElement> | PointerEvent,
+    element: HTMLDivElement
+  ) => {
+    const rect = element.getBoundingClientRect();
+    const localPoint = {
+      x: ((event.clientX - rect.left) / rect.width) * MINI_MAP_WIDTH_PX,
+      y: ((event.clientY - rect.top) / rect.height) * MINI_MAP_HEIGHT_PX,
+    };
+    onPanToWorldPoint(miniMapState.screenToWorld(localPoint));
+  };
+
+  const roomFill = themeMode === "light" ? "rgba(82, 82, 91, 0.24)" : "rgba(212, 212, 216, 0.14)";
+  const roomStroke = themeMode === "light" ? "rgba(63, 63, 70, 0.66)" : "rgba(228, 228, 231, 0.42)";
+  const frameStroke = themeMode === "light" ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.98)";
+
+  return (
+    <CanvasHudCard>
+      <div
+        className="pointer-events-auto cursor-pointer touch-none overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        onPointerDown={(event) => {
+          const element = event.currentTarget;
+          dragPointerIdRef.current = event.pointerId;
+          element.setPointerCapture(event.pointerId);
+          onInteractionActiveChange(true);
+          updateCameraFromPointer(event, element);
+        }}
+        onPointerMove={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          updateCameraFromPointer(event, event.currentTarget);
+        }}
+        onPointerUp={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          dragPointerIdRef.current = null;
+          onInteractionActiveChange(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onPointerCancel={(event) => {
+          if (dragPointerIdRef.current !== event.pointerId) return;
+          dragPointerIdRef.current = null;
+          onInteractionActiveChange(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+      >
+        <svg
+          width={MINI_MAP_WIDTH_PX}
+          height={MINI_MAP_HEIGHT_PX}
+          viewBox={`0 0 ${MINI_MAP_WIDTH_PX} ${MINI_MAP_HEIGHT_PX}`}
+          aria-hidden="true"
+          className="block"
+        >
+          {miniMapState.roomPaths.map((room) => (
+            <path
+              key={room.id}
+              d={room.path}
+              fill={roomFill}
+              stroke={roomStroke}
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+            />
+          ))}
+          <rect
+            x={miniMapState.viewportRect.x}
+            y={miniMapState.viewportRect.y}
+            width={miniMapState.viewportRect.width}
+            height={miniMapState.viewportRect.height}
+            rx={8}
+            fill="none"
+            stroke={frameStroke}
+            strokeWidth={1.5}
+          />
+        </svg>
+      </div>
+    </CanvasHudCard>
+  );
+}
+
+function buildMiniMapRoomPath(points: Point[], mapPoint: (point: Point) => ScreenPoint) {
+  if (points.length === 0) return "";
+
+  return points
+    .map((point, index) => {
+      const mappedPoint = mapPoint(point);
+      return `${index === 0 ? "M" : "L"} ${mappedPoint.x} ${mappedPoint.y}`;
+    })
+    .join(" ")
+    .concat(" Z");
+}
+
+function getMiniMapViewportWorldBounds(camera: CameraState, viewport: ViewportSize) {
+  if (Math.abs(normalizeCanvasRotationDegrees(camera.rotationDegrees)) <= 0.01) {
+    const halfWidthMm = viewport.width / camera.pixelsPerMm / 2;
+    const halfHeightMm = viewport.height / camera.pixelsPerMm / 2;
+
+    return {
+      minX: camera.xMm - halfWidthMm,
+      maxX: camera.xMm + halfWidthMm,
+      minY: camera.yMm - halfHeightMm,
+      maxY: camera.yMm + halfHeightMm,
+    };
+  }
+
+  return getViewportWorldBounds(camera, viewport);
+}
+
+function getMiniMapFitViewportWorldBounds(
+  layoutBounds: NonNullable<ReturnType<typeof getLayoutBoundsFromRooms>>,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  const fitCamera = getCameraFitTargetForBounds({
+    layoutBounds,
+    viewport,
+    emptyLayoutCamera: {
+      ...camera,
+      xMm: layoutBounds.centerX,
+      yMm: layoutBounds.centerY,
+    },
+  }).camera;
+
+  return getMiniMapViewportWorldBounds(fitCamera, viewport);
 }
 
 type NorthDragTooltipState = {
@@ -509,6 +716,7 @@ export default function EditorCanvas({
     () => false
   );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
+  const rooms = useEditorStore((state) => state.document.rooms);
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
@@ -521,6 +729,8 @@ export default function EditorCanvas({
   const commitNorthBearingDegrees = useEditorStore((state) => state.commitNorthBearingDegrees);
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
+  const viewport = useEditorStore((state) => state.viewport);
+  const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
@@ -1879,6 +2089,12 @@ export default function EditorCanvas({
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
+  const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
+  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
+  const canvasHudHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
+  const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
+  const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -1893,6 +2109,56 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
+
+  useEffect(() => {
+    if (canvasHudHideTimeoutRef.current) {
+      clearTimeout(canvasHudHideTimeoutRef.current);
+      canvasHudHideTimeoutRef.current = null;
+    }
+
+    if (showCanvasHud) {
+      setIsCanvasHudPresent(true);
+      return;
+    }
+
+    if (!isCanvasHudPresent) return;
+
+    canvasHudHideTimeoutRef.current = setTimeout(() => {
+      setIsCanvasHudPresent(false);
+      canvasHudHideTimeoutRef.current = null;
+    }, CANVAS_HUD_HIDE_TRANSITION_MS);
+
+    return () => {
+      if (!canvasHudHideTimeoutRef.current) return;
+      clearTimeout(canvasHudHideTimeoutRef.current);
+      canvasHudHideTimeoutRef.current = null;
+    };
+  }, [isCanvasHudPresent, showCanvasHud]);
+
+  useEffect(() => {
+    if (miniMapHideTimeoutRef.current) {
+      clearTimeout(miniMapHideTimeoutRef.current);
+      miniMapHideTimeoutRef.current = null;
+    }
+
+    if (shouldShowMiniMap) {
+      setIsMiniMapPresent(true);
+      return;
+    }
+
+    if (!isMiniMapPresent) return;
+
+    miniMapHideTimeoutRef.current = setTimeout(() => {
+      setIsMiniMapPresent(false);
+      miniMapHideTimeoutRef.current = null;
+    }, CANVAS_HUD_HIDE_TRANSITION_MS);
+
+    return () => {
+      if (!miniMapHideTimeoutRef.current) return;
+      clearTimeout(miniMapHideTimeoutRef.current);
+      miniMapHideTimeoutRef.current = null;
+    };
+  }, [isMiniMapPresent, shouldShowMiniMap]);
 
   return (
     <section
@@ -1936,8 +2202,15 @@ export default function EditorCanvas({
             tabIndex={-1}
             className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
-          {showCanvasHud ? (
-            <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 sm:bottom-4 sm:left-4">
+          {isCanvasHudPresent ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:bottom-4 sm:left-4",
+                showCanvasHud
+                  ? "translate-y-0 scale-100 opacity-100"
+                  : "translate-y-1 scale-[0.985] opacity-0"
+              )}
+            >
               <CanvasHudCard>
                 <div
                   className="text-[11px] font-medium tracking-[0.04em] text-foreground/72"
@@ -1979,6 +2252,25 @@ export default function EditorCanvas({
                   </div>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {isMiniMapPresent ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute bottom-4 right-4 z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
+                shouldShowMiniMap
+                  ? "translate-y-0 scale-100 opacity-100"
+                  : "translate-y-1 scale-[0.985] opacity-0"
+              )}
+            >
+              <CanvasMiniMap
+                rooms={rooms}
+                camera={camera}
+                viewport={viewport}
+                themeMode={editorThemeMode}
+                onPanToWorldPoint={(point) => setCameraCenterMm(point.x, point.y)}
+                onInteractionActiveChange={setCanvasInteractionActive}
+              />
             </div>
           ) : null}
           {northDragTooltip ? (

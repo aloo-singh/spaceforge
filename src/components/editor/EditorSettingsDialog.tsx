@@ -30,6 +30,7 @@ export function EditorSettingsDialog({
   const isLargeMeasurementText = settings.measurementFontSize === "large";
   const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
   const isCanvasHudVisible = settings.showCanvasHud;
+  const isMiniMapVisible = settings.showMiniMap;
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
@@ -309,6 +310,55 @@ export function EditorSettingsDialog({
               variant={!isCanvasHudVisible ? "secondary" : "ghost"}
               aria-pressed={!isCanvasHudVisible}
               onClick={() => updateSettings({ showCanvasHud: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-mini-map-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-mini-map-title" className="text-sm font-medium text-foreground">
+                Show mini-map
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Keep the overview map visible in the canvas corner for quick spatial navigation.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Mini-map status</dt>
+                <dd>{isMiniMapVisible ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Show mini-map"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={isMiniMapVisible ? "secondary" : "ghost"}
+              aria-pressed={isMiniMapVisible}
+              onClick={() => updateSettings({ showMiniMap: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!isMiniMapVisible ? "secondary" : "ghost"}
+              aria-pressed={!isMiniMapVisible}
+              onClick={() => updateSettings({ showMiniMap: false })}
               className="min-w-20 flex-1 sm:flex-none"
             >
               Off

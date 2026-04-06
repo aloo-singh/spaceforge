@@ -10,25 +10,23 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.53.3</h2>
-            <span className="text-sm text-muted-foreground">2026-04-05</span>
+            <h2 className="text-2xl font-semibold">v0.53.4</h2>
+            <span className="text-sm text-muted-foreground">2026-04-06</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>
-                  Canvas rotation (feature/canvas-rotation)
+                  Mini-map (feature/mini-map)
                   <ul className="mt-2 list-disc space-y-2 pl-5">
-                    <li>Temporarily disabled behind a feature flag (<code>CANVAS_ROTATION_ENABLED = false</code>)</li>
-                    <li>Right-click drag and rotation indicator are inert</li>
-                    <li>All rotation code preserved for easy re-enablement</li>
-                    <li>North indicator and HUD foundation remain fully active and polished</li>
-                    <li>
-                      Bugs noted for later: wall length distance on rotate, resize handles during
-                      rotation, cursor orientation, stairs resize
-                    </li>
+                    <li>Small abstracted mini-map in bottom-right corner (simple filled room outlines)</li>
+                    <li>White viewport rectangle showing current camera view (handles edge cases when scrolling outside fit-to-layout bounds)</li>
+                    <li>Click/drag to pan main canvas</li>
+                    <li>Settings toggle &ldquo;Show mini-map&rdquo; (default On) with persistence</li>
+                    <li>Calm fade-out transition when toggled off</li>
+                    <li>Dark/light mode consistency with rounded corners matching existing HUD</li>
                   </ul>
                 </li>
               </ul>

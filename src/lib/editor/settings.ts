@@ -10,6 +10,7 @@ export type EditorSettings = {
   measurementFontSize: EditorMeasurementFontSize;
   wallMeasurementPosition: EditorWallMeasurementPosition;
   showCanvasHud: boolean;
+  showMiniMap: boolean;
   showGuidelines: boolean;
   snappingEnabled: boolean;
   exportSignatureText: string;
@@ -21,6 +22,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   measurementFontSize: "normal",
   wallMeasurementPosition: "inside",
   showCanvasHud: true,
+  showMiniMap: true,
   showGuidelines: true,
   snappingEnabled: true,
   exportSignatureText: "",
@@ -33,6 +35,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     measurementFontSize: settings.measurementFontSize,
     wallMeasurementPosition: settings.wallMeasurementPosition,
     showCanvasHud: settings.showCanvasHud,
+    showMiniMap: settings.showMiniMap,
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     exportSignatureText: settings.exportSignatureText,
@@ -46,6 +49,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.measurementFontSize === b.measurementFontSize &&
     a.wallMeasurementPosition === b.wallMeasurementPosition &&
     a.showCanvasHud === b.showCanvasHud &&
+    a.showMiniMap === b.showMiniMap &&
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.exportSignatureText === b.exportSignatureText
@@ -116,6 +120,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showCanvasHud" in value && typeof value.showCanvasHud === "boolean"
         ? value.showCanvasHud
         : DEFAULT_EDITOR_SETTINGS.showCanvasHud,
+    showMiniMap:
+      "showMiniMap" in value && typeof value.showMiniMap === "boolean"
+        ? value.showMiniMap
+        : DEFAULT_EDITOR_SETTINGS.showMiniMap,
     showGuidelines:
       "showGuidelines" in value && typeof value.showGuidelines === "boolean"
         ? value.showGuidelines
