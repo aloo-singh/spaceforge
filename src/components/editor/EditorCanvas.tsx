@@ -99,7 +99,6 @@ import {
   getRoomEdgeMeasurements,
   getRectResizeMeasurements,
   getCornerResizeMeasurements,
-  getWallResizeMeasurementMillimetres,
 } from "@/lib/editor/measurements";
 import {
   getActiveSnapStepMm,
@@ -3635,6 +3634,7 @@ function drawActiveResizeDimensions(
     activeWall: RectWall | null;
     activeCorner: RectCorner | null;
     activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
   camera: CameraState,
@@ -3643,14 +3643,18 @@ function drawActiveResizeDimensions(
   theme: EditorCanvasTheme
 ) {
   if (!roomResizeUi.activeRoomId) return;
-  if (!roomResizeUi.activeWall && !roomResizeUi.activeCorner) return;
+  if (
+    !roomResizeUi.activeWall &&
+    !roomResizeUi.activeCorner &&
+    roomResizeUi.activeWallSegmentIndex === null
+  ) {
+    return;
+  }
 
   const activeRoom = rooms.find((room) => room.id === roomResizeUi.activeRoomId);
   if (!activeRoom) return;
 
   const bounds = getAxisAlignedRoomBounds(activeRoom);
-  if (!bounds) return;
-
   const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport, settings, {
     showArea: true,
   });
@@ -3659,6 +3663,7 @@ function drawActiveResizeDimensions(
     bounds,
     roomResizeUi.activeWall,
     roomResizeUi.activeCorner,
+    roomResizeUi.activeWallSegmentIndex,
     camera,
     viewport,
     settings
@@ -3837,30 +3842,34 @@ function drawDimensionLabels(
 
 function getResizeDimensionLabelSpecs(
   room: Room,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  bounds: { minX: number; maxX: number; minY: number; maxY: number } | null,
   activeWall: RectWall | null,
   activeCorner: RectCorner | null,
+  activeWallSegmentIndex: number | null,
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize">
 ): ResizeDimensionLabelSpec[] {
   if (activeWall) {
-    const measurement = getWallResizeMeasurementMillimetres(room, activeWall);
-    if (measurement === null) return [];
+    if (!bounds) return [];
+    const measurements = getRectResizeMeasurements(room);
+    if (!measurements) return [];
+    const { measurementWalls, measurementMillimetres } = getResizeWallsForWall(activeWall, measurements);
 
-    return [
+    return measurementWalls.map((wall) =>
       createDimensionLabelSpecForWallMeasurement(
-        activeWall,
-        measurement,
+        wall,
+        measurementMillimetres,
         bounds,
         camera,
         viewport,
         settings
-      ),
-    ];
+      )
+    );
   }
 
   if (activeCorner) {
+    if (!bounds) return [];
     const measurements = getCornerResizeMeasurements(room, activeCorner);
     if (!measurements) return [];
 
@@ -3886,6 +3895,15 @@ function getResizeDimensionLabelSpecs(
     ];
   }
 
+  if (activeWallSegmentIndex !== null) {
+    return getResizeDimensionLabelSpecsForOrthogonalWallSegment(
+      room,
+      activeWallSegmentIndex,
+      camera,
+      viewport
+    );
+  }
+
   return [];
 }
 
@@ -3903,6 +3921,55 @@ function getResizeWallsForCorner(corner: RectCorner): {
     case "bottom-left":
       return { horizontalWall: "bottom", verticalWall: "left" };
   }
+}
+
+function getResizeWallsForWall(
+  wall: RectWall,
+  measurements: { widthMillimetres: number; heightMillimetres: number }
+): {
+  measurementWalls: RectWall[];
+  measurementMillimetres: number;
+} {
+  if (wall === "top" || wall === "bottom") {
+    return {
+      measurementWalls: ["left", "right"],
+      measurementMillimetres: measurements.heightMillimetres,
+    };
+  }
+
+  return {
+    measurementWalls: ["top", "bottom"],
+    measurementMillimetres: measurements.widthMillimetres,
+  };
+}
+
+function getResizeDimensionLabelSpecsForOrthogonalWallSegment(
+  room: Room,
+  wallSegmentIndex: number,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec[] {
+  if (room.points.length < 4) return [];
+
+  const pointCount = room.points.length;
+  const adjacentWallIndices = [
+    (wallSegmentIndex - 1 + pointCount) % pointCount,
+    (wallSegmentIndex + 1) % pointCount,
+  ];
+
+  return adjacentWallIndices.flatMap((wallIndex) => {
+    const wallMeasurement = getRoomWallMeasurement(room, wallIndex);
+    if (!wallMeasurement) return [];
+
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(
+      room,
+      wallMeasurement,
+      camera,
+      viewport,
+      { wallMeasurementPosition: "outside" }
+    );
+    return labelSpec ? [labelSpec] : [];
+  });
 }
 
 function createDimensionLabelSpecForWallMeasurement(
