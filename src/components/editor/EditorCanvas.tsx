@@ -284,7 +284,7 @@ const MINI_MAP_HEIGHT_PX = 128;
 const MINI_MAP_INSET_PX = 10;
 const MINI_MAP_WORLD_PADDING_RATIO = 0.08;
 const MINI_MAP_WORLD_PADDING_MIN_MM = 320;
-const MINI_MAP_HIDE_TRANSITION_MS = 220;
+const CANVAS_HUD_HIDE_TRANSITION_MS = 220;
 
 function CanvasMiniMap({
   rooms,
@@ -2090,6 +2090,8 @@ export default function EditorCanvas({
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
+  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
+  const canvasHudHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
   const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
   const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2109,6 +2111,31 @@ export default function EditorCanvas({
   );
 
   useEffect(() => {
+    if (canvasHudHideTimeoutRef.current) {
+      clearTimeout(canvasHudHideTimeoutRef.current);
+      canvasHudHideTimeoutRef.current = null;
+    }
+
+    if (showCanvasHud) {
+      setIsCanvasHudPresent(true);
+      return;
+    }
+
+    if (!isCanvasHudPresent) return;
+
+    canvasHudHideTimeoutRef.current = setTimeout(() => {
+      setIsCanvasHudPresent(false);
+      canvasHudHideTimeoutRef.current = null;
+    }, CANVAS_HUD_HIDE_TRANSITION_MS);
+
+    return () => {
+      if (!canvasHudHideTimeoutRef.current) return;
+      clearTimeout(canvasHudHideTimeoutRef.current);
+      canvasHudHideTimeoutRef.current = null;
+    };
+  }, [isCanvasHudPresent, showCanvasHud]);
+
+  useEffect(() => {
     if (miniMapHideTimeoutRef.current) {
       clearTimeout(miniMapHideTimeoutRef.current);
       miniMapHideTimeoutRef.current = null;
@@ -2124,7 +2151,7 @@ export default function EditorCanvas({
     miniMapHideTimeoutRef.current = setTimeout(() => {
       setIsMiniMapPresent(false);
       miniMapHideTimeoutRef.current = null;
-    }, MINI_MAP_HIDE_TRANSITION_MS);
+    }, CANVAS_HUD_HIDE_TRANSITION_MS);
 
     return () => {
       if (!miniMapHideTimeoutRef.current) return;
@@ -2175,8 +2202,15 @@ export default function EditorCanvas({
             tabIndex={-1}
             className="h-full w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
-          {showCanvasHud ? (
-            <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 sm:bottom-4 sm:left-4">
+          {isCanvasHudPresent ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:bottom-4 sm:left-4",
+                showCanvasHud
+                  ? "translate-y-0 scale-100 opacity-100"
+                  : "translate-y-1 scale-[0.985] opacity-0"
+              )}
+            >
               <CanvasHudCard>
                 <div
                   className="text-[11px] font-medium tracking-[0.04em] text-foreground/72"
