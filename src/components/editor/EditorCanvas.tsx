@@ -64,6 +64,7 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
+import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
@@ -283,6 +284,7 @@ const MINI_MAP_HEIGHT_PX = 128;
 const MINI_MAP_INSET_PX = 10;
 const MINI_MAP_WORLD_PADDING_RATIO = 0.08;
 const MINI_MAP_WORLD_PADDING_MIN_MM = 320;
+const MINI_MAP_HIDE_TRANSITION_MS = 220;
 
 function CanvasMiniMap({
   rooms,
@@ -304,15 +306,22 @@ function CanvasMiniMap({
   const miniMapState = useMemo(() => {
     if (!layoutBounds) return null;
 
-    const dominantDimensionMm = Math.max(layoutBounds.width, layoutBounds.height, 1);
+    const fitViewportBounds = getMiniMapFitViewportWorldBounds(layoutBounds, camera, viewport);
+    const framingMinX = Math.min(layoutBounds.minX, fitViewportBounds.minX);
+    const framingMinY = Math.min(layoutBounds.minY, fitViewportBounds.minY);
+    const framingMaxX = Math.max(layoutBounds.maxX, fitViewportBounds.maxX);
+    const framingMaxY = Math.max(layoutBounds.maxY, fitViewportBounds.maxY);
+    const framingWidthMm = Math.max(framingMaxX - framingMinX, 1);
+    const framingHeightMm = Math.max(framingMaxY - framingMinY, 1);
+    const dominantDimensionMm = Math.max(framingWidthMm, framingHeightMm, 1);
     const worldPaddingMm = Math.max(
       MINI_MAP_WORLD_PADDING_MIN_MM,
       dominantDimensionMm * MINI_MAP_WORLD_PADDING_RATIO
     );
-    const worldMinX = layoutBounds.minX - worldPaddingMm;
-    const worldMinY = layoutBounds.minY - worldPaddingMm;
-    const worldWidth = Math.max(layoutBounds.width + worldPaddingMm * 2, 1);
-    const worldHeight = Math.max(layoutBounds.height + worldPaddingMm * 2, 1);
+    const worldMinX = framingMinX - worldPaddingMm;
+    const worldMinY = framingMinY - worldPaddingMm;
+    const worldWidth = Math.max(framingWidthMm + worldPaddingMm * 2, 1);
+    const worldHeight = Math.max(framingHeightMm + worldPaddingMm * 2, 1);
     const drawableWidthPx = MINI_MAP_WIDTH_PX - MINI_MAP_INSET_PX * 2;
     const drawableHeightPx = MINI_MAP_HEIGHT_PX - MINI_MAP_INSET_PX * 2;
     const scale = Math.min(drawableWidthPx / worldWidth, drawableHeightPx / worldHeight);
@@ -367,9 +376,6 @@ function CanvasMiniMap({
 
   return (
     <CanvasHudCard>
-      <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-        Mini-map
-      </div>
       <div
         className="pointer-events-auto cursor-pointer touch-none overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
         onPointerDown={(event) => {
@@ -459,6 +465,24 @@ function getMiniMapViewportWorldBounds(camera: CameraState, viewport: ViewportSi
   }
 
   return getViewportWorldBounds(camera, viewport);
+}
+
+function getMiniMapFitViewportWorldBounds(
+  layoutBounds: NonNullable<ReturnType<typeof getLayoutBoundsFromRooms>>,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  const fitCamera = getCameraFitTargetForBounds({
+    layoutBounds,
+    viewport,
+    emptyLayoutCamera: {
+      ...camera,
+      xMm: layoutBounds.centerX,
+      yMm: layoutBounds.centerY,
+    },
+  }).camera;
+
+  return getMiniMapViewportWorldBounds(fitCamera, viewport);
 }
 
 type NorthDragTooltipState = {
@@ -2066,6 +2090,9 @@ export default function EditorCanvas({
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
+  const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
+  const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
+  const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2080,6 +2107,31 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
+
+  useEffect(() => {
+    if (miniMapHideTimeoutRef.current) {
+      clearTimeout(miniMapHideTimeoutRef.current);
+      miniMapHideTimeoutRef.current = null;
+    }
+
+    if (shouldShowMiniMap) {
+      setIsMiniMapPresent(true);
+      return;
+    }
+
+    if (!isMiniMapPresent) return;
+
+    miniMapHideTimeoutRef.current = setTimeout(() => {
+      setIsMiniMapPresent(false);
+      miniMapHideTimeoutRef.current = null;
+    }, MINI_MAP_HIDE_TRANSITION_MS);
+
+    return () => {
+      if (!miniMapHideTimeoutRef.current) return;
+      clearTimeout(miniMapHideTimeoutRef.current);
+      miniMapHideTimeoutRef.current = null;
+    };
+  }, [isMiniMapPresent, shouldShowMiniMap]);
 
   return (
     <section
@@ -2168,8 +2220,15 @@ export default function EditorCanvas({
               ) : null}
             </div>
           ) : null}
-          {showCanvasHud && showMiniMap && hasRooms ? (
-            <div className="pointer-events-none absolute bottom-3 right-3 z-10 sm:bottom-4 sm:right-4">
+          {isMiniMapPresent ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute bottom-4 right-4 z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
+                shouldShowMiniMap
+                  ? "translate-y-0 scale-100 opacity-100"
+                  : "translate-y-1 scale-[0.985] opacity-0"
+              )}
+            >
               <CanvasMiniMap
                 rooms={rooms}
                 camera={camera}
