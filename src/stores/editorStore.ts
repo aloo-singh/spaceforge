@@ -648,6 +648,7 @@ function insertOpeningOnSelectedWall(
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
+    selectedWall: null,
     selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
     selectedInteriorAsset: null,
     history: {
