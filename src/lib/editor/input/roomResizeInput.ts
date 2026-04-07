@@ -681,8 +681,8 @@ export function attachRoomResizeInput(
         ? getWallHandleLayouts(selected.bounds, selected.state.camera, selected.state.viewport)
         : [];
     const hitWall =
-      hitVertexIndex === null && hitCorner === null
-        ? getHitRectWall(selected.bounds!, screenPoint, selected.state.camera, selected.state.viewport) ??
+      hitVertexIndex === null && hitCorner === null && selected.bounds
+        ? getHitRectWall(selected.bounds, screenPoint, selected.state.camera, selected.state.viewport) ??
           hitTestWallHandle(wallHandles, screenPoint)
         : null;
     if (hitVertexIndex === null && hitWallSegmentIndex === null && !hitCorner && !hitWall) return;

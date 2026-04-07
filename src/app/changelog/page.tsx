@@ -10,6 +10,39 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.5</h2>
+            <span className="text-sm text-muted-foreground">2026-04-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Editor interaction polish
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Fixed a crash after selecting then deselecting non-rectangular rooms before resize hit-testing</li>
+                    <li>Pressing Enter in the selected-room name field now blurs and commits the rename as expected</li>
+                    <li>Adding a door or window now leaves only the new opening selected instead of keeping the host wall selected too</li>
+                    <li>Active resize dimension pills now follow the walls whose lengths actually change during rectangular wall drags</li>
+                    <li>The same live dimension-pill behaviour now applies to non-rectangular orthogonal wall-segment drags</li>
+                  </ul>
+                </li>
+                <li>
+                  North indicator hover compass
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Hover ring now uses 16 ticks instead of 12 for a more natural compass read</li>
+                    <li>Cardinal NSEW ticks are more prominent and slightly longer</li>
+                    <li>Tick contrast is now tuned separately for dark and light mode</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.53.4</h2>
             <span className="text-sm text-muted-foreground">2026-04-06</span>
           </div>

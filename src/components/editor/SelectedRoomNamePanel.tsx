@@ -174,8 +174,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               if (event.key === "Enter") {
                 event.preventDefault();
                 event.stopPropagation();
-                commitRoomRenameSession({ deselectIfUnchanged: false });
-                selectRoomById(selectedRoom.id);
+                event.currentTarget.blur();
                 return;
               }
 
@@ -184,6 +183,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                 event.stopPropagation();
                 cancelRoomRenameSession();
                 selectRoomById(selectedRoom.id);
+                event.currentTarget.blur();
               }
             }}
             placeholder="Untitled room"
