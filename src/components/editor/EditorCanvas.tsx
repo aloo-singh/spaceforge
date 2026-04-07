@@ -628,8 +628,8 @@ function NorthIndicatorControl({
         }`}
         style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
       >
-        {Array.from({ length: 12 }).map((_, index) => {
-          const angle = index * 30;
+        {Array.from({ length: 16 }).map((_, index) => {
+          const angle = index * 22.5;
           const isMajorTick = angle % 90 === 0;
           return (
             <div
@@ -641,7 +641,11 @@ function NorthIndicatorControl({
               }}
             >
               <div
-                className={`mx-auto rounded-full bg-foreground/28 ${isMajorTick ? "h-2.5 w-px" : "h-1.5 w-px"}`}
+                className={`mx-auto rounded-full ${
+                  isMajorTick
+                    ? "h-2 w-px bg-black/90 dark:bg-white/90"
+                    : "h-1.5 w-px bg-black/55 dark:bg-white/50"
+                }`}
               />
             </div>
           );
