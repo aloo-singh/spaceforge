@@ -19,12 +19,31 @@ import {
   saveActiveProjectId,
 } from "@/lib/projects/clientIdentity";
 import { ensureFirstProject } from "@/lib/projects/bootstrap";
+import {
+  INITIAL_PIXELS_PER_MM,
+  NEW_PROJECT_INITIAL_PIXELS_PER_MM,
+} from "@/lib/editor/constants";
 import type { ProjectRecord } from "@/lib/projects/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
 const PROJECT_THUMBNAIL_DEBOUNCE_MS = 1400;
 const PROJECT_THUMBNAIL_IDLE_TIMEOUT_MS = 1200;
+const NEW_PROJECT_OPEN_CAMERA_OPTIONS = {
+  emptyLayoutPixelsPerMm: NEW_PROJECT_INITIAL_PIXELS_PER_MM,
+} as const;
+
+function isFreshEmptyProjectBootstrapState(
+  document: ReturnType<typeof cloneDocumentState>,
+  camera: ReturnType<typeof useEditorStore.getState>["camera"]
+) {
+  return (
+    document.rooms.length === 0 &&
+    camera.xMm === 0 &&
+    camera.yMm === 0 &&
+    camera.pixelsPerMm === INITIAL_PIXELS_PER_MM
+  );
+}
 
 function getDocumentSignature(document: ReturnType<typeof cloneDocumentState>) {
   return JSON.stringify(document);
@@ -134,11 +153,17 @@ export function EditorProjectBootstrap({
             if (isCancelled) return;
 
             const fallbackDocument = cloneDocumentState(fallbackProject.document);
-            const currentDocument = useEditorStore.getState().document;
+            const currentState = useEditorStore.getState();
+            const currentDocument = currentState.document;
+            const projectOpenCameraOptions =
+              fallbackDocument.rooms.length === 0 &&
+              isFreshEmptyProjectBootstrapState(currentDocument, currentState.camera)
+                ? NEW_PROJECT_OPEN_CAMERA_OPTIONS
+                : undefined;
             if (!areDocumentsEqual(currentDocument, fallbackDocument)) {
-              loadProjectDocument(fallbackDocument);
+              loadProjectDocument(fallbackDocument, projectOpenCameraOptions);
             } else {
-              fitCameraOnProjectOpen();
+              fitCameraOnProjectOpen(projectOpenCameraOptions);
             }
 
             saveActiveProjectId(fallbackProject.id);
@@ -164,6 +189,10 @@ export function EditorProjectBootstrap({
           const project = await ensureFirstProject(clientToken, localDocument);
           if (isCancelled) return;
 
+          if (project.document.rooms.length === 0) {
+            fitCameraOnProjectOpen(NEW_PROJECT_OPEN_CAMERA_OPTIONS);
+          }
+
           saveActiveProjectId(project.id);
           onProjectResolvedRef.current?.({
             id: project.id,
@@ -188,11 +217,17 @@ export function EditorProjectBootstrap({
         }
 
         const nextDocument = cloneDocumentState(selectedProject.document);
-        const currentDocument = useEditorStore.getState().document;
+        const currentState = useEditorStore.getState();
+        const currentDocument = currentState.document;
+        const projectOpenCameraOptions =
+          nextDocument.rooms.length === 0 &&
+          isFreshEmptyProjectBootstrapState(currentDocument, currentState.camera)
+            ? NEW_PROJECT_OPEN_CAMERA_OPTIONS
+            : undefined;
         if (!areDocumentsEqual(currentDocument, nextDocument)) {
-          loadProjectDocument(nextDocument);
+          loadProjectDocument(nextDocument, projectOpenCameraOptions);
         } else {
-          fitCameraOnProjectOpen();
+          fitCameraOnProjectOpen(projectOpenCameraOptions);
         }
 
         saveActiveProjectId(selectedProject.id);
