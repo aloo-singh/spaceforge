@@ -28,6 +28,7 @@ export type ExportPngRequest = {
   description: string;
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
+  includeNorthIndicator: boolean;
   showLegend: boolean;
   showScaleBar: boolean;
   legendPosition: EditorExportLegendPosition;
@@ -106,6 +107,7 @@ export function ExportPngDialog({
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
+  const [includeNorthIndicator, setIncludeNorthIndicator] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewDimensions, setPreviewDimensions] = useState({ width: 1600, height: 1200 });
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
@@ -136,6 +138,7 @@ export function ExportPngDialog({
         description,
         titlePosition,
         descriptionPosition,
+        includeNorthIndicator,
         showLegend: effectiveLegendPosition !== "none",
         showScaleBar: effectiveScaleBarPosition !== "none",
         legendPosition: effectiveLegendPosition,
@@ -178,6 +181,7 @@ export function ExportPngDialog({
     description,
     titlePosition,
     descriptionPosition,
+    includeNorthIndicator,
     effectiveLegendPosition,
     effectiveScaleBarPosition,
     designedBy,
@@ -195,6 +199,7 @@ export function ExportPngDialog({
       description,
       titlePosition,
       descriptionPosition,
+      includeNorthIndicator,
       showLegend: effectiveLegendPosition !== "none",
       showScaleBar: effectiveScaleBarPosition !== "none",
       legendPosition: effectiveLegendPosition,
@@ -417,6 +422,19 @@ export function ExportPngDialog({
                   onShowScaleBarChange(value !== "none");
                   onScaleBarPositionChange(value);
                 }}
+              />
+            </ExportToggleCard>
+
+            <ExportToggleCard
+              title="Include north indicator"
+              description="Pass north-indicator intent through the export request without changing the current PNG layout."
+              value={includeNorthIndicator ? "On" : "Off"}
+            >
+              <BinaryChoice
+                ariaLabel="Include north indicator"
+                enabled={includeNorthIndicator}
+                onEnable={() => setIncludeNorthIndicator(true)}
+                onDisable={() => setIncludeNorthIndicator(false)}
               />
             </ExportToggleCard>
 

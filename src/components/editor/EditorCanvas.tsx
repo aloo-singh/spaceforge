@@ -109,6 +109,7 @@ import {
   type SnapGuides,
 } from "@/lib/editor/snapping";
 import {
+  DEFAULT_EDITOR_SETTINGS,
   getMeasurementTextScale,
   normalizeEditorExportSignature,
   shouldShowDimensions,
@@ -2102,6 +2103,9 @@ export default function EditorCanvas({
   const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
+  const hydratedSnappingEnabled = hasHydratedClient
+    ? snappingEnabled
+    : DEFAULT_EDITOR_SETTINGS.snappingEnabled;
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
   const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
@@ -2240,7 +2244,7 @@ export default function EditorCanvas({
                   className="mt-1 text-[11px] text-muted-foreground"
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
-                  {snappingEnabled
+                  {hydratedSnappingEnabled
                     ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
                     : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
                 </div>
