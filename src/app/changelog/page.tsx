@@ -10,6 +10,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.6</h2>
+            <span className="text-sm text-muted-foreground">2026-04-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Editor canvas teardown race in `Fix/small-bugs`
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Prevented late render callbacks from drawing into destroyed PIXI layers during blur/teardown</li>
+                    <li>Fixes the `Cannot read properties of null (reading &apos;clear&apos;)` crash from `drawGrid`</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.53.5</h2>
             <span className="text-sm text-muted-foreground">2026-04-07</span>
           </div>

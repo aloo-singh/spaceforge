@@ -805,6 +805,17 @@ export default function EditorCanvas({
     const draft = draftRef.current;
     const dimensionOverlay = dimensionOverlayRef.current;
     if (!grid || !rooms || !openings || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
+    if (
+      grid.destroyed ||
+      rooms.destroyed ||
+      openings.destroyed ||
+      wallOverlay.destroyed ||
+      roomLabels.destroyed ||
+      draft.destroyed ||
+      dimensionOverlay.destroyed
+    ) {
+      return;
+    }
 
     drawScene(
       grid,
