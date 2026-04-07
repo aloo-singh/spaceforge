@@ -9,6 +9,7 @@ export type ProjectExportConfig = {
   description: string;
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
+  includeNorthIndicator: boolean;
 };
 
 export const DEFAULT_PROJECT_EXPORT_CONFIG: ProjectExportConfig = {
@@ -16,6 +17,7 @@ export const DEFAULT_PROJECT_EXPORT_CONFIG: ProjectExportConfig = {
   description: "",
   titlePosition: "top",
   descriptionPosition: "below-title",
+  includeNorthIndicator: false,
 };
 
 export function cloneProjectExportConfig(config: ProjectExportConfig): ProjectExportConfig {
@@ -24,6 +26,7 @@ export function cloneProjectExportConfig(config: ProjectExportConfig): ProjectEx
     description: config.description,
     titlePosition: config.titlePosition,
     descriptionPosition: config.descriptionPosition,
+    includeNorthIndicator: config.includeNorthIndicator,
   };
 }
 
@@ -58,5 +61,9 @@ export function normalizeProjectExportConfig(value: unknown): ProjectExportConfi
       (value.descriptionPosition === "below-title" || value.descriptionPosition === "none")
         ? value.descriptionPosition
         : DEFAULT_PROJECT_EXPORT_CONFIG.descriptionPosition,
+    includeNorthIndicator:
+      "includeNorthIndicator" in value && typeof value.includeNorthIndicator === "boolean"
+        ? value.includeNorthIndicator
+        : DEFAULT_PROJECT_EXPORT_CONFIG.includeNorthIndicator,
   };
 }

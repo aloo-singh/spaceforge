@@ -109,6 +109,7 @@ import {
   type SnapGuides,
 } from "@/lib/editor/snapping";
 import {
+  DEFAULT_EDITOR_SETTINGS,
   getMeasurementTextScale,
   normalizeEditorExportSignature,
   shouldShowDimensions,
@@ -1104,6 +1105,7 @@ export default function EditorCanvas({
   const createCanvasExportSnapshot = useCallback(
     ({
       includeSignature,
+      includeNorthIndicator,
       innerPaddingPx,
       paddingPx,
       showDimensions,
@@ -1117,6 +1119,7 @@ export default function EditorCanvas({
       themeMode,
     }: {
       includeSignature: boolean;
+      includeNorthIndicator?: boolean;
       innerPaddingPx: number;
       paddingPx: number;
       showDimensions: boolean;
@@ -1262,6 +1265,13 @@ export default function EditorCanvas({
                 mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
               }
             : undefined,
+          northIndicator: includeNorthIndicator
+            ? {
+                bearingDegrees: state.document.northBearingDegrees,
+                color: themeMode === "light" ? "#0f172a" : "#f8fafc",
+                mutedColor: themeMode === "light" ? "#475569" : "#cbd5e1",
+              }
+            : undefined,
           signature: includeSignature
             ? {
                 lines: signatureText
@@ -1309,6 +1319,7 @@ export default function EditorCanvas({
 
     return createCanvasExportSnapshot({
       includeSignature: true,
+      includeNorthIndicator: request.includeNorthIndicator,
       innerPaddingPx: exportInnerPaddingPx,
       paddingPx: 48,
       showDimensions: request.showDimensions,
@@ -1384,6 +1395,7 @@ export default function EditorCanvas({
   const generateThumbnailDataUrl = useCallback(async () => {
     const exportSnapshot = createCanvasExportSnapshot({
       includeSignature: false,
+      includeNorthIndicator: false,
       innerPaddingPx: 56,
       paddingPx: 24,
       showDimensions: false,
@@ -2102,6 +2114,9 @@ export default function EditorCanvas({
   const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
+  const hydratedSnappingEnabled = hasHydratedClient
+    ? snappingEnabled
+    : DEFAULT_EDITOR_SETTINGS.snappingEnabled;
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
   const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
@@ -2240,7 +2255,7 @@ export default function EditorCanvas({
                   className="mt-1 text-[11px] text-muted-foreground"
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
-                  {snappingEnabled
+                  {hydratedSnappingEnabled
                     ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
                     : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
                 </div>

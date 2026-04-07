@@ -869,6 +869,7 @@ function getSafePersistedHistorySnapshot(
             description: document.exportConfig.description,
             titlePosition: document.exportConfig.titlePosition,
             descriptionPosition: document.exportConfig.descriptionPosition,
+            includeNorthIndicator: document.exportConfig.includeNorthIndicator,
           },
           canvasRotationDegrees: document.canvasRotationDegrees,
           northBearingDegrees: document.northBearingDegrees,
@@ -1079,7 +1080,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         state.document.exportConfig.title === nextExportConfig.title &&
         state.document.exportConfig.description === nextExportConfig.description &&
         state.document.exportConfig.titlePosition === nextExportConfig.titlePosition &&
-        state.document.exportConfig.descriptionPosition === nextExportConfig.descriptionPosition
+        state.document.exportConfig.descriptionPosition === nextExportConfig.descriptionPosition &&
+        state.document.exportConfig.includeNorthIndicator === nextExportConfig.includeNorthIndicator
       ) {
         return state;
       }

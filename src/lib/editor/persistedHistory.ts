@@ -29,6 +29,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     exportConfigA.description !== exportConfigB.description ||
     exportConfigA.titlePosition !== exportConfigB.titlePosition ||
     exportConfigA.descriptionPosition !== exportConfigB.descriptionPosition ||
+    exportConfigA.includeNorthIndicator !== exportConfigB.includeNorthIndicator ||
     normalizeCanvasRotationDegrees(a.canvasRotationDegrees) !==
       normalizeCanvasRotationDegrees(b.canvasRotationDegrees) ||
     normalizeNorthBearingDegrees(a.northBearingDegrees) !==
@@ -60,6 +61,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       description: exportConfig.description,
       titlePosition: exportConfig.titlePosition,
       descriptionPosition: exportConfig.descriptionPosition,
+      includeNorthIndicator: exportConfig.includeNorthIndicator,
     },
     canvasRotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),

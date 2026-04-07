@@ -1,5 +1,6 @@
 import type { Container, ICanvas, Renderer } from "pixi.js";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
+import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 
 export type PixiPngExportSource =
   | Renderer
@@ -30,6 +31,11 @@ export type PixiPngExportOptions = {
   scaleBar?: {
     widthPx: number;
     label: string;
+    color: string;
+    mutedColor: string;
+  };
+  northIndicator?: {
+    bearingDegrees: number;
     color: string;
     mutedColor: string;
   };
@@ -74,6 +80,14 @@ type ExportScaleBarBlock = {
   height: number;
 };
 
+type ExportNorthIndicatorBlock = {
+  bearingDegrees: number;
+  color: string;
+  mutedColor: string;
+  width: number;
+  height: number;
+};
+
 function resolveRenderer(source: PixiPngExportSource): Renderer {
   if ("extract" in source) return source;
   return source.renderer;
@@ -114,7 +128,13 @@ function composeExportCanvas(
 
   const footerGapPx = getSectionGap(paddingPx);
   const legendPosition = options.legend?.position === "right-side" ? "right-side" : "bottom";
-  const headerBlock = buildHeaderBlock(measurementContext, sourceWidth, options.header);
+  const northIndicatorBlock = buildNorthIndicatorBlock(options.northIndicator);
+  const topRightReservedWidth = northIndicatorBlock ? northIndicatorBlock.width + footerGapPx : 0;
+  const headerBlock = buildHeaderBlock(
+    measurementContext,
+    Math.max(220, sourceWidth - topRightReservedWidth),
+    options.header
+  );
   const sideLegendMaxWidth = Math.max(220, Math.min(320, Math.floor(sourceWidth * 0.32)));
   const legendBlock = buildLegendBlock(
     measurementContext,
@@ -130,7 +150,8 @@ function composeExportCanvas(
   const exportWidth = Math.max(1, sourceWidth + paddingPx * 2 + rightColumnGapPx + rightLegendWidth);
   const bottomLeftBlockHeight =
     legendPosition === "bottom" ? getBottomLeftBlockHeight(scaleBarBlock, legendBlock) : scaleBarBlock?.height ?? 0;
-  const topSectionHeight = headerBlock ? headerBlock.height + footerGapPx : 0;
+  const topSectionContentHeight = Math.max(headerBlock?.height ?? 0, northIndicatorBlock?.height ?? 0);
+  const topSectionHeight = topSectionContentHeight > 0 ? topSectionContentHeight + footerGapPx : 0;
   const bottomContentHeight = Math.max(bottomLeftBlockHeight, signatureBlock?.height ?? 0);
   const bottomSectionHeight = bottomContentHeight > 0 ? footerGapPx + bottomContentHeight : 0;
   const baseExportHeight = Math.max(
@@ -160,6 +181,15 @@ function composeExportCanvas(
 
   if (headerBlock) {
     drawLeftAlignedTextBlock(context, headerBlock, paddingPx, paddingPx);
+  }
+
+  if (northIndicatorBlock) {
+    drawNorthIndicatorBlock(
+      context,
+      northIndicatorBlock,
+      exportWidth - paddingPx - northIndicatorBlock.width,
+      paddingPx
+    );
   }
 
   context.drawImage(
@@ -405,6 +435,21 @@ function buildScaleBarBlock(
   };
 }
 
+function buildNorthIndicatorBlock(
+  northIndicator: PixiPngExportOptions["northIndicator"]
+): ExportNorthIndicatorBlock | null {
+  if (!northIndicator) return null;
+  if (!Number.isFinite(northIndicator.bearingDegrees)) return null;
+
+  return {
+    bearingDegrees: normalizeNorthBearingDegrees(northIndicator.bearingDegrees),
+    color: northIndicator.color,
+    mutedColor: northIndicator.mutedColor,
+    width: 72,
+    height: 96,
+  };
+}
+
 function buildSignatureBlock(
   context: CanvasRenderingContext2D,
   signature: PixiPngExportOptions["signature"],
@@ -486,6 +531,62 @@ function drawScaleBarBlock(
   context.lineTo(x + block.widthPx - 0.5, lineTopY);
   context.lineTo(x + block.widthPx - 0.5, lineTopY + 8);
   context.stroke();
+  context.restore();
+}
+
+function drawNorthIndicatorBlock(
+  context: CanvasRenderingContext2D,
+  block: ExportNorthIndicatorBlock,
+  x: number,
+  y: number
+) {
+  const centerX = x + block.width / 2;
+  const labelY = y + 1;
+  const shaftBottomY = y + block.height - 18;
+  const shaftLengthPx = 52;
+  const shaftTopY = shaftBottomY - shaftLengthPx;
+  const shaftMidY = shaftTopY + shaftLengthPx / 2;
+  const rotationCenterY = shaftTopY + shaftLengthPx / 2;
+  const rotationRadians = (block.bearingDegrees * Math.PI) / 180;
+  const labelFont = `700 26px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+
+  context.save();
+  context.translate(centerX, rotationCenterY);
+  context.rotate(rotationRadians);
+  context.translate(-centerX, -rotationCenterY);
+
+  context.strokeStyle = block.color;
+  context.fillStyle = block.color;
+  context.lineWidth = 1.5;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  context.beginPath();
+  context.moveTo(centerX, shaftBottomY);
+  context.lineTo(centerX, shaftTopY + 12);
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(centerX - 10, shaftMidY);
+  context.lineTo(centerX + 10, shaftMidY);
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(centerX, shaftTopY);
+  context.lineTo(centerX - 7, shaftTopY + 13);
+  context.lineTo(centerX + 7, shaftTopY + 13);
+  context.closePath();
+  context.fill();
+
+  context.restore();
+
+  context.save();
+  context.textAlign = "center";
+  context.textBaseline = "top";
+  context.font = labelFont;
+  context.fillStyle = block.color;
+  context.globalAlpha = 0.94;
+  context.fillText("N", centerX, labelY);
   context.restore();
 }
 

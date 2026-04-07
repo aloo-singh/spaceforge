@@ -28,6 +28,7 @@ export type ExportPngRequest = {
   description: string;
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
+  includeNorthIndicator: boolean;
   showLegend: boolean;
   showScaleBar: boolean;
   legendPosition: EditorExportLegendPosition;
@@ -50,6 +51,7 @@ type ExportPngDialogProps = {
   description: string;
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
+  includeNorthIndicator: boolean;
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
@@ -61,6 +63,7 @@ type ExportPngDialogProps = {
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
   onDescriptionPositionChange: (value: ProjectExportDescriptionPosition) => void;
+  onIncludeNorthIndicatorChange: (value: boolean) => void;
   onShowLegendChange: (value: boolean) => void;
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
@@ -84,6 +87,7 @@ export function ExportPngDialog({
   description,
   titlePosition,
   descriptionPosition,
+  includeNorthIndicator,
   showLegend,
   showScaleBar,
   showGrid,
@@ -95,6 +99,7 @@ export function ExportPngDialog({
   onDescriptionChange,
   onTitlePositionChange,
   onDescriptionPositionChange,
+  onIncludeNorthIndicatorChange,
   onShowLegendChange,
   onShowScaleBarChange,
   onShowGridChange,
@@ -136,6 +141,7 @@ export function ExportPngDialog({
         description,
         titlePosition,
         descriptionPosition,
+        includeNorthIndicator,
         showLegend: effectiveLegendPosition !== "none",
         showScaleBar: effectiveScaleBarPosition !== "none",
         legendPosition: effectiveLegendPosition,
@@ -178,6 +184,7 @@ export function ExportPngDialog({
     description,
     titlePosition,
     descriptionPosition,
+    includeNorthIndicator,
     effectiveLegendPosition,
     effectiveScaleBarPosition,
     designedBy,
@@ -195,6 +202,7 @@ export function ExportPngDialog({
       description,
       titlePosition,
       descriptionPosition,
+      includeNorthIndicator,
       showLegend: effectiveLegendPosition !== "none",
       showScaleBar: effectiveScaleBarPosition !== "none",
       legendPosition: effectiveLegendPosition,
@@ -417,6 +425,19 @@ export function ExportPngDialog({
                   onShowScaleBarChange(value !== "none");
                   onScaleBarPositionChange(value);
                 }}
+              />
+            </ExportToggleCard>
+
+            <ExportToggleCard
+              title="Include north indicator"
+              description="Include a traditional north arrow in the exported PNG without affecting the live editor."
+              value={includeNorthIndicator ? "On" : "Off"}
+            >
+              <BinaryChoice
+                ariaLabel="Include north indicator"
+                enabled={includeNorthIndicator}
+                onEnable={() => onIncludeNorthIndicatorChange(true)}
+                onDisable={() => onIncludeNorthIndicatorChange(false)}
               />
             </ExportToggleCard>
 

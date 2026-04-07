@@ -159,6 +159,12 @@ export function isProjectDocument(value: unknown): value is EditorDocumentState 
   ) {
     return false;
   }
+  if (
+    value.exportConfig.includeNorthIndicator !== undefined &&
+    typeof value.exportConfig.includeNorthIndicator !== "boolean"
+  ) {
+    return false;
+  }
   return true;
 }
 
