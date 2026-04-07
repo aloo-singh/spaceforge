@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
+import {
+  GRID_SIZE_MM,
+  INITIAL_PIXELS_PER_MM,
+} from "@/lib/editor/constants";
 import {
   applyEditorCommand,
   createEmptyEditorDocumentState,
@@ -130,6 +133,7 @@ type EditorState = {
   document: DocumentState;
   camera: CameraState;
   pendingProjectOpenCameraFit: boolean;
+  pendingProjectOpenEmptyLayoutPixelsPerMm: number | null;
   settings: EditorSettings;
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
@@ -240,8 +244,8 @@ type EditorState = {
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
-  fitCameraOnProjectOpen: () => void;
-  loadProjectDocument: (document: DocumentState) => void;
+  fitCameraOnProjectOpen: (options?: { emptyLayoutPixelsPerMm?: number }) => void;
+  loadProjectDocument: (document: DocumentState, options?: { emptyLayoutPixelsPerMm?: number }) => void;
 };
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
@@ -939,12 +943,17 @@ function isViewportReadyForProjectOpenCameraFit(viewport: ViewportSize): boolean
   return viewport.width > 1 && viewport.height > 1;
 }
 
-function getProjectOpenCamera(document: DocumentState, viewport: ViewportSize): CameraState {
+function getProjectOpenCamera(
+  document: DocumentState,
+  viewport: ViewportSize,
+  options?: { emptyLayoutPixelsPerMm?: number }
+): CameraState {
   return getCameraFitTarget({
     rooms: document.rooms,
     viewport,
     emptyLayoutCamera: {
       ...DEFAULT_CAMERA_STATE,
+      pixelsPerMm: options?.emptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
       rotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
     },
   }).camera;
@@ -988,6 +997,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
   pendingProjectOpenCameraFit: false,
+  pendingProjectOpenEmptyLayoutPixelsPerMm: null,
   settings: createInitialEditorSettings(),
   exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
@@ -1042,8 +1052,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         viewport: nextViewport,
-        camera: getProjectOpenCamera(state.document, nextViewport),
+        camera: getProjectOpenCamera(state.document, nextViewport, {
+          emptyLayoutPixelsPerMm: state.pendingProjectOpenEmptyLayoutPixelsPerMm ?? undefined,
+        }),
         pendingProjectOpenCameraFit: false,
+        pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       };
     }),
   updateSettings: (settings) =>
@@ -2375,6 +2388,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       document: cloneDocumentState(DEFAULT_DOCUMENT_STATE),
       camera: syncCameraRotationToDocument({ ...DEFAULT_CAMERA_STATE }, DEFAULT_DOCUMENT_STATE),
       pendingProjectOpenCameraFit: false,
+      pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       roomDraft: {
         points: [],
         history: [],
@@ -2452,23 +2466,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: remainingFuture.length > 0,
       };
     }),
-  fitCameraOnProjectOpen: () =>
+  fitCameraOnProjectOpen: (options) =>
     set((state) => {
       const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
+      const emptyLayoutPixelsPerMm = options?.emptyLayoutPixelsPerMm;
 
       stopResetCameraAnimation();
 
       if (shouldDeferCameraFit) {
-        if (state.pendingProjectOpenCameraFit) {
+        if (
+          state.pendingProjectOpenCameraFit &&
+          state.pendingProjectOpenEmptyLayoutPixelsPerMm === (emptyLayoutPixelsPerMm ?? null)
+        ) {
           return state;
         }
 
         return {
           pendingProjectOpenCameraFit: true,
+          pendingProjectOpenEmptyLayoutPixelsPerMm: emptyLayoutPixelsPerMm ?? null,
         };
       }
 
-      const targetCamera = getProjectOpenCamera(state.document, state.viewport);
+      const targetCamera = getProjectOpenCamera(state.document, state.viewport, {
+        emptyLayoutPixelsPerMm,
+      });
       if (!state.pendingProjectOpenCameraFit && areCamerasEqual(state.camera, targetCamera)) {
         return state;
       }
@@ -2476,9 +2497,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         camera: targetCamera,
         pendingProjectOpenCameraFit: false,
+        pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       };
     }),
-  loadProjectDocument: (document) =>
+  loadProjectDocument: (document, options) =>
     set((state) => {
       const nextDocument = cloneDocumentState(document);
       if (areDocumentsEqual(state.document, nextDocument)) {
@@ -2487,13 +2509,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       stopResetCameraAnimation();
       const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
+      const emptyLayoutPixelsPerMm = options?.emptyLayoutPixelsPerMm;
 
       return {
         document: nextDocument,
         camera: shouldDeferCameraFit
           ? syncCameraRotationToDocument(state.camera, nextDocument)
-          : getProjectOpenCamera(nextDocument, state.viewport),
+          : getProjectOpenCamera(nextDocument, state.viewport, {
+              emptyLayoutPixelsPerMm,
+            }),
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
+        pendingProjectOpenEmptyLayoutPixelsPerMm: shouldDeferCameraFit
+          ? emptyLayoutPixelsPerMm ?? null
+          : null,
         roomDraft: EMPTY_ROOM_DRAFT,
         selectedNorthIndicator: false,
         selectedRoomId: null,
