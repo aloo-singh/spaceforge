@@ -91,6 +91,9 @@ export function HistoryControls({
   const exportDescriptionPosition = useEditorStore(
     (state) => state.document.exportConfig.descriptionPosition
   );
+  const includeNorthIndicator = useEditorStore(
+    (state) => state.document.exportConfig.includeNorthIndicator
+  );
   const exportPreferences = useEditorStore((state) => state.exportPreferences);
   const updateExportPreferences = useEditorStore((state) => state.updateExportPreferences);
   const updateProjectExportConfig = useEditorStore((state) => state.updateProjectExportConfig);
@@ -316,6 +319,7 @@ export function HistoryControls({
         description={exportDescription}
         titlePosition={exportTitlePosition}
         descriptionPosition={exportDescriptionPosition}
+        includeNorthIndicator={includeNorthIndicator}
         showLegend={exportPreferences.showLegend}
         showScaleBar={exportPreferences.showScaleBar}
         showGrid={exportPreferences.showGrid}
@@ -328,6 +332,9 @@ export function HistoryControls({
         onTitlePositionChange={(value) => updateProjectExportConfig({ titlePosition: value })}
         onDescriptionPositionChange={(value) =>
           updateProjectExportConfig({ descriptionPosition: value })
+        }
+        onIncludeNorthIndicatorChange={(value) =>
+          updateProjectExportConfig({ includeNorthIndicator: value })
         }
         onShowLegendChange={(value) => updateExportPreferences({ showLegend: value })}
         onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}

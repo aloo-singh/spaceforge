@@ -51,6 +51,7 @@ type ExportPngDialogProps = {
   description: string;
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
+  includeNorthIndicator: boolean;
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
@@ -62,6 +63,7 @@ type ExportPngDialogProps = {
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
   onDescriptionPositionChange: (value: ProjectExportDescriptionPosition) => void;
+  onIncludeNorthIndicatorChange: (value: boolean) => void;
   onShowLegendChange: (value: boolean) => void;
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
@@ -85,6 +87,7 @@ export function ExportPngDialog({
   description,
   titlePosition,
   descriptionPosition,
+  includeNorthIndicator,
   showLegend,
   showScaleBar,
   showGrid,
@@ -96,6 +99,7 @@ export function ExportPngDialog({
   onDescriptionChange,
   onTitlePositionChange,
   onDescriptionPositionChange,
+  onIncludeNorthIndicatorChange,
   onShowLegendChange,
   onShowScaleBarChange,
   onShowGridChange,
@@ -107,7 +111,6 @@ export function ExportPngDialog({
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
-  const [includeNorthIndicator, setIncludeNorthIndicator] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewDimensions, setPreviewDimensions] = useState({ width: 1600, height: 1200 });
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
@@ -427,14 +430,14 @@ export function ExportPngDialog({
 
             <ExportToggleCard
               title="Include north indicator"
-              description="Pass north-indicator intent through the export request without changing the current PNG layout."
+              description="Include a traditional north arrow in the exported PNG without affecting the live editor."
               value={includeNorthIndicator ? "On" : "Off"}
             >
               <BinaryChoice
                 ariaLabel="Include north indicator"
                 enabled={includeNorthIndicator}
-                onEnable={() => setIncludeNorthIndicator(true)}
-                onDisable={() => setIncludeNorthIndicator(false)}
+                onEnable={() => onIncludeNorthIndicatorChange(true)}
+                onDisable={() => onIncludeNorthIndicatorChange(false)}
               />
             </ExportToggleCard>
 

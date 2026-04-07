@@ -445,8 +445,8 @@ function buildNorthIndicatorBlock(
     bearingDegrees: normalizeNorthBearingDegrees(northIndicator.bearingDegrees),
     color: northIndicator.color,
     mutedColor: northIndicator.mutedColor,
-    width: 60,
-    height: 74,
+    width: 72,
+    height: 96,
   };
 }
 
@@ -541,16 +541,19 @@ function drawNorthIndicatorBlock(
   y: number
 ) {
   const centerX = x + block.width / 2;
-  const circleCenterY = y + block.height - 14;
-  const shaftLengthPx = 28;
-  const indicatorTopY = circleCenterY - shaftLengthPx;
+  const labelY = y + 1;
+  const shaftBottomY = y + block.height - 18;
+  const shaftLengthPx = 52;
+  const shaftTopY = shaftBottomY - shaftLengthPx;
+  const shaftMidY = shaftTopY + shaftLengthPx / 2;
+  const rotationCenterY = shaftTopY + shaftLengthPx / 2;
   const rotationRadians = (block.bearingDegrees * Math.PI) / 180;
-  const labelFont = `700 11px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
+  const labelFont = `700 26px ${MEASUREMENT_TEXT_FONT_FAMILY}`;
 
   context.save();
-  context.translate(centerX, circleCenterY);
+  context.translate(centerX, rotationCenterY);
   context.rotate(rotationRadians);
-  context.translate(-centerX, -circleCenterY);
+  context.translate(-centerX, -rotationCenterY);
 
   context.strokeStyle = block.color;
   context.fillStyle = block.color;
@@ -559,27 +562,21 @@ function drawNorthIndicatorBlock(
   context.lineJoin = "round";
 
   context.beginPath();
-  context.arc(centerX, circleCenterY, 3.5, 0, Math.PI * 2);
+  context.moveTo(centerX, shaftBottomY);
+  context.lineTo(centerX, shaftTopY + 12);
   context.stroke();
 
   context.beginPath();
-  context.moveTo(centerX, circleCenterY - 3);
-  context.lineTo(centerX, indicatorTopY + 8);
+  context.moveTo(centerX - 10, shaftMidY);
+  context.lineTo(centerX + 10, shaftMidY);
   context.stroke();
 
   context.beginPath();
-  context.moveTo(centerX, indicatorTopY);
-  context.lineTo(centerX - 5.5, indicatorTopY + 9);
-  context.lineTo(centerX + 5.5, indicatorTopY + 9);
+  context.moveTo(centerX, shaftTopY);
+  context.lineTo(centerX - 7, shaftTopY + 13);
+  context.lineTo(centerX + 7, shaftTopY + 13);
   context.closePath();
   context.fill();
-
-  context.strokeStyle = block.mutedColor;
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(centerX - 5, circleCenterY + 8.5);
-  context.lineTo(centerX + 5, circleCenterY + 8.5);
-  context.stroke();
 
   context.restore();
 
@@ -588,8 +585,8 @@ function drawNorthIndicatorBlock(
   context.textBaseline = "top";
   context.font = labelFont;
   context.fillStyle = block.color;
-  context.globalAlpha = 0.9;
-  context.fillText("N", centerX, y);
+  context.globalAlpha = 0.94;
+  context.fillText("N", centerX, labelY);
   context.restore();
 }
 
