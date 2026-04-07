@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.54.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Default zoom refinement
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Brand-new empty projects now open with a wider, more realistic initial zoom (better first-room drawing experience)</li>
+                    <li>Existing saved projects continue to open exactly as saved</li>
+                    <li>&ldquo;Fit View&rdquo; button behaviour unchanged</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.54.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-07</span>
           </div>
