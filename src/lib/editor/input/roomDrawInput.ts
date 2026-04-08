@@ -854,6 +854,15 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+    const selectedInteriorAsset = getSelectedInteriorAssetForHandles();
+    const selectedInteriorAssetHit = selectedInteriorAsset
+      ? findInteriorAssetAtScreenPoint(
+          [selectedInteriorAsset.room],
+          screenPoint,
+          state.camera,
+          state.viewport
+        )
+      : null;
     const labelHitRoom = findRoomLabelAtScreenPoint(
       state.document.rooms,
       screenPoint,
@@ -867,7 +876,14 @@ export function attachRoomDrawInput(
       return;
     }
 
-    if (labelHitRoom) {
+    if (
+      labelHitRoom &&
+      !(
+        selectedInteriorAssetHit &&
+        selectedInteriorAssetHit.roomId === selectedInteriorAsset?.room.id &&
+        selectedInteriorAssetHit.assetId === selectedInteriorAsset.asset.id
+      )
+    ) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
       const startWorldPoint = getSnappedPointFromGuides(
@@ -937,7 +953,6 @@ export function attachRoomDrawInput(
       return;
     }
 
-    const selectedInteriorAsset = getSelectedInteriorAssetForHandles();
     const interiorAssetCornerHandleHit = selectedInteriorAsset
       ? hitTestCornerHandle(
           getCornerHandleLayouts(
