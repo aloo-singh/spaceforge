@@ -153,18 +153,26 @@ export function constrainInteriorAssetCenter(
   targetCenter: Point,
   options?: { gridSizeMm?: number }
 ): Point | null {
-  const nextCenter = {
-    x:
-      options?.gridSizeMm && options.gridSizeMm > 0
-        ? snapToGrid(targetCenter.x, options.gridSizeMm)
-        : targetCenter.x,
-    y:
-      options?.gridSizeMm && options.gridSizeMm > 0
-        ? snapToGrid(targetCenter.y, options.gridSizeMm)
-        : targetCenter.y,
-  };
+  const nextCenter =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? getSnappedInteriorAssetCenter(targetCenter, asset, options.gridSizeMm)
+      : targetCenter;
 
   return findConstrainedInteriorAssetCenter(room, asset.widthMm, asset.depthMm, nextCenter);
+}
+
+function getSnappedInteriorAssetCenter(
+  targetCenter: Point,
+  asset: Pick<RoomInteriorAsset, "widthMm" | "depthMm">,
+  gridSizeMm: number
+): Point {
+  const halfWidth = asset.widthMm / 2;
+  const halfDepth = asset.depthMm / 2;
+
+  return {
+    x: snapToGrid(targetCenter.x - halfWidth, gridSizeMm) + halfWidth,
+    y: snapToGrid(targetCenter.y - halfDepth, gridSizeMm) + halfDepth,
+  };
 }
 
 export function getInteriorAssetBoundsAsRectBounds(

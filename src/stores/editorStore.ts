@@ -2774,7 +2774,8 @@ export function getOpeningResizeWidthForCursor(
 export function getInteriorAssetMoveCenterForCursor(
   roomId: string,
   assetId: string,
-  cursorWorld: Point
+  cursorWorld: Point,
+  dragAnchorOffset?: Point
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
@@ -2789,8 +2790,13 @@ export function getInteriorAssetMoveCenterForCursor(
     state.document,
     roomId,
     assetId,
-    resolvedCursorWorld,
-    null
+    dragAnchorOffset
+      ? {
+          x: resolvedCursorWorld.x + dragAnchorOffset.x,
+          y: resolvedCursorWorld.y + dragAnchorOffset.y,
+        }
+      : resolvedCursorWorld,
+    activeSnapStepMm
   );
 }
 
