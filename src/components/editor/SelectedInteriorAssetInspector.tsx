@@ -182,7 +182,7 @@ export function SelectedInteriorAssetInspector({
               updateInteriorAssetArrowLabelDraft(
                 selectedAssetRoomId,
                 selectedAssetId,
-                event.target.value
+                event.target.value.toUpperCase()
               );
             }}
             onBlur={() => {
