@@ -1,4 +1,5 @@
 import { worldToScreen } from "@/lib/editor/camera";
+import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { getPolygonBounds, isPointInPolygon } from "@/lib/editor/roomGeometry";
 import type { RectCorner, RectWall, RoomRectBounds } from "@/lib/editor/rectRoomResize";
@@ -38,6 +39,7 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     yMm: asset.yMm,
     widthMm: asset.widthMm,
     depthMm: asset.depthMm,
+    rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
   };
 }
 
@@ -61,7 +63,9 @@ export function areRoomInteriorAssetsEqual(
       assetA.xMm !== assetB.xMm ||
       assetA.yMm !== assetB.yMm ||
       assetA.widthMm !== assetB.widthMm ||
-      assetA.depthMm !== assetB.depthMm
+      assetA.depthMm !== assetB.depthMm ||
+      normalizeCanvasRotationDegrees(assetA.rotationDegrees ?? 0) !==
+        normalizeCanvasRotationDegrees(assetB.rotationDegrees ?? 0)
     ) {
       return false;
     }
@@ -110,6 +114,7 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
     yMm: center.y,
     widthMm: DEFAULT_STAIR_WIDTH_MM,
     depthMm: DEFAULT_STAIR_DEPTH_MM,
+    rotationDegrees: 0,
   };
 }
 
@@ -272,6 +277,7 @@ function findConstrainedInteriorAssetCenter(
     yMm: clampedPreferred.y,
     widthMm,
     depthMm,
+    rotationDegrees: 0,
   };
   if (isInteriorAssetWithinRoom(room, directCandidate)) {
     return clampedPreferred;
@@ -291,6 +297,7 @@ function findConstrainedInteriorAssetCenter(
         yMm: y,
         widthMm,
         depthMm,
+        rotationDegrees: 0,
       };
       if (!isInteriorAssetWithinRoom(room, candidate)) continue;
 

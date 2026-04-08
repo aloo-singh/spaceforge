@@ -1,5 +1,7 @@
 "use client";
 
+import { RotateCcw, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
@@ -28,6 +30,7 @@ export function SelectedInteriorAssetInspector({
   const cancelInteriorAssetRenameSession = useEditorStore(
     (state) => state.cancelInteriorAssetRenameSession
   );
+  const rotateSelectedInteriorAsset = useEditorStore((state) => state.rotateSelectedInteriorAsset);
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
@@ -35,7 +38,7 @@ export function SelectedInteriorAssetInspector({
   return (
     <EditorInspectorSection
       title="Selected stair"
-      description="Review the current stair block and reserve space for future stair-specific controls."
+      description="Review the current stair block and adjust its orientation."
       className={className}
     >
       <div className="space-y-4">
@@ -93,8 +96,27 @@ export function SelectedInteriorAssetInspector({
 
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Stair options</p>
-          <div className="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-            Rotation, arrow style, and related stair settings will land here in a later step.
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => rotateSelectedInteriorAsset(-90)}
+              aria-label="Rotate stair left 90 degrees"
+              title="Rotate Left 90°"
+            >
+              <RotateCcw />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => rotateSelectedInteriorAsset(90)}
+              aria-label="Rotate stair right 90 degrees"
+              title="Rotate Right 90°"
+            >
+              <RotateCw />
+            </Button>
           </div>
         </div>
       </div>

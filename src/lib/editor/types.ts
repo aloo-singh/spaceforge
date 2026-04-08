@@ -86,6 +86,7 @@ export type RoomInteriorAsset = {
   yMm: number;
   widthMm: number;
   depthMm: number;
+  rotationDegrees: number;
 };
 
 export type RoomInteriorAssetSelection = {

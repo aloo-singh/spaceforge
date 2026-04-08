@@ -90,7 +90,8 @@ function isRoomInteriorAsset(value: unknown): boolean {
     isFiniteNumber(value.widthMm) &&
     value.widthMm > 0 &&
     isFiniteNumber(value.depthMm) &&
-    value.depthMm > 0
+    value.depthMm > 0 &&
+    (value.rotationDegrees === undefined || isFiniteNumber(value.rotationDegrees))
   );
 }
 

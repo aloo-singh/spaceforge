@@ -200,6 +200,7 @@ type EditorState = {
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
   updateSelectedInteriorAssetName: (name: string) => void;
+  rotateSelectedInteriorAsset: (deltaDegrees: number) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -2015,6 +2016,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...cloneRoomInteriorAsset(asset),
           name: nextName,
+        };
+      });
+      return nextState ?? state;
+    }),
+  rotateSelectedInteriorAsset: (deltaDegrees) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (!Number.isFinite(deltaDegrees) || deltaDegrees === 0) return null;
+
+        const nextRotationDegrees = normalizeCanvasRotationDegrees(
+          asset.rotationDegrees + deltaDegrees
+        );
+        const isQuarterTurn = Math.abs(deltaDegrees) % 180 === 90;
+
+        if (asset.rotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
+
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          widthMm: isQuarterTurn ? asset.depthMm : asset.widthMm,
+          depthMm: isQuarterTurn ? asset.widthMm : asset.depthMm,
+          rotationDegrees: nextRotationDegrees,
         };
       });
       return nextState ?? state;
