@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import {
   GRID_SIZE_MM,
   INITIAL_PIXELS_PER_MM,
@@ -71,6 +72,7 @@ import {
   constrainInteriorAssetCenter,
   createCenteredDefaultStair,
   DEFAULT_STAIR_NAME,
+  getAdjustedInteriorAssetForRoomResize,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
 } from "@/lib/editor/interiorAssets";
@@ -263,6 +265,14 @@ type EditorState = {
   loadProjectDocument: (document: DocumentState, options?: { emptyLayoutPixelsPerMm?: number }) => void;
 };
 
+let activeStairsAdjustedToast:
+  | {
+      id: string | number;
+      roomId: string;
+      nextPoints: Point[];
+    }
+  | null = null;
+
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
 const DEFAULT_CAMERA_STATE: CameraState = {
@@ -359,6 +369,28 @@ function updateRoomPointsInDocument(
         ? {
             ...room,
             points: nextPoints.map((point) => ({ ...point })),
+          }
+        : room
+    ),
+  };
+}
+
+function updateResizedRoomInDocument(
+  document: DocumentState,
+  roomId: string,
+  nextPoints: Point[],
+  nextInteriorAssets?: Room["interiorAssets"]
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            points: nextPoints.map((point) => ({ ...point })),
+            interiorAssets: nextInteriorAssets
+              ? cloneRoomInteriorAssets(nextInteriorAssets)
+              : room.interiorAssets,
           }
         : room
     ),
@@ -589,6 +621,76 @@ function getRoomTranslationDelta(previousPoints: Point[], nextPoints: Point[]): 
     x: nextPoints[0].x - previousPoints[0].x,
     y: nextPoints[0].y - previousPoints[0].y,
   };
+}
+
+function getAdjustedInteriorAssetsForRoomResize(room: Room, nextPoints: Point[]) {
+  const resizedRoom = {
+    ...room,
+    points: clonePoints(nextPoints),
+  };
+  const nextInteriorAssets = room.interiorAssets.flatMap((asset) => {
+    const adjustedAsset = getAdjustedInteriorAssetForRoomResize(resizedRoom, asset);
+    return adjustedAsset ? [adjustedAsset] : [];
+  });
+
+  return {
+    nextInteriorAssets,
+    didAdjust: !areRoomInteriorAssetsEqual(room.interiorAssets, nextInteriorAssets),
+  };
+}
+
+function showStairsAdjustedToast(roomId: string, nextPoints: Point[]) {
+  if (activeStairsAdjustedToast) {
+    toast.dismiss(activeStairsAdjustedToast.id);
+  }
+
+  const id = toast("Stairs adjusted to fit", {
+    duration: 5000,
+    onDismiss: () => {
+      if (
+        activeStairsAdjustedToast?.roomId === roomId &&
+        arePointListsEqual(activeStairsAdjustedToast.nextPoints, nextPoints)
+      ) {
+        activeStairsAdjustedToast = null;
+      }
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (
+          latestCommand?.type !== "resize-room" ||
+          latestCommand.roomId !== roomId ||
+          !arePointListsEqual(latestCommand.nextPoints, nextPoints)
+        ) {
+          return;
+        }
+
+        state.undo();
+      },
+    },
+  });
+
+  activeStairsAdjustedToast = {
+    id,
+    roomId,
+    nextPoints: clonePoints(nextPoints),
+  };
+}
+
+function dismissStairsAdjustedToastForCommand(command: EditorCommand) {
+  if (
+    command.type !== "resize-room" ||
+    !activeStairsAdjustedToast ||
+    activeStairsAdjustedToast.roomId !== command.roomId ||
+    !arePointListsEqual(activeStairsAdjustedToast.nextPoints, command.nextPoints)
+  ) {
+    return;
+  }
+
+  toast.dismiss(activeStairsAdjustedToast.id);
+  activeStairsAdjustedToast = null;
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
@@ -2520,16 +2622,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (arePointListsEqual(previousPoints, nextPoints)) return state;
+      const { nextInteriorAssets, didAdjust } = getAdjustedInteriorAssetsForRoomResize(
+        room,
+        nextPoints
+      );
 
       const command: EditorCommand = {
         type: "resize-room",
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
+        previousInteriorAssets: didAdjust ? cloneRoomInteriorAssets(room.interiorAssets) : undefined,
+        nextInteriorAssets: didAdjust ? cloneRoomInteriorAssets(nextInteriorAssets) : undefined,
       };
+      const nextDocument = updateResizedRoomInDocument(
+        state.document,
+        roomId,
+        nextPoints,
+        didAdjust ? nextInteriorAssets : undefined
+      );
+
+      if (didAdjust) {
+        showStairsAdjustedToast(roomId, nextPoints);
+      }
 
       return {
-        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+        document: nextDocument,
+        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
+          state.selectedInteriorAsset,
+          nextDocument
+        ),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -2624,6 +2746,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const command = state.history.past[state.history.past.length - 1];
       if (!command) return state;
+      dismissStairsAdjustedToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];

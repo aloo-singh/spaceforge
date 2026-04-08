@@ -12,6 +12,7 @@ import {
   measurementMonoFont,
 } from "@/lib/fonts";
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
+import { AppToaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://spaceforge.app"),
@@ -47,6 +48,7 @@ export default function RootLayout({
         className={`${appUiSansFont.variable} ${appUiMonoFont.variable} ${measurementMonoFont.variable} antialiased`}
       >
         <ThemeProvider>
+          <AppToaster />
           <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-black/10 bg-background/95 px-4 backdrop-blur sm:px-6">
             <Link href="/" aria-label="SpaceForge home" className="flex items-center gap-2">
               <BrandWordmark />
