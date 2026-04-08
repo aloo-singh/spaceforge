@@ -4,7 +4,14 @@ import { ArrowUpDown, RotateCcw, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { getRotatedInteriorAssetForRoom } from "@/lib/editor/interiorAssets";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import type { RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
@@ -51,6 +58,17 @@ export function SelectedInteriorAssetInspector({
     (state) => state.swapSelectedInteriorAssetArrowDirection
   );
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const canRotateSelectedInteriorAsset = useEditorStore((state) => {
+    const roomId = state.selectedInteriorAsset?.roomId;
+    const assetId = state.selectedInteriorAsset?.assetId;
+    if (!roomId || !assetId) return false;
+
+    const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+    const selectedAsset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+    if (!room || !selectedAsset) return false;
+
+    return getRotatedInteriorAssetForRoom(room, selectedAsset, 90) !== null;
+  });
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
 
@@ -115,28 +133,50 @@ export function SelectedInteriorAssetInspector({
 
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Rotate</p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => rotateSelectedInteriorAsset(-90)}
-              aria-label="Rotate stair left 90 degrees"
-              title="Rotate Left 90°"
-            >
-              <RotateCcw />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => rotateSelectedInteriorAsset(90)}
-              aria-label="Rotate stair right 90 degrees"
-              title="Rotate Right 90°"
-            >
-              <RotateCw />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex flex-wrap gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => rotateSelectedInteriorAsset(-90)}
+                      aria-label="Rotate stair left 90 degrees"
+                      title={canRotateSelectedInteriorAsset ? "Rotate Left 90°" : undefined}
+                      disabled={!canRotateSelectedInteriorAsset}
+                    >
+                      <RotateCcw />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canRotateSelectedInteriorAsset ? (
+                  <TooltipContent side="top">Stairs won&apos;t fit after rotation</TooltipContent>
+                ) : null}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => rotateSelectedInteriorAsset(90)}
+                      aria-label="Rotate stair right 90 degrees"
+                      title={canRotateSelectedInteriorAsset ? "Rotate Right 90°" : undefined}
+                      disabled={!canRotateSelectedInteriorAsset}
+                    >
+                      <RotateCw />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canRotateSelectedInteriorAsset ? (
+                  <TooltipContent side="top">Stairs won&apos;t fit after rotation</TooltipContent>
+                ) : null}
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
         <div className="space-y-1.5">

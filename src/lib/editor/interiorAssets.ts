@@ -210,88 +210,121 @@ export function getAdjustedInteriorAssetForRoomResize(
   const assetBounds = getRoomInteriorAssetBounds(normalizedAsset);
   const isHorizontalRun = isStairRunHorizontal(normalizedAsset);
   const maxRunMm = isHorizontalRun ? maxWidthMm : maxDepthMm;
-  const maxCrossMm = isHorizontalRun ? maxDepthMm : maxWidthMm;
+  const runAnchor = getPreferredRunAnchorForRoomResize(room, assetBounds, isHorizontalRun);
   const startingRunMm = Math.min(
     isHorizontalRun ? normalizedAsset.widthMm : normalizedAsset.depthMm,
     maxRunMm
   );
-  const startingCrossMm = Math.max(
-    MIN_STAIR_WIDTH_MM,
-    Math.min(isHorizontalRun ? normalizedAsset.depthMm : normalizedAsset.widthMm, maxCrossMm)
-  );
   const startingSnappedRunMm = Math.floor(startingRunMm / DEFAULT_STAIR_TREAD_SPACING_MM) *
     DEFAULT_STAIR_TREAD_SPACING_MM;
 
-  for (
-    let runMm = startingSnappedRunMm;
-    runMm >= MIN_STAIR_DEPTH_MM;
-    runMm -= DEFAULT_STAIR_TREAD_SPACING_MM
-  ) {
-    for (let crossMm = startingCrossMm; crossMm >= MIN_STAIR_WIDTH_MM; crossMm -= 100) {
-      const candidateBounds = getResizeAdjustedBoundsForRoomResize(
-        assetBounds,
-        bounds,
-        {
-          widthMm: isHorizontalRun ? runMm : crossMm,
-          depthMm: isHorizontalRun ? crossMm : runMm,
-        }
-      );
-      const candidate = getInteriorAssetFromBounds(normalizedAsset, candidateBounds);
-      if (!isInteriorAssetWithinRoom(room, candidate)) continue;
-
-      return candidate;
-    }
+  for (let runMm = startingSnappedRunMm; runMm >= MIN_STAIR_DEPTH_MM; runMm -= DEFAULT_STAIR_TREAD_SPACING_MM) {
+    const candidateBounds = getRunAnchoredBoundsForRoomResize(assetBounds, normalizedAsset, runMm, runAnchor);
+    const candidate = getConstrainedResizedStair(room, normalizedAsset, candidateBounds);
+    if (candidate) return candidate;
   }
 
   return null;
 }
 
-function getResizeAdjustedBoundsForRoomResize(
-  assetBounds: RoomInteriorAssetBounds,
-  roomBounds: NonNullable<ReturnType<typeof getPolygonBounds>>,
-  size: { widthMm: number; depthMm: number }
-): RoomRectBounds {
-  const horizontalAnchor = getPreferredResizeAnchor(
-    assetBounds.left,
-    assetBounds.right,
-    roomBounds.minX,
-    roomBounds.maxX
-  );
-  const verticalAnchor = getPreferredResizeAnchor(
-    assetBounds.top,
-    assetBounds.bottom,
-    roomBounds.minY,
-    roomBounds.maxY
-  );
+export function getRotatedInteriorAssetForRoom(
+  room: Room,
+  asset: RoomInteriorAsset,
+  deltaDegrees: number
+): RoomInteriorAsset | null {
+  if (!Number.isFinite(deltaDegrees) || deltaDegrees === 0) return null;
 
-  const minX =
-    horizontalAnchor === "max" ? assetBounds.right - size.widthMm : assetBounds.left;
-  const maxX =
-    horizontalAnchor === "max" ? assetBounds.right : assetBounds.left + size.widthMm;
-  const minY =
-    verticalAnchor === "max" ? assetBounds.bottom - size.depthMm : assetBounds.top;
-  const maxY =
-    verticalAnchor === "max" ? assetBounds.bottom : assetBounds.top + size.depthMm;
+  const nextRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees + deltaDegrees);
+  const isQuarterTurn = Math.abs(deltaDegrees) % 180 === 90;
+
+  if (asset.rotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
+
+  const rotatedAsset = {
+    ...cloneRoomInteriorAsset(asset),
+    widthMm: isQuarterTurn ? asset.depthMm : asset.widthMm,
+    depthMm: isQuarterTurn ? asset.widthMm : asset.depthMm,
+    rotationDegrees: nextRotationDegrees,
+  };
+
+  if (isInteriorAssetWithinRoom(room, rotatedAsset)) {
+    return rotatedAsset;
+  }
+
+  const nudgedCenter = constrainInteriorAssetCenter(room, rotatedAsset, {
+    x: asset.xMm,
+    y: asset.yMm,
+  });
+  if (!nudgedCenter) return null;
 
   return {
-    minX,
-    maxX,
-    minY,
-    maxY,
+    ...rotatedAsset,
+    xMm: nudgedCenter.x,
+    yMm: nudgedCenter.y,
   };
 }
 
-function getPreferredResizeAnchor(
-  assetMin: number,
-  assetMax: number,
-  roomMin: number,
-  roomMax: number
-) {
-  const minOverflow = Math.max(0, roomMin - assetMin);
-  const maxOverflow = Math.max(0, assetMax - roomMax);
+function getRunAnchoredBoundsForRoomResize(
+  assetBounds: RoomInteriorAssetBounds,
+  asset: RoomInteriorAsset,
+  runMm: number,
+  runAnchor: "min" | "max"
+): RoomRectBounds {
+  if (isStairRunHorizontal(asset)) {
+    return runAnchor === "max"
+      ? {
+          minX: assetBounds.right - runMm,
+          maxX: assetBounds.right,
+          minY: assetBounds.top,
+          maxY: assetBounds.bottom,
+        }
+      : {
+          minX: assetBounds.left,
+          maxX: assetBounds.left + runMm,
+          minY: assetBounds.top,
+          maxY: assetBounds.bottom,
+        };
+  }
 
-  if (minOverflow > maxOverflow) return "max" as const;
-  if (maxOverflow > minOverflow) return "min" as const;
+  return runAnchor === "max"
+    ? {
+        minX: assetBounds.left,
+        maxX: assetBounds.right,
+        minY: assetBounds.bottom - runMm,
+        maxY: assetBounds.bottom,
+      }
+    : {
+        minX: assetBounds.left,
+        maxX: assetBounds.right,
+        minY: assetBounds.top,
+        maxY: assetBounds.top + runMm,
+      };
+}
+
+function getPreferredRunAnchorForRoomResize(
+  room: Room,
+  assetBounds: RoomInteriorAssetBounds,
+  isHorizontalRun: boolean
+) {
+  const topLeftInside = isPointInPolygon({ x: assetBounds.left, y: assetBounds.top }, room.points);
+  const topRightInside = isPointInPolygon({ x: assetBounds.right, y: assetBounds.top }, room.points);
+  const bottomRightInside = isPointInPolygon(
+    { x: assetBounds.right, y: assetBounds.bottom },
+    room.points
+  );
+  const bottomLeftInside = isPointInPolygon({ x: assetBounds.left, y: assetBounds.bottom }, room.points);
+
+  if (isHorizontalRun) {
+    const leftOutside = !topLeftInside || !bottomLeftInside;
+    const rightOutside = !topRightInside || !bottomRightInside;
+    if (leftOutside && !rightOutside) return "max" as const;
+    if (rightOutside && !leftOutside) return "min" as const;
+    return "min" as const;
+  }
+
+  const topOutside = !topLeftInside || !topRightInside;
+  const bottomOutside = !bottomLeftInside || !bottomRightInside;
+  if (topOutside && !bottomOutside) return "max" as const;
+  if (bottomOutside && !topOutside) return "min" as const;
   return "min" as const;
 }
 

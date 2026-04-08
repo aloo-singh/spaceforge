@@ -73,6 +73,7 @@ import {
   createCenteredDefaultStair,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
+  getRotatedInteriorAssetForRoom,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
 } from "@/lib/editor/interiorAssets";
@@ -2280,22 +2281,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   rotateSelectedInteriorAsset: (deltaDegrees) =>
     set((state) => {
-      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
-        if (!Number.isFinite(deltaDegrees) || deltaDegrees === 0) return null;
-
-        const nextRotationDegrees = normalizeCanvasRotationDegrees(
-          asset.rotationDegrees + deltaDegrees
-        );
-        const isQuarterTurn = Math.abs(deltaDegrees) % 180 === 90;
-
-        if (asset.rotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
-
-        return {
-          ...cloneRoomInteriorAsset(asset),
-          widthMm: isQuarterTurn ? asset.depthMm : asset.widthMm,
-          depthMm: isQuarterTurn ? asset.widthMm : asset.depthMm,
-          rotationDegrees: nextRotationDegrees,
-        };
+      const nextState = updateSelectedInteriorAsset(state, (room, asset) => {
+        return getRotatedInteriorAssetForRoom(room, asset, deltaDegrees);
       });
       return nextState ?? state;
     }),
