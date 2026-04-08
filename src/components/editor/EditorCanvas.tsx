@@ -3096,11 +3096,14 @@ function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: Transfor
       ? {
           ...room,
           points: transformedPoints,
-          interiorAssets: room.interiorAssets.map((asset) => ({
-            ...asset,
-            xMm: asset.xMm + delta.x,
-            yMm: asset.yMm + delta.y,
-          })),
+          interiorAssets:
+            transformFeedback.mode === "move"
+              ? room.interiorAssets.map((asset) => ({
+                  ...asset,
+                  xMm: asset.xMm + delta.x,
+                  yMm: asset.yMm + delta.y,
+                }))
+              : room.interiorAssets,
         }
       : room
   );
