@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowUpDown, Eye, EyeOff, RotateCcw, RotateCw } from "lucide-react";
+import { ArrowUpDown, RotateCcw, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import type { RoomInteriorAsset } from "@/lib/editor/types";
@@ -140,17 +141,18 @@ export function SelectedInteriorAssetInspector({
 
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Direction</p>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+            <label htmlFor="stair-direction-arrow-switch" className="text-sm font-medium">
+              Show arrow
+            </label>
+            <Switch
+              id="stair-direction-arrow-switch"
+              checked={asset.arrowEnabled}
+              onCheckedChange={setSelectedInteriorAssetArrowEnabled}
+              aria-label="Toggle stair direction arrow"
+            />
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={asset.arrowEnabled ? "secondary" : "outline"}
-              size="icon-sm"
-              onClick={() => setSelectedInteriorAssetArrowEnabled(!asset.arrowEnabled)}
-              aria-label={asset.arrowEnabled ? "Hide stair direction arrow" : "Show stair direction arrow"}
-              title={asset.arrowEnabled ? "Hide Arrow" : "Show Arrow"}
-            >
-              {asset.arrowEnabled ? <Eye /> : <EyeOff />}
-            </Button>
             <Button
               type="button"
               variant="outline"
