@@ -77,6 +77,7 @@ export type RoomOpeningSelection = {
 };
 
 export type InteriorAssetType = "stairs";
+export type StairDirection = "forward" | "reverse";
 
 export type RoomInteriorAsset = {
   id: string;
@@ -87,6 +88,9 @@ export type RoomInteriorAsset = {
   widthMm: number;
   depthMm: number;
   rotationDegrees: number;
+  arrowEnabled: boolean;
+  arrowDirection: StairDirection;
+  arrowLabel: string;
 };
 
 export type RoomInteriorAssetSelection = {

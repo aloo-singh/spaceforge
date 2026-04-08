@@ -70,6 +70,7 @@ import {
   cloneRoomInteriorAssets,
   constrainInteriorAssetCenter,
   createCenteredDefaultStair,
+  DEFAULT_STAIR_ARROW_LABEL,
   DEFAULT_STAIR_NAME,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
@@ -129,6 +130,12 @@ type InteriorAssetRenameSessionState = {
   initialName: string;
 } | null;
 
+type InteriorAssetArrowLabelSessionState = {
+  roomId: string;
+  assetId: string;
+  initialArrowLabel: string;
+} | null;
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
@@ -148,6 +155,7 @@ type EditorState = {
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
+  interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
   history: {
     past: EditorCommand[];
     future: EditorCommand[];
@@ -192,6 +200,10 @@ type EditorState = {
   updateInteriorAssetRenameDraft: (roomId: string, assetId: string, name: string) => void;
   commitInteriorAssetRenameSession: () => void;
   cancelInteriorAssetRenameSession: () => void;
+  startInteriorAssetArrowLabelSession: (roomId: string, assetId: string) => void;
+  updateInteriorAssetArrowLabelDraft: (roomId: string, assetId: string, label: string) => void;
+  commitInteriorAssetArrowLabelSession: () => void;
+  cancelInteriorAssetArrowLabelSession: () => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
@@ -201,6 +213,9 @@ type EditorState = {
   insertDefaultStairInSelectedRoom: () => void;
   updateSelectedInteriorAssetName: (name: string) => void;
   rotateSelectedInteriorAsset: (deltaDegrees: number) => void;
+  setSelectedInteriorAssetArrowEnabled: (isEnabled: boolean) => void;
+  swapSelectedInteriorAssetArrowDirection: () => void;
+  updateSelectedInteriorAssetArrowLabel: (label: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -460,8 +475,12 @@ function updateRoomInteriorAssetInDocument(
     xMm: number;
     yMm: number;
     rotationDegrees?: number;
+    arrowEnabled?: boolean;
+    arrowDirection?: Room["interiorAssets"][number]["arrowDirection"];
+    arrowLabel?: string;
   }
 ): DocumentState {
+  const clonedAssetDefaults = (asset: Room["interiorAssets"][number]) => cloneRoomInteriorAsset(asset);
   return {
     ...document,
     rooms: document.rooms.map((room) =>
@@ -471,13 +490,18 @@ function updateRoomInteriorAssetInDocument(
             interiorAssets: room.interiorAssets.map((asset) =>
               asset.id === nextAsset.id
                 ? {
-                    ...cloneRoomInteriorAsset(asset),
+                    ...clonedAssetDefaults(asset),
                     widthMm: nextAsset.widthMm,
                     depthMm: nextAsset.depthMm,
                     xMm: nextAsset.xMm,
                     yMm: nextAsset.yMm,
                     rotationDegrees:
-                      nextAsset.rotationDegrees ?? cloneRoomInteriorAsset(asset).rotationDegrees,
+                      nextAsset.rotationDegrees ?? clonedAssetDefaults(asset).rotationDegrees,
+                    arrowEnabled:
+                      nextAsset.arrowEnabled ?? clonedAssetDefaults(asset).arrowEnabled,
+                    arrowDirection:
+                      nextAsset.arrowDirection ?? clonedAssetDefaults(asset).arrowDirection,
+                    arrowLabel: nextAsset.arrowLabel ?? clonedAssetDefaults(asset).arrowLabel,
                   }
                 : asset
             ),
@@ -1025,6 +1049,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   interiorAssetRenameSession: null,
+  interiorAssetArrowLabelSession: null,
   history: {
     past: hydratedHistoryState.past,
     future: hydratedHistoryState.future,
@@ -1137,6 +1162,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   clearNorthIndicatorSelection: () =>
@@ -1491,6 +1517,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   selectWallByRoomId: (roomId, wall) =>
@@ -1507,6 +1534,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
           interiorAssetRenameSession: null,
+          interiorAssetArrowLabelSession: null,
         };
       }
 
@@ -1527,6 +1555,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   selectOpeningById: (roomId, openingId) =>
@@ -1551,6 +1580,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   selectInteriorAssetById: (roomId, assetId) =>
@@ -1575,6 +1605,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   clearSelectedOpening: () =>
@@ -1589,6 +1620,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedInteriorAsset === null) return state;
       return {
         selectedInteriorAsset: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
       };
     }),
   clearSelectedWall: () =>
@@ -1608,6 +1641,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       interiorAssetRenameSession: null,
+      interiorAssetArrowLabelSession: null,
     }),
   setCanvasInteractionActive: (isActive) =>
     set((state) => {
@@ -1868,6 +1902,121 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         interiorAssetRenameSession: null,
       };
     }),
+  startInteriorAssetArrowLabelSession: (roomId, assetId) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+      if (
+        state.interiorAssetArrowLabelSession?.roomId === roomId &&
+        state.interiorAssetArrowLabelSession.assetId === assetId
+      ) {
+        return state;
+      }
+
+      return {
+        interiorAssetArrowLabelSession: {
+          roomId,
+          assetId,
+          initialArrowLabel: asset.arrowLabel,
+        },
+      };
+    }),
+  updateInteriorAssetArrowLabelDraft: (roomId, assetId, label) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!room || !asset) return state;
+
+      const trimmedLabel = label.trim();
+      const nextLabel = trimmedLabel.length > 0 ? trimmedLabel : DEFAULT_STAIR_ARROW_LABEL;
+      const interiorAssetArrowLabelSession =
+        state.interiorAssetArrowLabelSession?.roomId === roomId &&
+        state.interiorAssetArrowLabelSession.assetId === assetId
+          ? state.interiorAssetArrowLabelSession
+          : {
+              roomId,
+              assetId,
+              initialArrowLabel: asset.arrowLabel,
+            };
+
+      if (
+        asset.arrowLabel === nextLabel &&
+        state.interiorAssetArrowLabelSession?.roomId === roomId &&
+        state.interiorAssetArrowLabelSession.assetId === assetId
+      ) {
+        return state;
+      }
+
+      return {
+        document: updateRoomInteriorAssetInDocument(state.document, roomId, {
+          ...cloneRoomInteriorAsset(asset),
+          arrowLabel: nextLabel,
+        }),
+        interiorAssetArrowLabelSession,
+      };
+    }),
+  commitInteriorAssetArrowLabelSession: () =>
+    set((state) => {
+      const labelSession = state.interiorAssetArrowLabelSession;
+      if (!labelSession) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === labelSession.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === labelSession.assetId);
+      if (!room || !asset) {
+        return {
+          interiorAssetArrowLabelSession: null,
+        };
+      }
+
+      if (asset.arrowLabel === labelSession.initialArrowLabel) {
+        return {
+          interiorAssetArrowLabelSession: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId: room.id,
+        previousAsset: {
+          ...cloneRoomInteriorAsset(asset),
+          arrowLabel: labelSession.initialArrowLabel,
+        },
+        nextAsset: cloneRoomInteriorAsset(asset),
+      };
+
+      return {
+        interiorAssetArrowLabelSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  cancelInteriorAssetArrowLabelSession: () =>
+    set((state) => {
+      const labelSession = state.interiorAssetArrowLabelSession;
+      if (!labelSession) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === labelSession.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === labelSession.assetId);
+      const nextDocument =
+        room && asset && asset.arrowLabel !== labelSession.initialArrowLabel
+          ? updateRoomInteriorAssetInDocument(state.document, labelSession.roomId, {
+              ...cloneRoomInteriorAsset(asset),
+              arrowLabel: labelSession.initialArrowLabel,
+            })
+          : state.document;
+
+      return {
+        document: nextDocument,
+        interiorAssetArrowLabelSession: null,
+      };
+    }),
   deleteSelectedRoom: () =>
     set((state) => {
       const selectedRoomId = state.selectedRoomId;
@@ -2046,6 +2195,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           widthMm: isQuarterTurn ? asset.depthMm : asset.widthMm,
           depthMm: isQuarterTurn ? asset.widthMm : asset.depthMm,
           rotationDegrees: nextRotationDegrees,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSelectedInteriorAssetArrowEnabled: (isEnabled) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.arrowEnabled === isEnabled) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          arrowEnabled: isEnabled,
+        };
+      });
+      return nextState ?? state;
+    }),
+  swapSelectedInteriorAssetArrowDirection: () =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => ({
+        ...cloneRoomInteriorAsset(asset),
+        arrowDirection: asset.arrowDirection === "reverse" ? "forward" : "reverse",
+      }));
+      return nextState ?? state;
+    }),
+  updateSelectedInteriorAssetArrowLabel: (label) =>
+    set((state) => {
+      const trimmedLabel = label.trim();
+      const nextLabel = trimmedLabel.length > 0 ? trimmedLabel : DEFAULT_STAIR_ARROW_LABEL;
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.arrowLabel === nextLabel) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          arrowLabel: nextLabel,
         };
       });
       return nextState ?? state;
@@ -2431,6 +2612,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedInteriorAsset: null,
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
+      interiorAssetRenameSession: null,
+      interiorAssetArrowLabelSession: null,
       history: {
         past: [],
         future: [],
@@ -2461,6 +2644,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
         history: {
           past: nextPast,
           future: nextFuture,
@@ -2489,6 +2674,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
         history: {
           past: nextPast,
           future: remainingFuture,
@@ -2561,6 +2748,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: null,
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
         history: {
           past: [],
           future: [],

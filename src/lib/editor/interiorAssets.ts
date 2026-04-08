@@ -8,6 +8,7 @@ import type {
   Point,
   Room,
   RoomInteriorAsset,
+  StairDirection,
   RoomInteriorAssetSelection,
   ViewportSize,
 } from "@/lib/editor/types";
@@ -18,6 +19,9 @@ export const DEFAULT_STAIR_TREAD_SPACING_MM = 300;
 export const MIN_STAIR_WIDTH_MM = 300;
 export const MIN_STAIR_DEPTH_MM = DEFAULT_STAIR_TREAD_SPACING_MM;
 export const DEFAULT_STAIR_NAME = "Stairs";
+export const DEFAULT_STAIR_ARROW_ENABLED = true;
+export const DEFAULT_STAIR_ARROW_DIRECTION: StairDirection = "forward";
+export const DEFAULT_STAIR_ARROW_LABEL = "UP";
 const INTERIOR_ASSET_HIT_PADDING_PX = 10;
 
 export type RoomInteriorAssetBounds = {
@@ -40,6 +44,9 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     widthMm: asset.widthMm,
     depthMm: asset.depthMm,
     rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
+    arrowEnabled: asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED,
+    arrowDirection: asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION,
+    arrowLabel: asset.arrowLabel?.trim() ? asset.arrowLabel : DEFAULT_STAIR_ARROW_LABEL,
   };
 }
 
@@ -65,7 +72,13 @@ export function areRoomInteriorAssetsEqual(
       assetA.widthMm !== assetB.widthMm ||
       assetA.depthMm !== assetB.depthMm ||
       normalizeCanvasRotationDegrees(assetA.rotationDegrees ?? 0) !==
-        normalizeCanvasRotationDegrees(assetB.rotationDegrees ?? 0)
+        normalizeCanvasRotationDegrees(assetB.rotationDegrees ?? 0) ||
+      (assetA.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) !==
+        (assetB.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) ||
+      (assetA.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) !==
+        (assetB.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) ||
+      (assetA.arrowLabel?.trim() ? assetA.arrowLabel : DEFAULT_STAIR_ARROW_LABEL) !==
+        (assetB.arrowLabel?.trim() ? assetB.arrowLabel : DEFAULT_STAIR_ARROW_LABEL)
     ) {
       return false;
     }
@@ -115,6 +128,9 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
     widthMm: DEFAULT_STAIR_WIDTH_MM,
     depthMm: DEFAULT_STAIR_DEPTH_MM,
     rotationDegrees: 0,
+    arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
+    arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
+    arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
   };
 }
 
@@ -288,6 +304,9 @@ function findConstrainedInteriorAssetCenter(
     widthMm,
     depthMm,
     rotationDegrees: 0,
+    arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
+    arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
+    arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
   };
   if (isInteriorAssetWithinRoom(room, directCandidate)) {
     return clampedPreferred;
@@ -308,6 +327,9 @@ function findConstrainedInteriorAssetCenter(
         widthMm,
         depthMm,
         rotationDegrees: 0,
+        arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
+        arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
+        arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
       };
       if (!isInteriorAssetWithinRoom(room, candidate)) continue;
 

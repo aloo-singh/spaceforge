@@ -27,6 +27,9 @@ import {
   isNonRectangularOrthogonalRoom,
 } from "@/lib/editor/constrainedVertexAdjustments";
 import {
+  DEFAULT_STAIR_ARROW_DIRECTION,
+  DEFAULT_STAIR_ARROW_ENABLED,
+  DEFAULT_STAIR_ARROW_LABEL,
   DEFAULT_STAIR_TREAD_SPACING_MM,
   findInteriorAssetAtScreenPoint,
   getInteriorAssetBoundsAsRectBounds,
@@ -228,7 +231,6 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
-const STAIR_DIRECTION_LABEL = "UP";
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
 const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
 const STAIR_DIRECTION_LABEL_WORLD_MM = 60;
@@ -3375,11 +3377,13 @@ function drawStairDirectionArrow(
   theme: EditorCanvasTheme,
   isSelected: boolean
 ) {
+  if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) return;
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+  const resolvedDirection = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
   const rotationRadians = (normalizedRotationDegrees * Math.PI) / 180;
   const direction = {
-    x: Math.sin(rotationRadians),
-    y: -Math.cos(rotationRadians),
+    x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
+    y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
   };
   const runLengthMm = Math.abs(normalizedRotationDegrees) === 90 ? asset.widthMm : asset.depthMm;
   const arrowLengthMm = Math.max(
@@ -3457,11 +3461,14 @@ function drawStairDirectionLabels(
 
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
+      if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) continue;
       const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+      const resolvedDirection = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
+      const resolvedLabel = asset.arrowLabel?.trim() ? asset.arrowLabel : DEFAULT_STAIR_ARROW_LABEL;
       const rotationRadians = (normalizedRotationDegrees * Math.PI) / 180;
       const direction = {
-        x: Math.sin(rotationRadians),
-        y: -Math.cos(rotationRadians),
+        x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
+        y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
       };
       const runLengthMm =
         Math.abs(normalizedRotationDegrees) === 90 ? asset.widthMm : asset.depthMm;
@@ -3481,7 +3488,7 @@ function drawStairDirectionLabels(
         viewport
       );
       const text = new Text({
-        text: STAIR_DIRECTION_LABEL,
+        text: resolvedLabel,
         resolution: textResolution,
         style: {
           fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,

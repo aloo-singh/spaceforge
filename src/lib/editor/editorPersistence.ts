@@ -238,6 +238,15 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
   if (typeof value.id !== "string") return false;
   if (!isInteriorAssetType(value.type)) return false;
   if (value.name !== undefined && typeof value.name !== "string") return false;
+  if (value.arrowEnabled !== undefined && typeof value.arrowEnabled !== "boolean") return false;
+  if (
+    value.arrowDirection !== undefined &&
+    value.arrowDirection !== "forward" &&
+    value.arrowDirection !== "reverse"
+  ) {
+    return false;
+  }
+  if (value.arrowLabel !== undefined && typeof value.arrowLabel !== "string") return false;
 
   return (
     isFiniteNumber(value.xMm) &&
