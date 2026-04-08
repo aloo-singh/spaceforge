@@ -3456,10 +3456,6 @@ function drawStairDirectionLabels(
         x: Math.sin(rotationRadians),
         y: -Math.cos(rotationRadians),
       };
-      const normal = {
-        x: -direction.y,
-        y: direction.x,
-      };
       const runLengthMm =
         Math.abs(normalizedRotationDegrees) === 90 ? asset.widthMm : asset.depthMm;
       const arrowLengthMm = Math.max(
@@ -3470,12 +3466,9 @@ function drawStairDirectionLabels(
         {
           x:
             asset.xMm -
-            direction.x * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM) +
-            normal.x * 40,
+            direction.x * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM),
           y:
-            asset.yMm -
-            direction.y * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM) +
-            normal.y * 40,
+            asset.yMm - direction.y * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM),
         },
         camera,
         viewport
