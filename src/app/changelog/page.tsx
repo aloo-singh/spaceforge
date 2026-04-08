@@ -10,6 +10,32 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.54.2</h2>
+            <span className="text-sm text-muted-foreground">2026-04-08</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Stairs rotation
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Icon-only Rotate Left 90° / Rotate Right 90° buttons in the inspector</li>
+                    <li>Visual directional arrow on the stair (rotates with the stair)</li>
+                    <li>Editable arrow label (default &ldquo;UP&rdquo;, placed at tail end)</li>
+                    <li>Direction swap button</li>
+                    <li>All changes (angle, arrow state, label) persist with the project and support undo/redo</li>
+                    <li>Clean, icon-first inspector UI</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.54.1</h2>
             <span className="text-sm text-muted-foreground">2026-04-07</span>
           </div>

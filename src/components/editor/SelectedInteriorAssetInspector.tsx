@@ -1,6 +1,9 @@
 "use client";
 
+import { ArrowUpDown, RotateCcw, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import type { RoomInteriorAsset } from "@/lib/editor/types";
@@ -28,6 +31,25 @@ export function SelectedInteriorAssetInspector({
   const cancelInteriorAssetRenameSession = useEditorStore(
     (state) => state.cancelInteriorAssetRenameSession
   );
+  const startInteriorAssetArrowLabelSession = useEditorStore(
+    (state) => state.startInteriorAssetArrowLabelSession
+  );
+  const updateInteriorAssetArrowLabelDraft = useEditorStore(
+    (state) => state.updateInteriorAssetArrowLabelDraft
+  );
+  const commitInteriorAssetArrowLabelSession = useEditorStore(
+    (state) => state.commitInteriorAssetArrowLabelSession
+  );
+  const cancelInteriorAssetArrowLabelSession = useEditorStore(
+    (state) => state.cancelInteriorAssetArrowLabelSession
+  );
+  const rotateSelectedInteriorAsset = useEditorStore((state) => state.rotateSelectedInteriorAsset);
+  const setSelectedInteriorAssetArrowEnabled = useEditorStore(
+    (state) => state.setSelectedInteriorAssetArrowEnabled
+  );
+  const swapSelectedInteriorAssetArrowDirection = useEditorStore(
+    (state) => state.swapSelectedInteriorAssetArrowDirection
+  );
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
@@ -35,7 +57,7 @@ export function SelectedInteriorAssetInspector({
   return (
     <EditorInspectorSection
       title="Selected stair"
-      description="Review the current stair block and reserve space for future stair-specific controls."
+      description="Review the current stair block and adjust its orientation."
       className={className}
     >
       <div className="space-y-4">
@@ -92,10 +114,105 @@ export function SelectedInteriorAssetInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Stair options</p>
-          <div className="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-            Rotation, arrow style, and related stair settings will land here in a later step.
+          <p className="text-sm font-medium">Rotate</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => rotateSelectedInteriorAsset(-90)}
+              aria-label="Rotate stair left 90 degrees"
+              title="Rotate Left 90°"
+            >
+              <RotateCcw />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => rotateSelectedInteriorAsset(90)}
+              aria-label="Rotate stair right 90 degrees"
+              title="Rotate Right 90°"
+            >
+              <RotateCw />
+            </Button>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Direction</p>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+            <label htmlFor="stair-direction-arrow-switch" className="text-sm font-medium">
+              Show arrow
+            </label>
+            <Switch
+              id="stair-direction-arrow-switch"
+              checked={asset.arrowEnabled}
+              onCheckedChange={setSelectedInteriorAssetArrowEnabled}
+              aria-label="Toggle stair direction arrow"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => swapSelectedInteriorAssetArrowDirection()}
+              aria-label="Swap stair arrow direction"
+              title="Swap Direction"
+            >
+              <ArrowUpDown />
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="stair-arrow-label-input" className="text-sm font-medium">
+            Arrow label
+          </label>
+          <Input
+            id="stair-arrow-label-input"
+            value={asset.arrowLabel}
+            onFocus={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              startInteriorAssetArrowLabelSession(selectedAssetRoomId, selectedAssetId);
+            }}
+            onChange={(event) => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              updateInteriorAssetArrowLabelDraft(
+                selectedAssetRoomId,
+                selectedAssetId,
+                event.target.value.toUpperCase()
+              );
+            }}
+            onBlur={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              commitInteriorAssetArrowLabelSession();
+              selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                commitInteriorAssetArrowLabelSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                return;
+              }
+
+              if (event.key === "Escape") {
+                event.preventDefault();
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                cancelInteriorAssetArrowLabelSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+              }
+            }}
+            aria-describedby="stair-arrow-label-hint"
+          />
+          <p id="stair-arrow-label-hint" className="text-[11px] leading-relaxed text-muted-foreground">
+            Tail label shown beside the stair direction arrow on canvas.
+          </p>
         </div>
       </div>
     </EditorInspectorSection>

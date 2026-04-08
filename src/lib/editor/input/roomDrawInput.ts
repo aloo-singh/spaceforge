@@ -154,6 +154,7 @@ type InteriorAssetDragSession = {
   roomId: string;
   assetId: string;
   startScreenPoint: Point;
+  startWorldPoint: Point;
   startCenter: Point;
   latestCenter: Point | null;
   didDrag: boolean;
@@ -164,6 +165,7 @@ type InteriorAssetResizeSession = {
   roomId: string;
   assetId: string;
   startScreenPoint: Point;
+  startWorldPoint: Point;
   startAsset: { widthMm: number; depthMm: number; xMm: number; yMm: number };
   latestAsset: { widthMm: number; depthMm: number; xMm: number; yMm: number } | null;
   didDrag: boolean;
@@ -260,6 +262,46 @@ export function attachRoomDrawInput(
   const setSnapGuides = (guides: SnapGuides | null) => {
     callbacks.onSnapGuidesChange?.(guides);
     callbacks.requestRender();
+  };
+
+  const getInteriorAssetResizeCursorWorld = (
+    session: InteriorAssetResizeSession,
+    cursorWorld: Point
+  ): Point => {
+    const delta = {
+      x: cursorWorld.x - session.startWorldPoint.x,
+      y: cursorWorld.y - session.startWorldPoint.y,
+    };
+    const bounds = {
+      minX: session.startAsset.xMm - session.startAsset.widthMm / 2,
+      maxX: session.startAsset.xMm + session.startAsset.widthMm / 2,
+      minY: session.startAsset.yMm - session.startAsset.depthMm / 2,
+      maxY: session.startAsset.yMm + session.startAsset.depthMm / 2,
+    };
+
+    if (session.target.type === "wall") {
+      if (session.target.wall === "left") {
+        return { x: bounds.minX + delta.x, y: cursorWorld.y };
+      }
+      if (session.target.wall === "right") {
+        return { x: bounds.maxX + delta.x, y: cursorWorld.y };
+      }
+      if (session.target.wall === "top") {
+        return { x: cursorWorld.x, y: bounds.minY + delta.y };
+      }
+      return { x: cursorWorld.x, y: bounds.maxY + delta.y };
+    }
+
+    if (session.target.corner === "top-left") {
+      return { x: bounds.minX + delta.x, y: bounds.minY + delta.y };
+    }
+    if (session.target.corner === "top-right") {
+      return { x: bounds.maxX + delta.x, y: bounds.minY + delta.y };
+    }
+    if (session.target.corner === "bottom-right") {
+      return { x: bounds.maxX + delta.x, y: bounds.maxY + delta.y };
+    }
+    return { x: bounds.minX + delta.x, y: bounds.maxY + delta.y };
   };
 
   const getMoveTransformFeedback = (
@@ -613,13 +655,13 @@ export function attachRoomDrawInput(
               session.roomId,
               session.assetId,
               session.target.wall,
-              cursorWorld
+              getInteriorAssetResizeCursorWorld(session, cursorWorld)
             )
           : getInteriorAssetResizeFromCornerForCursor(
               session.roomId,
               session.assetId,
               session.target.corner,
-              cursorWorld
+              getInteriorAssetResizeCursorWorld(session, cursorWorld)
             );
       if (!resizeTarget) {
         setSnapGuides(null);
@@ -657,7 +699,15 @@ export function attachRoomDrawInput(
         return;
       }
 
-      const moveTarget = getInteriorAssetMoveCenterForCursor(session.roomId, session.assetId, cursorWorld);
+      const moveTarget = getInteriorAssetMoveCenterForCursor(
+        session.roomId,
+        session.assetId,
+        cursorWorld,
+        {
+          x: session.startCenter.x - session.startWorldPoint.x,
+          y: session.startCenter.y - session.startWorldPoint.y,
+        }
+      );
       if (!moveTarget) {
         setSnapGuides(null);
         callbacks.requestRender();
@@ -913,16 +963,17 @@ export function attachRoomDrawInput(
       event.preventDefault();
       state.selectInteriorAssetById(selectedInteriorAsset.room.id, selectedInteriorAsset.asset.id);
       canvas.setPointerCapture(event.pointerId);
-      activeInteriorAssetResizeSession = {
-        pointerId: event.pointerId,
-        roomId: selectedInteriorAsset.room.id,
-        assetId: selectedInteriorAsset.asset.id,
-        startScreenPoint: screenPoint,
-        startAsset: {
-          widthMm: selectedInteriorAsset.asset.widthMm,
-          depthMm: selectedInteriorAsset.asset.depthMm,
-          xMm: selectedInteriorAsset.asset.xMm,
-          yMm: selectedInteriorAsset.asset.yMm,
+        activeInteriorAssetResizeSession = {
+          pointerId: event.pointerId,
+          roomId: selectedInteriorAsset.room.id,
+          assetId: selectedInteriorAsset.asset.id,
+          startScreenPoint: screenPoint,
+          startWorldPoint: cursorWorld,
+          startAsset: {
+            widthMm: selectedInteriorAsset.asset.widthMm,
+            depthMm: selectedInteriorAsset.asset.depthMm,
+            xMm: selectedInteriorAsset.asset.xMm,
+            yMm: selectedInteriorAsset.asset.yMm,
         },
         latestAsset: null,
         didDrag: false,
@@ -993,6 +1044,7 @@ export function attachRoomDrawInput(
           roomId: interiorAssetHit.roomId,
           assetId: interiorAssetHit.assetId,
           startScreenPoint: screenPoint,
+          startWorldPoint: cursorWorld,
           startCenter: { x: asset.xMm, y: asset.yMm },
           latestCenter: null,
           didDrag: false,
