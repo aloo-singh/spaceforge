@@ -229,7 +229,9 @@ const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
 const STAIR_DIRECTION_LABEL = "UP";
-const STAIR_DIRECTION_LABEL_FONT_SIZE_PX = 11;
+const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
+const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
+const STAIR_DIRECTION_LABEL_WORLD_MM = 60;
 const STAIR_DIRECTION_ARROW_LENGTH_RATIO = 0.56;
 const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
 const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
@@ -3447,6 +3449,11 @@ function drawStairDirectionLabels(
   theme: EditorCanvasTheme
 ) {
   const textResolution = getTextResolution();
+  const stairDirectionLabelFontSizePx = clampValue(
+    camera.pixelsPerMm * STAIR_DIRECTION_LABEL_WORLD_MM,
+    STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX,
+    STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX
+  );
 
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
@@ -3478,15 +3485,15 @@ function drawStairDirectionLabels(
         resolution: textResolution,
         style: {
           fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
-          fontSize: STAIR_DIRECTION_LABEL_FONT_SIZE_PX,
+          fontSize: stairDirectionLabelFontSizePx,
           fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
           fill: theme.roomLabelFill,
           stroke: {
             color: theme.roomLabelStroke,
-            width: 1.5,
+            width: Math.max(1.25, stairDirectionLabelFontSizePx * 0.14),
             join: "round",
           },
-          letterSpacing: 0.3,
+          letterSpacing: Math.max(0.2, stairDirectionLabelFontSizePx * 0.025),
         },
       });
       text.roundPixels = true;
