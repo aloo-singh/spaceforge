@@ -46,7 +46,7 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
     arrowEnabled: asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED,
     arrowDirection: asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION,
-    arrowLabel: asset.arrowLabel?.trim() ? asset.arrowLabel : DEFAULT_STAIR_ARROW_LABEL,
+    arrowLabel: asset.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL,
   };
 }
 
@@ -77,8 +77,8 @@ export function areRoomInteriorAssetsEqual(
         (assetB.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) ||
       (assetA.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) !==
         (assetB.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) ||
-      (assetA.arrowLabel?.trim() ? assetA.arrowLabel : DEFAULT_STAIR_ARROW_LABEL) !==
-        (assetB.arrowLabel?.trim() ? assetB.arrowLabel : DEFAULT_STAIR_ARROW_LABEL)
+      (assetA.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) !==
+        (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL)
     ) {
       return false;
     }

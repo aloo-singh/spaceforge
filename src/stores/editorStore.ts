@@ -70,7 +70,6 @@ import {
   cloneRoomInteriorAssets,
   constrainInteriorAssetCenter,
   createCenteredDefaultStair,
-  DEFAULT_STAIR_ARROW_LABEL,
   DEFAULT_STAIR_NAME,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
@@ -1930,8 +1929,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
       if (!room || !asset) return state;
 
-      const trimmedLabel = label.trim();
-      const nextLabel = trimmedLabel.length > 0 ? trimmedLabel : DEFAULT_STAIR_ARROW_LABEL;
+      const nextLabel = label.trim();
       const interiorAssetArrowLabelSession =
         state.interiorAssetArrowLabelSession?.roomId === roomId &&
         state.interiorAssetArrowLabelSession.assetId === assetId
@@ -2220,8 +2218,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   updateSelectedInteriorAssetArrowLabel: (label) =>
     set((state) => {
-      const trimmedLabel = label.trim();
-      const nextLabel = trimmedLabel.length > 0 ? trimmedLabel : DEFAULT_STAIR_ARROW_LABEL;
+      const nextLabel = label.trim();
       const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
         if (asset.arrowLabel === nextLabel) return null;
         return {

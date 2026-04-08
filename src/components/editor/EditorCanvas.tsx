@@ -29,7 +29,6 @@ import {
 import {
   DEFAULT_STAIR_ARROW_DIRECTION,
   DEFAULT_STAIR_ARROW_ENABLED,
-  DEFAULT_STAIR_ARROW_LABEL,
   DEFAULT_STAIR_TREAD_SPACING_MM,
   findInteriorAssetAtScreenPoint,
   getInteriorAssetBoundsAsRectBounds,
@@ -3464,7 +3463,8 @@ function drawStairDirectionLabels(
       if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) continue;
       const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
       const resolvedDirection = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
-      const resolvedLabel = asset.arrowLabel?.trim() ? asset.arrowLabel : DEFAULT_STAIR_ARROW_LABEL;
+      const resolvedLabel = asset.arrowLabel?.trim() ?? "";
+      if (resolvedLabel.length === 0) continue;
       const rotationRadians = (normalizedRotationDegrees * Math.PI) / 180;
       const direction = {
         x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
