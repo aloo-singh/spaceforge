@@ -10,6 +10,32 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.55.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-08</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Stairs polish
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Fixed animation jump when resizing rooms containing stairs</li>
+                    <li>Auto-nudge stairs on room resize with friendly Sonner &ldquo;Stairs adjusted to fit&rdquo; + undo link (5s)</li>
+                    <li>Smart rotate button disablement when 90&deg; rotation wouldn&apos;t fit</li>
+                    <li>Auto-nudge stairs back inside room bounds after rotation</li>
+                    <li>Fixed drag-from-under-room-label bug (stairs now stay selected and follow cursor smoothly)</li>
+                    <li>All fixes work for both rectangular and non-rectangular rooms</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.54.2</h2>
             <span className="text-sm text-muted-foreground">2026-04-08</span>
           </div>
