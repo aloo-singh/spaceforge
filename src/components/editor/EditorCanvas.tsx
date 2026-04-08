@@ -228,6 +228,12 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
+const STAIR_DIRECTION_LABEL = "UP";
+const STAIR_DIRECTION_LABEL_FONT_SIZE_PX = 11;
+const STAIR_DIRECTION_ARROW_LENGTH_RATIO = 0.56;
+const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
+const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
+const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
 const CANVAS_ROTATION_ENABLED = false;
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
@@ -1184,7 +1190,8 @@ export default function EditorCanvas({
         null,
         exportCamera,
         exportViewport,
-        exportTheme
+        exportTheme,
+        { includeStairDirectionVisuals: false }
       );
       drawWallInteractionOverlay(
         exportWallOverlayGraphics,
@@ -1208,7 +1215,8 @@ export default function EditorCanvas({
         state.settings,
         showDimensions,
         null,
-        exportTheme
+        exportTheme,
+        { includeStairDirectionLabels: false }
       );
       drawDraft(
         exportDraftGraphics,
@@ -2467,7 +2475,8 @@ function drawScene(
     state.selectedInteriorAsset,
     state.camera,
     state.viewport,
-    theme
+    theme,
+    { includeStairDirectionVisuals: true }
   );
   drawWallInteractionOverlay(
     wallOverlayGraphics,
@@ -2491,7 +2500,8 @@ function drawScene(
     state.settings,
     showDimensions,
     transformFeedback,
-    theme
+    theme,
+    { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
   if (showDimensions) {
@@ -2815,14 +2825,15 @@ function drawOpenings(
   selectedInteriorAsset: RoomInteriorAssetSelection | null,
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  options?: { includeStairDirectionVisuals?: boolean }
 ) {
   graphics.clear();
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selectedInteriorAsset, camera, viewport, theme);
+    drawRoomInteriorAssets(graphics, room, selectedInteriorAsset, camera, viewport, theme, options);
   }
 }
 
@@ -3162,7 +3173,8 @@ function drawRoomInteriorAssets(
   selectedInteriorAsset: RoomInteriorAssetSelection | null,
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  options?: { includeStairDirectionVisuals?: boolean }
 ) {
   for (const asset of room.interiorAssets) {
     const bounds = getRoomInteriorAssetBounds(asset);
@@ -3249,6 +3261,10 @@ function drawRoomInteriorAssets(
       graphics.moveTo(start.x, start.y);
       graphics.lineTo(end.x, end.y);
       graphics.stroke();
+    }
+
+    if (options?.includeStairDirectionVisuals !== false) {
+      drawStairDirectionArrow(graphics, asset, camera, viewport, theme, isSelected);
     }
 
     if (!isSelected) continue;
@@ -3347,6 +3363,150 @@ function drawOpeningWidthHandle(
     2
   );
   graphics.stroke();
+}
+
+function drawStairDirectionArrow(
+  graphics: Graphics,
+  asset: Room["interiorAssets"][number],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme,
+  isSelected: boolean
+) {
+  const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+  const rotationRadians = (normalizedRotationDegrees * Math.PI) / 180;
+  const direction = {
+    x: Math.sin(rotationRadians),
+    y: -Math.cos(rotationRadians),
+  };
+  const runLengthMm = Math.abs(normalizedRotationDegrees) === 90 ? asset.widthMm : asset.depthMm;
+  const arrowLengthMm = Math.max(
+    STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
+    Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)
+  );
+  const tail = worldToScreen(
+    {
+      x: asset.xMm - direction.x * (arrowLengthMm / 2),
+      y: asset.yMm - direction.y * (arrowLengthMm / 2),
+    },
+    camera,
+    viewport
+  );
+  const head = worldToScreen(
+    {
+      x: asset.xMm + direction.x * (arrowLengthMm / 2),
+      y: asset.yMm + direction.y * (arrowLengthMm / 2),
+    },
+    camera,
+    viewport
+  );
+  const screenDirectionLength = Math.hypot(head.x - tail.x, head.y - tail.y);
+  if (screenDirectionLength < 0.001) return;
+
+  const screenDirection = {
+    x: (head.x - tail.x) / screenDirectionLength,
+    y: (head.y - tail.y) / screenDirectionLength,
+  };
+  const screenNormal = {
+    x: -screenDirection.y,
+    y: screenDirection.x,
+  };
+  const headSizePx = Math.max(camera.pixelsPerMm * STAIR_DIRECTION_ARROW_HEAD_WORLD_MM, 8);
+  const headBase = {
+    x: head.x - screenDirection.x * headSizePx,
+    y: head.y - screenDirection.y * headSizePx,
+  };
+
+  graphics.setStrokeStyle({
+    width: Math.max(camera.pixelsPerMm * 8, 1),
+    color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+    alpha: isSelected ? 0.94 : 0.76,
+    cap: "round",
+    join: "round",
+  });
+  graphics.moveTo(tail.x, tail.y);
+  graphics.lineTo(head.x, head.y);
+  graphics.moveTo(head.x, head.y);
+  graphics.lineTo(
+    headBase.x + screenNormal.x * (headSizePx * 0.55),
+    headBase.y + screenNormal.y * (headSizePx * 0.55)
+  );
+  graphics.moveTo(head.x, head.y);
+  graphics.lineTo(
+    headBase.x - screenNormal.x * (headSizePx * 0.55),
+    headBase.y - screenNormal.y * (headSizePx * 0.55)
+  );
+  graphics.stroke();
+}
+
+function drawStairDirectionLabels(
+  labelContainer: Container,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const textResolution = getTextResolution();
+
+  for (const room of rooms) {
+    for (const asset of room.interiorAssets) {
+      const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+      const rotationRadians = (normalizedRotationDegrees * Math.PI) / 180;
+      const direction = {
+        x: Math.sin(rotationRadians),
+        y: -Math.cos(rotationRadians),
+      };
+      const normal = {
+        x: -direction.y,
+        y: direction.x,
+      };
+      const runLengthMm =
+        Math.abs(normalizedRotationDegrees) === 90 ? asset.widthMm : asset.depthMm;
+      const arrowLengthMm = Math.max(
+        STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
+        Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)
+      );
+      const labelPoint = worldToScreen(
+        {
+          x:
+            asset.xMm -
+            direction.x * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM) +
+            normal.x * 40,
+          y:
+            asset.yMm -
+            direction.y * (arrowLengthMm / 2 + STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM) +
+            normal.y * 40,
+        },
+        camera,
+        viewport
+      );
+      const text = new Text({
+        text: STAIR_DIRECTION_LABEL,
+        resolution: textResolution,
+        style: {
+          fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
+          fontSize: STAIR_DIRECTION_LABEL_FONT_SIZE_PX,
+          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+          fill: theme.roomLabelFill,
+          stroke: {
+            color: theme.roomLabelStroke,
+            width: 1.5,
+            join: "round",
+          },
+          letterSpacing: 0.3,
+        },
+      });
+      text.roundPixels = true;
+      text.anchor.set(0.5);
+      text.position.set(
+        snapToPixel(labelPoint.x, textResolution),
+        snapToPixel(labelPoint.y, textResolution)
+      );
+      text.angle = normalizedRotationDegrees - camera.rotationDegrees;
+      text.alpha = 0.82;
+      labelContainer.addChild(text);
+    }
+  }
 }
 
 function drawTransformDestinationPreview(
@@ -3522,7 +3682,8 @@ function drawRoomLabels(
   settings: Pick<EditorSettings, "measurementFontSize">,
   showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  options?: { includeStairDirectionLabels?: boolean }
 ) {
   clearContainerChildren(labelContainer);
   const measurementTextScale = getMeasurementTextScale(settings);
@@ -3628,6 +3789,10 @@ function drawRoomLabels(
       );
       labelContainer.addChild(areaText);
     }
+  }
+
+  if (options?.includeStairDirectionLabels !== false) {
+    drawStairDirectionLabels(labelContainer, rooms, camera, viewport, theme);
   }
 }
 
