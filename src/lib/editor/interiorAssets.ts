@@ -177,6 +177,157 @@ export function constrainInteriorAssetCenter(
   return findConstrainedInteriorAssetCenter(room, asset.widthMm, asset.depthMm, nextCenter);
 }
 
+export function getAdjustedInteriorAssetForRoomResize(
+  room: Room,
+  asset: RoomInteriorAsset
+): RoomInteriorAsset | null {
+  const normalizedAsset = cloneRoomInteriorAsset(asset);
+  if (isInteriorAssetWithinRoom(room, normalizedAsset)) {
+    return normalizedAsset;
+  }
+
+  const nudgedCenter = constrainInteriorAssetCenter(room, normalizedAsset, {
+    x: normalizedAsset.xMm,
+    y: normalizedAsset.yMm,
+  });
+  if (nudgedCenter) {
+    return {
+      ...normalizedAsset,
+      xMm: nudgedCenter.x,
+      yMm: nudgedCenter.y,
+    };
+  }
+
+  const bounds = getPolygonBounds(room.points);
+  if (!bounds) return null;
+
+  const maxWidthMm = bounds.maxX - bounds.minX;
+  const maxDepthMm = bounds.maxY - bounds.minY;
+  if (maxWidthMm < MIN_STAIR_WIDTH_MM || maxDepthMm < MIN_STAIR_DEPTH_MM) {
+    return null;
+  }
+
+  const assetBounds = getRoomInteriorAssetBounds(normalizedAsset);
+  const isHorizontalRun = isStairRunHorizontal(normalizedAsset);
+  const maxRunMm = isHorizontalRun ? maxWidthMm : maxDepthMm;
+  const runAnchor = getPreferredRunAnchorForRoomResize(room, assetBounds, isHorizontalRun);
+  const startingRunMm = Math.min(
+    isHorizontalRun ? normalizedAsset.widthMm : normalizedAsset.depthMm,
+    maxRunMm
+  );
+  const startingSnappedRunMm = Math.floor(startingRunMm / DEFAULT_STAIR_TREAD_SPACING_MM) *
+    DEFAULT_STAIR_TREAD_SPACING_MM;
+
+  for (let runMm = startingSnappedRunMm; runMm >= MIN_STAIR_DEPTH_MM; runMm -= DEFAULT_STAIR_TREAD_SPACING_MM) {
+    const candidateBounds = getRunAnchoredBoundsForRoomResize(assetBounds, normalizedAsset, runMm, runAnchor);
+    const candidate = getConstrainedResizedStair(room, normalizedAsset, candidateBounds);
+    if (candidate) return candidate;
+  }
+
+  return null;
+}
+
+export function getRotatedInteriorAssetForRoom(
+  room: Room,
+  asset: RoomInteriorAsset,
+  deltaDegrees: number
+): RoomInteriorAsset | null {
+  if (!Number.isFinite(deltaDegrees) || deltaDegrees === 0) return null;
+
+  const nextRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees + deltaDegrees);
+  const isQuarterTurn = Math.abs(deltaDegrees) % 180 === 90;
+
+  if (asset.rotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
+
+  const rotatedAsset = {
+    ...cloneRoomInteriorAsset(asset),
+    widthMm: isQuarterTurn ? asset.depthMm : asset.widthMm,
+    depthMm: isQuarterTurn ? asset.widthMm : asset.depthMm,
+    rotationDegrees: nextRotationDegrees,
+  };
+
+  if (isInteriorAssetWithinRoom(room, rotatedAsset)) {
+    return rotatedAsset;
+  }
+
+  const nudgedCenter = constrainInteriorAssetCenter(room, rotatedAsset, {
+    x: asset.xMm,
+    y: asset.yMm,
+  });
+  if (!nudgedCenter) return null;
+
+  return {
+    ...rotatedAsset,
+    xMm: nudgedCenter.x,
+    yMm: nudgedCenter.y,
+  };
+}
+
+function getRunAnchoredBoundsForRoomResize(
+  assetBounds: RoomInteriorAssetBounds,
+  asset: RoomInteriorAsset,
+  runMm: number,
+  runAnchor: "min" | "max"
+): RoomRectBounds {
+  if (isStairRunHorizontal(asset)) {
+    return runAnchor === "max"
+      ? {
+          minX: assetBounds.right - runMm,
+          maxX: assetBounds.right,
+          minY: assetBounds.top,
+          maxY: assetBounds.bottom,
+        }
+      : {
+          minX: assetBounds.left,
+          maxX: assetBounds.left + runMm,
+          minY: assetBounds.top,
+          maxY: assetBounds.bottom,
+        };
+  }
+
+  return runAnchor === "max"
+    ? {
+        minX: assetBounds.left,
+        maxX: assetBounds.right,
+        minY: assetBounds.bottom - runMm,
+        maxY: assetBounds.bottom,
+      }
+    : {
+        minX: assetBounds.left,
+        maxX: assetBounds.right,
+        minY: assetBounds.top,
+        maxY: assetBounds.top + runMm,
+      };
+}
+
+function getPreferredRunAnchorForRoomResize(
+  room: Room,
+  assetBounds: RoomInteriorAssetBounds,
+  isHorizontalRun: boolean
+) {
+  const topLeftInside = isPointInPolygon({ x: assetBounds.left, y: assetBounds.top }, room.points);
+  const topRightInside = isPointInPolygon({ x: assetBounds.right, y: assetBounds.top }, room.points);
+  const bottomRightInside = isPointInPolygon(
+    { x: assetBounds.right, y: assetBounds.bottom },
+    room.points
+  );
+  const bottomLeftInside = isPointInPolygon({ x: assetBounds.left, y: assetBounds.bottom }, room.points);
+
+  if (isHorizontalRun) {
+    const leftOutside = !topLeftInside || !bottomLeftInside;
+    const rightOutside = !topRightInside || !bottomRightInside;
+    if (leftOutside && !rightOutside) return "max" as const;
+    if (rightOutside && !leftOutside) return "min" as const;
+    return "min" as const;
+  }
+
+  const topOutside = !topLeftInside || !topRightInside;
+  const bottomOutside = !bottomLeftInside || !bottomRightInside;
+  if (topOutside && !bottomOutside) return "max" as const;
+  if (bottomOutside && !topOutside) return "min" as const;
+  return "min" as const;
+}
+
 function getSnappedInteriorAssetCenter(
   targetCenter: Point,
   asset: Pick<RoomInteriorAsset, "widthMm" | "depthMm">,
@@ -201,6 +352,12 @@ export function getInteriorAssetBoundsAsRectBounds(
     minY: bounds.top,
     maxY: bounds.bottom,
   };
+}
+
+export function getStairRunLengthMm(
+  asset: Pick<RoomInteriorAsset, "widthMm" | "depthMm" | "rotationDegrees">
+) {
+  return isStairRunHorizontal(asset as RoomInteriorAsset) ? asset.widthMm : asset.depthMm;
 }
 
 export function getInteriorAssetFromBounds(

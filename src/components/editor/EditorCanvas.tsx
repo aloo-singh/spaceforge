@@ -31,6 +31,7 @@ import {
   DEFAULT_STAIR_ARROW_ENABLED,
   DEFAULT_STAIR_TREAD_SPACING_MM,
   findInteriorAssetAtScreenPoint,
+  getStairRunLengthMm,
   getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
 } from "@/lib/editor/interiorAssets";
@@ -3096,11 +3097,14 @@ function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: Transfor
       ? {
           ...room,
           points: transformedPoints,
-          interiorAssets: room.interiorAssets.map((asset) => ({
-            ...asset,
-            xMm: asset.xMm + delta.x,
-            yMm: asset.yMm + delta.y,
-          })),
+          interiorAssets:
+            transformFeedback.mode === "move"
+              ? room.interiorAssets.map((asset) => ({
+                  ...asset,
+                  xMm: asset.xMm + delta.x,
+                  yMm: asset.yMm + delta.y,
+                }))
+              : room.interiorAssets,
         }
       : room
   );
@@ -3422,7 +3426,7 @@ function drawRoomInteriorAssets(
 
     const isQuarterTurnSideways =
       Math.abs(normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
-    const treadRunLengthMm = Math.max(displayedAsset.widthMm, displayedAsset.depthMm, 1);
+    const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
     const treadCount = Math.max(
       0,
       Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
@@ -3577,7 +3581,7 @@ function drawStairDirectionArrow(
     x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
     y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
   };
-  const runLengthMm = Math.max(asset.widthMm, asset.depthMm);
+  const runLengthMm = getStairRunLengthMm(asset);
   const arrowLengthMm = Math.max(
     STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
     Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)
@@ -3672,7 +3676,7 @@ function drawStairDirectionLabels(
         x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
         y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
       };
-      const runLengthMm = Math.max(displayedAsset.widthMm, displayedAsset.depthMm);
+      const runLengthMm = getStairRunLengthMm(displayedAsset);
       const arrowLengthMm = Math.max(
         STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
         Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)

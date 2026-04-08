@@ -53,6 +53,8 @@ export type EditorCommand =
       roomId: string;
       previousPoints: Room["points"];
       nextPoints: Room["points"];
+      previousInteriorAssets?: RoomInteriorAsset[];
+      nextInteriorAssets?: RoomInteriorAsset[];
     }
   | {
       type: "move-room";
@@ -172,6 +174,10 @@ export function applyEditorCommand(
 
   if (command.type === "resize-room") {
     const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
+    const nextInteriorAssets =
+      direction === "undo"
+        ? command.previousInteriorAssets
+        : command.nextInteriorAssets;
     return {
       ...document,
       rooms: document.rooms.map((room) =>
@@ -179,6 +185,9 @@ export function applyEditorCommand(
           ? {
               ...room,
               points: nextPoints.map((point) => ({ ...point })),
+              interiorAssets: nextInteriorAssets
+                ? cloneRoomInteriorAssets(nextInteriorAssets)
+                : room.interiorAssets,
             }
           : room
       ),

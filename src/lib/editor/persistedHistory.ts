@@ -208,12 +208,39 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (!didNameChange && didPointsChange) {
-    // Snapshot-based history only needs a deterministic point transition command.
+    const translationDelta = getPointListTranslationDelta(
+      changedRoom.previous.points,
+      changedRoom.next.points
+    );
+    const didTranslateRoomPoints = arePointListsTranslatedByDelta(
+      changedRoom.previous.points,
+      changedRoom.next.points,
+      translationDelta
+    );
+    const didMoveInteriorAssetsBySameDelta =
+      !didInteriorAssetsChange ||
+      areInteriorAssetsTranslatedByDelta(
+        changedRoom.previous.interiorAssets ?? [],
+        changedRoom.next.interiorAssets ?? [],
+        translationDelta
+      );
+
+    if (didTranslateRoomPoints && didMoveInteriorAssetsBySameDelta && !didOpeningsChange) {
+      return {
+        type: "move-room",
+        roomId: changedRoom.next.id,
+        previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
+        nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+      };
+    }
+
     return {
-      type: "move-room",
+      type: "resize-room",
       roomId: changedRoom.next.id,
       previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
       nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+      previousInteriorAssets: cloneRoomInteriorAssets(changedRoom.previous.interiorAssets ?? []),
+      nextInteriorAssets: cloneRoomInteriorAssets(changedRoom.next.interiorAssets ?? []),
     };
   }
 
@@ -549,6 +576,70 @@ function areOpeningsEqual(a: RoomOpening, b: RoomOpening) {
     a.openingSide === b.openingSide &&
     a.hingeSide === b.hingeSide
   );
+}
+
+function getPointListTranslationDelta(previousPoints: Room["points"], nextPoints: Room["points"]) {
+  if (previousPoints.length === 0 || nextPoints.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: nextPoints[0].x - previousPoints[0].x,
+    y: nextPoints[0].y - previousPoints[0].y,
+  };
+}
+
+function arePointListsTranslatedByDelta(
+  previousPoints: Room["points"],
+  nextPoints: Room["points"],
+  delta: { x: number; y: number }
+) {
+  if (previousPoints.length !== nextPoints.length) return false;
+
+  for (let index = 0; index < previousPoints.length; index += 1) {
+    if (
+      previousPoints[index].x + delta.x !== nextPoints[index].x ||
+      previousPoints[index].y + delta.y !== nextPoints[index].y
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areInteriorAssetsTranslatedByDelta(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[],
+  delta: { x: number; y: number }
+) {
+  if (previousAssets.length !== nextAssets.length) return false;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  for (const previousAsset of previousAssets) {
+    const nextAsset = nextById.get(previousAsset.id);
+    if (!nextAsset) return false;
+    if (
+      previousAsset.type !== nextAsset.type ||
+      previousAsset.name !== nextAsset.name ||
+      previousAsset.widthMm !== nextAsset.widthMm ||
+      previousAsset.depthMm !== nextAsset.depthMm ||
+      previousAsset.rotationDegrees !== nextAsset.rotationDegrees ||
+      previousAsset.arrowEnabled !== nextAsset.arrowEnabled ||
+      previousAsset.arrowDirection !== nextAsset.arrowDirection ||
+      previousAsset.arrowLabel !== nextAsset.arrowLabel
+    ) {
+      return false;
+    }
+    if (
+      previousAsset.xMm + delta.x !== nextAsset.xMm ||
+      previousAsset.yMm + delta.y !== nextAsset.yMm
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function findDocumentIndex(historyStack: EditorDocumentState[], document: EditorDocumentState): number | null {
