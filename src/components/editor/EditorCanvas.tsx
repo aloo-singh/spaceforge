@@ -3217,21 +3217,28 @@ function drawRoomInteriorAssets(
     graphics.closePath();
     graphics.stroke();
 
-    const assetDepthMm = Math.max(bounds.bottom - bounds.top, 1);
+    const isQuarterTurnSideways =
+      Math.abs(normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0)) === 90;
+    const treadRunLengthMm = Math.max(
+      isQuarterTurnSideways ? asset.widthMm : asset.depthMm,
+      1
+    );
     const treadCount = Math.max(
       0,
-      Math.floor(assetDepthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+      Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
     );
     for (let index = 1; index <= treadCount; index += 1) {
-      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / assetDepthMm;
+      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
       if (progress <= 0 || progress >= 1) continue;
+      const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
+      const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
       const start = {
-        x: topLeft.x + (bottomLeft.x - topLeft.x) * progress,
-        y: topLeft.y + (bottomLeft.y - topLeft.y) * progress,
+        x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
+        y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
       };
       const end = {
-        x: topRight.x + (bottomRight.x - topRight.x) * progress,
-        y: topRight.y + (bottomRight.y - topRight.y) * progress,
+        x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
+        y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
       };
       graphics.setStrokeStyle({
         width: Math.max(camera.pixelsPerMm * 10, 1.1),

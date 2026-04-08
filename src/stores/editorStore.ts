@@ -453,7 +453,14 @@ function updateRoomInteriorAssetPositionInDocument(
 function updateRoomInteriorAssetInDocument(
   document: DocumentState,
   roomId: string,
-  nextAsset: { id: string; widthMm: number; depthMm: number; xMm: number; yMm: number }
+  nextAsset: {
+    id: string;
+    widthMm: number;
+    depthMm: number;
+    xMm: number;
+    yMm: number;
+    rotationDegrees?: number;
+  }
 ): DocumentState {
   return {
     ...document,
@@ -469,6 +476,8 @@ function updateRoomInteriorAssetInDocument(
                     depthMm: nextAsset.depthMm,
                     xMm: nextAsset.xMm,
                     yMm: nextAsset.yMm,
+                    rotationDegrees:
+                      nextAsset.rotationDegrees ?? cloneRoomInteriorAsset(asset).rotationDegrees,
                   }
                 : asset
             ),
