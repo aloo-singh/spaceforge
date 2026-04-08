@@ -113,7 +113,7 @@ export function SelectedInteriorAssetInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Stair options</p>
+          <p className="text-sm font-medium">Rotate</p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -135,6 +135,12 @@ export function SelectedInteriorAssetInspector({
             >
               <RotateCw />
             </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Direction</p>
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant={asset.arrowEnabled ? "secondary" : "outline"}
