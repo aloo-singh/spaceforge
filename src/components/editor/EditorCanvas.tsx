@@ -3502,7 +3502,7 @@ function drawStairDirectionLabels(
         snapToPixel(labelPoint.x, textResolution),
         snapToPixel(labelPoint.y, textResolution)
       );
-      text.angle = normalizedRotationDegrees - camera.rotationDegrees;
+      text.angle = 0;
       text.alpha = 0.82;
       labelContainer.addChild(text);
     }
