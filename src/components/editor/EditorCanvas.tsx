@@ -119,9 +119,8 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
-  getKeyboardShortcutFeedbackMessage,
   matchEditorKeyboardShortcut,
-  showKeyboardShortcutFeedbackToast,
+  showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
 import {
   formatCanvasRotationDegrees,
@@ -1712,42 +1711,30 @@ export default function EditorCanvas({
       if (shortcut.id === "toggle-guidelines") {
         const nextShowGuidelines = !store.settings.showGuidelines;
         store.updateSettings({ showGuidelines: nextShowGuidelines });
-        if (store.keyboardShortcutFeedbackEnabled) {
-          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
-            isEnabled: nextShowGuidelines,
-          });
-          if (message) {
-            showKeyboardShortcutFeedbackToast(message);
-          }
-        }
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextShowGuidelines },
+        });
         return;
       }
 
       if (shortcut.id === "toggle-canvas-hud") {
         const nextShowCanvasHud = !store.settings.showCanvasHud;
         store.updateSettings({ showCanvasHud: nextShowCanvasHud });
-        if (store.keyboardShortcutFeedbackEnabled) {
-          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
-            isEnabled: nextShowCanvasHud,
-          });
-          if (message) {
-            showKeyboardShortcutFeedbackToast(message);
-          }
-        }
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextShowCanvasHud },
+        });
         return;
       }
 
       if (shortcut.id === "toggle-snapping") {
         const nextSnappingEnabled = !store.settings.snappingEnabled;
         store.updateSettings({ snappingEnabled: nextSnappingEnabled });
-        if (store.keyboardShortcutFeedbackEnabled) {
-          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
-            isEnabled: nextSnappingEnabled,
-          });
-          if (message) {
-            showKeyboardShortcutFeedbackToast(message);
-          }
-        }
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextSnappingEnabled },
+        });
       }
     };
 

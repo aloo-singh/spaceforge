@@ -1,8 +1,7 @@
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import {
-  getKeyboardShortcutFeedbackMessage,
   matchEditorKeyboardShortcut,
-  showKeyboardShortcutFeedbackToast,
+  showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
 
 type HistoryStoreState = {
@@ -39,12 +38,9 @@ export function attachHistoryHotkeys(store: HistoryStore) {
     } else {
       state.redo();
     }
-    if (state.keyboardShortcutFeedbackEnabled) {
-      const message = getKeyboardShortcutFeedbackMessage(shortcut.id);
-      if (message) {
-        showKeyboardShortcutFeedbackToast(message);
-      }
-    }
+    showKeyboardShortcutFeedback(shortcut.id, {
+      feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+    });
   };
 
   // Capture-phase interception keeps browser/app chrome shortcuts from winning

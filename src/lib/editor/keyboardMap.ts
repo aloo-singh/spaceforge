@@ -49,7 +49,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     windowsKeys: "H",
     type: "toggle",
     bindings: [{ key: "h", code: "KeyH" }],
-    sonnerMessage: ({ isEnabled }) => (isEnabled ? "HUD shown" : "HUD hidden"),
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Canvas HUD shown" : "Canvas HUD hidden"),
   },
   {
     id: "toggle-guidelines",
@@ -60,7 +60,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     windowsKeys: "G",
     type: "toggle",
     bindings: [{ key: "g", code: "KeyG" }],
-    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Guidelines on" : "Guidelines off"),
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Guidelines enabled" : "Guidelines disabled"),
   },
   {
     id: "toggle-snapping",
@@ -71,7 +71,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     windowsKeys: "S",
     type: "toggle",
     bindings: [{ key: "s", code: "KeyS" }],
-    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping on" : "Snapping off"),
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
   },
   {
     id: "undo",
@@ -205,6 +205,21 @@ export function showKeyboardShortcutFeedbackToast(message: string) {
   });
 
   activeKeyboardShortcutFeedbackToastId = id;
+}
+
+export function showKeyboardShortcutFeedback(
+  shortcutId: EditorKeyboardShortcutId,
+  options: {
+    feedbackEnabled: boolean;
+    context?: KeyboardShortcutFeedbackContext;
+  }
+) {
+  if (!options.feedbackEnabled) return;
+
+  const message = getKeyboardShortcutFeedbackMessage(shortcutId, options.context);
+  if (!message) return;
+
+  showKeyboardShortcutFeedbackToast(message);
 }
 
 function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: KeyboardEvent) {
