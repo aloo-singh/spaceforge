@@ -72,7 +72,7 @@ function ButtonGroup({
     <div
       data-slot="button-group"
       className={cn(
-        "inline-flex items-center [&>[data-slot=button-group-item]]:relative [&>[data-slot=button-group-item]:not(:first-child)]:-ml-px [&>[data-slot=button-group-item]:hover]:z-10 [&>[data-slot=button-group-item]:focus-within]:z-10 [&>[data-slot=button-group-item]>[data-slot=button]]:rounded-none [&>[data-slot=button-group-item]:first-child>[data-slot=button]]:rounded-l-[min(var(--radius-md),10px)] [&>[data-slot=button-group-item]:last-child>[data-slot=button]]:rounded-r-[min(var(--radius-md),10px)]",
+        "inline-flex items-center [&>[data-slot=button-group-item]]:relative [&>[data-slot=button-group-item]:not(:first-child)]:-ml-px [&>[data-slot=button-group-item]:hover]:z-10 [&>[data-slot=button-group-item]:focus-within]:z-10 [&>[data-slot=button-group-item]_[data-slot=button]]:rounded-none [&>[data-slot=button-group-item]:first-child]_[data-slot=button]:rounded-l-[min(var(--radius-md),10px)] [&>[data-slot=button-group-item]:last-child]_[data-slot=button]:rounded-r-[min(var(--radius-md),10px)]",
         className
       )}
       {...props}

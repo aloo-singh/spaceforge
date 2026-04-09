@@ -1,13 +1,13 @@
 "use client";
 
 import { ArrowUpDown, RotateCcw, RotateCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
+  ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
@@ -20,6 +20,29 @@ type SelectedInteriorAssetInspectorProps = {
   asset: RoomInteriorAsset;
   className?: string;
 };
+
+function InspectorIconTooltip({
+  content,
+  children,
+  groupItem = false,
+}: {
+  content: React.ReactNode;
+  children: React.ReactNode;
+  groupItem?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span data-slot={groupItem ? "button-group-item" : undefined} className="inline-flex">
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center">
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function SelectedInteriorAssetInspector({
   asset,
@@ -133,50 +156,52 @@ export function SelectedInteriorAssetInspector({
 
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Rotate</p>
-          <TooltipProvider>
-            <div className="flex flex-wrap gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => rotateSelectedInteriorAsset(-90)}
-                      aria-label="Rotate stair left 90 degrees"
-                      title={canRotateSelectedInteriorAsset ? "Rotate Left 90°" : undefined}
-                      disabled={!canRotateSelectedInteriorAsset}
-                    >
-                      <RotateCcw />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canRotateSelectedInteriorAsset ? (
-                  <TooltipContent side="top">Stairs won&apos;t fit after rotation</TooltipContent>
-                ) : null}
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => rotateSelectedInteriorAsset(90)}
-                      aria-label="Rotate stair right 90 degrees"
-                      title={canRotateSelectedInteriorAsset ? "Rotate Right 90°" : undefined}
-                      disabled={!canRotateSelectedInteriorAsset}
-                    >
-                      <RotateCw />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canRotateSelectedInteriorAsset ? (
-                  <TooltipContent side="top">Stairs won&apos;t fit after rotation</TooltipContent>
-                ) : null}
-              </Tooltip>
-            </div>
-          </TooltipProvider>
+          <ImmediateTooltipProvider>
+            <ButtonGroup>
+              <InspectorIconTooltip
+                groupItem
+                content={
+                  canRotateSelectedInteriorAsset
+                    ? "Rotate left 90°"
+                    : "Rotate left 90° · Stairs won't fit after rotation"
+                }
+              >
+                <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => rotateSelectedInteriorAsset(-90)}
+                    aria-label="Rotate stair left 90 degrees"
+                    disabled={!canRotateSelectedInteriorAsset}
+                  >
+                    <RotateCcw />
+                  </Button>
+                </span>
+              </InspectorIconTooltip>
+              <InspectorIconTooltip
+                groupItem
+                content={
+                  canRotateSelectedInteriorAsset
+                    ? "Rotate right 90°"
+                    : "Rotate right 90° · Stairs won't fit after rotation"
+                }
+              >
+                <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => rotateSelectedInteriorAsset(90)}
+                    aria-label="Rotate stair right 90 degrees"
+                    disabled={!canRotateSelectedInteriorAsset}
+                  >
+                    <RotateCw />
+                  </Button>
+                </span>
+              </InspectorIconTooltip>
+            </ButtonGroup>
+          </ImmediateTooltipProvider>
         </div>
 
         <div className="space-y-1.5">
@@ -192,18 +217,21 @@ export function SelectedInteriorAssetInspector({
               aria-label="Toggle stair direction arrow"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => swapSelectedInteriorAssetArrowDirection()}
-              aria-label="Swap stair arrow direction"
-              title="Swap Direction"
-            >
-              <ArrowUpDown />
-            </Button>
-          </div>
+          <ImmediateTooltipProvider>
+            <div className="flex flex-wrap gap-2">
+              <InspectorIconTooltip content="Swap direction">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => swapSelectedInteriorAssetArrowDirection()}
+                  aria-label="Swap stair arrow direction"
+                >
+                  <ArrowUpDown />
+                </Button>
+              </InspectorIconTooltip>
+            </div>
+          </ImmediateTooltipProvider>
         </div>
 
         <div className="space-y-1.5">
