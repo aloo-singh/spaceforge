@@ -6,7 +6,10 @@ export type EditorKeyboardShortcutId =
   | "toggle-snapping"
   | "undo"
   | "redo"
-  | "delete-selection";
+  | "delete-selection"
+  | "hold-pan"
+  | "cancel-draft-or-clear-selection"
+  | "step-back-draft";
 
 type EditorKeyboardShortcutBinding = {
   key?: string;
@@ -24,6 +27,7 @@ type KeyboardShortcutFeedbackContext = {
 
 export type EditorKeyboardShortcut = {
   id: EditorKeyboardShortcutId;
+  section: "View" | "Edit" | "Drawing";
   keyCombination: string;
   description: string;
   macKeys: string;
@@ -38,6 +42,7 @@ const KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS = 2000;
 export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
   {
     id: "toggle-canvas-hud",
+    section: "View",
     keyCombination: "H",
     description: "Toggle the canvas HUD",
     macKeys: "H",
@@ -48,6 +53,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
   },
   {
     id: "toggle-guidelines",
+    section: "View",
     keyCombination: "G",
     description: "Toggle predictive guidelines",
     macKeys: "G",
@@ -58,6 +64,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
   },
   {
     id: "toggle-snapping",
+    section: "View",
     keyCombination: "S",
     description: "Toggle snapping",
     macKeys: "S",
@@ -68,16 +75,18 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
   },
   {
     id: "undo",
+    section: "Edit",
     keyCombination: "Primary+Z",
     description: "Undo the last edit",
     macKeys: "Cmd+Z",
     windowsKeys: "Ctrl+Z",
     type: "action",
     bindings: [{ key: "z", code: "KeyZ", primaryModifier: true, altKey: false, shiftKey: false }],
-    sonnerMessage: "Undo",
+    sonnerMessage: "Undo performed",
   },
   {
     id: "redo",
+    section: "Edit",
     keyCombination: "Primary+Shift+Z / Ctrl+Y",
     description: "Redo the last undone edit",
     macKeys: "Shift+Cmd+Z",
@@ -87,10 +96,11 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "z", code: "KeyZ", primaryModifier: true, altKey: false, shiftKey: true },
       { key: "y", code: "KeyY", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false },
     ],
-    sonnerMessage: "Redo",
+    sonnerMessage: "Redo performed",
   },
   {
     id: "delete-selection",
+    section: "Edit",
     keyCombination: "Delete / Backspace",
     description: "Delete the current selection",
     macKeys: "Delete / Backspace",
@@ -101,6 +111,36 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "Backspace", altKey: false, ctrlKey: false, metaKey: false },
     ],
     sonnerMessage: "Selection deleted",
+  },
+  {
+    id: "hold-pan",
+    section: "View",
+    keyCombination: "Hold Space",
+    description: "Temporarily pan the canvas",
+    macKeys: "Hold Space",
+    windowsKeys: "Hold Space",
+    type: "action",
+    bindings: [{ code: "Space" }],
+  },
+  {
+    id: "cancel-draft-or-clear-selection",
+    section: "Drawing",
+    keyCombination: "Escape",
+    description: "Cancel the current draft or clear the room selection",
+    macKeys: "Escape",
+    windowsKeys: "Escape",
+    type: "action",
+    bindings: [{ code: "Escape" }],
+  },
+  {
+    id: "step-back-draft",
+    section: "Drawing",
+    keyCombination: "Backspace",
+    description: "Remove the last draft point while drawing",
+    macKeys: "Backspace",
+    windowsKeys: "Backspace",
+    type: "action",
+    bindings: [{ code: "Backspace", metaKey: false, ctrlKey: false, altKey: false }],
   },
 ] as const;
 
