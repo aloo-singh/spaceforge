@@ -156,9 +156,9 @@ import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
 import {
+  ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   tooltipContentClassName,
 } from "@/components/ui/tooltip";
@@ -616,7 +616,7 @@ function CanvasRotationIndicatorControl({
   const northMarkerDegrees = normalizeNorthBearingDegrees(northBearingDegrees + normalizedRotationDegrees);
 
   return (
-    <TooltipProvider>
+    <ImmediateTooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -660,7 +660,7 @@ function CanvasRotationIndicatorControl({
           {formatCanvasRotationDegrees(normalizedRotationDegrees)}. {formatCanvasRotationShortcutLabel()}. Click to reset.
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
+    </ImmediateTooltipProvider>
   );
 }
 
@@ -698,65 +698,74 @@ function NorthIndicatorControl({
   const showSurface = surfaceState === "visible";
 
   return (
-    <button
-      type="button"
-      aria-label={`North indicator ${formatNorthBearingDegrees(visibleBearingDegrees)}`}
-      onPointerDown={onPointerDown}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-      className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 rounded-md border border-border/70 bg-background/86 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm transition-opacity duration-150 ease-out dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)] ${
-          showSurface ? "opacity-100" : "opacity-0"
-        }`}
-        style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
-      />
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 transition-opacity duration-150 ease-out ${
-          showSurface ? "opacity-100" : "opacity-0"
-        }`}
-        style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
-      >
-        {Array.from({ length: 16 }).map((_, index) => {
-          const angle = index * 22.5;
-          const isMajorTick = angle % 90 === 0;
-          return (
+    <ImmediateTooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`North indicator ${formatNorthBearingDegrees(visibleBearingDegrees)}`}
+            onPointerDown={onPointerDown}
+            onPointerEnter={onPointerEnter}
+            onPointerLeave={onPointerLeave}
+            className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
             <div
-              key={angle}
-              className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
-              style={{
-                transform: `translate(-50%, -100%) rotate(${angle}deg)`,
-                height: "21px",
-              }}
+              aria-hidden="true"
+              className={`absolute inset-0 rounded-md border border-border/70 bg-background/86 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm transition-opacity duration-150 ease-out dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)] ${
+                showSurface ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
+            />
+            <div
+              aria-hidden="true"
+              className={`absolute inset-0 transition-opacity duration-150 ease-out ${
+                showSurface ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
             >
-              <div
-                className={`mx-auto rounded-full ${
-                  isMajorTick
-                    ? "h-2 w-px bg-black/90 dark:bg-white/90"
-                    : "h-1.5 w-px bg-black/55 dark:bg-white/50"
-                }`}
-              />
+              {Array.from({ length: 16 }).map((_, index) => {
+                const angle = index * 22.5;
+                const isMajorTick = angle % 90 === 0;
+                return (
+                  <div
+                    key={angle}
+                    className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
+                    style={{
+                      transform: `translate(-50%, -100%) rotate(${angle}deg)`,
+                      height: "21px",
+                    }}
+                  >
+                    <div
+                      className={`mx-auto rounded-full ${
+                        isMajorTick
+                          ? "h-2 w-px bg-black/90 dark:bg-white/90"
+                          : "h-1.5 w-px bg-black/55 dark:bg-white/50"
+                      }`}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 transition-transform ease-out ${isDragging ? "duration-75" : "duration-200"}`}
-        style={{ transform: `rotate(${displayBearingDegrees}deg)` }}
-      >
-        <div className="absolute top-1.5 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" />
-      </div>
-      <div
-        className="relative text-xs font-semibold tracking-[0.2em] text-foreground/86"
-        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
-      >
-        N
-      </div>
-    </button>
+            <div
+              aria-hidden="true"
+              className={`absolute inset-0 transition-transform ease-out ${isDragging ? "duration-75" : "duration-200"}`}
+              style={{ transform: `rotate(${displayBearingDegrees}deg)` }}
+            >
+              <div className="absolute top-1.5 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" />
+            </div>
+            <div
+              className="relative text-xs font-semibold tracking-[0.2em] text-foreground/86"
+              style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+            >
+              N
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="center">
+          {formatNorthBearingDegrees(visibleBearingDegrees)}. Drag to rotate north.
+        </TooltipContent>
+      </Tooltip>
+    </ImmediateTooltipProvider>
   );
 }
 export default function EditorCanvas({

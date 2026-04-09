@@ -72,7 +72,7 @@ function ButtonGroup({
     <div
       data-slot="button-group"
       className={cn(
-        "inline-flex items-center [&>[data-slot=button-group-item]]:relative [&>[data-slot=button-group-item]:not(:first-child)]:-ml-px [&>[data-slot=button-group-item]:hover]:z-10 [&>[data-slot=button-group-item]:focus-within]:z-10 [&>[data-slot=button-group-item]_[data-slot=button]]:rounded-none [&>[data-slot=button-group-item]:first-child]_[data-slot=button]:rounded-l-[min(var(--radius-md),10px)] [&>[data-slot=button-group-item]:last-child]_[data-slot=button]:rounded-r-[min(var(--radius-md),10px)]",
+        "inline-flex items-center overflow-hidden rounded-[min(var(--radius-md),10px)] border border-border bg-background shadow-xs dark:border-input dark:bg-input/30 [&>[data-slot=button-group-item]]:relative [&>[data-slot=button-group-item]:hover]:z-10 [&>[data-slot=button-group-item]:focus-within]:z-10 [&>[data-slot=button-group-item]:not(:first-child)]:before:absolute [&>[data-slot=button-group-item]:not(:first-child)]:before:inset-y-0 [&>[data-slot=button-group-item]:not(:first-child)]:before:left-0 [&>[data-slot=button-group-item]:not(:first-child)]:before:w-px [&>[data-slot=button-group-item]:not(:first-child)]:before:bg-border/80 dark:[&>[data-slot=button-group-item]:not(:first-child)]:before:bg-input [&>[data-slot=button-group-item]_[data-slot=button]]:rounded-none [&>[data-slot=button-group-item]_[data-slot=button]]:border-transparent [&>[data-slot=button-group-item]_[data-slot=button]]:bg-transparent [&>[data-slot=button-group-item]_[data-slot=button]]:shadow-none",
         className
       )}
       {...props}

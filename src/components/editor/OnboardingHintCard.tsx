@@ -3,6 +3,12 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type OnboardingHintCardProps = {
@@ -32,19 +38,29 @@ export function OnboardingHintCard({
     >
       <CardContent className="flex items-center gap-2 p-2.5 pl-3">
         <p className={cn("text-sm", isDarkCard ? "text-slate-200/90" : "text-slate-700")}>{message}</p>
-        <Button
-          type="button"
-          variant={isDarkCard ? "secondary" : "ghost"}
-          size="icon-xs"
-          onClick={onDismiss}
-          aria-label="Dismiss hint"
-          className={cn(
-            "ml-auto",
-            isDarkCard ? "bg-slate-800 text-slate-100 hover:bg-slate-700" : undefined
-          )}
-        >
-          <X />
-        </Button>
+        <ImmediateTooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="ml-auto inline-flex">
+                <Button
+                  type="button"
+                  variant={isDarkCard ? "secondary" : "ghost"}
+                  size="icon-xs"
+                  onClick={onDismiss}
+                  aria-label="Dismiss hint"
+                  className={cn(
+                    isDarkCard ? "bg-slate-800 text-slate-100 hover:bg-slate-700" : undefined
+                  )}
+                >
+                  <X />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center">
+              Dismiss hint
+            </TooltipContent>
+          </Tooltip>
+        </ImmediateTooltipProvider>
       </CardContent>
     </Card>
   );
