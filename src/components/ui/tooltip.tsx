@@ -3,6 +3,8 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
 import { cn } from "@/lib/utils"
 
+const IMMEDIATE_TOOLTIP_DELAY_DURATION = 0
+
 export const tooltipContentClassName =
   "z-50 overflow-hidden rounded-md border border-border/80 bg-popover px-2.5 py-1.5 text-[11px] font-medium text-popover-foreground shadow-md backdrop-blur-sm animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1"
 
@@ -11,6 +13,17 @@ function TooltipProvider({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return <TooltipPrimitive.Provider delayDuration={delayDuration} {...props} />
+}
+
+function ImmediateTooltipProvider(props: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  return (
+    <TooltipProvider
+      delayDuration={IMMEDIATE_TOOLTIP_DELAY_DURATION}
+      skipDelayDuration={IMMEDIATE_TOOLTIP_DELAY_DURATION}
+      disableHoverableContent
+      {...props}
+    />
+  )
 }
 
 function Tooltip(props: React.ComponentProps<typeof TooltipPrimitive.Root>) {
@@ -38,4 +51,4 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }
+export { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }

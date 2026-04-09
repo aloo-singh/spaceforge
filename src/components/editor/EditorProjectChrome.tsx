@@ -6,6 +6,12 @@ import { ArrowLeft } from "lucide-react";
 import { updateProject } from "@/lib/projects/clientApi";
 import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -78,21 +84,32 @@ export function EditorProjectChrome({
 
   return (
     <div className={cn("min-w-0", isSidebar ? "flex items-center gap-2" : "flex items-center gap-1.5")}>
-      <Button
-        asChild
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={cn(
-          isSidebar
-            ? "size-8 rounded-lg text-foreground/72 hover:bg-muted/80 hover:text-foreground"
-            : "size-8 text-foreground/64 hover:bg-muted hover:text-foreground"
-        )}
-      >
-        <Link href="/projects" aria-label="Back to projects">
-          <ArrowLeft className="size-4" />
-        </Link>
-      </Button>
+      <ImmediateTooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                asChild
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className={cn(
+                  isSidebar
+                    ? "size-8 rounded-lg text-foreground/72 hover:bg-muted/80 hover:text-foreground"
+                    : "size-8 text-foreground/64 hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Link href="/projects" aria-label="Back to projects">
+                  <ArrowLeft className="size-4" />
+                </Link>
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="center">
+            Back to projects
+          </TooltipContent>
+        </Tooltip>
+      </ImmediateTooltipProvider>
 
       <div data-editor-project-name-anchor className={cn("min-w-0", isSidebar && "flex-1")}>
         {isLoading ? (
