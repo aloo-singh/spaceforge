@@ -1,11 +1,15 @@
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
-
-const ROOM_DELETE_SHORTCUT_KEYS = ["Delete", "Backspace"] as const;
+import {
+  getKeyboardShortcutFeedbackMessage,
+  matchEditorKeyboardShortcut,
+  showKeyboardShortcutFeedbackToast,
+} from "@/lib/editor/keyboardMap";
 
 type DeleteRoomStoreState = {
   selectedRoomId: string | null;
   selectedOpening: { roomId: string; openingId: string } | null;
   selectedInteriorAsset: { roomId: string; assetId: string } | null;
+  keyboardShortcutFeedbackEnabled: boolean;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
   deleteSelectedRoom: () => void;
@@ -18,8 +22,8 @@ type DeleteRoomStore = {
 export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
   const onKeyDown = (event: KeyboardEvent) => {
     if (isEditableTarget(event.target)) return;
-    if (event.altKey || event.ctrlKey || event.metaKey) return;
-    if (!isRoomDeleteShortcutKey(event.key)) return;
+    const shortcut = matchEditorKeyboardShortcut(event, ["delete-selection"]);
+    if (!shortcut) return;
 
     const state = store.getState();
     if (!state.selectedOpening && !state.selectedInteriorAsset && !state.selectedRoomId) return;
@@ -29,13 +33,18 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
     event.preventDefault();
     if (state.selectedOpening) {
       state.deleteSelectedOpening();
-      return;
-    }
-    if (state.selectedInteriorAsset) {
+    } else if (state.selectedInteriorAsset) {
       state.deleteSelectedInteriorAsset();
-      return;
+    } else {
+      state.deleteSelectedRoom();
     }
-    state.deleteSelectedRoom();
+
+    if (state.keyboardShortcutFeedbackEnabled) {
+      const message = getKeyboardShortcutFeedbackMessage(shortcut.id);
+      if (message) {
+        showKeyboardShortcutFeedbackToast(message);
+      }
+    }
   };
 
   const listenerOptions: AddEventListenerOptions = {
@@ -48,8 +57,4 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
     document.removeEventListener("keydown", onKeyDown, listenerOptions);
     window.removeEventListener("keydown", onKeyDown, listenerOptions);
   };
-}
-
-function isRoomDeleteShortcutKey(key: string): key is (typeof ROOM_DELETE_SHORTCUT_KEYS)[number] {
-  return ROOM_DELETE_SHORTCUT_KEYS.includes(key as (typeof ROOM_DELETE_SHORTCUT_KEYS)[number]);
 }

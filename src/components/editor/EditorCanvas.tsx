@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
-import { toast } from "sonner";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
@@ -119,6 +118,11 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  getKeyboardShortcutFeedbackMessage,
+  matchEditorKeyboardShortcut,
+  showKeyboardShortcutFeedbackToast,
+} from "@/lib/editor/keyboardMap";
 import {
   formatCanvasRotationDegrees,
   formatCanvasRotationShortcutLabel,
@@ -241,27 +245,6 @@ const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
 const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
 const STAIR_ROTATION_ANIMATION_MS = 180;
 const CANVAS_ROTATION_ENABLED = false;
-const KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS = 2000;
-
-let activeKeyboardShortcutFeedbackToastId: string | number | null = null;
-
-function showKeyboardShortcutFeedback(message: string) {
-  if (activeKeyboardShortcutFeedbackToastId !== null) {
-    toast.dismiss(activeKeyboardShortcutFeedbackToastId);
-  }
-
-  const id = toast(message, {
-    duration: KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
-    onDismiss: () => {
-      if (activeKeyboardShortcutFeedbackToastId === id) {
-        activeKeyboardShortcutFeedbackToastId = null;
-      }
-    },
-  });
-
-  activeKeyboardShortcutFeedbackToastId = id;
-}
-
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
 }
@@ -1719,32 +1702,51 @@ export default function EditorCanvas({
       }
 
       const store = useEditorStore.getState();
-      const key = event.key.toLowerCase();
-      const code = event.code;
+      const shortcut = matchEditorKeyboardShortcut(event, [
+        "toggle-guidelines",
+        "toggle-canvas-hud",
+        "toggle-snapping",
+      ]);
+      if (!shortcut) return;
 
-      if (key === "g" || code === "KeyG") {
+      if (shortcut.id === "toggle-guidelines") {
         const nextShowGuidelines = !store.settings.showGuidelines;
         store.updateSettings({ showGuidelines: nextShowGuidelines });
         if (store.keyboardShortcutFeedbackEnabled) {
-          showKeyboardShortcutFeedback(nextShowGuidelines ? "Guidelines on" : "Guidelines off");
+          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
+            isEnabled: nextShowGuidelines,
+          });
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
         }
         return;
       }
 
-      if (key === "h" || code === "KeyH") {
+      if (shortcut.id === "toggle-canvas-hud") {
         const nextShowCanvasHud = !store.settings.showCanvasHud;
         store.updateSettings({ showCanvasHud: nextShowCanvasHud });
         if (store.keyboardShortcutFeedbackEnabled) {
-          showKeyboardShortcutFeedback(nextShowCanvasHud ? "HUD shown" : "HUD hidden");
+          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
+            isEnabled: nextShowCanvasHud,
+          });
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
         }
         return;
       }
 
-      if (key === "s" || code === "KeyS") {
+      if (shortcut.id === "toggle-snapping") {
         const nextSnappingEnabled = !store.settings.snappingEnabled;
         store.updateSettings({ snappingEnabled: nextSnappingEnabled });
         if (store.keyboardShortcutFeedbackEnabled) {
-          showKeyboardShortcutFeedback(nextSnappingEnabled ? "Snapping on" : "Snapping off");
+          const message = getKeyboardShortcutFeedbackMessage(shortcut.id, {
+            isEnabled: nextSnappingEnabled,
+          });
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
         }
       }
     };
