@@ -119,6 +119,10 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
+  matchEditorKeyboardShortcut,
+  showKeyboardShortcutFeedback,
+} from "@/lib/editor/keyboardMap";
+import {
   formatCanvasRotationDegrees,
   formatCanvasRotationShortcutLabel,
   normalizeCanvasRotationDegrees,
@@ -1697,21 +1701,40 @@ export default function EditorCanvas({
       }
 
       const store = useEditorStore.getState();
-      const key = event.key.toLowerCase();
-      const code = event.code;
+      const shortcut = matchEditorKeyboardShortcut(event, [
+        "toggle-guidelines",
+        "toggle-canvas-hud",
+        "toggle-snapping",
+      ]);
+      if (!shortcut) return;
 
-      if (key === "g" || code === "KeyG") {
-        store.updateSettings({ showGuidelines: !store.settings.showGuidelines });
+      if (shortcut.id === "toggle-guidelines") {
+        const nextShowGuidelines = !store.settings.showGuidelines;
+        store.updateSettings({ showGuidelines: nextShowGuidelines });
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextShowGuidelines },
+        });
         return;
       }
 
-      if (key === "h" || code === "KeyH") {
-        store.updateSettings({ showCanvasHud: !store.settings.showCanvasHud });
+      if (shortcut.id === "toggle-canvas-hud") {
+        const nextShowCanvasHud = !store.settings.showCanvasHud;
+        store.updateSettings({ showCanvasHud: nextShowCanvasHud });
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextShowCanvasHud },
+        });
         return;
       }
 
-      if (key === "s" || code === "KeyS") {
-        store.updateSettings({ snappingEnabled: !store.settings.snappingEnabled });
+      if (shortcut.id === "toggle-snapping") {
+        const nextSnappingEnabled = !store.settings.snappingEnabled;
+        store.updateSettings({ snappingEnabled: nextSnappingEnabled });
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextSnappingEnabled },
+        });
       }
     };
 

@@ -144,6 +144,7 @@ type EditorState = {
   pendingProjectOpenCameraFit: boolean;
   pendingProjectOpenEmptyLayoutPixelsPerMm: number | null;
   settings: EditorSettings;
+  keyboardShortcutFeedbackEnabled: boolean;
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
@@ -167,6 +168,7 @@ type EditorState = {
   setDimensionsVisibilityOverrideActive: (isActive: boolean) => void;
   setViewport: (width: number, height: number) => void;
   updateSettings: (settings: Partial<EditorSettings>) => void;
+  setKeyboardShortcutFeedbackEnabled: (isEnabled: boolean) => void;
   updateExportPreferences: (preferences: Partial<EditorExportPreferences>) => void;
   updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
   selectNorthIndicator: () => void;
@@ -1135,6 +1137,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingProjectOpenCameraFit: false,
   pendingProjectOpenEmptyLayoutPixelsPerMm: null,
   settings: createInitialEditorSettings(),
+  keyboardShortcutFeedbackEnabled: true,
   exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
   viewport: {
@@ -1206,6 +1209,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         settings: nextSettings,
+      };
+    }),
+  setKeyboardShortcutFeedbackEnabled: (isEnabled) =>
+    set((state) => {
+      if (state.keyboardShortcutFeedbackEnabled === isEnabled) return state;
+
+      return {
+        keyboardShortcutFeedbackEnabled: isEnabled,
       };
     }),
   updateExportPreferences: (preferences) =>
