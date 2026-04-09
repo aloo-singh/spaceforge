@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ChartNoAxesCombined } from "lucide-react";
+import { ArrowRight, ChartNoAxesCombined } from "@/components/ui/icons";
 
 import { FeedbackTrendChart } from "@/components/admin/FeedbackTrendChart";
 import { Button } from "@/components/ui/button";

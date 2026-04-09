@@ -1,21 +1,38 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTheme } from "next-themes";
-import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
+import {
+  Construction,
+  DoorOpen,
+  Download,
+  LocateFixed,
+  Redo2,
+  Restore,
+  Settings2,
+  Undo2,
+  WindowIcon,
+} from "@/components/ui/icons";
 import {
   ExportPngDialog,
   type ExportPngRequest,
 } from "@/components/editor/ExportPngDialog";
 import { EarlyExplorerBadge } from "@/components/ui/EarlyExplorerBadge";
-import { Button } from "@/components/ui/button";
-import { Keycap } from "@/components/ui/keycap";
+import { Button, ButtonGroup } from "@/components/ui/button";
+import { KeycapCombo } from "@/components/ui/keycap";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
+import { detectMacPlatform } from "@/lib/platform";
 import { resolveEditorThemeMode } from "@/lib/editor/theme";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -29,6 +46,36 @@ type HistoryControlsProps = {
   className?: string;
   leadingContent?: React.ReactNode;
 };
+
+type EditorChromeTooltipProps = {
+  content: ReactNode;
+  children: ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  groupItem?: boolean;
+};
+
+function EditorChromeTooltip({
+  content,
+  children,
+  side = "bottom",
+  groupItem = false,
+}: EditorChromeTooltipProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          data-slot={groupItem ? "button-group-item" : undefined}
+          className="inline-flex"
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side={side} align="center">
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function HistoryControls({
   onExportPng,
@@ -47,6 +94,11 @@ export function HistoryControls({
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
+    () => false
+  );
+  const isMacPlatform = useSyncExternalStore(
+    () => () => undefined,
+    detectMacPlatform,
     () => false
   );
   const canUndo = useEditorStore((state) => state.canUndo);
@@ -107,6 +159,8 @@ export function HistoryControls({
     : hasRooms
       ? "Fit all rooms into view"
       : "Fit view unavailable";
+  const undoShortcut = isMacPlatform ? ["⌘", "Z"] : ["Ctrl", "Z"];
+  const redoShortcut = isMacPlatform ? ["⇧", "⌘", "Z"] : ["Ctrl", "Y"];
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -130,146 +184,188 @@ export function HistoryControls({
       >
         <div className="flex min-w-0 items-center gap-2 sm:flex-1">
           {leadingContent ? <div className="shrink-0">{leadingContent}</div> : null}
-          <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={insertDefaultDoorOnSelectedWall}
-            disabled={!canInsertOpening}
-            aria-label="Add centered door to selected wall"
-            title={canInsertOpening ? "Add centered door to selected wall" : "Select a wall to add a door"}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <span>Door</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={insertDefaultWindowOnSelectedWall}
-            disabled={!canInsertOpening}
-            aria-label="Add centered window to selected wall"
-            title={canInsertOpening ? "Add centered window to selected wall" : "Select a wall to add a window"}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <span>Window</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={insertDefaultStairInSelectedRoom}
-            disabled={!canInsertStair}
-            aria-label="Add stairs to selected room"
-            title={
-              canInsertStair
-                ? "Add centered stairs to selected room"
-                : selectedRoomId
-                  ? "Selected room is too small for default stairs"
-                  : "Select a room to add stairs"
-            }
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <span>Stairs</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={openSettingsDialog}
-            aria-label="Open editor settings"
-            aria-haspopup="dialog"
-            aria-expanded={isSettingsDialogOpen}
-            aria-controls={settingsDialogId}
-            title="Editor settings"
-            className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
-          >
-            <Settings2 />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={resetCamera}
-            disabled={isResetCameraDisabled}
-            aria-label={resetCameraAriaLabel}
-            title={resetCameraTitle}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <LocateFixed />
-            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Fit View</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={() => setIsExportDialogOpen(true)}
-            disabled={isExportButtonDisabled}
-            aria-label="Open PNG export options"
-            title={exportButtonTitle}
-            aria-haspopup="dialog"
-            aria-expanded={isExportDialogOpen}
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <Download />
-            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Export PNG</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setIsResetDialogOpen(true)}
-            disabled={isResetDisabled}
-            aria-label="Reset canvas"
-            title="Reset canvas"
-            className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
-          >
-            <RotateCcw />
-          </Button>
-        </div>
+          <ImmediateTooltipProvider>
+            <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
+                  content={canInsertOpening ? "Add door" : "Select a wall to add a door"}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultDoorOnSelectedWall}
+                    disabled={!canInsertOpening}
+                    aria-label="Add centered door to selected wall"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <DoorOpen />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={canInsertOpening ? "Add window" : "Select a wall to add a window"}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultWindowOnSelectedWall}
+                    disabled={!canInsertOpening}
+                    aria-label="Add centered window to selected wall"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <WindowIcon className="size-4" />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    canInsertStair
+                      ? "Add stairs"
+                      : selectedRoomId
+                        ? "Selected room is too small for stairs"
+                        : "Select a room to add stairs"
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultStairInSelectedRoom}
+                    disabled={!canInsertStair}
+                    aria-label="Add stairs to selected room"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <Construction />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
+              <EditorChromeTooltip content="Editor settings">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={openSettingsDialog}
+                  aria-label="Open editor settings"
+                  aria-haspopup="dialog"
+                  aria-expanded={isSettingsDialogOpen}
+                  aria-controls={settingsDialogId}
+                  className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                >
+                  <Settings2 />
+                </Button>
+              </EditorChromeTooltip>
+              <EditorChromeTooltip content={resetCameraTitle}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={resetCamera}
+                  disabled={isResetCameraDisabled}
+                  aria-label={resetCameraAriaLabel}
+                  className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                >
+                  <LocateFixed />
+                </Button>
+              </EditorChromeTooltip>
+              <EditorChromeTooltip
+                content={isExportButtonDisabled ? exportButtonTitle ?? "Export PNG unavailable" : "Export PNG"}
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsExportDialogOpen(true)}
+                  disabled={isExportButtonDisabled}
+                  aria-label="Open PNG export options"
+                  aria-haspopup="dialog"
+                  aria-expanded={isExportDialogOpen}
+                  className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                >
+                  <Download />
+                </Button>
+              </EditorChromeTooltip>
+              <EditorChromeTooltip
+                content={
+                  isResetDisabled ? "Nothing to reset yet" : "Reset canvas"
+                }
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsResetDialogOpen(true)}
+                  disabled={isResetDisabled}
+                  aria-label="Reset canvas"
+                  className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                >
+                  <Restore />
+                </Button>
+              </EditorChromeTooltip>
+            </div>
+          </ImmediateTooltipProvider>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5">
           <EarlyExplorerBadge />
-          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={undo}
-            disabled={isUndoDisabled}
-            aria-label="Undo last edit, shortcut Command or Control plus Z"
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <Undo2 />
-            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Undo</span>
-            <Keycap
-              aria-hidden="true"
-              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
-            >
-              ⌘Z
-            </Keycap>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={redo}
-            disabled={isRedoDisabled}
-            aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-            className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
-          >
-            <Redo2 />
-            <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Redo</span>
-            <Keycap
-              aria-hidden="true"
-              className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
-            >
-              ⇧⌘Z
-            </Keycap>
-          </Button>
-          </div>
+          <ImmediateTooltipProvider>
+            <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isUndoDisabled ? (
+                      "Nothing to undo"
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>Undo</span>
+                        <KeycapCombo keys={undoShortcut} />
+                      </span>
+                    )
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={undo}
+                    disabled={isUndoDisabled}
+                    aria-label="Undo last edit, shortcut Command or Control plus Z"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <Undo2 />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isRedoDisabled ? (
+                      "Nothing to redo"
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>Redo</span>
+                        <KeycapCombo keys={redoShortcut} />
+                      </span>
+                    )
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={redo}
+                    disabled={isRedoDisabled}
+                    aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <Redo2 />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
+            </div>
+          </ImmediateTooltipProvider>
         </div>
       </aside>
 

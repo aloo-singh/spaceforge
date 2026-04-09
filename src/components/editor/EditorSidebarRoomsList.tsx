@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/components/ui/icons";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
@@ -38,6 +44,25 @@ function getRoomWalls(room: Room): RoomWall[] {
 
 function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
   return asset.name || "Stairs";
+}
+
+function SidebarIconTooltip({
+  content,
+  children,
+}: {
+  content: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function EditorSidebarRoomsList() {
@@ -116,7 +141,8 @@ export function EditorSidebarRoomsList() {
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <ImmediateTooltipProvider>
+      <div className="flex flex-col gap-1">
       {rooms.map((room) => {
         const isSelected = selectedRoomId === room.id;
         const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
@@ -177,23 +203,27 @@ export function EditorSidebarRoomsList() {
                 className="flex min-h-10 items-center gap-2 px-3 py-2"
                 onClick={() => selectRoomById(room.id)}
               >
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setExpandedRoomIds((current) =>
-                      current.includes(room.id)
-                        ? current.filter((roomId) => roomId !== room.id)
-                        : [...current, room.id]
-                    );
-                  }}
-                  className="flex size-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
-                  aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
+                <SidebarIconTooltip
+                  content={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                 >
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setExpandedRoomIds((current) =>
+                        current.includes(room.id)
+                          ? current.filter((roomId) => roomId !== room.id)
+                          : [...current, room.id]
+                      );
+                    }}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+                    aria-label={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
+                  >
                     <ChevronRight
                       className={cn("size-3.5 transition-transform", isRoomExpanded && "rotate-90")}
                     />
                   </button>
+                </SidebarIconTooltip>
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   <span
                     onDoubleClick={(event) => {
@@ -233,27 +263,35 @@ export function EditorSidebarRoomsList() {
                           onClick={() => selectWallByRoomId(room.id, wall)}
                         >
                           {wallOpenings.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setExpandedWallKeys((current) =>
-                                  current.includes(wallKey)
-                                    ? current.filter((key) => key !== wallKey)
-                                    : [...current, wallKey]
-                                );
-                              }}
-                              className={SIDEBAR_CHEVRON_BUTTON_CLASS}
-                              aria-label={
+                            <SidebarIconTooltip
+                              content={
                                 isWallExpanded
                                   ? `Collapse ${getWallLabel(wall)}`
                                   : `Expand ${getWallLabel(wall)}`
                               }
                             >
-                              <ChevronRight
-                                className={cn("size-3.5 transition-transform", isWallExpanded && "rotate-90")}
-                              />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setExpandedWallKeys((current) =>
+                                    current.includes(wallKey)
+                                      ? current.filter((key) => key !== wallKey)
+                                      : [...current, wallKey]
+                                  );
+                                }}
+                                className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                                aria-label={
+                                  isWallExpanded
+                                    ? `Collapse ${getWallLabel(wall)}`
+                                    : `Expand ${getWallLabel(wall)}`
+                                }
+                              >
+                                <ChevronRight
+                                  className={cn("size-3.5 transition-transform", isWallExpanded && "rotate-90")}
+                                />
+                              </button>
+                            </SidebarIconTooltip>
                           ) : (
                             <span className="size-6 shrink-0" aria-hidden="true" />
                           )}
@@ -301,26 +339,34 @@ export function EditorSidebarRoomsList() {
                   {hasInteriorAssets ? (
                     <div className="flex flex-col gap-1">
                       <div className="ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedAssetRoomIds((current) =>
-                              current.includes(room.id)
-                                ? current.filter((roomId) => roomId !== room.id)
-                                : [...current, room.id]
-                            )
-                          }
-                          className={SIDEBAR_CHEVRON_BUTTON_CLASS}
-                          aria-label={
+                        <SidebarIconTooltip
+                          content={
                             isAssetSectionExpanded
                               ? `Collapse interior assets for ${room.name}`
                               : `Expand interior assets for ${room.name}`
                           }
                         >
-                          <ChevronRight
-                            className={cn("size-3.5 transition-transform", isAssetSectionExpanded && "rotate-90")}
-                          />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedAssetRoomIds((current) =>
+                                current.includes(room.id)
+                                  ? current.filter((roomId) => roomId !== room.id)
+                                  : [...current, room.id]
+                              )
+                            }
+                            className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                            aria-label={
+                              isAssetSectionExpanded
+                                ? `Collapse interior assets for ${room.name}`
+                                : `Expand interior assets for ${room.name}`
+                            }
+                          >
+                            <ChevronRight
+                              className={cn("size-3.5 transition-transform", isAssetSectionExpanded && "rotate-90")}
+                            />
+                          </button>
+                        </SidebarIconTooltip>
                         <span className="flex-1 text-left">Interior Assets</span>
                         <span className="ml-auto text-[11px] text-inherit/70">
                           {room.interiorAssets.length}
@@ -416,6 +462,7 @@ export function EditorSidebarRoomsList() {
           </div>
         );
       })}
-    </div>
+      </div>
+    </ImmediateTooltipProvider>
   );
 }

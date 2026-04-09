@@ -10,8 +10,8 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.55.0</h2>
-            <span className="text-sm text-muted-foreground">2026-04-08</span>
+            <h2 className="text-2xl font-semibold">v0.55.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-09</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
@@ -27,6 +27,22 @@ export default function ChangelogPage() {
                     <li>Auto-nudge stairs back inside room bounds after rotation</li>
                     <li>Fixed drag-from-under-room-label bug (stairs now stay selected and follow cursor smoothly)</li>
                     <li>All fixes work for both rectangular and non-rectangular rooms</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Icon-only button principle applied across the app
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>All toolbar, inspector, sidebar, HUD, and chrome buttons now use icon-only controls</li>
+                    <li>Labels and keycaps moved into immediate shadcn tooltips with zero hover delay</li>
+                    <li>Tooltip contrast and behaviour are now consistent in both light and dark modes</li>
+                    <li>Grouped button sets now keep proper outer rounded corners and match standalone button height</li>
+                    <li>Editor iconography migrated from Lucide to Tabler, including updated settings, fit-view, reset, stairs, and door-orientation controls</li>
                   </ul>
                 </li>
               </ul>

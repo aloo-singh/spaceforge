@@ -1,19 +1,44 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 type SelectedRoomNamePanelProps = {
   className?: string;
 };
+
+function InspectorIconTooltip({
+  content,
+  children,
+}: {
+  content: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center">
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps) {
   const panelRef = useRef<HTMLElement | null>(null);
@@ -216,30 +241,34 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                   Removes this room from the layout. Undo restores it immediately.
                 </p>
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:hidden">
-                <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
-                  Del
-                </Keycap>
-                <span aria-hidden="true">/</span>
-                <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
-                  ⌫
-                </Keycap>
-              </div>
             </div>
             <div className="mt-3 flex justify-end">
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={deleteSelectedRoom}
-                disabled={!canDeleteSelectedRoom}
-                className="gap-2"
-                aria-label={`Delete ${selectedRoom.name}`}
-                aria-describedby="delete-room-hint"
-              >
-                <Trash2 />
-                Delete room
-              </Button>
+              <ImmediateTooltipProvider>
+                <InspectorIconTooltip
+                  content={
+                    <span className="inline-flex items-center gap-2">
+                      <span>Delete room</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Keycap aria-hidden="true" className="shadow-none">Del</Keycap>
+                        <span aria-hidden="true" className="text-muted-foreground/70">/</span>
+                        <Keycap aria-hidden="true" className="shadow-none">⌫</Keycap>
+                      </span>
+                    </span>
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon-sm"
+                    onClick={deleteSelectedRoom}
+                    disabled={!canDeleteSelectedRoom}
+                    aria-label={`Delete ${selectedRoom.name}`}
+                    aria-describedby="delete-room-hint"
+                  >
+                    <Trash2 />
+                  </Button>
+                </InspectorIconTooltip>
+              </ImmediateTooltipProvider>
             </div>
           </div>
         </aside>

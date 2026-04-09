@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
 import { Card, CardContent } from "@/components/ui/card";

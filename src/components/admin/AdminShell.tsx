@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronRight, Inbox, LogOut, Mail } from "lucide-react";
+import { BarChart3, ChevronRight, Inbox, LogOut, Mail } from "@/components/ui/icons";
 
 import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
