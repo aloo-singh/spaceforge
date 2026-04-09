@@ -62,6 +62,74 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.55.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-09</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Stairs polish
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Fixed animation jump when resizing rooms containing stairs</li>
+                    <li>Auto-nudge stairs on room resize with friendly Sonner &ldquo;Stairs adjusted to fit&rdquo; + undo link (5s)</li>
+                    <li>Smart rotate button disablement when 90&deg; rotation wouldn&apos;t fit</li>
+                    <li>Auto-nudge stairs back inside room bounds after rotation</li>
+                    <li>Fixed drag-from-under-room-label bug (stairs now stay selected and follow cursor smoothly)</li>
+                    <li>All fixes work for both rectangular and non-rectangular rooms</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Icon-only button principle applied across the app
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>All toolbar, inspector, sidebar, HUD, and chrome buttons now use icon-only controls</li>
+                    <li>Labels and keycaps moved into immediate shadcn tooltips with zero hover delay</li>
+                    <li>Tooltip contrast and behaviour are now consistent in both light and dark modes</li>
+                    <li>Grouped button sets now keep proper outer rounded corners and match standalone button height</li>
+                    <li>Editor iconography migrated from Lucide to Tabler, including updated settings, fit-view, reset, stairs, and door-orientation controls</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.55.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-08</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Stairs polish
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Fixed animation jump when resizing rooms containing stairs</li>
+                    <li>Auto-nudge stairs on room resize with friendly Sonner &ldquo;Stairs adjusted to fit&rdquo; + undo link (5s)</li>
+                    <li>Smart rotate button disablement when 90&deg; rotation wouldn&apos;t fit</li>
+                    <li>Auto-nudge stairs back inside room bounds after rotation</li>
+                    <li>Fixed drag-from-under-room-label bug (stairs now stay selected and follow cursor smoothly)</li>
+                    <li>All fixes work for both rectangular and non-rectangular rooms</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.54.2</h2>
             <span className="text-sm text-muted-foreground">2026-04-08</span>
           </div>
@@ -137,6 +205,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.6</h2>
+            <span className="text-sm text-muted-foreground">2026-04-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Editor canvas teardown race in <code>Fix/small-bugs</code>
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Prevented late render callbacks from drawing into destroyed PIXI layers during blur/teardown</li>
+                    <li>Fixes the <code>Cannot read properties of null (reading &apos;clear&apos;)</code> crash from <code>drawGrid</code></li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.53.5</h2>
             <span className="text-sm text-muted-foreground">2026-04-07</span>
           </div>
@@ -187,6 +277,31 @@ export default function ChangelogPage() {
                     <li>Settings toggle &ldquo;Show mini-map&rdquo; (default On) with persistence</li>
                     <li>Calm fade-out transition when toggled off</li>
                     <li>Dark/light mode consistency with rounded corners matching existing HUD</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.53.3</h2>
+            <span className="text-sm text-muted-foreground">2026-04-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Canvas rotation (feature/canvas-rotation)
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Temporarily disabled behind a feature flag (<code>CANVAS_ROTATION_ENABLED = false</code>)</li>
+                    <li>Right-click drag and rotation indicator are inert</li>
+                    <li>All rotation code preserved for easy re-enablement</li>
+                    <li>North indicator and HUD foundation remain fully active and polished</li>
+                    <li>Bugs noted for later: wall length distance on rotate, resize handles during rotation, cursor orientation, stairs resize</li>
                   </ul>
                 </li>
               </ul>
