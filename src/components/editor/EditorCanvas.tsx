@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
+import { toast } from "sonner";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
 import {
@@ -240,6 +241,27 @@ const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
 const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
 const STAIR_ROTATION_ANIMATION_MS = 180;
 const CANVAS_ROTATION_ENABLED = false;
+const KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS = 2000;
+
+let activeKeyboardShortcutFeedbackToastId: string | number | null = null;
+
+function showKeyboardShortcutFeedback(message: string) {
+  if (activeKeyboardShortcutFeedbackToastId !== null) {
+    toast.dismiss(activeKeyboardShortcutFeedbackToastId);
+  }
+
+  const id = toast(message, {
+    duration: KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
+    onDismiss: () => {
+      if (activeKeyboardShortcutFeedbackToastId === id) {
+        activeKeyboardShortcutFeedbackToastId = null;
+      }
+    },
+  });
+
+  activeKeyboardShortcutFeedbackToastId = id;
+}
+
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
 }
@@ -1701,17 +1723,29 @@ export default function EditorCanvas({
       const code = event.code;
 
       if (key === "g" || code === "KeyG") {
-        store.updateSettings({ showGuidelines: !store.settings.showGuidelines });
+        const nextShowGuidelines = !store.settings.showGuidelines;
+        store.updateSettings({ showGuidelines: nextShowGuidelines });
+        if (store.keyboardShortcutFeedbackEnabled) {
+          showKeyboardShortcutFeedback(nextShowGuidelines ? "Guidelines on" : "Guidelines off");
+        }
         return;
       }
 
       if (key === "h" || code === "KeyH") {
-        store.updateSettings({ showCanvasHud: !store.settings.showCanvasHud });
+        const nextShowCanvasHud = !store.settings.showCanvasHud;
+        store.updateSettings({ showCanvasHud: nextShowCanvasHud });
+        if (store.keyboardShortcutFeedbackEnabled) {
+          showKeyboardShortcutFeedback(nextShowCanvasHud ? "HUD shown" : "HUD hidden");
+        }
         return;
       }
 
       if (key === "s" || code === "KeyS") {
-        store.updateSettings({ snappingEnabled: !store.settings.snappingEnabled });
+        const nextSnappingEnabled = !store.settings.snappingEnabled;
+        store.updateSettings({ snappingEnabled: nextSnappingEnabled });
+        if (store.keyboardShortcutFeedbackEnabled) {
+          showKeyboardShortcutFeedback(nextSnappingEnabled ? "Snapping on" : "Snapping off");
+        }
       }
     };
 

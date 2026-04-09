@@ -26,6 +26,12 @@ export function EditorSettingsDialog({
   const { theme, setTheme } = useTheme();
   const settings = useEditorStore((state) => state.settings);
   const updateSettings = useEditorStore((state) => state.updateSettings);
+  const keyboardShortcutFeedbackEnabled = useEditorStore(
+    (state) => state.keyboardShortcutFeedbackEnabled
+  );
+  const setKeyboardShortcutFeedbackEnabled = useEditorStore(
+    (state) => state.setKeyboardShortcutFeedbackEnabled
+  );
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
   const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
@@ -478,6 +484,63 @@ export function EditorSettingsDialog({
               Off
             </Button>
           </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-keyboard-shortcut-feedback-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3
+                id="editor-settings-keyboard-shortcut-feedback-title"
+                className="text-sm font-medium text-foreground"
+              >
+                Keyboard shortcut feedback
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Show brief confirmation toasts for editor shortcuts like HUD, guidelines, and
+                snapping.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Keyboard shortcut feedback status</dt>
+                <dd>{keyboardShortcutFeedbackEnabled ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Keyboard shortcut feedback"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={keyboardShortcutFeedbackEnabled ? "secondary" : "ghost"}
+              aria-pressed={keyboardShortcutFeedbackEnabled}
+              onClick={() => setKeyboardShortcutFeedbackEnabled(true)}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!keyboardShortcutFeedbackEnabled ? "secondary" : "ghost"}
+              aria-pressed={!keyboardShortcutFeedbackEnabled}
+              onClick={() => setKeyboardShortcutFeedbackEnabled(false)}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+
+          <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+            Applies only to this session and resets when the editor is reopened.
+          </p>
         </div>
 
         <div
