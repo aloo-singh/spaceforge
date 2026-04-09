@@ -10,13 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.55.1</h2>
+            <h2 className="text-2xl font-semibold">v0.56.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-09</span>
           </div>
 
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>
+                  Keyboard shortcut feedback
+                  <ul className="mt-2 list-disc space-y-2 pl-5">
+                    <li>Session-level toggle in Editor Settings: &ldquo;Keyboard shortcut feedback&rdquo; (default On)</li>
+                    <li>Brief, calm Sonner toasts for important shortcuts when enabled</li>
+                    <li>Central keyboard map as single source of truth (supports future reference dialog)</li>
+                    <li>Context-aware messages (e.g. &ldquo;HUD shown/hidden&rdquo;, &ldquo;Guidelines enabled/disabled&rdquo;, &ldquo;Undo room move&rdquo;, &ldquo;Redo stair rotation&rdquo;, &ldquo;Selection deleted&rdquo;)</li>
+                    <li>Messages auto-dismiss after ~2 seconds</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>
                   Stairs polish
@@ -29,12 +45,6 @@ export default function ChangelogPage() {
                     <li>All fixes work for both rectangular and non-rectangular rooms</li>
                   </ul>
                 </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
-              <ul className="mt-2 list-disc space-y-2 pl-5">
                 <li>
                   Icon-only button principle applied across the app
                   <ul className="mt-2 list-disc space-y-2 pl-5">
