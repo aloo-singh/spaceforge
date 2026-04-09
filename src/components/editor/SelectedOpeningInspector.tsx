@@ -5,7 +5,7 @@ import {
   AlignStartHorizontal,
   ArrowDownToLine,
   ArrowUpToLine,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";

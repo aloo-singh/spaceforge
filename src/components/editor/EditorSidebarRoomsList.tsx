@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/components/ui/icons";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
 import {
   ImmediateTooltipProvider,

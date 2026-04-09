@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
 import { Input } from "@/components/ui/input";

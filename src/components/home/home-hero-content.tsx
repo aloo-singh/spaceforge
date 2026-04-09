@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "@/components/ui/icons";
 import { Safari } from "@/components/ui/safari";
 import { Button } from "@/components/ui/button";
 

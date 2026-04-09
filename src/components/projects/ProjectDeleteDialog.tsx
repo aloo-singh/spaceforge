@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import type { ProjectListItem } from "@/lib/projects/types";

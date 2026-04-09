@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft } from "@/components/ui/icons";
 import { Collapsible, Slot } from "radix-ui";
 
 import { Button } from "@/components/ui/button";

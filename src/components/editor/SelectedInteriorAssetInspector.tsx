@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, RotateCcw, RotateCw } from "lucide-react";
+import { ArrowUpDown, RotateCcw, RotateCw } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";

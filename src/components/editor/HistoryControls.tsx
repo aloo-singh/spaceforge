@@ -11,7 +11,8 @@ import {
   RotateCcw,
   Settings2,
   Undo2,
-} from "lucide-react";
+  WindowIcon,
+} from "@/components/ui/icons";
 import {
   ExportPngDialog,
   type ExportPngRequest,
@@ -52,25 +53,6 @@ type EditorChromeTooltipProps = {
   side?: "top" | "right" | "bottom" | "left";
   groupItem?: boolean;
 };
-
-function WindowIcon(props: React.ComponentProps<"svg">) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <rect x="4" y="5" width="16" height="14" rx="2" />
-      <path d="M12 5v14" />
-      <path d="M4 12h16" />
-    </svg>
-  );
-}
 
 function EditorChromeTooltip({
   content,
