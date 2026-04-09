@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  AlignEndHorizontal,
-  AlignStartHorizontal,
-  ArrowDownToLine,
-  ArrowUpToLine,
+  ArrowsLeftRight,
+  CaretLeftRightFilled,
 } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +64,14 @@ export function SelectedOpeningInspector({
     updateSelectedOpeningWidth(parsedWidth);
   };
 
+  const toggleOpeningSide = () => {
+    updateSelectedDoorOpeningSide(opening.openingSide === "interior" ? "exterior" : "interior");
+  };
+
+  const toggleHingeSide = () => {
+    updateSelectedDoorHingeSide(opening.hingeSide === "start" ? "end" : "start");
+  };
+
   return (
     <EditorInspectorSection
       title="Selected opening"
@@ -112,63 +118,52 @@ export function SelectedOpeningInspector({
         </div>
 
         {opening.type === "door" ? (
-          <>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">Opening side</p>
-              <ImmediateTooltipProvider>
-                <ButtonGroup>
-                  {(["interior", "exterior"] as const).map((openingSide) => (
-                    <InspectorIconTooltip
-                      key={openingSide}
-                      groupItem
-                      content={openingSide === "interior" ? "Interior" : "Exterior"}
-                    >
-                      <Button
-                        type="button"
-                        variant={opening.openingSide === openingSide ? "secondary" : "outline"}
-                        size="icon-sm"
-                        onClick={() => updateSelectedDoorOpeningSide(openingSide)}
-                        aria-label={openingSide === "interior" ? "Interior opening side" : "Exterior opening side"}
-                      >
-                        {openingSide === "interior" ? <ArrowDownToLine /> : <ArrowUpToLine />}
-                      </Button>
-                    </InspectorIconTooltip>
-                  ))}
-                </ButtonGroup>
-              </ImmediateTooltipProvider>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Controls which side of the host wall the leaf swings toward.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">Hinge side</p>
-              <ImmediateTooltipProvider>
-                <ButtonGroup>
-                  {(["start", "end"] as const).map((hingeSide) => (
-                    <InspectorIconTooltip
-                      key={hingeSide}
-                      groupItem
-                      content={hingeSide === "start" ? "Start" : "End"}
-                    >
-                      <Button
-                        type="button"
-                        variant={opening.hingeSide === hingeSide ? "secondary" : "outline"}
-                        size="icon-sm"
-                        onClick={() => updateSelectedDoorHingeSide(hingeSide)}
-                        aria-label={hingeSide === "start" ? "Start hinge side" : "End hinge side"}
-                      >
-                        {hingeSide === "start" ? <AlignStartHorizontal /> : <AlignEndHorizontal />}
-                      </Button>
-                    </InspectorIconTooltip>
-                  ))}
-                </ButtonGroup>
-              </ImmediateTooltipProvider>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Hinge anchors to the canonical segment start or end.
-              </p>
-            </div>
-          </>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Orientation</p>
+            <ImmediateTooltipProvider>
+              <ButtonGroup>
+                <InspectorIconTooltip
+                  groupItem
+                  content={`Opening side: ${
+                    opening.openingSide === "interior" ? "Interior" : "Exterior"
+                  }`}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={toggleOpeningSide}
+                    aria-label={`Toggle opening side, currently ${
+                      opening.openingSide === "interior" ? "interior" : "exterior"
+                    }`}
+                    aria-pressed={opening.openingSide === "exterior"}
+                  >
+                    <ArrowsLeftRight />
+                  </Button>
+                </InspectorIconTooltip>
+                <InspectorIconTooltip
+                  groupItem
+                  content={`Hinge side: ${opening.hingeSide === "start" ? "Start" : "End"}`}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={toggleHingeSide}
+                    aria-label={`Toggle hinge side, currently ${
+                      opening.hingeSide === "start" ? "start" : "end"
+                    }`}
+                    aria-pressed={opening.hingeSide === "end"}
+                  >
+                    <CaretLeftRightFilled />
+                  </Button>
+                </InspectorIconTooltip>
+              </ButtonGroup>
+            </ImmediateTooltipProvider>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Toggle which side the door opens toward and which end of the host segment carries the hinge.
+            </p>
+          </div>
         ) : null}
       </div>
     </EditorInspectorSection>

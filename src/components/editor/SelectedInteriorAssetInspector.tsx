@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, RotateCcw, RotateCw } from "@/components/ui/icons";
+import { RotateCcw, RotateCw, Transfer } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -227,7 +227,7 @@ export function SelectedInteriorAssetInspector({
                   onClick={() => swapSelectedInteriorAssetArrowDirection()}
                   aria-label="Swap stair arrow direction"
                 >
-                  <ArrowUpDown />
+                  <Transfer />
                 </Button>
               </InspectorIconTooltip>
             </div>

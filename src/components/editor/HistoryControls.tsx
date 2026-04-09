@@ -8,7 +8,7 @@ import {
   Download,
   LocateFixed,
   Redo2,
-  RotateCcw,
+  Restore,
   Settings2,
   Undo2,
   WindowIcon,
@@ -301,7 +301,7 @@ export function HistoryControls({
                   aria-label="Reset canvas"
                   className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                 >
-                  <RotateCcw />
+                  <Restore />
                 </Button>
               </EditorChromeTooltip>
             </div>
