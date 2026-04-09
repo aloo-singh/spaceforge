@@ -2,14 +2,23 @@
 
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTheme } from "next-themes";
-import { Download, LocateFixed, Redo2, RotateCcw, Settings2, Undo2 } from "lucide-react";
+import {
+  Construction,
+  DoorOpen,
+  Download,
+  LocateFixed,
+  Redo2,
+  RotateCcw,
+  Settings2,
+  Undo2,
+} from "lucide-react";
 import {
   ExportPngDialog,
   type ExportPngRequest,
 } from "@/components/editor/ExportPngDialog";
 import { EarlyExplorerBadge } from "@/components/ui/EarlyExplorerBadge";
-import { Button } from "@/components/ui/button";
-import { Keycap } from "@/components/ui/keycap";
+import { Button, ButtonGroup } from "@/components/ui/button";
+import { KeycapCombo } from "@/components/ui/keycap";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
   ImmediateTooltipProvider,
@@ -22,6 +31,7 @@ import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
+import { detectMacPlatform } from "@/lib/platform";
 import { resolveEditorThemeMode } from "@/lib/editor/theme";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -40,17 +50,43 @@ type EditorChromeTooltipProps = {
   content: ReactNode;
   children: ReactNode;
   side?: "top" | "right" | "bottom" | "left";
+  groupItem?: boolean;
 };
+
+function WindowIcon(props: React.ComponentProps<"svg">) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M12 5v14" />
+      <path d="M4 12h16" />
+    </svg>
+  );
+}
 
 function EditorChromeTooltip({
   content,
   children,
   side = "bottom",
+  groupItem = false,
 }: EditorChromeTooltipProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex">{children}</span>
+        <span
+          data-slot={groupItem ? "button-group-item" : undefined}
+          className="inline-flex"
+        >
+          {children}
+        </span>
       </TooltipTrigger>
       <TooltipContent side={side} align="center">
         {content}
@@ -76,6 +112,11 @@ export function HistoryControls({
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
+    () => false
+  );
+  const isMacPlatform = useSyncExternalStore(
+    () => () => undefined,
+    detectMacPlatform,
     () => false
   );
   const canUndo = useEditorStore((state) => state.canUndo);
@@ -136,6 +177,8 @@ export function HistoryControls({
     : hasRooms
       ? "Fit all rooms into view"
       : "Fit view unavailable";
+  const undoShortcut = isMacPlatform ? ["⌘", "Z"] : ["Ctrl", "Z"];
+  const redoShortcut = isMacPlatform ? ["⇧", "⌘", "Z"] : ["Ctrl", "Y"];
 
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
@@ -161,57 +204,62 @@ export function HistoryControls({
           {leadingContent ? <div className="shrink-0">{leadingContent}</div> : null}
           <ImmediateTooltipProvider>
             <div className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-              <EditorChromeTooltip
-                content={canInsertOpening ? "Add door" : "Select a wall to add a door"}
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={insertDefaultDoorOnSelectedWall}
-                  disabled={!canInsertOpening}
-                  aria-label="Add centered door to selected wall"
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
+                  content={canInsertOpening ? "Add door" : "Select a wall to add a door"}
                 >
-                  <span>Door</span>
-                </Button>
-              </EditorChromeTooltip>
-              <EditorChromeTooltip
-                content={canInsertOpening ? "Add window" : "Select a wall to add a window"}
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={insertDefaultWindowOnSelectedWall}
-                  disabled={!canInsertOpening}
-                  aria-label="Add centered window to selected wall"
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultDoorOnSelectedWall}
+                    disabled={!canInsertOpening}
+                    aria-label="Add centered door to selected wall"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <DoorOpen />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={canInsertOpening ? "Add window" : "Select a wall to add a window"}
                 >
-                  <span>Window</span>
-                </Button>
-              </EditorChromeTooltip>
-              <EditorChromeTooltip
-                content={
-                  canInsertStair
-                    ? "Add stairs"
-                    : selectedRoomId
-                      ? "Selected room is too small for stairs"
-                      : "Select a room to add stairs"
-                }
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={insertDefaultStairInSelectedRoom}
-                  disabled={!canInsertStair}
-                  aria-label="Add stairs to selected room"
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultWindowOnSelectedWall}
+                    disabled={!canInsertOpening}
+                    aria-label="Add centered window to selected wall"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <WindowIcon className="size-4" />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    canInsertStair
+                      ? "Add stairs"
+                      : selectedRoomId
+                        ? "Selected room is too small for stairs"
+                        : "Select a room to add stairs"
+                  }
                 >
-                  <span>Stairs</span>
-                </Button>
-              </EditorChromeTooltip>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={insertDefaultStairInSelectedRoom}
+                    disabled={!canInsertStair}
+                    aria-label="Add stairs to selected room"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <Construction />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
               <EditorChromeTooltip content="Editor settings">
                 <Button
                   type="button"
@@ -231,14 +279,13 @@ export function HistoryControls({
                 <Button
                   type="button"
                   variant="outline"
-                  size="default"
+                  size="icon"
                   onClick={resetCamera}
                   disabled={isResetCameraDisabled}
                   aria-label={resetCameraAriaLabel}
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+                  className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                 >
                   <LocateFixed />
-                  <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Fit View</span>
                 </Button>
               </EditorChromeTooltip>
               <EditorChromeTooltip
@@ -247,19 +294,22 @@ export function HistoryControls({
                 <Button
                   type="button"
                   variant="outline"
-                  size="default"
+                  size="icon"
                   onClick={() => setIsExportDialogOpen(true)}
                   disabled={isExportButtonDisabled}
                   aria-label="Open PNG export options"
                   aria-haspopup="dialog"
                   aria-expanded={isExportDialogOpen}
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+                  className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                 >
                   <Download />
-                  <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Export PNG</span>
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content={isResetDisabled ? "Nothing to reset yet" : "Reset canvas"}>
+              <EditorChromeTooltip
+                content={
+                  isResetDisabled ? "Nothing to reset yet" : "Reset canvas"
+                }
+              >
                 <Button
                   type="button"
                   variant="outline"
@@ -280,46 +330,58 @@ export function HistoryControls({
           <EarlyExplorerBadge />
           <ImmediateTooltipProvider>
             <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-              <EditorChromeTooltip content={isUndoDisabled ? "Nothing to undo" : "Undo"}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={undo}
-                  disabled={isUndoDisabled}
-                  aria-label="Undo last edit, shortcut Command or Control plus Z"
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isUndoDisabled ? (
+                      "Nothing to undo"
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>Undo</span>
+                        <KeycapCombo keys={undoShortcut} />
+                      </span>
+                    )
+                  }
                 >
-                  <Undo2 />
-                  <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Undo</span>
-                  <Keycap
-                    aria-hidden="true"
-                    className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={undo}
+                    disabled={isUndoDisabled}
+                    aria-label="Undo last edit, shortcut Command or Control plus Z"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                   >
-                    ⌘Z
-                  </Keycap>
-                </Button>
-              </EditorChromeTooltip>
-              <EditorChromeTooltip content={isRedoDisabled ? "Nothing to redo" : "Redo"}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={redo}
-                  disabled={isRedoDisabled}
-                  aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-                  className="min-h-9 min-w-9 gap-2 px-2.5 sm:h-8 sm:min-h-8 sm:min-w-8 sm:px-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:px-2"
+                    <Undo2 />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isRedoDisabled ? (
+                      "Nothing to redo"
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>Redo</span>
+                        <KeycapCombo keys={redoShortcut} />
+                      </span>
+                    )
+                  }
                 >
-                  <Redo2 />
-                  <span className="hidden sm:inline [@media(max-height:540px)_and_(orientation:landscape)]:hidden">Redo</span>
-                  <Keycap
-                    aria-hidden="true"
-                    className="hidden h-5 min-w-0 rounded-sm px-1.5 text-[10px] sm:inline-flex [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={redo}
+                    disabled={isRedoDisabled}
+                    aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                   >
-                    ⇧⌘Z
-                  </Keycap>
-                </Button>
-              </EditorChromeTooltip>
+                    <Redo2 />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
             </div>
           </ImmediateTooltipProvider>
         </div>
