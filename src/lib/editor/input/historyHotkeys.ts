@@ -1,13 +1,19 @@
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import {
+  getHistoryCommandActionLabel,
   matchEditorKeyboardShortcut,
   showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
+import type { EditorCommand } from "@/lib/editor/history";
 
 type HistoryStoreState = {
   canUndo: boolean;
   canRedo: boolean;
   keyboardShortcutFeedbackEnabled: boolean;
+  history: {
+    past: EditorCommand[];
+    future: EditorCommand[];
+  };
   undo: () => void;
   redo: () => void;
 };
@@ -25,6 +31,10 @@ export function attachHistoryHotkeys(store: HistoryStore) {
     if (!shortcut) return;
 
     const state = store.getState();
+    const command =
+      shortcut.id === "undo"
+        ? state.history.past[state.history.past.length - 1]
+        : state.history.future[0];
     if (shortcut.id === "undo") {
       if (!state.canUndo) return;
     } else if (!state.canRedo) {
@@ -40,6 +50,9 @@ export function attachHistoryHotkeys(store: HistoryStore) {
     }
     showKeyboardShortcutFeedback(shortcut.id, {
       feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+      context: {
+        actionLabel: getHistoryCommandActionLabel(command),
+      },
     });
   };
 

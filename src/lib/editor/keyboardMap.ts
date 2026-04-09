@@ -1,4 +1,6 @@
 import { toast } from "sonner";
+import type { EditorCommand } from "@/lib/editor/history";
+import type { RoomInteriorAsset } from "@/lib/editor/types";
 
 export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
@@ -23,6 +25,7 @@ type EditorKeyboardShortcutBinding = {
 
 type KeyboardShortcutFeedbackContext = {
   isEnabled?: boolean;
+  actionLabel?: string;
 };
 
 export type EditorKeyboardShortcut = {
@@ -49,7 +52,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     windowsKeys: "H",
     type: "toggle",
     bindings: [{ key: "h", code: "KeyH" }],
-    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Canvas HUD shown" : "Canvas HUD hidden"),
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "HUD shown" : "HUD hidden"),
   },
   {
     id: "toggle-guidelines",
@@ -82,7 +85,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     windowsKeys: "Ctrl+Z",
     type: "action",
     bindings: [{ key: "z", code: "KeyZ", primaryModifier: true, altKey: false, shiftKey: false }],
-    sonnerMessage: "Undo performed",
+    sonnerMessage: ({ actionLabel }) => `Undo ${actionLabel ?? "action"}`,
   },
   {
     id: "redo",
@@ -96,7 +99,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "z", code: "KeyZ", primaryModifier: true, altKey: false, shiftKey: true },
       { key: "y", code: "KeyY", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false },
     ],
-    sonnerMessage: "Redo performed",
+    sonnerMessage: ({ actionLabel }) => `Redo ${actionLabel ?? "action"}`,
   },
   {
     id: "delete-selection",
@@ -222,6 +225,99 @@ export function showKeyboardShortcutFeedback(
   showKeyboardShortcutFeedbackToast(message);
 }
 
+export function getHistoryCommandActionLabel(command: EditorCommand | undefined): string {
+  if (!command) return "action";
+
+  if (command.type === "update-canvas-rotation") {
+    return "canvas rotation";
+  }
+
+  if (command.type === "update-north-bearing") {
+    return "north rotation";
+  }
+
+  if (command.type === "complete-room") {
+    return "room creation";
+  }
+
+  if (command.type === "delete-room") {
+    return "room deletion";
+  }
+
+  if (command.type === "rename-room") {
+    return "room rename";
+  }
+
+  if (command.type === "resize-room") {
+    return "room resize";
+  }
+
+  if (command.type === "move-room") {
+    return "room move";
+  }
+
+  if (command.type === "add-opening") {
+    return "opening creation";
+  }
+
+  if (command.type === "delete-opening") {
+    return "opening deletion";
+  }
+
+  if (command.type === "move-opening") {
+    return "opening move";
+  }
+
+  if (command.type === "update-opening") {
+    if (command.previousOpening.widthMm !== command.nextOpening.widthMm) {
+      return "opening resize";
+    }
+
+    return "opening edit";
+  }
+
+  if (command.type === "add-interior-asset") {
+    return getInteriorAssetActionLabel(command.asset.type, "creation");
+  }
+
+  if (command.type === "delete-interior-asset") {
+    return getInteriorAssetActionLabel(command.asset.type, "deletion");
+  }
+
+  if (command.type === "move-interior-asset") {
+    return "interior asset move";
+  }
+
+  if (command.type === "update-interior-asset") {
+    const previousAsset = command.previousAsset;
+    const nextAsset = command.nextAsset;
+
+    if (previousAsset.rotationDegrees !== nextAsset.rotationDegrees) {
+      return getInteriorAssetActionLabel(nextAsset.type, "rotation");
+    }
+
+    if (
+      previousAsset.widthMm !== nextAsset.widthMm ||
+      previousAsset.depthMm !== nextAsset.depthMm
+    ) {
+      return getInteriorAssetActionLabel(nextAsset.type, "resize");
+    }
+
+    if (
+      previousAsset.name !== nextAsset.name ||
+      previousAsset.arrowLabel !== nextAsset.arrowLabel ||
+      previousAsset.arrowDirection !== nextAsset.arrowDirection ||
+      previousAsset.arrowEnabled !== nextAsset.arrowEnabled
+    ) {
+      return getInteriorAssetActionLabel(nextAsset.type, "edit");
+    }
+
+    return "interior asset edit";
+  }
+
+  return "action";
+}
+
 function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: KeyboardEvent) {
   const eventKey = event.key.toLowerCase();
   const bindingKey = binding.key?.toLowerCase();
@@ -236,4 +332,12 @@ function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: Ke
   if (binding.shiftKey !== undefined && binding.shiftKey !== event.shiftKey) return false;
 
   return true;
+}
+
+function getInteriorAssetActionLabel(
+  type: RoomInteriorAsset["type"],
+  action: "creation" | "deletion" | "rotation" | "resize" | "edit"
+) {
+  const assetLabel = type === "stairs" ? "stair" : "interior asset";
+  return `${assetLabel} ${action}`;
 }
