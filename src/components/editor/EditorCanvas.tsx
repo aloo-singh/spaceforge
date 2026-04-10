@@ -370,6 +370,8 @@ type EditorCanvasProps = {
   onThumbnailGeneratorChange?: (generateThumbnailDataUrl: (() => Promise<string | null>) | null) => void;
   topBarLeadingContent?: ReactNode;
   leftSidebarContent?: ReactNode;
+  mobileInspectorOpen?: boolean;
+  onMobileInspectorOpenChange?: (open: boolean) => void;
 };
 
 function CanvasHudCard({ children }: { children: ReactNode }) {
@@ -785,6 +787,8 @@ export default function EditorCanvas({
   onThumbnailGeneratorChange,
   topBarLeadingContent,
   leftSidebarContent,
+  mobileInspectorOpen,
+  onMobileInspectorOpenChange,
 }: EditorCanvasProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2391,7 +2395,23 @@ export default function EditorCanvas({
     <EditorInspectorEmptyState />
   );
   const inspectorDrawerSide = isMobile && isPortraitViewport ? "bottom" : "right";
+  const isMobileLandscape = isMobile && !isPortraitViewport;
+  const resolvedMobileInspectorOpen =
+    isMobileLandscape && mobileInspectorOpen !== undefined
+      ? mobileInspectorOpen
+      : isInspectorDrawerOpen;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
+  const handleMobileInspectorOpenChange = useCallback(
+    (open: boolean) => {
+      if (isMobileLandscape && onMobileInspectorOpenChange) {
+        onMobileInspectorOpenChange(open);
+        return;
+      }
+
+      setIsInspectorDrawerOpen(open);
+    },
+    [isMobileLandscape, onMobileInspectorOpenChange]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2683,14 +2703,18 @@ export default function EditorCanvas({
       </div>
       {isMobile ? (
         <Drawer
-          open={isInspectorDrawerOpen}
-          onOpenChange={setIsInspectorDrawerOpen}
+          open={resolvedMobileInspectorOpen}
+          onOpenChange={handleMobileInspectorOpenChange}
           shouldScaleBackground={false}
           direction={inspectorDrawerSide}
+          modal={!isMobileLandscape}
         >
           <DrawerContent
             side={inspectorDrawerSide}
             aria-label="Editor inspector"
+            showOverlay={!isMobileLandscape}
+            onPointerDownOutside={isMobileLandscape ? (event) => event.preventDefault() : undefined}
+            onInteractOutside={isMobileLandscape ? (event) => event.preventDefault() : undefined}
             className={cn(
               inspectorDrawerSide === "right"
                 ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
