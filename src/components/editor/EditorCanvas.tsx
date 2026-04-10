@@ -2393,6 +2393,7 @@ export default function EditorCanvas({
   const { isMobile } = useMobile();
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
+  const [isLandscapeViewport, setIsLandscapeViewport] = useState(false);
   const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
   const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
   const inspectorContent = selectedNorthIndicator ? (
@@ -2412,8 +2413,8 @@ export default function EditorCanvas({
   const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
-  const shouldShowTouchZoomControls = isMobile;
-  const shouldShowTouchCancelButton = isMobile && roomDraftPointCount > 0;
+  const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
+  const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2422,18 +2423,22 @@ export default function EditorCanvas({
 
     const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
     const compactLandscapeMediaQuery = window.matchMedia("(max-height: 540px) and (orientation: landscape)");
+    const landscapeMediaQuery = window.matchMedia("(orientation: landscape)");
     const updateIsPortraitViewport = () => {
       setIsPortraitViewport(portraitMediaQuery.matches);
       setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
+      setIsLandscapeViewport(landscapeMediaQuery.matches);
     };
 
     updateIsPortraitViewport();
     portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
     compactLandscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
+    landscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
 
     return () => {
       portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
       compactLandscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+      landscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
     };
   }, []);
 

@@ -1070,7 +1070,21 @@ function createInitialCameraState(): CameraState {
 }
 
 function createInitialEditorSettings(): EditorSettings {
-  return hydrationSnapshot?.settings ?? cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
+  if (hydrationSnapshot?.settings) {
+    return hydrationSnapshot.settings;
+  }
+
+  // No persisted settings - check if mobile and default HUD elements to off
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+  if (isMobile) {
+    return {
+      ...cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
+      showCanvasHud: false,
+      showMiniMap: false,
+    };
+  }
+
+  return cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
 }
 
 function createInitialEditorExportPreferences(): EditorExportPreferences {
@@ -2660,10 +2674,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   resetCamera: () => {
     const state = get();
+    const isLandscape = state.viewport.width > state.viewport.height;
+    const isMobile = state.viewport.height < 600;
+    const paddingPx = isLandscape && !isMobile ? 48 : 96;
     const targetCamera = getCameraFitTarget({
       rooms: state.document.rooms,
       viewport: state.viewport,
       emptyLayoutCamera: syncCameraRotationToDocument(DEFAULT_CAMERA_STATE, state.document),
+      paddingPx,
     }).camera;
 
     if (areCamerasEqual(state.camera, targetCamera)) return;
