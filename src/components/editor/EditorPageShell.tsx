@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, PanelRightCollapse, PanelRightExpand } from "@/components/ui/icons";
+import { LoaderCircle } from "@/components/ui/icons";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
 import { EditorProjectChrome } from "@/components/editor/EditorProjectChrome";
@@ -11,7 +11,6 @@ import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import type { EditorOnboardingHintId } from "@/lib/editor/onboardingHints";
-import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { useGamificationStore } from "@/stores/useGamificationStore";
 
@@ -38,15 +37,10 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
   const hydrateEarlyExplorer = useGamificationStore((state) => state.hydrateEarlyExplorer);
   const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
   const [isLoadingOverlayVisible, setIsLoadingOverlayVisible] = useState(projectId !== undefined);
-  const [isPortraitViewport, setIsPortraitViewport] = useState(false);
-  const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
-  const [isMobileLandscapeInspectorOpen, setIsMobileLandscapeInspectorOpen] = useState(false);
   const loadingOverlayExitTimerRef = useRef<number | null>(null);
-  const { isMobile, isReady: isMobileReady } = useMobile();
   const isProjectBootstrapLoading = projectId !== undefined && bootstrapState.status === "loading";
   const shouldRenderLoadingOverlay = projectId !== undefined && isLoadingOverlayVisible;
   const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status !== "ready";
-  const isMobileLandscape = isMobileReady && !isPortraitViewport && (isMobile || isCompactLandscapeViewport);
   const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
     setGenerateThumbnailDataUrl(() => nextGenerator);
   };
@@ -62,28 +56,6 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
       if (loadingOverlayExitTimerRef.current !== null) {
         window.clearTimeout(loadingOverlayExitTimerRef.current);
       }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
-    const compactLandscapeMediaQuery = window.matchMedia("(max-height: 540px) and (orientation: landscape)");
-    const updateIsPortraitViewport = () => {
-      setIsPortraitViewport(portraitMediaQuery.matches);
-      setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
-    };
-
-    updateIsPortraitViewport();
-    portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
-    compactLandscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
-
-    return () => {
-      portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
-      compactLandscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
     };
   }, []);
 
@@ -155,8 +127,6 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           onDisplayedHintChange={setActiveHintId}
           onThumbnailGeneratorChange={handleThumbnailGeneratorChange}
           projectRenameCompletionCount={projectRenameCompletionCount}
-          mobileInspectorOpen={isMobileLandscapeInspectorOpen}
-          onMobileInspectorOpenChange={setIsMobileLandscapeInspectorOpen}
           leftSidebarContent={
             <div className="flex h-full min-h-0 w-full flex-col">
               <div>
@@ -196,26 +166,6 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
         projectId={activeProject?.id ?? null}
         promptEligible={bootstrapState.status === "ready" && hasMeaningfulEditorInteraction}
         surface="dark"
-        leadingMobileAction={
-          isMobileLandscape ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              onClick={() => setIsMobileLandscapeInspectorOpen((current) => !current)}
-              className="pointer-events-auto size-10 rounded-full border-white/12 bg-black/72 text-white shadow-lg hover:bg-black/82"
-              aria-label={
-                isMobileLandscapeInspectorOpen ? "Close inspector" : "Open inspector"
-              }
-            >
-              {isMobileLandscapeInspectorOpen ? (
-                <PanelRightCollapse className="size-4" />
-              ) : (
-                <PanelRightExpand className="size-4" />
-              )}
-            </Button>
-          ) : null
-        }
         getMetadata={() => ({
           roomCount,
           bootstrapStatus: bootstrapState.status,

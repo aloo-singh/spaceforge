@@ -210,6 +210,7 @@ const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX = 320;
 const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
+const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -370,8 +371,6 @@ type EditorCanvasProps = {
   onThumbnailGeneratorChange?: (generateThumbnailDataUrl: (() => Promise<string | null>) | null) => void;
   topBarLeadingContent?: ReactNode;
   leftSidebarContent?: ReactNode;
-  mobileInspectorOpen?: boolean;
-  onMobileInspectorOpenChange?: (open: boolean) => void;
 };
 
 function CanvasHudCard({ children }: { children: ReactNode }) {
@@ -787,8 +786,6 @@ export default function EditorCanvas({
   onThumbnailGeneratorChange,
   topBarLeadingContent,
   leftSidebarContent,
-  mobileInspectorOpen,
-  onMobileInspectorOpenChange,
 }: EditorCanvasProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2401,25 +2398,10 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
-  const usesMobileInspectorDrawer = isMobile || isCompactLandscapeViewport;
-  const inspectorDrawerSide = usesMobileInspectorDrawer && isPortraitViewport ? "bottom" : "right";
-  const isMobileLandscape = usesMobileInspectorDrawer && !isPortraitViewport;
-  const resolvedMobileInspectorOpen =
-    isMobileLandscape && mobileInspectorOpen !== undefined
-      ? mobileInspectorOpen
-      : isInspectorDrawerOpen;
+  const usesMobileInspectorDrawer = isMobile && isPortraitViewport;
+  const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
+  const inspectorDrawerSide = "bottom";
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
-  const handleMobileInspectorOpenChange = useCallback(
-    (open: boolean) => {
-      if (isMobileLandscape && onMobileInspectorOpenChange) {
-        onMobileInspectorOpenChange(open);
-        return;
-      }
-
-      setIsInspectorDrawerOpen(open);
-    },
-    [isMobileLandscape, onMobileInspectorOpenChange]
-  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2446,6 +2428,14 @@ export default function EditorCanvas({
   useEffect(() => {
     setIsInspectorDrawerOpen(true);
   }, [inspectorDrawerSide, selectedNorthIndicator, selectedRoomId]);
+
+  useEffect(() => {
+    if (!isCompactLandscapeInspector) {
+      return;
+    }
+
+    setIsDesktopInspectorCollapsed(true);
+  }, [isCompactLandscapeInspector]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {
@@ -2670,11 +2660,11 @@ export default function EditorCanvas({
             usesMobileInspectorDrawer && "sm:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
           )}
           style={{
-            width: `${
-              isDesktopInspectorCollapsed
-                ? DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX
-                : DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX
-            }px`,
+            width: isDesktopInspectorCollapsed
+              ? `${DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX}px`
+              : isCompactLandscapeInspector
+                ? COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS
+                : `${DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX}px`,
             transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
@@ -2718,24 +2708,22 @@ export default function EditorCanvas({
       </div>
       {usesMobileInspectorDrawer ? (
         <Drawer
-          open={resolvedMobileInspectorOpen}
-          onOpenChange={handleMobileInspectorOpenChange}
+          open={isInspectorDrawerOpen}
+          onOpenChange={setIsInspectorDrawerOpen}
           shouldScaleBackground={false}
           direction={inspectorDrawerSide}
-          modal={!isMobileLandscape}
+          modal
         >
           <DrawerContent
             side={inspectorDrawerSide}
             aria-label="Editor inspector"
-            showOverlay={!isMobileLandscape}
+            showOverlay
             className={cn(
-              inspectorDrawerSide === "right"
-                ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
-                : "w-auto"
+              "w-auto"
             )}
           >
             <DrawerTitle className="sr-only">Editor inspector</DrawerTitle>
-            {inspectorDrawerSide === "right" ? inspectorContent : compactInspectorContent}
+            {compactInspectorContent}
           </DrawerContent>
         </Drawer>
       ) : null}
