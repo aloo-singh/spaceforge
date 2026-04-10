@@ -10,6 +10,35 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.57.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-10</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Mobile interface foundation: adaptive inspector and sidebar panels (visible by default on desktop, hidden by default on mobile)</li>
+                <li>Touch-friendly canvas controls: cancel drawing button during active draw + zoom in/out/fit fallback</li>
+                <li>HUD and mini-map now default to off on mobile (user choice respected)</li>
+                <li>Scaled and repositioned HUD elements for small screens</li>
+                <li>Removed keyboard references (Enter/Esc hints) on mobile</li>
+                <li>Final polish: tighter Sonner toasts + larger, more comfortable mobile touch targets</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Inspector and sidebar now use consistent adaptive panel pattern across all screen sizes</li>
+                <li>Mobile experience is now calm and usable while desktop remains unchanged</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.56.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-09</span>
           </div>
