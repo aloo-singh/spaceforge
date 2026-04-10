@@ -382,9 +382,12 @@ type EditorCanvasProps = {
   leftSidebarContent?: ReactNode;
 };
 
-function CanvasHudCard({ children }: { children: ReactNode }) {
+function CanvasHudCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="rounded-md border border-border/70 bg-background/86 px-3 py-2 text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
+    <div className={cn(
+      "rounded-md border border-border/70 bg-background/86 px-3 py-2 text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)]",
+      className
+    )}>
       {children}
     </div>
   );
@@ -404,6 +407,7 @@ function CanvasMiniMap({
   themeMode,
   onPanToWorldPoint,
   onInteractionActiveChange,
+  compact = false,
 }: {
   rooms: Room[];
   camera: CameraState;
@@ -411,8 +415,12 @@ function CanvasMiniMap({
   themeMode: "light" | "dark";
   onPanToWorldPoint: (point: Point) => void;
   onInteractionActiveChange: (isActive: boolean) => void;
+  compact?: boolean;
 }) {
   const dragPointerIdRef = useRef<number | null>(null);
+  const miniMapWidth = compact ? 132 : MINI_MAP_WIDTH_PX;
+  const miniMapHeight = compact ? 96 : MINI_MAP_HEIGHT_PX;
+  const miniMapInset = compact ? 8 : MINI_MAP_INSET_PX;
   const layoutBounds = useMemo(() => getLayoutBoundsFromRooms(rooms), [rooms]);
   const miniMapState = useMemo(() => {
     if (!layoutBounds) return null;
@@ -433,11 +441,11 @@ function CanvasMiniMap({
     const worldMinY = framingMinY - worldPaddingMm;
     const worldWidth = Math.max(framingWidthMm + worldPaddingMm * 2, 1);
     const worldHeight = Math.max(framingHeightMm + worldPaddingMm * 2, 1);
-    const drawableWidthPx = MINI_MAP_WIDTH_PX - MINI_MAP_INSET_PX * 2;
-    const drawableHeightPx = MINI_MAP_HEIGHT_PX - MINI_MAP_INSET_PX * 2;
+    const drawableWidthPx = miniMapWidth - miniMapInset * 2;
+    const drawableHeightPx = miniMapHeight - miniMapInset * 2;
     const scale = Math.min(drawableWidthPx / worldWidth, drawableHeightPx / worldHeight);
-    const offsetX = (MINI_MAP_WIDTH_PX - worldWidth * scale) / 2;
-    const offsetY = (MINI_MAP_HEIGHT_PX - worldHeight * scale) / 2;
+    const offsetX = (miniMapWidth - worldWidth * scale) / 2;
+    const offsetY = (miniMapHeight - worldHeight * scale) / 2;
     const mapPoint = (point: Point) => ({
       x: offsetX + (point.x - worldMinX) * scale,
       y: offsetY + (point.y - worldMinY) * scale,
@@ -465,7 +473,7 @@ function CanvasMiniMap({
         height: viewportBottomRight.y - viewportTopLeft.y,
       },
     };
-  }, [camera, layoutBounds, rooms, viewport]);
+  }, [camera, layoutBounds, miniMapHeight, miniMapInset, miniMapWidth, rooms, viewport]);
 
   if (!miniMapState) return null;
 
@@ -475,8 +483,8 @@ function CanvasMiniMap({
   ) => {
     const rect = element.getBoundingClientRect();
     const localPoint = {
-      x: ((event.clientX - rect.left) / rect.width) * MINI_MAP_WIDTH_PX,
-      y: ((event.clientY - rect.top) / rect.height) * MINI_MAP_HEIGHT_PX,
+      x: ((event.clientX - rect.left) / rect.width) * miniMapWidth,
+      y: ((event.clientY - rect.top) / rect.height) * miniMapHeight,
     };
     onPanToWorldPoint(miniMapState.screenToWorld(localPoint));
   };
@@ -486,9 +494,12 @@ function CanvasMiniMap({
   const frameStroke = themeMode === "light" ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.98)";
 
   return (
-    <CanvasHudCard>
+    <CanvasHudCard className={compact ? "px-2 py-1.5" : undefined}>
       <div
-        className="pointer-events-auto cursor-pointer touch-none overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        className={cn(
+          "pointer-events-auto cursor-pointer touch-none overflow-hidden border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
+          compact ? "rounded-lg" : "rounded-[10px]"
+        )}
         onPointerDown={(event) => {
           const element = event.currentTarget;
           dragPointerIdRef.current = event.pointerId;
@@ -518,9 +529,9 @@ function CanvasMiniMap({
         }}
       >
         <svg
-          width={MINI_MAP_WIDTH_PX}
-          height={MINI_MAP_HEIGHT_PX}
-          viewBox={`0 0 ${MINI_MAP_WIDTH_PX} ${MINI_MAP_HEIGHT_PX}`}
+          width={miniMapWidth}
+          height={miniMapHeight}
+          viewBox={`0 0 ${miniMapWidth} ${miniMapHeight}`}
           aria-hidden="true"
           className="block"
         >
@@ -530,7 +541,7 @@ function CanvasMiniMap({
               d={room.path}
               fill={roomFill}
               stroke={roomStroke}
-              strokeWidth={1.25}
+              strokeWidth={compact ? 1 : 1.25}
               strokeLinejoin="round"
             />
           ))}
@@ -539,10 +550,10 @@ function CanvasMiniMap({
             y={miniMapState.viewportRect.y}
             width={miniMapState.viewportRect.width}
             height={miniMapState.viewportRect.height}
-            rx={8}
+            rx={compact ? 6 : 8}
             fill="none"
             stroke={frameStroke}
-            strokeWidth={1.5}
+            strokeWidth={compact ? 1.1 : 1.5}
           />
         </svg>
       </div>
@@ -624,11 +635,13 @@ function CanvasRotationIndicatorControl({
   northBearingDegrees,
   surfaceState,
   onReset,
+  compact = false,
 }: {
   rotationDegrees: number;
   northBearingDegrees: number;
   surfaceState: NorthIndicatorSurfaceState;
   onReset: () => void;
+  compact?: boolean;
 }) {
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(rotationDegrees);
   const showSurface = surfaceState === "visible";
@@ -643,33 +656,42 @@ function CanvasRotationIndicatorControl({
             type="button"
             onClick={onReset}
             aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
-            className={`group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
+            className={`group relative flex touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
               showSurface ? "pointer-events-auto" : "pointer-events-none"
             } ${
               showSurface ? "opacity-100" : "opacity-0"
-            }`}
+            } ${compact ? "h-11 w-11" : "h-14 w-14"}`}
             style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
           >
             <div
               aria-hidden="true"
-              className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
+              className={cn(
+                "absolute rounded-full border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]",
+                compact ? "inset-[6px] border-2" : "inset-[7px] border-[2.5px]"
+              )}
             />
             <div
               aria-hidden="true"
-              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              className={cn("absolute transition-transform duration-75 ease-out", compact ? "inset-[8px]" : "inset-[10px]")}
               style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
             >
-              <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
+              <div className={cn(
+                "absolute left-1/2 top-0 -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]",
+                compact ? "h-2.5 w-0.5" : "h-3.5 w-[2.5px]"
+              )} />
             </div>
             <div
               aria-hidden="true"
-              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              className={cn("absolute transition-transform duration-75 ease-out", compact ? "inset-[8px]" : "inset-[10px]")}
               style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
             >
-              <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
+              <div className={cn(
+                "absolute left-1/2 h-0 w-0 -translate-x-1/2 border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]",
+                compact ? "top-0 border-x-[4px] border-b-[6px]" : "top-[-1px] border-x-[6px] border-b-[9px]"
+              )} />
             </div>
             <div
-              className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
+              className={cn("relative font-semibold tracking-[0.06em] text-foreground/82", compact ? "text-[8px]" : "text-[10px]")}
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
               {formatCanvasRotationDegrees(normalizedRotationDegrees)}
@@ -692,6 +714,7 @@ function NorthIndicatorControl({
   onPointerDown,
   onPointerEnter,
   onPointerLeave,
+  compact = false,
 }: {
   bearingDegrees: number;
   viewRotationDegrees: number;
@@ -700,6 +723,7 @@ function NorthIndicatorControl({
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
+  compact?: boolean;
 }) {
   const initialVisibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
   const [displayBearingDegrees, setDisplayBearingDegrees] = useState(initialVisibleBearingDegrees);
@@ -727,7 +751,10 @@ function NorthIndicatorControl({
             onPointerDown={onPointerDown}
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}
-            className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={cn(
+              "pointer-events-auto group relative flex touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              compact ? "h-11 w-11" : "h-14 w-14"
+            )}
           >
             <div
               aria-hidden="true"
@@ -749,17 +776,21 @@ function NorthIndicatorControl({
                 return (
                   <div
                     key={angle}
-                    className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
-                    style={{
-                      transform: `translate(-50%, -100%) rotate(${angle}deg)`,
-                      height: "21px",
-                    }}
-                  >
+                      className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
+                      style={{
+                        transform: `translate(-50%, -100%) rotate(${angle}deg)`,
+                        height: compact ? "16px" : "21px",
+                      }}
+                    >
                     <div
                       className={`mx-auto rounded-full ${
                         isMajorTick
-                          ? "h-2 w-px bg-black/90 dark:bg-white/90"
-                          : "h-1.5 w-px bg-black/55 dark:bg-white/50"
+                          ? compact
+                            ? "h-1.5 w-px bg-black/90 dark:bg-white/90"
+                            : "h-2 w-px bg-black/90 dark:bg-white/90"
+                          : compact
+                            ? "h-1 w-px bg-black/55 dark:bg-white/50"
+                            : "h-1.5 w-px bg-black/55 dark:bg-white/50"
                       }`}
                     />
                   </div>
@@ -771,10 +802,13 @@ function NorthIndicatorControl({
               className={`absolute inset-0 transition-transform ease-out ${isDragging ? "duration-75" : "duration-200"}`}
               style={{ transform: `rotate(${displayBearingDegrees}deg)` }}
             >
-              <div className="absolute top-1.5 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" />
+              <div className={cn(
+                "absolute left-1/2 h-0 w-0 -translate-x-1/2 border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]",
+                compact ? "top-1 border-x-[4px] border-b-[6px]" : "top-1.5 border-x-[6px] border-b-[9px]"
+              )} />
             </div>
             <div
-              className="relative text-xs font-semibold tracking-[0.2em] text-foreground/86"
+              className={cn("relative font-semibold tracking-[0.2em] text-foreground/86", compact ? "text-[10px]" : "text-xs")}
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
               N
@@ -2413,6 +2447,7 @@ export default function EditorCanvas({
   const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
+  const useCompactHud = isMobile || isLandscapeViewport;
   const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
   const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
 
@@ -2582,25 +2617,33 @@ export default function EditorCanvas({
           {isCanvasHudPresent ? (
             <div
               className={cn(
-                "pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:bottom-4 sm:left-4",
+                "pointer-events-none absolute z-10 flex items-end transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                useCompactHud
+                  ? isPortraitViewport
+                    ? "bottom-2 left-2 gap-1.5"
+                    : "left-2 bottom-2 gap-1.5"
+                  : "bottom-3 left-3 gap-2 sm:bottom-4 sm:left-4",
                 hydratedShowCanvasHud
                   ? "translate-y-0 scale-100 opacity-100"
                   : "translate-y-1 scale-[0.985] opacity-0"
               )}
             >
-              <CanvasHudCard>
+              <CanvasHudCard className={useCompactHud ? "px-2.5 py-1.5" : undefined}>
                 <div
-                  className="text-[11px] font-medium tracking-[0.04em] text-foreground/72"
+                  className={cn(
+                    "font-medium tracking-[0.04em] text-foreground/72",
+                    useCompactHud ? "text-[10px]" : "text-[11px]"
+                  )}
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {scaleOverlay.label}
                 </div>
                 <div
-                  className="mt-1 h-2 border-x border-t border-foreground/70"
-                  style={{ width: `${scaleOverlay.widthPx}px` }}
+                  className={cn("mt-1 border-x border-t border-foreground/70", useCompactHud ? "h-1.5" : "h-2")}
+                  style={{ width: `${useCompactHud ? Math.round(scaleOverlay.widthPx * 0.78) : scaleOverlay.widthPx}px` }}
                 />
                 <div
-                  className="mt-1 text-[11px] text-muted-foreground"
+                  className={cn("mt-1 text-muted-foreground", useCompactHud ? "text-[10px]" : "text-[11px]")}
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {hydratedSnappingEnabled
@@ -2616,15 +2659,20 @@ export default function EditorCanvas({
                 onPointerDown={handleNorthIndicatorPointerDown}
                 onPointerEnter={() => setIsNorthIndicatorHovered(true)}
                 onPointerLeave={() => setIsNorthIndicatorHovered(false)}
+                compact={useCompactHud}
               />
               {CANVAS_ROTATION_ENABLED ? (
-                <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
+                <div
+                  ref={canvasRotationIndicatorSlotRef}
+                  className={cn("relative shrink-0", useCompactHud ? "h-11 w-11" : "h-14 w-14")}
+                >
                   <div className="absolute inset-0 flex items-center justify-center">
                     <CanvasRotationIndicatorControl
                       rotationDegrees={hydratedCanvasRotationDegrees}
                       northBearingDegrees={hydratedNorthBearingDegrees}
                       surfaceState={canvasRotationIndicatorSurfaceState}
                       onReset={resetCanvasRotation}
+                      compact={useCompactHud}
                     />
                   </div>
                 </div>
@@ -2676,7 +2724,12 @@ export default function EditorCanvas({
           {isMiniMapPresent ? (
             <div
               className={cn(
-                "pointer-events-none absolute bottom-4 right-4 z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
+                "pointer-events-none absolute z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                useCompactHud
+                  ? isPortraitViewport
+                    ? "right-2 bottom-2"
+                    : "right-2 bottom-2"
+                  : "bottom-4 right-4 [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
                 shouldShowMiniMap
                   ? "translate-y-0 scale-100 opacity-100"
                   : "translate-y-1 scale-[0.985] opacity-0"
@@ -2689,6 +2742,7 @@ export default function EditorCanvas({
                 themeMode={editorThemeMode}
                 onPanToWorldPoint={(point) => setCameraCenterMm(point.x, point.y)}
                 onInteractionActiveChange={setCanvasInteractionActive}
+                compact={useCompactHud}
               />
             </div>
           ) : null}
