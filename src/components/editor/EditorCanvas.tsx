@@ -164,6 +164,8 @@ import {
   Minus,
   PanelBottomCollapse,
   PanelBottomExpand,
+  PanelLeftCollapse,
+  PanelLeftExpand,
   Plus,
   PanelRightCollapse,
   PanelRightExpand,
@@ -215,6 +217,10 @@ const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
+const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
+const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
+const MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS = "min(15rem, 72vw)";
+const COMPACT_LANDSCAPE_SIDEBAR_EXPANDED_WIDTH_CSS = "15rem";
 const DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX = 320;
 const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
@@ -2428,6 +2434,7 @@ export default function EditorCanvas({
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const [isLandscapeViewport, setIsLandscapeViewport] = useState(false);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
   const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
   const inspectorContent = selectedNorthIndicator ? (
@@ -2450,6 +2457,26 @@ export default function EditorCanvas({
   const useCompactHud = isMobile || isLandscapeViewport;
   const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
   const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
+  const expandedLeftSidebarWidth = isMobile
+    ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
+    : isCompactLandscapeViewport
+      ? COMPACT_LANDSCAPE_SIDEBAR_EXPANDED_WIDTH_CSS
+      : `${DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX}px`;
+  const leftSidebarWidth = leftSidebarContent
+    ? isLeftSidebarCollapsed
+      ? `${DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX}px`
+      : expandedLeftSidebarWidth
+    : null;
+  const rightInspectorWidth = usesPortraitBottomInspector
+    ? null
+    : isDesktopInspectorCollapsed
+      ? `${DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX}px`
+      : isCompactLandscapeInspector
+        ? COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS
+        : `${DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX}px`;
+  const editorGridTemplateColumns = [leftSidebarWidth, "minmax(0,1fr)", rightInspectorWidth]
+    .filter((value): value is string => value !== null)
+    .join(" ");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2484,6 +2511,10 @@ export default function EditorCanvas({
 
     setIsDesktopInspectorCollapsed(true);
   }, [isCompactLandscapeInspector]);
+
+  useEffect(() => {
+    setIsLeftSidebarCollapsed(isMobile);
+  }, [isMobile]);
 
   useEffect(() => {
     if (!usesPortraitBottomInspector) {
@@ -2590,19 +2621,54 @@ export default function EditorCanvas({
         />
       </div>
       <div
-        className={cn(
-          "grid min-h-0 gap-3 p-3 sm:gap-4 sm:p-4 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5",
-          leftSidebarContent
-            ? "grid-rows-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto] sm:grid-rows-1 lg:grid-cols-[18rem_minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1"
-            : "grid-rows-1 sm:grid-cols-[minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[minmax(0,1fr)_auto]"
-        )}
+        className="grid min-h-0 gap-3 p-3 transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-4 sm:p-4 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5"
+        style={{ gridTemplateColumns: editorGridTemplateColumns }}
       >
         {leftSidebarContent ? (
           <aside
-            className="hidden min-h-0 overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
+            className="min-h-0"
             aria-label="Project sidebar"
+            style={{
+              width: leftSidebarWidth ?? undefined,
+              transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
           >
-            {leftSidebarContent}
+            <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                      onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
+                      className="absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5"
+                    >
+                      {isLeftSidebarCollapsed ? (
+                        <PanelLeftExpand className="size-4" />
+                      ) : (
+                        <PanelLeftCollapse className="size-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="start">
+                    {isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
+                  isLeftSidebarCollapsed
+                    ? "pointer-events-none -translate-x-2 opacity-0"
+                    : "translate-x-0 opacity-100"
+                )}
+                aria-hidden={isLeftSidebarCollapsed}
+              >
+                {leftSidebarContent}
+              </div>
+            </div>
           </aside>
         ) : null}
         <div
@@ -2791,17 +2857,11 @@ export default function EditorCanvas({
         </div>
         <aside
           aria-label="Editor inspector"
-          className={cn(
-            "hidden min-h-0 sm:block [@media(max-height:540px)_and_(orientation:landscape)]:block",
-            usesPortraitBottomInspector && "sm:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
-          )}
+          className="min-h-0"
           style={{
-            width: isDesktopInspectorCollapsed
-              ? `${DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX}px`
-              : isCompactLandscapeInspector
-                ? COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS
-                : `${DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX}px`,
+            width: rightInspectorWidth ?? undefined,
             transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+            display: usesPortraitBottomInspector ? "none" : undefined,
           }}
         >
           <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">

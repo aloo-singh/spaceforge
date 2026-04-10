@@ -27,6 +27,8 @@ export {
   IconLayoutBottombarCollapse as PanelBottomCollapse,
   IconLayoutBottombarExpand as PanelBottomExpand,
   IconLayoutSidebarLeftCollapse as PanelLeft,
+  IconLayoutSidebarLeftCollapse as PanelLeftCollapse,
+  IconLayoutSidebarLeftExpand as PanelLeftExpand,
   IconLayoutSidebarRightCollapse as PanelRightCollapse,
   IconLayoutSidebarRightExpand as PanelRightExpand,
   IconLoader as LoaderCircle,
