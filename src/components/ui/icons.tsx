@@ -25,6 +25,8 @@ export {
   IconFocus2 as LocateFixed,
   IconInbox as Inbox,
   IconLayoutSidebarLeftCollapse as PanelLeft,
+  IconLayoutSidebarRightCollapse as PanelRightCollapse,
+  IconLayoutSidebarRightExpand as PanelRightExpand,
   IconLoader as LoaderCircle,
   IconLogout as LogOut,
   IconMail as Mail,

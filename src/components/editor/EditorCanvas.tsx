@@ -159,7 +159,9 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { PanelRightCollapse, PanelRightExpand } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -206,6 +208,8 @@ const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
+const DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX = 320;
+const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -2126,6 +2130,9 @@ export default function EditorCanvas({
       setIsCanvasReadyForExport(true);
       containerRef.current.appendChild(app.canvas);
       app.canvas.style.touchAction = "none";
+      app.canvas.style.display = "block";
+      app.canvas.style.width = "100%";
+      app.canvas.style.height = "100%";
 
       const grid = new Graphics();
       const rooms = new Graphics();
@@ -2160,8 +2167,19 @@ export default function EditorCanvas({
       const handleResize = () => {
         syncViewport();
       };
+      const resizeObserver = new ResizeObserver(([entry]) => {
+        const nextWidth = Math.round(entry.contentRect.width);
+        const nextHeight = Math.round(entry.contentRect.height);
+        if (nextWidth <= 0 || nextHeight <= 0) return;
+        if (app.screen.width === nextWidth && app.screen.height === nextHeight) return;
+
+        app.renderer.resize(nextWidth, nextHeight);
+        syncViewport();
+        drawCurrentScene();
+      });
 
       app.renderer.on("resize", handleResize);
+      resizeObserver.observe(resizeTarget);
 
       const unsubscribe = useEditorStore.subscribe((state, previousState) => {
         let shouldAnimateStairRotation = false;
@@ -2277,6 +2295,7 @@ export default function EditorCanvas({
         detachRoomResizeInput();
         detachRoomDrawInput();
         unsubscribe();
+        resizeObserver.disconnect();
         app.renderer.off("resize", handleResize);
         appRef.current = null;
         setIsCanvasReadyForExport(false);
@@ -2351,6 +2370,7 @@ export default function EditorCanvas({
   const { isMobile } = useMobile();
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isInspectorDrawerOpen, setIsInspectorDrawerOpen] = useState(true);
+  const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2366,6 +2386,7 @@ export default function EditorCanvas({
     <EditorInspectorEmptyState />
   );
   const inspectorDrawerSide = isMobile && isPortraitViewport ? "bottom" : "right";
+  const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2470,8 +2491,8 @@ export default function EditorCanvas({
         className={cn(
           "grid min-h-0 gap-3 p-3 sm:gap-4 sm:p-4 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5",
           leftSidebarContent
-            ? "grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1"
-            : "grid-rows-1"
+            ? "grid-rows-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto] sm:grid-rows-1 lg:grid-cols-[18rem_minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1"
+            : "grid-rows-1 sm:grid-cols-[minmax(0,1fr)_auto] [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[minmax(0,1fr)_auto]"
         )}
       >
         {leftSidebarContent ? (
@@ -2482,7 +2503,10 @@ export default function EditorCanvas({
             {leftSidebarContent}
           </aside>
         ) : null}
-        <div className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+        <div
+          className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+          style={{ backgroundColor: canvasBackgroundCss }}
+        >
           <div
             ref={containerRef}
             tabIndex={-1}
@@ -2602,26 +2626,77 @@ export default function EditorCanvas({
             </aside>
           ) : null}
         </div>
-      </div>
-      <Drawer
-        open={isInspectorDrawerOpen}
-        onOpenChange={setIsInspectorDrawerOpen}
-        shouldScaleBackground={false}
-        direction={inspectorDrawerSide}
-      >
-        <DrawerContent
-          side={inspectorDrawerSide}
+        <aside
           aria-label="Editor inspector"
-          className={cn(
-            inspectorDrawerSide === "right"
-              ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
-              : "w-auto"
-          )}
+          className="hidden min-h-0 sm:block [@media(max-height:540px)_and_(orientation:landscape)]:block"
+          style={{
+            width: `${
+              isDesktopInspectorCollapsed
+                ? DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX
+                : DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX
+            }px`,
+            transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
         >
-          <DrawerTitle className="sr-only">Editor inspector</DrawerTitle>
-          {inspectorDrawerSide === "right" ? inspectorContent : compactInspectorContent}
-        </DrawerContent>
-      </Drawer>
+          <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <ImmediateTooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                    onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
+                    className="absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5"
+                  >
+                    {isDesktopInspectorCollapsed ? (
+                      <PanelRightExpand className="size-4" />
+                    ) : (
+                      <PanelRightCollapse className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" align="start">
+                  {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                </TooltipContent>
+              </Tooltip>
+            </ImmediateTooltipProvider>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
+                isDesktopInspectorCollapsed
+                  ? "pointer-events-none translate-x-2 opacity-0"
+                  : "translate-x-0 opacity-100"
+              )}
+              aria-hidden={isDesktopInspectorCollapsed}
+            >
+              {inspectorContent}
+            </div>
+          </div>
+        </aside>
+      </div>
+      {isMobile ? (
+        <Drawer
+          open={isInspectorDrawerOpen}
+          onOpenChange={setIsInspectorDrawerOpen}
+          shouldScaleBackground={false}
+          direction={inspectorDrawerSide}
+        >
+          <DrawerContent
+            side={inspectorDrawerSide}
+            aria-label="Editor inspector"
+            className={cn(
+              inspectorDrawerSide === "right"
+                ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
+                : "w-auto"
+            )}
+          >
+            <DrawerTitle className="sr-only">Editor inspector</DrawerTitle>
+            {inspectorDrawerSide === "right" ? inspectorContent : compactInspectorContent}
+          </DrawerContent>
+        </Drawer>
+      ) : null}
       {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
         <aside
           className={`pointer-events-none absolute z-30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
