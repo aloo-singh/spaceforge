@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Keycap } from "@/components/ui/keycap";
@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,8 @@ function InspectorIconTooltip({
 
 export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const { isMobile } = useMobile();
+  const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const shouldFocusSelectedRoomNameInput = useEditorStore(
     (state) => state.shouldFocusSelectedRoomNameInput
@@ -76,6 +79,27 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
       : null;
   const canDeleteSelectedRoom = selectedRoom !== null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
+  const shouldHideKeyboardHints = isMobile || isCompactLandscapeViewport;
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const compactLandscapeMediaQuery = window.matchMedia(
+      "(max-height: 540px) and (orientation: landscape)"
+    );
+    const updateIsCompactLandscapeViewport = () => {
+      setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
+    };
+
+    updateIsCompactLandscapeViewport();
+    compactLandscapeMediaQuery.addEventListener("change", updateIsCompactLandscapeViewport);
+
+    return () => {
+      compactLandscapeMediaQuery.removeEventListener("change", updateIsCompactLandscapeViewport);
+    };
+  }, []);
 
   useEffect(() => {
     if (!shouldFocusSelectedRoomNameInput || !selectedRoom || isRenameBlocked) return;
@@ -214,22 +238,24 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
             placeholder="Untitled room"
             autoComplete="off"
             disabled={isRenameBlocked}
-            aria-describedby="room-name-input-hint"
+            aria-describedby={shouldHideKeyboardHints ? undefined : "room-name-input-hint"}
           />
-          <p
-            id="room-name-input-hint"
-            className="mt-1.5 flex items-center justify-end gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:mt-1"
-          >
-            <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
-              Enter
-            </Keycap>
-            <span>save</span>
-            <span aria-hidden="true">·</span>
-            <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
-              Esc
-            </Keycap>
-            <span>cancel</span>
-          </p>
+          {!shouldHideKeyboardHints ? (
+            <p
+              id="room-name-input-hint"
+              className="mt-1.5 flex items-center justify-end gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:mt-1"
+            >
+              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+                Enter
+              </Keycap>
+              <span>save</span>
+              <span aria-hidden="true">·</span>
+              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+                Esc
+              </Keycap>
+              <span>cancel</span>
+            </p>
+          ) : null}
           <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 [@media(max-height:540px)_and_(orientation:landscape)]:mt-3 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -245,7 +271,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
             <div className="mt-3 flex justify-end">
               <ImmediateTooltipProvider>
                 <InspectorIconTooltip
-                  content={
+                  content={shouldHideKeyboardHints ? "Delete room" : (
                     <span className="inline-flex items-center gap-2">
                       <span>Delete room</span>
                       <span className="inline-flex items-center gap-1">
@@ -254,7 +280,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                         <Keycap aria-hidden="true" className="shadow-none">⌫</Keycap>
                       </span>
                     </span>
-                  }
+                  )}
                 >
                   <Button
                     type="button"
