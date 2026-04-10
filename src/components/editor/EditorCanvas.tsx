@@ -912,6 +912,7 @@ export default function EditorCanvas({
   ]);
 
   const drawCurrentScene = useCallback(() => {
+    const app = appRef.current;
     const grid = gridRef.current;
     const rooms = roomRef.current;
     const openings = openingRef.current;
@@ -951,6 +952,10 @@ export default function EditorCanvas({
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag)
     );
+
+    if (app) {
+      app.render();
+    }
   }, []);
 
   const stopTransformAnimation = useCallback(() => {
