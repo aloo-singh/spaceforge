@@ -2455,6 +2455,7 @@ export default function EditorCanvas({
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
   const useCompactHud = isMobile || isLandscapeViewport;
+  const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
   const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
   const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
   const expandedLeftSidebarWidth = isMobile
@@ -2643,7 +2644,10 @@ export default function EditorCanvas({
                       size="icon-sm"
                       aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                       onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
-                      className="absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5"
+                      className={cn(
+                        "absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
                     >
                       {isLeftSidebarCollapsed ? (
                         <PanelLeftExpand className="size-4" />
@@ -2746,9 +2750,19 @@ export default function EditorCanvas({
             </div>
           ) : null}
           {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
-            <div className="pointer-events-none absolute top-3 right-3 z-20 flex flex-col items-end gap-2 sm:top-4 sm:right-4">
+            <div
+              className={cn(
+                "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
+                useCompactMobileControls ? "top-2 right-2 gap-1.5" : "top-3 right-3 gap-2"
+              )}
+            >
               {shouldShowTouchZoomControls ? (
-                <ButtonGroup className="pointer-events-auto flex-col rounded-xl border border-border/70 bg-background/90 backdrop-blur-sm dark:bg-zinc-950/78">
+                <ButtonGroup
+                  className={cn(
+                    "pointer-events-auto flex-col border border-border/70 bg-background/90 backdrop-blur-sm dark:bg-zinc-950/78",
+                    useCompactMobileControls ? "rounded-2xl" : "rounded-xl"
+                  )}
+                >
                   <div data-slot="button-group-item">
                     <Button
                       type="button"
@@ -2756,6 +2770,7 @@ export default function EditorCanvas({
                       size="icon-sm"
                       aria-label="Zoom in"
                       onClick={handleZoomIn}
+                      className={cn(useCompactMobileControls && "size-9 rounded-xl")}
                     >
                       <Plus className="size-4" />
                     </Button>
@@ -2767,6 +2782,7 @@ export default function EditorCanvas({
                       size="icon-sm"
                       aria-label="Zoom out"
                       onClick={handleZoomOut}
+                      className={cn(useCompactMobileControls && "size-9 rounded-xl")}
                     >
                       <Minus className="size-4" />
                     </Button>
@@ -2780,7 +2796,10 @@ export default function EditorCanvas({
                   size="icon-sm"
                   aria-label="Cancel drawing"
                   onClick={resetDraft}
-                  className="pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
+                  className={cn(
+                    "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
+                    useCompactMobileControls && "size-9 rounded-xl"
+                  )}
                 >
                   <X className="size-4" />
                 </Button>
@@ -2868,14 +2887,17 @@ export default function EditorCanvas({
             <ImmediateTooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
-                    onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
-                    className="absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5"
-                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                      onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
+                      className={cn(
+                        "absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
+                    >
                     {isDesktopInspectorCollapsed ? (
                       <PanelRightExpand className="size-4" />
                     ) : (
@@ -2924,7 +2946,10 @@ export default function EditorCanvas({
                       size="icon-sm"
                       aria-label={isPortraitInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
                       onClick={() => setIsPortraitInspectorCollapsed((current) => !current)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className={cn(
+                        "text-muted-foreground hover:text-foreground",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
                     >
                       {isPortraitInspectorCollapsed ? (
                         <PanelBottomExpand className="size-4" />
