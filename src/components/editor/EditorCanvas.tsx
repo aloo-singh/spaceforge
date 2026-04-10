@@ -2371,9 +2371,15 @@ export default function EditorCanvas({
     : DEFAULT_EDITOR_SETTINGS.snappingEnabled;
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
-  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
+  const hydratedShowCanvasHud = hasHydratedClient
+    ? showCanvasHud
+    : DEFAULT_EDITOR_SETTINGS.showCanvasHud;
+  const hydratedShowMiniMap = hasHydratedClient
+    ? showMiniMap
+    : DEFAULT_EDITOR_SETTINGS.showMiniMap;
+  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(hydratedShowCanvasHud);
   const canvasHudHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
+  const shouldShowMiniMap = hydratedShowCanvasHud && hydratedShowMiniMap && hasRooms;
   const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
   const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isMobile } = useMobile();
@@ -2447,7 +2453,7 @@ export default function EditorCanvas({
       canvasHudHideTimeoutRef.current = null;
     }
 
-    if (showCanvasHud) {
+    if (hydratedShowCanvasHud) {
       setIsCanvasHudPresent(true);
       return;
     }
@@ -2464,7 +2470,7 @@ export default function EditorCanvas({
       clearTimeout(canvasHudHideTimeoutRef.current);
       canvasHudHideTimeoutRef.current = null;
     };
-  }, [isCanvasHudPresent, showCanvasHud]);
+  }, [hydratedShowCanvasHud, isCanvasHudPresent]);
 
   useEffect(() => {
     if (miniMapHideTimeoutRef.current) {
@@ -2547,7 +2553,7 @@ export default function EditorCanvas({
             <div
               className={cn(
                 "pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:bottom-4 sm:left-4",
-                showCanvasHud
+                hydratedShowCanvasHud
                   ? "translate-y-0 scale-100 opacity-100"
                   : "translate-y-1 scale-[0.985] opacity-0"
               )}
@@ -2722,8 +2728,6 @@ export default function EditorCanvas({
             side={inspectorDrawerSide}
             aria-label="Editor inspector"
             showOverlay={!isMobileLandscape}
-            onPointerDownOutside={isMobileLandscape ? (event) => event.preventDefault() : undefined}
-            onInteractOutside={isMobileLandscape ? (event) => event.preventDefault() : undefined}
             className={cn(
               inspectorDrawerSide === "right"
                 ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
