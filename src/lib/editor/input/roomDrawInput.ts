@@ -200,6 +200,7 @@ export function attachRoomDrawInput(
 ) {
   let isSpaceHeld = false;
   let shouldSuppressNextContextMenu = false;
+  let activePointerCount = 0;
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
   let hoveredSelectableWall: SelectableWallHit | null = null;
@@ -836,7 +837,29 @@ export function attachRoomDrawInput(
     callbacks.requestRender();
   };
 
+  const onTouchStart = (event: TouchEvent) => {
+    if (event.touches.length > 1) {
+      event.preventDefault();
+      // Cancel drawing if multi-touch starts
+      if (store.getState().roomDraft.points.length > 0) {
+        store.getState().resetDraft();
+        setSnapGuides(null);
+        updateCursor();
+      }
+    }
+  };
+
   const onPointerDown = (event: PointerEvent) => {
+    if (activePointerCount > 0) {
+      // Cancel drawing if multi-touch starts
+      if (store.getState().roomDraft.points.length > 0) {
+        store.getState().resetDraft();
+        setSnapGuides(null);
+        updateCursor();
+      }
+      return;
+    }
+
     const state = store.getState();
 
     if (event.button === 2) {
@@ -847,10 +870,16 @@ export function attachRoomDrawInput(
         setSnapGuides(null);
         updateCursor();
       }
+      activePointerCount++;
       return;
     }
 
-    if (event.button !== 0 || isSpaceHeld) return;
+    if (event.button !== 0 || isSpaceHeld) {
+      activePointerCount++;
+      return;
+    }
+
+    activePointerCount++;
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
@@ -1123,6 +1152,7 @@ export function attachRoomDrawInput(
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    activePointerCount--;
     const screenPoint = toCanvasPoint(event);
 
     if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
@@ -1310,6 +1340,7 @@ export function attachRoomDrawInput(
   };
 
   const onPointerCancel = (event: PointerEvent) => {
+    activePointerCount--;
     if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
       if (activeOpeningDragSession.didDrag) {
         store
@@ -1547,6 +1578,7 @@ export function attachRoomDrawInput(
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointercancel", onPointerCancel);
+  canvas.addEventListener("touchstart", onTouchStart, { passive: false });
   canvas.addEventListener("contextmenu", onContextMenu);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
@@ -1558,6 +1590,7 @@ export function attachRoomDrawInput(
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
     canvas.removeEventListener("pointercancel", onPointerCancel);
+    canvas.removeEventListener("touchstart", onTouchStart);
     canvas.removeEventListener("contextmenu", onContextMenu);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
