@@ -39,13 +39,14 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
   const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
   const [isLoadingOverlayVisible, setIsLoadingOverlayVisible] = useState(projectId !== undefined);
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+  const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const [isMobileLandscapeInspectorOpen, setIsMobileLandscapeInspectorOpen] = useState(false);
   const loadingOverlayExitTimerRef = useRef<number | null>(null);
   const { isMobile, isReady: isMobileReady } = useMobile();
   const isProjectBootstrapLoading = projectId !== undefined && bootstrapState.status === "loading";
   const shouldRenderLoadingOverlay = projectId !== undefined && isLoadingOverlayVisible;
   const shouldHideCanvasDuringBootstrap = projectId !== undefined && bootstrapState.status !== "ready";
-  const isMobileLandscape = isMobileReady && isMobile && !isPortraitViewport;
+  const isMobileLandscape = isMobileReady && !isPortraitViewport && (isMobile || isCompactLandscapeViewport);
   const handleThumbnailGeneratorChange = (nextGenerator: (() => Promise<string | null>) | null) => {
     setGenerateThumbnailDataUrl(() => nextGenerator);
   };
@@ -70,15 +71,19 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     }
 
     const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
+    const compactLandscapeMediaQuery = window.matchMedia("(max-height: 540px) and (orientation: landscape)");
     const updateIsPortraitViewport = () => {
       setIsPortraitViewport(portraitMediaQuery.matches);
+      setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
     };
 
     updateIsPortraitViewport();
     portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
+    compactLandscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
 
     return () => {
       portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+      compactLandscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
     };
   }, []);
 

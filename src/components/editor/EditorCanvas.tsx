@@ -2378,6 +2378,7 @@ export default function EditorCanvas({
   const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isMobile } = useMobile();
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+  const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const [isInspectorDrawerOpen, setIsInspectorDrawerOpen] = useState(true);
   const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
   const inspectorContent = selectedNorthIndicator ? (
@@ -2394,8 +2395,9 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
-  const inspectorDrawerSide = isMobile && isPortraitViewport ? "bottom" : "right";
-  const isMobileLandscape = isMobile && !isPortraitViewport;
+  const usesMobileInspectorDrawer = isMobile || isCompactLandscapeViewport;
+  const inspectorDrawerSide = usesMobileInspectorDrawer && isPortraitViewport ? "bottom" : "right";
+  const isMobileLandscape = usesMobileInspectorDrawer && !isPortraitViewport;
   const resolvedMobileInspectorOpen =
     isMobileLandscape && mobileInspectorOpen !== undefined
       ? mobileInspectorOpen
@@ -2419,15 +2421,19 @@ export default function EditorCanvas({
     }
 
     const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
+    const compactLandscapeMediaQuery = window.matchMedia("(max-height: 540px) and (orientation: landscape)");
     const updateIsPortraitViewport = () => {
       setIsPortraitViewport(portraitMediaQuery.matches);
+      setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
     };
 
     updateIsPortraitViewport();
     portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
+    compactLandscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
 
     return () => {
       portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+      compactLandscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
     };
   }, []);
 
@@ -2653,7 +2659,10 @@ export default function EditorCanvas({
         </div>
         <aside
           aria-label="Editor inspector"
-          className="hidden min-h-0 sm:block [@media(max-height:540px)_and_(orientation:landscape)]:block"
+          className={cn(
+            "hidden min-h-0 sm:block [@media(max-height:540px)_and_(orientation:landscape)]:block",
+            usesMobileInspectorDrawer && "sm:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
+          )}
           style={{
             width: `${
               isDesktopInspectorCollapsed
@@ -2701,7 +2710,7 @@ export default function EditorCanvas({
           </div>
         </aside>
       </div>
-      {isMobile ? (
+      {usesMobileInspectorDrawer ? (
         <Drawer
           open={resolvedMobileInspectorOpen}
           onOpenChange={handleMobileInspectorOpenChange}
