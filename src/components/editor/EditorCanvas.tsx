@@ -160,8 +160,12 @@ import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
-import { PanelRightCollapse, PanelRightExpand } from "@/components/ui/icons";
+import {
+  PanelBottomCollapse,
+  PanelBottomExpand,
+  PanelRightCollapse,
+  PanelRightExpand,
+} from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -211,6 +215,8 @@ const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX = 320;
 const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
+const MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS = "min(22rem, 42vh)";
+const MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX = 44;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -2382,8 +2388,8 @@ export default function EditorCanvas({
   const { isMobile } = useMobile();
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
-  const [isInspectorDrawerOpen, setIsInspectorDrawerOpen] = useState(true);
   const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
+  const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2398,9 +2404,8 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
-  const usesMobileInspectorDrawer = isMobile && isPortraitViewport;
+  const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
-  const inspectorDrawerSide = "bottom";
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
 
   useEffect(() => {
@@ -2426,16 +2431,20 @@ export default function EditorCanvas({
   }, []);
 
   useEffect(() => {
-    setIsInspectorDrawerOpen(true);
-  }, [inspectorDrawerSide, selectedNorthIndicator, selectedRoomId]);
-
-  useEffect(() => {
     if (!isCompactLandscapeInspector) {
       return;
     }
 
     setIsDesktopInspectorCollapsed(true);
   }, [isCompactLandscapeInspector]);
+
+  useEffect(() => {
+    if (!usesPortraitBottomInspector) {
+      return;
+    }
+
+    setIsPortraitInspectorCollapsed(true);
+  }, [usesPortraitBottomInspector]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {
@@ -2493,7 +2502,12 @@ export default function EditorCanvas({
       aria-label="SpaceForge floor plan editor canvas"
       aria-describedby={instructionsId}
       role="region"
-      className="relative grid h-full w-full grid-rows-[auto_minmax(0,1fr)]"
+      className={cn(
+        "relative grid h-full w-full",
+        usesPortraitBottomInspector
+          ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+          : "grid-rows-[auto_minmax(0,1fr)]"
+      )}
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
@@ -2657,7 +2671,7 @@ export default function EditorCanvas({
           aria-label="Editor inspector"
           className={cn(
             "hidden min-h-0 sm:block [@media(max-height:540px)_and_(orientation:landscape)]:block",
-            usesMobileInspectorDrawer && "sm:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
+            usesPortraitBottomInspector && "sm:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden"
           )}
           style={{
             width: isDesktopInspectorCollapsed
@@ -2706,26 +2720,56 @@ export default function EditorCanvas({
           </div>
         </aside>
       </div>
-      {usesMobileInspectorDrawer ? (
-        <Drawer
-          open={isInspectorDrawerOpen}
-          onOpenChange={setIsInspectorDrawerOpen}
-          shouldScaleBackground={false}
-          direction={inspectorDrawerSide}
-          modal
+      {usesPortraitBottomInspector ? (
+        <aside
+          aria-label="Editor inspector"
+          className="min-h-0 px-3 pb-0 sm:hidden"
+          style={{
+            height: isPortraitInspectorCollapsed
+              ? `${MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX}px`
+              : MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS,
+            transition: "height 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
         >
-          <DrawerContent
-            side={inspectorDrawerSide}
-            aria-label="Editor inspector"
-            showOverlay
-            className={cn(
-              "w-auto"
-            )}
-          >
-            <DrawerTitle className="sr-only">Editor inspector</DrawerTitle>
-            {compactInspectorContent}
-          </DrawerContent>
-        </Drawer>
+          <div className="flex h-full w-full flex-col overflow-hidden rounded-t-xl border border-zinc-200/80 border-b-0 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="flex h-11 shrink-0 items-center px-2">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isPortraitInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                      onClick={() => setIsPortraitInspectorCollapsed((current) => !current)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      {isPortraitInspectorCollapsed ? (
+                        <PanelBottomExpand className="size-4" />
+                      ) : (
+                        <PanelBottomCollapse className="size-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start">
+                    {isPortraitInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+            </div>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden px-2 pb-2 transition-[opacity,transform] duration-200 ease-out",
+                isPortraitInspectorCollapsed
+                  ? "pointer-events-none translate-y-2 opacity-0"
+                  : "translate-y-0 opacity-100"
+              )}
+              aria-hidden={isPortraitInspectorCollapsed}
+            >
+              {compactInspectorContent}
+            </div>
+          </div>
+        </aside>
       ) : null}
       {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
         <aside

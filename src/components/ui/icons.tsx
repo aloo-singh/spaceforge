@@ -24,6 +24,8 @@ export {
   IconDownload as Download,
   IconFocus2 as LocateFixed,
   IconInbox as Inbox,
+  IconLayoutBottombarCollapse as PanelBottomCollapse,
+  IconLayoutBottombarExpand as PanelBottomExpand,
   IconLayoutSidebarLeftCollapse as PanelLeft,
   IconLayoutSidebarRightCollapse as PanelRightCollapse,
   IconLayoutSidebarRightExpand as PanelRightExpand,
