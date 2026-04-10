@@ -52,6 +52,13 @@ export function attachPanZoomInput(
   let lastPointer: ScreenPoint = { x: 0, y: 0 };
   let activeRotationSession: ActiveRotationSession | null = null;
   let shouldSuppressNextContextMenu = false;
+  let activeTouchGesture:
+    | {
+        lastCenter: ScreenPoint;
+        lastDistance: number;
+      }
+    | null = null;
+  const activeTouchPoints = new Map<number, ScreenPoint>();
 
   const getViewportCenter = () => {
     const { viewport } = store.getState();
@@ -64,6 +71,19 @@ export function attachPanZoomInput(
   const getPointerAngleDegrees = (pointer: ScreenPoint) => {
     const center = getViewportCenter();
     return (Math.atan2(pointer.y - center.y, pointer.x - center.x) * 180) / Math.PI;
+  };
+
+  const getTouchGestureMetrics = () => {
+    const [firstPoint, secondPoint] = Array.from(activeTouchPoints.values());
+    if (!firstPoint || !secondPoint) return null;
+
+    return {
+      lastCenter: {
+        x: (firstPoint.x + secondPoint.x) / 2,
+        y: (firstPoint.y + secondPoint.y) / 2,
+      },
+      lastDistance: Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y),
+    };
   };
 
   const updateCursor = () => {
@@ -138,6 +158,26 @@ export function attachPanZoomInput(
   const onPointerDown = (event: PointerEvent) => {
     const screenPoint = getCanvasPointFromClientPoint(event.clientX, event.clientY);
 
+    if (event.pointerType === "touch") {
+      activeTouchPoints.set(event.pointerId, screenPoint);
+
+      if (activeTouchPoints.size >= 2) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        if (activeRotationSession) {
+          finishRotation({ cancel: true });
+        }
+
+        isPanning = false;
+        activePointerId = null;
+        activeTouchGesture = getTouchGestureMetrics();
+        store.getState().setCanvasInteractionActive(true);
+        updateCursor();
+        return;
+      }
+    }
+
     if (canStartRotation(event.button, screenPoint)) {
       event.preventDefault();
       shouldSuppressNextContextMenu = true;
@@ -166,6 +206,40 @@ export function attachPanZoomInput(
   };
 
   const onPointerMove = (event: PointerEvent) => {
+    if (event.pointerType === "touch" && activeTouchPoints.has(event.pointerId)) {
+      activeTouchPoints.set(event.pointerId, getCanvasPointFromClientPoint(event.clientX, event.clientY));
+
+      if (activeTouchPoints.size >= 2) {
+        const gestureMetrics = getTouchGestureMetrics();
+        if (!gestureMetrics) return;
+
+        event.preventDefault();
+        const storeState = store.getState();
+
+        if (activeTouchGesture) {
+          const centerDelta = {
+            x: gestureMetrics.lastCenter.x - activeTouchGesture.lastCenter.x,
+            y: gestureMetrics.lastCenter.y - activeTouchGesture.lastCenter.y,
+          };
+
+          if (centerDelta.x !== 0 || centerDelta.y !== 0) {
+            storeState.panCameraByPx(centerDelta);
+            callbacks.onPan?.();
+          }
+
+          if (activeTouchGesture.lastDistance > 0 && gestureMetrics.lastDistance > 0) {
+            storeState.zoomAtScreenPoint(
+              gestureMetrics.lastCenter,
+              gestureMetrics.lastDistance / activeTouchGesture.lastDistance
+            );
+          }
+        }
+
+        activeTouchGesture = gestureMetrics;
+        return;
+      }
+    }
+
     if (activeRotationSession?.type === "pointer" && activeRotationSession.pointerId === event.pointerId) {
       const rect = canvas.getBoundingClientRect();
       const screenPoint = {
@@ -199,8 +273,21 @@ export function attachPanZoomInput(
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    if (event.pointerType === "touch") {
+      activeTouchPoints.delete(event.pointerId);
+      if (activeTouchPoints.size < 2) {
+        activeTouchGesture = null;
+        store.getState().setCanvasInteractionActive(false);
+      }
+    }
+
     if (activeRotationSession?.type === "pointer") {
       finishRotation({ pointerId: event.pointerId });
+      return;
+    }
+
+    if (event.pointerType === "touch") {
+      updateCursor();
       return;
     }
 
@@ -246,7 +333,10 @@ export function attachPanZoomInput(
     isSpaceHeld = false;
     isPanning = false;
     activePointerId = null;
+    activeTouchGesture = null;
+    activeTouchPoints.clear();
     finishRotation({ cancel: true });
+    store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
 

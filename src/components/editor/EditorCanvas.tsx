@@ -13,7 +13,7 @@ import {
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
-import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
+import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM, ZOOM_STEP } from "@/lib/editor/constants";
 import {
   getOrthogonalSnappedPoint,
   pointsEqual,
@@ -159,6 +159,18 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import { Button, ButtonGroup } from "@/components/ui/button";
+import {
+  Minus,
+  PanelBottomCollapse,
+  PanelBottomExpand,
+  PanelLeftCollapse,
+  PanelLeftExpand,
+  Plus,
+  PanelRightCollapse,
+  PanelRightExpand,
+  X,
+} from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -166,6 +178,7 @@ import {
   TooltipTrigger,
   tooltipContentClassName,
 } from "@/components/ui/tooltip";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
@@ -204,6 +217,15 @@ const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
+const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
+const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
+const MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS = "min(15rem, 72vw)";
+const COMPACT_LANDSCAPE_SIDEBAR_EXPANDED_WIDTH_CSS = "15rem";
+const DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX = 320;
+const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
+const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
+const MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS = "min(22rem, 42vh)";
+const MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX = 44;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -366,9 +388,12 @@ type EditorCanvasProps = {
   leftSidebarContent?: ReactNode;
 };
 
-function CanvasHudCard({ children }: { children: ReactNode }) {
+function CanvasHudCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="rounded-md border border-border/70 bg-background/86 px-3 py-2 text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
+    <div className={cn(
+      "rounded-md border border-border/70 bg-background/86 px-3 py-2 text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.24)]",
+      className
+    )}>
       {children}
     </div>
   );
@@ -388,6 +413,7 @@ function CanvasMiniMap({
   themeMode,
   onPanToWorldPoint,
   onInteractionActiveChange,
+  compact = false,
 }: {
   rooms: Room[];
   camera: CameraState;
@@ -395,8 +421,12 @@ function CanvasMiniMap({
   themeMode: "light" | "dark";
   onPanToWorldPoint: (point: Point) => void;
   onInteractionActiveChange: (isActive: boolean) => void;
+  compact?: boolean;
 }) {
   const dragPointerIdRef = useRef<number | null>(null);
+  const miniMapWidth = compact ? 132 : MINI_MAP_WIDTH_PX;
+  const miniMapHeight = compact ? 96 : MINI_MAP_HEIGHT_PX;
+  const miniMapInset = compact ? 8 : MINI_MAP_INSET_PX;
   const layoutBounds = useMemo(() => getLayoutBoundsFromRooms(rooms), [rooms]);
   const miniMapState = useMemo(() => {
     if (!layoutBounds) return null;
@@ -417,11 +447,11 @@ function CanvasMiniMap({
     const worldMinY = framingMinY - worldPaddingMm;
     const worldWidth = Math.max(framingWidthMm + worldPaddingMm * 2, 1);
     const worldHeight = Math.max(framingHeightMm + worldPaddingMm * 2, 1);
-    const drawableWidthPx = MINI_MAP_WIDTH_PX - MINI_MAP_INSET_PX * 2;
-    const drawableHeightPx = MINI_MAP_HEIGHT_PX - MINI_MAP_INSET_PX * 2;
+    const drawableWidthPx = miniMapWidth - miniMapInset * 2;
+    const drawableHeightPx = miniMapHeight - miniMapInset * 2;
     const scale = Math.min(drawableWidthPx / worldWidth, drawableHeightPx / worldHeight);
-    const offsetX = (MINI_MAP_WIDTH_PX - worldWidth * scale) / 2;
-    const offsetY = (MINI_MAP_HEIGHT_PX - worldHeight * scale) / 2;
+    const offsetX = (miniMapWidth - worldWidth * scale) / 2;
+    const offsetY = (miniMapHeight - worldHeight * scale) / 2;
     const mapPoint = (point: Point) => ({
       x: offsetX + (point.x - worldMinX) * scale,
       y: offsetY + (point.y - worldMinY) * scale,
@@ -449,7 +479,7 @@ function CanvasMiniMap({
         height: viewportBottomRight.y - viewportTopLeft.y,
       },
     };
-  }, [camera, layoutBounds, rooms, viewport]);
+  }, [camera, layoutBounds, miniMapHeight, miniMapInset, miniMapWidth, rooms, viewport]);
 
   if (!miniMapState) return null;
 
@@ -459,8 +489,8 @@ function CanvasMiniMap({
   ) => {
     const rect = element.getBoundingClientRect();
     const localPoint = {
-      x: ((event.clientX - rect.left) / rect.width) * MINI_MAP_WIDTH_PX,
-      y: ((event.clientY - rect.top) / rect.height) * MINI_MAP_HEIGHT_PX,
+      x: ((event.clientX - rect.left) / rect.width) * miniMapWidth,
+      y: ((event.clientY - rect.top) / rect.height) * miniMapHeight,
     };
     onPanToWorldPoint(miniMapState.screenToWorld(localPoint));
   };
@@ -470,9 +500,12 @@ function CanvasMiniMap({
   const frameStroke = themeMode === "light" ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.98)";
 
   return (
-    <CanvasHudCard>
+    <CanvasHudCard className={compact ? "px-2 py-1.5" : undefined}>
       <div
-        className="pointer-events-auto cursor-pointer touch-none overflow-hidden rounded-[10px] border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        className={cn(
+          "pointer-events-auto cursor-pointer touch-none overflow-hidden border border-black/8 bg-zinc-200/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:border-white/8 dark:bg-zinc-900/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
+          compact ? "rounded-lg" : "rounded-[10px]"
+        )}
         onPointerDown={(event) => {
           const element = event.currentTarget;
           dragPointerIdRef.current = event.pointerId;
@@ -502,9 +535,9 @@ function CanvasMiniMap({
         }}
       >
         <svg
-          width={MINI_MAP_WIDTH_PX}
-          height={MINI_MAP_HEIGHT_PX}
-          viewBox={`0 0 ${MINI_MAP_WIDTH_PX} ${MINI_MAP_HEIGHT_PX}`}
+          width={miniMapWidth}
+          height={miniMapHeight}
+          viewBox={`0 0 ${miniMapWidth} ${miniMapHeight}`}
           aria-hidden="true"
           className="block"
         >
@@ -514,7 +547,7 @@ function CanvasMiniMap({
               d={room.path}
               fill={roomFill}
               stroke={roomStroke}
-              strokeWidth={1.25}
+              strokeWidth={compact ? 1 : 1.25}
               strokeLinejoin="round"
             />
           ))}
@@ -523,10 +556,10 @@ function CanvasMiniMap({
             y={miniMapState.viewportRect.y}
             width={miniMapState.viewportRect.width}
             height={miniMapState.viewportRect.height}
-            rx={8}
+            rx={compact ? 6 : 8}
             fill="none"
             stroke={frameStroke}
-            strokeWidth={1.5}
+            strokeWidth={compact ? 1.1 : 1.5}
           />
         </svg>
       </div>
@@ -608,11 +641,13 @@ function CanvasRotationIndicatorControl({
   northBearingDegrees,
   surfaceState,
   onReset,
+  compact = false,
 }: {
   rotationDegrees: number;
   northBearingDegrees: number;
   surfaceState: NorthIndicatorSurfaceState;
   onReset: () => void;
+  compact?: boolean;
 }) {
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(rotationDegrees);
   const showSurface = surfaceState === "visible";
@@ -627,33 +662,42 @@ function CanvasRotationIndicatorControl({
             type="button"
             onClick={onReset}
             aria-label={`Reset canvas rotation (${formatCanvasRotationDegrees(normalizedRotationDegrees)})`}
-            className={`group relative flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
+            className={`group relative flex touch-none items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,opacity] ease-out hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[0_8px_24px_rgba(0,0,0,0.26)] ${
               showSurface ? "pointer-events-auto" : "pointer-events-none"
             } ${
               showSurface ? "opacity-100" : "opacity-0"
-            }`}
+            } ${compact ? "h-11 w-11" : "h-14 w-14"}`}
             style={{ transitionDuration: showSurface ? "150ms" : "500ms" }}
           >
             <div
               aria-hidden="true"
-              className="absolute inset-[7px] rounded-full border-[2.5px] border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]"
+              className={cn(
+                "absolute rounded-full border-black shadow-[0_0_0_1px_rgba(255,255,255,0.82)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.58)]",
+                compact ? "inset-[6px] border-2" : "inset-[7px] border-[2.5px]"
+              )}
             />
             <div
               aria-hidden="true"
-              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              className={cn("absolute transition-transform duration-75 ease-out", compact ? "inset-[8px]" : "inset-[10px]")}
               style={{ transform: `rotate(${normalizedRotationDegrees}deg)` }}
             >
-              <div className="absolute left-1/2 top-0 h-3.5 w-[2.5px] -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]" />
+              <div className={cn(
+                "absolute left-1/2 top-0 -translate-x-1/2 rounded-full bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.72)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]",
+                compact ? "h-2.5 w-0.5" : "h-3.5 w-[2.5px]"
+              )} />
             </div>
             <div
               aria-hidden="true"
-              className="absolute inset-[10px] transition-transform duration-75 ease-out"
+              className={cn("absolute transition-transform duration-75 ease-out", compact ? "inset-[8px]" : "inset-[10px]")}
               style={{ transform: `rotate(${northMarkerDegrees}deg)` }}
             >
-              <div className="absolute left-1/2 top-[-1px] h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" />
+              <div className={cn(
+                "absolute left-1/2 h-0 w-0 -translate-x-1/2 border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]",
+                compact ? "top-0 border-x-[4px] border-b-[6px]" : "top-[-1px] border-x-[6px] border-b-[9px]"
+              )} />
             </div>
             <div
-              className="relative text-[10px] font-semibold tracking-[0.06em] text-foreground/82"
+              className={cn("relative font-semibold tracking-[0.06em] text-foreground/82", compact ? "text-[8px]" : "text-[10px]")}
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
               {formatCanvasRotationDegrees(normalizedRotationDegrees)}
@@ -676,6 +720,7 @@ function NorthIndicatorControl({
   onPointerDown,
   onPointerEnter,
   onPointerLeave,
+  compact = false,
 }: {
   bearingDegrees: number;
   viewRotationDegrees: number;
@@ -684,6 +729,7 @@ function NorthIndicatorControl({
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
+  compact?: boolean;
 }) {
   const initialVisibleBearingDegrees = normalizeNorthBearingDegrees(bearingDegrees + viewRotationDegrees);
   const [displayBearingDegrees, setDisplayBearingDegrees] = useState(initialVisibleBearingDegrees);
@@ -711,7 +757,10 @@ function NorthIndicatorControl({
             onPointerDown={onPointerDown}
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}
-            className="pointer-events-auto group relative flex h-14 w-14 touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={cn(
+              "pointer-events-auto group relative flex touch-none items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              compact ? "h-11 w-11" : "h-14 w-14"
+            )}
           >
             <div
               aria-hidden="true"
@@ -733,17 +782,21 @@ function NorthIndicatorControl({
                 return (
                   <div
                     key={angle}
-                    className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
-                    style={{
-                      transform: `translate(-50%, -100%) rotate(${angle}deg)`,
-                      height: "21px",
-                    }}
-                  >
+                      className="absolute left-1/2 top-1/2 origin-bottom -translate-x-1/2"
+                      style={{
+                        transform: `translate(-50%, -100%) rotate(${angle}deg)`,
+                        height: compact ? "16px" : "21px",
+                      }}
+                    >
                     <div
                       className={`mx-auto rounded-full ${
                         isMajorTick
-                          ? "h-2 w-px bg-black/90 dark:bg-white/90"
-                          : "h-1.5 w-px bg-black/55 dark:bg-white/50"
+                          ? compact
+                            ? "h-1.5 w-px bg-black/90 dark:bg-white/90"
+                            : "h-2 w-px bg-black/90 dark:bg-white/90"
+                          : compact
+                            ? "h-1 w-px bg-black/55 dark:bg-white/50"
+                            : "h-1.5 w-px bg-black/55 dark:bg-white/50"
                       }`}
                     />
                   </div>
@@ -755,10 +808,13 @@ function NorthIndicatorControl({
               className={`absolute inset-0 transition-transform ease-out ${isDragging ? "duration-75" : "duration-200"}`}
               style={{ transform: `rotate(${displayBearingDegrees}deg)` }}
             >
-              <div className="absolute top-1.5 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-b-[9px] border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" />
+              <div className={cn(
+                "absolute left-1/2 h-0 w-0 -translate-x-1/2 border-x-transparent border-b-red-500 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]",
+                compact ? "top-1 border-x-[4px] border-b-[6px]" : "top-1.5 border-x-[6px] border-b-[9px]"
+              )} />
             </div>
             <div
-              className="relative text-xs font-semibold tracking-[0.2em] text-foreground/86"
+              className={cn("relative font-semibold tracking-[0.2em] text-foreground/86", compact ? "text-[10px]" : "text-xs")}
               style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
             >
               N
@@ -840,8 +896,12 @@ export default function EditorCanvas({
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
   const viewport = useEditorStore((state) => state.viewport);
+  const zoomAtScreenPoint = useEditorStore((state) => state.zoomAtScreenPoint);
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
+  const resetDraft = useEditorStore((state) => state.resetDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
+  const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
+  const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -904,6 +964,7 @@ export default function EditorCanvas({
   ]);
 
   const drawCurrentScene = useCallback(() => {
+    const app = appRef.current;
     const grid = gridRef.current;
     const rooms = roomRef.current;
     const openings = openingRef.current;
@@ -943,6 +1004,10 @@ export default function EditorCanvas({
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag)
     );
+
+    if (app) {
+      app.render();
+    }
   }, []);
 
   const stopTransformAnimation = useCallback(() => {
@@ -2122,6 +2187,9 @@ export default function EditorCanvas({
       setIsCanvasReadyForExport(true);
       containerRef.current.appendChild(app.canvas);
       app.canvas.style.touchAction = "none";
+      app.canvas.style.display = "block";
+      app.canvas.style.width = "100%";
+      app.canvas.style.height = "100%";
 
       const grid = new Graphics();
       const rooms = new Graphics();
@@ -2156,8 +2224,19 @@ export default function EditorCanvas({
       const handleResize = () => {
         syncViewport();
       };
+      const resizeObserver = new ResizeObserver(([entry]) => {
+        const nextWidth = Math.round(entry.contentRect.width);
+        const nextHeight = Math.round(entry.contentRect.height);
+        if (nextWidth <= 0 || nextHeight <= 0) return;
+        if (app.screen.width === nextWidth && app.screen.height === nextHeight) return;
+
+        app.renderer.resize(nextWidth, nextHeight);
+        syncViewport();
+        drawCurrentScene();
+      });
 
       app.renderer.on("resize", handleResize);
+      resizeObserver.observe(resizeTarget);
 
       const unsubscribe = useEditorStore.subscribe((state, previousState) => {
         let shouldAnimateStairRotation = false;
@@ -2273,6 +2352,7 @@ export default function EditorCanvas({
         detachRoomResizeInput();
         detachRoomDrawInput();
         unsubscribe();
+        resizeObserver.disconnect();
         app.renderer.off("resize", handleResize);
         appRef.current = null;
         setIsCanvasReadyForExport(false);
@@ -2339,11 +2419,24 @@ export default function EditorCanvas({
     : DEFAULT_EDITOR_SETTINGS.snappingEnabled;
   const showCanvasHud = useEditorStore((state) => state.settings.showCanvasHud);
   const showMiniMap = useEditorStore((state) => state.settings.showMiniMap);
-  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(showCanvasHud);
+  const hydratedShowCanvasHud = hasHydratedClient
+    ? showCanvasHud
+    : DEFAULT_EDITOR_SETTINGS.showCanvasHud;
+  const hydratedShowMiniMap = hasHydratedClient
+    ? showMiniMap
+    : DEFAULT_EDITOR_SETTINGS.showMiniMap;
+  const [isCanvasHudPresent, setIsCanvasHudPresent] = useState(hydratedShowCanvasHud);
   const canvasHudHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
+  const shouldShowMiniMap = hydratedShowCanvasHud && hydratedShowMiniMap && hasRooms;
   const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
   const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isMobile } = useMobile();
+  const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+  const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
+  const [isLandscapeViewport, setIsLandscapeViewport] = useState(false);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
+  const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
+  const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2358,6 +2451,79 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
+  const usesPortraitBottomInspector = isMobile && isPortraitViewport;
+  const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
+  const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
+  const useCompactHud = isMobile || isLandscapeViewport;
+  const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
+  const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
+  const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
+  const expandedLeftSidebarWidth = isMobile
+    ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
+    : isCompactLandscapeViewport
+      ? COMPACT_LANDSCAPE_SIDEBAR_EXPANDED_WIDTH_CSS
+      : `${DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX}px`;
+  const leftSidebarWidth = leftSidebarContent
+    ? isLeftSidebarCollapsed
+      ? `${DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX}px`
+      : expandedLeftSidebarWidth
+    : null;
+  const rightInspectorWidth = usesPortraitBottomInspector
+    ? null
+    : isDesktopInspectorCollapsed
+      ? `${DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX}px`
+      : isCompactLandscapeInspector
+        ? COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS
+        : `${DESKTOP_INSPECTOR_EXPANDED_WIDTH_PX}px`;
+  const editorGridTemplateColumns = [leftSidebarWidth, "minmax(0,1fr)", rightInspectorWidth]
+    .filter((value): value is string => value !== null)
+    .join(" ");
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
+    const compactLandscapeMediaQuery = window.matchMedia("(max-height: 540px) and (orientation: landscape)");
+    const landscapeMediaQuery = window.matchMedia("(orientation: landscape)");
+    const updateIsPortraitViewport = () => {
+      setIsPortraitViewport(portraitMediaQuery.matches);
+      setIsCompactLandscapeViewport(compactLandscapeMediaQuery.matches);
+      setIsLandscapeViewport(landscapeMediaQuery.matches);
+    };
+
+    updateIsPortraitViewport();
+    portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
+    compactLandscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
+    landscapeMediaQuery.addEventListener("change", updateIsPortraitViewport);
+
+    return () => {
+      portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+      compactLandscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+      landscapeMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isCompactLandscapeInspector) {
+      return;
+    }
+
+    setIsDesktopInspectorCollapsed(true);
+  }, [isCompactLandscapeInspector]);
+
+  useEffect(() => {
+    setIsLeftSidebarCollapsed(isMobile);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!usesPortraitBottomInspector) {
+      return;
+    }
+
+    setIsPortraitInspectorCollapsed(true);
+  }, [usesPortraitBottomInspector]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {
@@ -2365,7 +2531,7 @@ export default function EditorCanvas({
       canvasHudHideTimeoutRef.current = null;
     }
 
-    if (showCanvasHud) {
+    if (hydratedShowCanvasHud) {
       setIsCanvasHudPresent(true);
       return;
     }
@@ -2382,7 +2548,7 @@ export default function EditorCanvas({
       clearTimeout(canvasHudHideTimeoutRef.current);
       canvasHudHideTimeoutRef.current = null;
     };
-  }, [isCanvasHudPresent, showCanvasHud]);
+  }, [hydratedShowCanvasHud, isCanvasHudPresent]);
 
   useEffect(() => {
     if (miniMapHideTimeoutRef.current) {
@@ -2409,13 +2575,32 @@ export default function EditorCanvas({
     };
   }, [isMiniMapPresent, shouldShowMiniMap]);
 
+  const handleZoomIn = useCallback(() => {
+    zoomAtScreenPoint(
+      { x: viewport.width / 2, y: viewport.height / 2 },
+      ZOOM_STEP
+    );
+  }, [viewport.height, viewport.width, zoomAtScreenPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    zoomAtScreenPoint(
+      { x: viewport.width / 2, y: viewport.height / 2 },
+      1 / ZOOM_STEP
+    );
+  }, [viewport.height, viewport.width, zoomAtScreenPoint]);
+
   return (
     <section
       ref={sectionRef}
       aria-label="SpaceForge floor plan editor canvas"
       aria-describedby={instructionsId}
       role="region"
-      className="relative grid h-full w-full grid-rows-[auto_minmax(0,1fr)]"
+      className={cn(
+        "relative grid h-full w-full",
+        usesPortraitBottomInspector
+          ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+          : "grid-rows-[auto_minmax(0,1fr)]"
+      )}
     >
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
@@ -2436,16 +2621,64 @@ export default function EditorCanvas({
           exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
         />
       </div>
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
+      <div
+        className="grid min-h-0 gap-3 p-3 transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-4 sm:p-4 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5"
+        style={{ gridTemplateColumns: editorGridTemplateColumns }}
+      >
         {leftSidebarContent ? (
           <aside
-            className="hidden min-h-0 overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
+            className="min-h-0"
             aria-label="Project sidebar"
+            style={{
+              width: leftSidebarWidth ?? undefined,
+              transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
           >
-            {leftSidebarContent}
+            <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                      onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
+                      className={cn(
+                        "absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
+                    >
+                      {isLeftSidebarCollapsed ? (
+                        <PanelLeftExpand className="size-4" />
+                      ) : (
+                        <PanelLeftCollapse className="size-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="start">
+                    {isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
+                  isLeftSidebarCollapsed
+                    ? "pointer-events-none -translate-x-2 opacity-0"
+                    : "translate-x-0 opacity-100"
+                )}
+                aria-hidden={isLeftSidebarCollapsed}
+              >
+                {leftSidebarContent}
+              </div>
+            </div>
           </aside>
         ) : null}
-        <div className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+        <div
+          className="relative min-h-0 overflow-hidden rounded-xl border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+          style={{ backgroundColor: canvasBackgroundCss }}
+        >
           <div
             ref={containerRef}
             tabIndex={-1}
@@ -2454,25 +2687,33 @@ export default function EditorCanvas({
           {isCanvasHudPresent ? (
             <div
               className={cn(
-                "pointer-events-none absolute bottom-3 left-3 z-10 flex items-end gap-2 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:bottom-4 sm:left-4",
-                showCanvasHud
+                "pointer-events-none absolute z-10 flex items-end transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                useCompactHud
+                  ? isPortraitViewport
+                    ? "bottom-2 left-2 gap-1.5"
+                    : "left-2 bottom-2 gap-1.5"
+                  : "bottom-3 left-3 gap-2 sm:bottom-4 sm:left-4",
+                hydratedShowCanvasHud
                   ? "translate-y-0 scale-100 opacity-100"
                   : "translate-y-1 scale-[0.985] opacity-0"
               )}
             >
-              <CanvasHudCard>
+              <CanvasHudCard className={useCompactHud ? "px-2.5 py-1.5" : undefined}>
                 <div
-                  className="text-[11px] font-medium tracking-[0.04em] text-foreground/72"
+                  className={cn(
+                    "font-medium tracking-[0.04em] text-foreground/72",
+                    useCompactHud ? "text-[10px]" : "text-[11px]"
+                  )}
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {scaleOverlay.label}
                 </div>
                 <div
-                  className="mt-1 h-2 border-x border-t border-foreground/70"
-                  style={{ width: `${scaleOverlay.widthPx}px` }}
+                  className={cn("mt-1 border-x border-t border-foreground/70", useCompactHud ? "h-1.5" : "h-2")}
+                  style={{ width: `${useCompactHud ? Math.round(scaleOverlay.widthPx * 0.78) : scaleOverlay.widthPx}px` }}
                 />
                 <div
-                  className="mt-1 text-[11px] text-muted-foreground"
+                  className={cn("mt-1 text-muted-foreground", useCompactHud ? "text-[10px]" : "text-[11px]")}
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {hydratedSnappingEnabled
@@ -2481,32 +2722,99 @@ export default function EditorCanvas({
                 </div>
               </CanvasHudCard>
               <NorthIndicatorControl
-                bearingDegrees={northBearingDegrees}
-                viewRotationDegrees={canvasRotationDegrees}
+                bearingDegrees={hydratedNorthBearingDegrees}
+                viewRotationDegrees={hydratedCanvasRotationDegrees}
                 surfaceState={northIndicatorSurfaceState}
                 isDragging={northDragTooltip !== null}
                 onPointerDown={handleNorthIndicatorPointerDown}
                 onPointerEnter={() => setIsNorthIndicatorHovered(true)}
                 onPointerLeave={() => setIsNorthIndicatorHovered(false)}
+                compact={useCompactHud}
               />
               {CANVAS_ROTATION_ENABLED ? (
-                <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
+                <div
+                  ref={canvasRotationIndicatorSlotRef}
+                  className={cn("relative shrink-0", useCompactHud ? "h-11 w-11" : "h-14 w-14")}
+                >
                   <div className="absolute inset-0 flex items-center justify-center">
                     <CanvasRotationIndicatorControl
-                      rotationDegrees={canvasRotationDegrees}
-                      northBearingDegrees={northBearingDegrees}
+                      rotationDegrees={hydratedCanvasRotationDegrees}
+                      northBearingDegrees={hydratedNorthBearingDegrees}
                       surfaceState={canvasRotationIndicatorSurfaceState}
                       onReset={resetCanvasRotation}
+                      compact={useCompactHud}
                     />
                   </div>
                 </div>
               ) : null}
             </div>
           ) : null}
+          {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
+                useCompactMobileControls ? "top-2 right-2 gap-1.5" : "top-3 right-3 gap-2"
+              )}
+            >
+              {shouldShowTouchZoomControls ? (
+                <ButtonGroup
+                  className={cn(
+                    "pointer-events-auto flex-col border border-border/70 bg-background/90 backdrop-blur-sm dark:bg-zinc-950/78",
+                    useCompactMobileControls ? "rounded-2xl" : "rounded-xl"
+                  )}
+                >
+                  <div data-slot="button-group-item">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Zoom in"
+                      onClick={handleZoomIn}
+                      className={cn(useCompactMobileControls && "size-9 rounded-xl")}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </div>
+                  <div data-slot="button-group-item">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Zoom out"
+                      onClick={handleZoomOut}
+                      className={cn(useCompactMobileControls && "size-9 rounded-xl")}
+                    >
+                      <Minus className="size-4" />
+                    </Button>
+                  </div>
+                </ButtonGroup>
+              ) : null}
+              {shouldShowTouchCancelButton ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  aria-label="Cancel drawing"
+                  onClick={resetDraft}
+                  className={cn(
+                    "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
+                    useCompactMobileControls && "size-9 rounded-xl"
+                  )}
+                >
+                  <X className="size-4" />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {isMiniMapPresent ? (
             <div
               className={cn(
-                "pointer-events-none absolute bottom-4 right-4 z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
+                "pointer-events-none absolute z-10 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                useCompactHud
+                  ? isPortraitViewport
+                    ? "right-2 bottom-2"
+                    : "right-2 bottom-2"
+                  : "bottom-4 right-4 [@media(max-height:540px)_and_(orientation:landscape)]:bottom-3 [@media(max-height:540px)_and_(orientation:landscape)]:right-3",
                 shouldShowMiniMap
                   ? "translate-y-0 scale-100 opacity-100"
                   : "translate-y-1 scale-[0.985] opacity-0"
@@ -2519,6 +2827,7 @@ export default function EditorCanvas({
                 themeMode={editorThemeMode}
                 onPanToWorldPoint={(point) => setCameraCenterMm(point.x, point.y)}
                 onInteractionActiveChange={setCanvasInteractionActive}
+                compact={useCompactHud}
               />
             </div>
           ) : null}
@@ -2565,13 +2874,110 @@ export default function EditorCanvas({
             </aside>
           ) : null}
         </div>
-        <aside className="hidden min-h-0 overflow-hidden lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
-          {inspectorContent}
-        </aside>
-        <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
-          {compactInspectorContent}
+        <aside
+          aria-label="Editor inspector"
+          className="min-h-0"
+          style={{
+            width: rightInspectorWidth ?? undefined,
+            transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+            display: usesPortraitBottomInspector ? "none" : undefined,
+          }}
+        >
+          <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <ImmediateTooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                      onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
+                      className={cn(
+                        "absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
+                    >
+                    {isDesktopInspectorCollapsed ? (
+                      <PanelRightExpand className="size-4" />
+                    ) : (
+                      <PanelRightCollapse className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" align="start">
+                  {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                </TooltipContent>
+              </Tooltip>
+            </ImmediateTooltipProvider>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
+                isDesktopInspectorCollapsed
+                  ? "pointer-events-none translate-x-2 opacity-0"
+                  : "translate-x-0 opacity-100"
+              )}
+              aria-hidden={isDesktopInspectorCollapsed}
+            >
+              {inspectorContent}
+            </div>
+          </div>
         </aside>
       </div>
+      {usesPortraitBottomInspector ? (
+        <aside
+          aria-label="Editor inspector"
+          className="min-h-0 px-3 pb-0 sm:hidden"
+          style={{
+            height: isPortraitInspectorCollapsed
+              ? `${MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX}px`
+              : MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS,
+            transition: "height 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
+          <div className="flex h-full w-full flex-col overflow-hidden rounded-t-xl border border-zinc-200/80 border-b-0 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="flex h-11 shrink-0 items-center px-2">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={isPortraitInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                      onClick={() => setIsPortraitInspectorCollapsed((current) => !current)}
+                      className={cn(
+                        "text-muted-foreground hover:text-foreground",
+                        useCompactMobileControls && "size-9 rounded-xl"
+                      )}
+                    >
+                      {isPortraitInspectorCollapsed ? (
+                        <PanelBottomExpand className="size-4" />
+                      ) : (
+                        <PanelBottomCollapse className="size-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start">
+                    {isPortraitInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+            </div>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden px-2 pb-2 transition-[opacity,transform] duration-200 ease-out",
+                isPortraitInspectorCollapsed
+                  ? "pointer-events-none translate-y-2 opacity-0"
+                  : "translate-y-0 opacity-100"
+              )}
+              aria-hidden={isPortraitInspectorCollapsed}
+            >
+              {compactInspectorContent}
+            </div>
+          </div>
+        </aside>
+      ) : null}
       {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
         <aside
           className={`pointer-events-none absolute z-30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${

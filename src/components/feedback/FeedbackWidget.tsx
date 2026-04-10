@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, LoaderCircle, MessageSquare, Send, ThumbsDown, ThumbsUp, X } from "@/components/ui/icons";
 import { submitFeedback } from "@/lib/feedback/client";
 import {
@@ -45,6 +45,7 @@ type FeedbackWidgetProps = {
   promptVariant?: string | null;
   surface?: "light" | "dark";
   getMetadata?: () => FeedbackMetadata | null;
+  leadingMobileAction?: ReactNode;
 };
 
 type FeedbackPanelContentProps = {
@@ -402,6 +403,7 @@ export function FeedbackWidget({
   promptVariant = FEEDBACK_PROMPT_VARIANT,
   surface = "light",
   getMetadata,
+  leadingMobileAction,
 }: FeedbackWidgetProps) {
   const [openedAtMs] = useState(() => Date.now());
   const isOpenRef = useRef(false);
@@ -854,20 +856,23 @@ export function FeedbackWidget({
           </Card>
         ) : null}
 
-        <button
-          type="button"
-          onClick={openManualFlow}
-          className={cn(
-            "pointer-events-auto inline-flex size-12 shrink-0 items-center justify-center rounded-full border shadow-lg transition-[colors,box-shadow,opacity,transform] duration-75 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
-            isDarkSurface
-              ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
-              : "border-border/70 bg-background/94 text-foreground hover:bg-background",
-            isMobileReady && isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
-          )}
-          aria-label="Open feedback"
-        >
-          <MessageSquare className="size-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {leadingMobileAction}
+          <button
+            type="button"
+            onClick={openManualFlow}
+            className={cn(
+              "pointer-events-auto inline-flex size-12 shrink-0 items-center justify-center rounded-full border shadow-lg transition-[colors,box-shadow,opacity,transform] duration-75 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+              isDarkSurface
+                ? "border-white/12 bg-black/72 text-white hover:bg-black/82"
+                : "border-border/70 bg-background/94 text-foreground hover:bg-background",
+              isMobileReady && isMobile && isPanelVisible ? "pointer-events-none opacity-0" : "opacity-100"
+            )}
+            aria-label="Open feedback"
+          >
+            <MessageSquare className="size-5" />
+          </button>
+        </div>
       </div>
 
       <ResponsiveDialog
