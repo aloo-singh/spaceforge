@@ -159,6 +159,7 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -166,6 +167,7 @@ import {
   TooltipTrigger,
   tooltipContentClassName,
 } from "@/components/ui/tooltip";
+import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
@@ -842,6 +844,8 @@ export default function EditorCanvas({
   const viewport = useEditorStore((state) => state.viewport);
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const hasRooms = hasHydratedClient && roomCount > 0;
+  const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
+  const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isCanvasReadyForExport, setIsCanvasReadyForExport] = useState(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -2344,6 +2348,9 @@ export default function EditorCanvas({
   const shouldShowMiniMap = showCanvasHud && showMiniMap && hasRooms;
   const [isMiniMapPresent, setIsMiniMapPresent] = useState(shouldShowMiniMap);
   const miniMapHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isMobile } = useMobile();
+  const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+  const [isInspectorDrawerOpen, setIsInspectorDrawerOpen] = useState(true);
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2358,6 +2365,29 @@ export default function EditorCanvas({
   ) : (
     <EditorInspectorEmptyState />
   );
+  const inspectorDrawerSide = isMobile && isPortraitViewport ? "bottom" : "right";
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const portraitMediaQuery = window.matchMedia("(orientation: portrait)");
+    const updateIsPortraitViewport = () => {
+      setIsPortraitViewport(portraitMediaQuery.matches);
+    };
+
+    updateIsPortraitViewport();
+    portraitMediaQuery.addEventListener("change", updateIsPortraitViewport);
+
+    return () => {
+      portraitMediaQuery.removeEventListener("change", updateIsPortraitViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsInspectorDrawerOpen(true);
+  }, [inspectorDrawerSide, selectedNorthIndicator, selectedRoomId]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {
@@ -2436,7 +2466,14 @@ export default function EditorCanvas({
           exportDisabledReason={!hasRooms ? "Draw a room before exporting." : undefined}
         />
       </div>
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)_15rem] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
+      <div
+        className={cn(
+          "grid min-h-0 gap-3 p-3 sm:gap-4 sm:p-4 [@media(max-height:540px)_and_(orientation:landscape)]:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5",
+          leftSidebarContent
+            ? "grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1 [@media(max-height:540px)_and_(orientation:landscape)]:grid-cols-[15rem_minmax(0,1fr)] [@media(max-height:540px)_and_(orientation:landscape)]:grid-rows-1"
+            : "grid-rows-1"
+        )}
+      >
         {leftSidebarContent ? (
           <aside
             className="hidden min-h-0 overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex [@media(max-height:540px)_and_(orientation:landscape)]:flex"
@@ -2481,8 +2518,8 @@ export default function EditorCanvas({
                 </div>
               </CanvasHudCard>
               <NorthIndicatorControl
-                bearingDegrees={northBearingDegrees}
-                viewRotationDegrees={canvasRotationDegrees}
+                bearingDegrees={hydratedNorthBearingDegrees}
+                viewRotationDegrees={hydratedCanvasRotationDegrees}
                 surfaceState={northIndicatorSurfaceState}
                 isDragging={northDragTooltip !== null}
                 onPointerDown={handleNorthIndicatorPointerDown}
@@ -2493,8 +2530,8 @@ export default function EditorCanvas({
                 <div ref={canvasRotationIndicatorSlotRef} className="relative h-14 w-14 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center">
                     <CanvasRotationIndicatorControl
-                      rotationDegrees={canvasRotationDegrees}
-                      northBearingDegrees={northBearingDegrees}
+                      rotationDegrees={hydratedCanvasRotationDegrees}
+                      northBearingDegrees={hydratedNorthBearingDegrees}
                       surfaceState={canvasRotationIndicatorSurfaceState}
                       onReset={resetCanvasRotation}
                     />
@@ -2565,13 +2602,26 @@ export default function EditorCanvas({
             </aside>
           ) : null}
         </div>
-        <aside className="hidden min-h-0 overflow-hidden lg:block [@media(max-height:540px)_and_(orientation:landscape)]:block" aria-label="Editor inspector">
-          {inspectorContent}
-        </aside>
-        <aside className="lg:hidden [@media(max-height:540px)_and_(orientation:landscape)]:hidden" aria-label="Editor inspector">
-          {compactInspectorContent}
-        </aside>
       </div>
+      <Drawer
+        open={isInspectorDrawerOpen}
+        onOpenChange={setIsInspectorDrawerOpen}
+        shouldScaleBackground={false}
+        direction={inspectorDrawerSide}
+      >
+        <DrawerContent
+          side={inspectorDrawerSide}
+          aria-label="Editor inspector"
+          className={cn(
+            inspectorDrawerSide === "right"
+              ? "top-[calc(env(safe-area-inset-top)+4.75rem)] bottom-3 w-[min(20rem,calc(100vw-1.5rem))] [@media(max-height:540px)_and_(orientation:landscape)]:top-[calc(env(safe-area-inset-top)+4rem)] [@media(max-height:540px)_and_(orientation:landscape)]:bottom-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:w-[min(15rem,calc(100vw-1rem))]"
+              : "w-auto"
+          )}
+        >
+          <DrawerTitle className="sr-only">Editor inspector</DrawerTitle>
+          {inspectorDrawerSide === "right" ? inspectorContent : compactInspectorContent}
+        </DrawerContent>
+      </Drawer>
       {displayedHint?.id === "project-name" && anchoredProjectNameHintPosition ? (
         <aside
           className={`pointer-events-none absolute z-30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
