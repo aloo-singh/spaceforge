@@ -13,7 +13,7 @@ import {
 import { useTheme } from "next-themes";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
-import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM } from "@/lib/editor/constants";
+import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM, ZOOM_STEP } from "@/lib/editor/constants";
 import {
   getOrthogonalSnappedPoint,
   pointsEqual,
@@ -159,12 +159,15 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonGroup } from "@/components/ui/button";
 import {
+  Minus,
   PanelBottomCollapse,
   PanelBottomExpand,
+  Plus,
   PanelRightCollapse,
   PanelRightExpand,
+  X,
 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
@@ -853,7 +856,9 @@ export default function EditorCanvas({
   const setCanvasInteractionActive = useEditorStore((state) => state.setCanvasInteractionActive);
   const camera = useEditorStore((state) => state.camera);
   const viewport = useEditorStore((state) => state.viewport);
+  const zoomAtScreenPoint = useEditorStore((state) => state.zoomAtScreenPoint);
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
+  const resetDraft = useEditorStore((state) => state.resetDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
@@ -2407,6 +2412,8 @@ export default function EditorCanvas({
   const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
+  const shouldShowTouchZoomControls = isMobile;
+  const shouldShowTouchCancelButton = isMobile && roomDraftPointCount > 0;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2495,6 +2502,20 @@ export default function EditorCanvas({
       miniMapHideTimeoutRef.current = null;
     };
   }, [isMiniMapPresent, shouldShowMiniMap]);
+
+  const handleZoomIn = useCallback(() => {
+    zoomAtScreenPoint(
+      { x: viewport.width / 2, y: viewport.height / 2 },
+      ZOOM_STEP
+    );
+  }, [viewport.height, viewport.width, zoomAtScreenPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    zoomAtScreenPoint(
+      { x: viewport.width / 2, y: viewport.height / 2 },
+      1 / ZOOM_STEP
+    );
+  }, [viewport.height, viewport.width, zoomAtScreenPoint]);
 
   return (
     <section
@@ -2602,6 +2623,48 @@ export default function EditorCanvas({
                     />
                   </div>
                 </div>
+              ) : null}
+            </div>
+          ) : null}
+          {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
+            <div className="pointer-events-none absolute top-3 right-3 z-20 flex flex-col items-end gap-2 sm:top-4 sm:right-4">
+              {shouldShowTouchZoomControls ? (
+                <ButtonGroup className="pointer-events-auto flex-col rounded-xl border border-border/70 bg-background/90 backdrop-blur-sm dark:bg-zinc-950/78">
+                  <div data-slot="button-group-item">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Zoom in"
+                      onClick={handleZoomIn}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </div>
+                  <div data-slot="button-group-item">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Zoom out"
+                      onClick={handleZoomOut}
+                    >
+                      <Minus className="size-4" />
+                    </Button>
+                  </div>
+                </ButtonGroup>
+              ) : null}
+              {shouldShowTouchCancelButton ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  aria-label="Cancel drawing"
+                  onClick={resetDraft}
+                  className="pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
+                >
+                  <X className="size-4" />
+                </Button>
               ) : null}
             </div>
           ) : null}

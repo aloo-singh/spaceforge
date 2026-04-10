@@ -33,6 +33,7 @@ export {
   IconLogout as LogOut,
   IconMail as Mail,
   IconMessage as MessageSquare,
+  IconMinus as Minus,
   IconPencil as PencilLine,
   IconPlus as Plus,
   IconRefresh as RefreshCcw,
