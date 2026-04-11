@@ -341,6 +341,7 @@ export function attachRoomDrawInput(
       diagonalLine: null,
       segments: fallbackSegment ? [fallbackSegment] : [],
       constraintMode,
+      diagonalGuideSegments: [],
     };
   };
 

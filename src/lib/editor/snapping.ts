@@ -10,7 +10,6 @@ const ADAPTIVE_SNAP_MEDIUM_ZOOM_THRESHOLD = 0.04;
 const ADAPTIVE_SNAP_FINE_ZOOM_THRESHOLD = 0.1;
 const SCALE_BAR_MAX_WIDTH_PX = 112;
 const PREDICTIVE_GUIDELINE_THRESHOLD_PX = 36;
-const SHORT_GUIDELINE_TARGET_PX = 44;
 const GUIDE_EXTENSION_MM = 1_000_000;
 const SCALE_BAR_WORLD_STEPS_MM = [
   100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000,
@@ -30,6 +29,7 @@ export type SnapGuides = {
   diagonalLine: { slope: 1 | -1; constant: number } | null;
   segments: SnapGuideSegment[];
   constraintMode: DrawConstraintMode;
+  diagonalGuideSegments: SnapGuideSegment[];
 };
 
 export function getActiveSnapStepMm(camera: Pick<CameraState, "pixelsPerMm">): number {
@@ -80,6 +80,7 @@ export function getPredictiveSnapGuides(
   const horizontalCandidates = new Map<number, AxisGuideSource[]>();
   const positiveDiagonalCandidates = new Set<number>();
   const negativeDiagonalCandidates = new Set<number>();
+  const diagonalGuideCandidates: Point[] = [];
   const excludedRoomIds = options?.excludeRoomIds ?? EMPTY_EXCLUDED_ROOM_IDS;
   const constraintMode = options?.constraintMode ?? "orthogonal";
 
@@ -91,6 +92,8 @@ export function getPredictiveSnapGuides(
       addAxisGuideSource(horizontalCandidates, point.y, { axis: "horizontal", point });
       positiveDiagonalCandidates.add(point.x - point.y);
       negativeDiagonalCandidates.add(point.x + point.y);
+      // Collect vertices for diagonal guidelines
+      diagonalGuideCandidates.push(point);
     }
 
     for (let index = 0; index < room.points.length; index += 1) {
@@ -151,6 +154,54 @@ export function getPredictiveSnapGuides(
           ? nearestPositiveDiagonal
           : nearestNegativeDiagonal;
 
+  // Find diagonal guide segments from vertices
+  const diagonalGuideSegments: SnapGuideSegment[] = [];
+
+  // Show diagonal guidelines when cursor is close to diagonal lines (same proximity rules as orthogonal)
+  if (nearestPositiveDiagonal) {
+    const constant = nearestPositiveDiagonal.constant;
+    for (const vertex of diagonalGuideCandidates) {
+      // Check if this vertex lies on the positive diagonal line that the cursor is close to
+      if (Math.abs((vertex.x - vertex.y) - constant) < 0.1) {
+        // Determine direction towards cursor along the diagonal line
+        const dx = cursorWorld.x - vertex.x;
+        // Extend towards the cursor: if cursor is to the right, extend right; if to the left, extend left
+        const direction = dx >= 0 ? 1 : -1;
+
+        // Show positive diagonal guideline from this vertex towards the cursor
+        diagonalGuideSegments.push({
+          start: vertex,
+          end: {
+            x: vertex.x + direction * GUIDE_EXTENSION_MM,
+            y: vertex.y + direction * GUIDE_EXTENSION_MM,
+          },
+        });
+      }
+    }
+  }
+
+  if (nearestNegativeDiagonal) {
+    const constant = nearestNegativeDiagonal.constant;
+    for (const vertex of diagonalGuideCandidates) {
+      // Check if this vertex lies on the negative diagonal line that the cursor is close to
+      if (Math.abs((vertex.x + vertex.y) - constant) < 0.1) {
+        // Determine direction towards cursor along the diagonal line
+        const dx = cursorWorld.x - vertex.x;
+        // Extend towards the cursor: if cursor is to the right, extend right; if to the left, extend left
+        const direction = dx >= 0 ? 1 : -1;
+
+        // Show negative diagonal guideline from this vertex towards the cursor
+        diagonalGuideSegments.push({
+          start: vertex,
+          end: {
+            x: vertex.x + direction * GUIDE_EXTENSION_MM,
+            y: vertex.y - direction * GUIDE_EXTENSION_MM,
+          },
+        });
+      }
+    }
+  }
+
   const point =
     constraintMode === "diagonal45" && nearestDiagonal
       ? nearestDiagonal.point
@@ -160,40 +211,19 @@ export function getPredictiveSnapGuides(
         };
 
   const segments: SnapGuideSegment[] = [];
-  if (constraintMode === "diagonal45" && nearestDiagonal) {
-    segments.push({
-      start: { x: cursorWorld.x, y: cursorWorld.y },
-      end: nearestDiagonal.point,
-    });
-  } else {
-    if (nearestVertical !== null) {
-      const segment = getAxisGuideSegment(nearestVertical, cursorWorld);
-      if (segment) segments.push(segment);
-    }
 
-    if (nearestHorizontal !== null) {
-      const segment = getAxisGuideSegment(nearestHorizontal, cursorWorld);
-      if (segment) segments.push(segment);
-    }
+  // Always show orthogonal guidelines
+  if (nearestVertical !== null) {
+    const segment = getAxisGuideSegment(nearestVertical, cursorWorld);
+    if (segment) segments.push(segment);
   }
 
-  if (options?.anchorPoint) {
-    const constrainedPoint = getConstrainedDrawPoint(
-      options.anchorPoint,
-      point,
-      getActiveSnapStepMm(camera),
-      null,
-      constraintMode
-    );
-    const alignmentSegment = getShortAlignmentGuideSegment(
-      options.anchorPoint,
-      constrainedPoint,
-      camera.pixelsPerMm
-    );
-    if (alignmentSegment) {
-      segments.push(alignmentSegment);
-    }
+  if (nearestHorizontal !== null) {
+    const segment = getAxisGuideSegment(nearestHorizontal, cursorWorld);
+    if (segment) segments.push(segment);
   }
+
+
 
   if (
     nearestVertical === null &&
@@ -214,6 +244,7 @@ export function getPredictiveSnapGuides(
         : null,
     segments,
     constraintMode,
+    diagonalGuideSegments,
   };
 }
 
@@ -420,28 +451,7 @@ function projectEightWayPoint(
   return negativeCandidate;
 }
 
-function getShortAlignmentGuideSegment(
-  anchorPoint: Point,
-  constrainedPoint: Point,
-  pixelsPerMm: number
-): SnapGuideSegment | null {
-  const dx = constrainedPoint.x - anchorPoint.x;
-  const dy = constrainedPoint.y - anchorPoint.y;
-  const lengthMm = Math.hypot(dx, dy);
-  if (lengthMm <= 0) return null;
 
-  const visibleLengthMm = Math.min(lengthMm, SHORT_GUIDELINE_TARGET_PX / pixelsPerMm);
-  const unitX = dx / lengthMm;
-  const unitY = dy / lengthMm;
-
-  return {
-    start: {
-      x: constrainedPoint.x - unitX * visibleLengthMm,
-      y: constrainedPoint.y - unitY * visibleLengthMm,
-    },
-    end: constrainedPoint,
-  };
-}
 
 function addAxisGuideSource(
   target: Map<number, AxisGuideSource[]>,
@@ -553,6 +563,8 @@ function projectPointToNegativeDiagonal(point: Point, constant: number): Point {
 function snapMaybe(value: number, gridSizeMm: number | null): number {
   return gridSizeMm ? snapToGrid(value, gridSizeMm) : value;
 }
+
+
 
 function getNearestEightWayOctant(dx: number, dy: number): number {
   if (dx === 0 && dy === 0) return 0;

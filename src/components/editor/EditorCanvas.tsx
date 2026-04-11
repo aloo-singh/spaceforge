@@ -3055,6 +3055,11 @@ function drawScene(
   theme: EditorCanvasTheme,
   hideCursorHud: boolean
 ) {
+  clearContainerChildren(roomLabelContainer);
+  clearContainerChildren(dimensionOverlayContainer);
+  if (draftConstraintMode === "diagonal45" && cursorWorld && state.roomDraft.points.length > 0) {
+    drawAngleIndicator(roomLabelContainer, worldToScreen(cursorWorld, state.camera, state.viewport), theme);
+  }
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
   const activeSnapStepMm = getActiveSnapStepMm(state.camera);
   const draftAnchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
@@ -5484,6 +5489,16 @@ function drawSnapGuides(
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
+  // Draw diagonal guide segments in blue
+  for (const segment of guides.diagonalGuideSegments) {
+    drawDashedGuideLine(
+      graphics,
+      worldToScreen(segment.start, camera, viewport),
+      worldToScreen(segment.end, camera, viewport),
+      theme.interactiveAccent
+    );
+  }
+
   if (guides.segments.length > 0) {
     for (const segment of guides.segments) {
       drawDashedGuideLine(
@@ -5652,6 +5667,38 @@ function drawCursorHud(
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.9 });
   graphics.circle(point.x, point.y, dotRadius);
   graphics.fill();
+}
+
+function drawAngleIndicator(
+  labelContainer: Container,
+  point: Point,
+  theme: EditorCanvasTheme
+) {
+  const textResolution = getTextResolution();
+  const text = new Text({
+    text: "45°",
+    resolution: textResolution,
+    style: {
+      fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+      fontSize: 12,
+      fontWeight: "500",
+      fill: theme.roomLabelFill,
+      stroke: {
+        color: theme.roomLabelStroke,
+        width: 2,
+        join: "round",
+      },
+      letterSpacing: 0.2,
+    },
+  });
+  text.roundPixels = true;
+  text.anchor.set(0.5, 1); // Center horizontally, bottom align
+  text.position.set(
+    snapToPixel(point.x, textResolution),
+    snapToPixel(point.y - 8, textResolution) // Position above the cursor
+  );
+  text.alpha = 0.9;
+  labelContainer.addChild(text);
 }
 
 function drawDashedGuideLine(
