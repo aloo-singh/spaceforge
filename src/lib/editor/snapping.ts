@@ -11,6 +11,7 @@ const ADAPTIVE_SNAP_FINE_ZOOM_THRESHOLD = 0.1;
 const SCALE_BAR_MAX_WIDTH_PX = 112;
 const PREDICTIVE_GUIDELINE_THRESHOLD_PX = 36;
 const SHORT_GUIDELINE_TARGET_PX = 44;
+const GUIDE_EXTENSION_MM = 1_000_000;
 const SCALE_BAR_WORLD_STEPS_MM = [
   100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000,
 ] as const;
@@ -75,8 +76,8 @@ export function getPredictiveSnapGuides(
     anchorPoint?: Point;
   }
 ): SnapGuides | null {
-  const verticalCandidates = new Set<number>();
-  const horizontalCandidates = new Set<number>();
+  const verticalCandidates = new Map<number, AxisGuideSource[]>();
+  const horizontalCandidates = new Map<number, AxisGuideSource[]>();
   const positiveDiagonalCandidates = new Set<number>();
   const negativeDiagonalCandidates = new Set<number>();
   const excludedRoomIds = options?.excludeRoomIds ?? EMPTY_EXCLUDED_ROOM_IDS;
@@ -86,8 +87,8 @@ export function getPredictiveSnapGuides(
     if (excludedRoomIds.has(room.id)) continue;
 
     for (const point of room.points) {
-      verticalCandidates.add(point.x);
-      horizontalCandidates.add(point.y);
+      addAxisGuideSource(verticalCandidates, point.x, { axis: "vertical", point });
+      addAxisGuideSource(horizontalCandidates, point.y, { axis: "horizontal", point });
       positiveDiagonalCandidates.add(point.x - point.y);
       negativeDiagonalCandidates.add(point.x + point.y);
     }
@@ -96,9 +97,17 @@ export function getPredictiveSnapGuides(
       const start = room.points[index];
       const end = room.points[(index + 1) % room.points.length];
       if (start.x === end.x) {
-        verticalCandidates.add(start.x);
+        addAxisGuideSource(verticalCandidates, start.x, {
+          axis: "vertical",
+          spanStart: Math.min(start.y, end.y),
+          spanEnd: Math.max(start.y, end.y),
+        });
       } else if (start.y === end.y) {
-        horizontalCandidates.add(start.y);
+        addAxisGuideSource(horizontalCandidates, start.y, {
+          axis: "horizontal",
+          spanStart: Math.min(start.x, end.x),
+          spanEnd: Math.max(start.x, end.x),
+        });
       } else if (Math.abs(end.x - start.x) === Math.abs(end.y - start.y)) {
         if ((end.x - start.x) * (end.y - start.y) > 0) {
           positiveDiagonalCandidates.add(start.x - start.y);
@@ -111,13 +120,15 @@ export function getPredictiveSnapGuides(
 
   const nearestVertical = getNearestAxisCandidateMm(
     verticalCandidates,
-    cursorWorld.x,
-    camera.pixelsPerMm
+    cursorWorld,
+    camera.pixelsPerMm,
+    "vertical"
   );
   const nearestHorizontal = getNearestAxisCandidateMm(
     horizontalCandidates,
-    cursorWorld.y,
-    camera.pixelsPerMm
+    cursorWorld,
+    camera.pixelsPerMm,
+    "horizontal"
   );
   const nearestPositiveDiagonal = getNearestDiagonalCandidate(
     positiveDiagonalCandidates,
@@ -144,8 +155,8 @@ export function getPredictiveSnapGuides(
     constraintMode === "diagonal45" && nearestDiagonal
       ? nearestDiagonal.point
       : {
-          x: nearestVertical ?? cursorWorld.x,
-          y: nearestHorizontal ?? cursorWorld.y,
+          x: nearestVertical?.coordinate ?? cursorWorld.x,
+          y: nearestHorizontal?.coordinate ?? cursorWorld.y,
         };
 
   const segments: SnapGuideSegment[] = [];
@@ -156,17 +167,13 @@ export function getPredictiveSnapGuides(
     });
   } else {
     if (nearestVertical !== null) {
-      segments.push({
-        start: { x: cursorWorld.x, y: cursorWorld.y },
-        end: { x: nearestVertical, y: cursorWorld.y },
-      });
+      const segment = getAxisGuideSegment(nearestVertical, cursorWorld);
+      if (segment) segments.push(segment);
     }
 
     if (nearestHorizontal !== null) {
-      segments.push({
-        start: { x: cursorWorld.x, y: cursorWorld.y },
-        end: { x: cursorWorld.x, y: nearestHorizontal },
-      });
+      const segment = getAxisGuideSegment(nearestHorizontal, cursorWorld);
+      if (segment) segments.push(segment);
     }
   }
 
@@ -290,6 +297,18 @@ export function getScaleOverlayState(camera: Pick<CameraState, "pixelsPerMm">): 
 }
 
 const EMPTY_EXCLUDED_ROOM_IDS = new Set<string>();
+type AxisGuideSource =
+  | { axis: "vertical"; point: Point }
+  | { axis: "vertical"; spanStart: number; spanEnd: number }
+  | { axis: "horizontal"; point: Point }
+  | { axis: "horizontal"; spanStart: number; spanEnd: number };
+
+type AxisGuideCandidate = {
+  axis: "vertical" | "horizontal";
+  coordinate: number;
+  origin: Point;
+  distancePx: number;
+};
 
 function projectOrthogonalPoint(anchor: Point, target: Point): Point {
   const dx = target.x - anchor.x;
@@ -303,24 +322,31 @@ function projectOrthogonalPoint(anchor: Point, target: Point): Point {
 }
 
 function getNearestAxisCandidateMm(
-  candidates: Set<number>,
-  cursorCoordinateMm: number,
-  pixelsPerMm: number
-): number | null {
-  let nearestCoordinate: number | null = null;
+  candidates: Map<number, AxisGuideSource[]>,
+  cursorWorld: Point,
+  pixelsPerMm: number,
+  axis: "vertical" | "horizontal"
+): AxisGuideCandidate | null {
+  let nearestCandidate: AxisGuideCandidate | null = null;
   let nearestDistancePx = Number.POSITIVE_INFINITY;
 
-  for (const candidate of candidates) {
-    const distancePx = Math.abs(candidate - cursorCoordinateMm) * pixelsPerMm;
+  for (const [coordinate, sources] of candidates) {
+    const cursorCoordinateMm = axis === "vertical" ? cursorWorld.x : cursorWorld.y;
+    const distancePx = Math.abs(coordinate - cursorCoordinateMm) * pixelsPerMm;
     if (distancePx > PREDICTIVE_GUIDELINE_THRESHOLD_PX || distancePx >= nearestDistancePx) {
       continue;
     }
 
-    nearestCoordinate = candidate;
+    nearestCandidate = {
+      axis,
+      coordinate,
+      origin: resolveAxisGuideOrigin(axis, coordinate, sources, cursorWorld),
+      distancePx,
+    };
     nearestDistancePx = distancePx;
   }
 
-  return nearestCoordinate;
+  return nearestCandidate;
 }
 
 function getNearestDiagonalCandidate(
@@ -417,6 +443,99 @@ function getShortAlignmentGuideSegment(
   };
 }
 
+function addAxisGuideSource(
+  target: Map<number, AxisGuideSource[]>,
+  coordinate: number,
+  source: AxisGuideSource
+) {
+  const existing = target.get(coordinate);
+  if (existing) {
+    existing.push(source);
+    return;
+  }
+  target.set(coordinate, [source]);
+}
+
+function resolveAxisGuideOrigin(
+  axis: "vertical" | "horizontal",
+  coordinate: number,
+  sources: AxisGuideSource[],
+  cursorWorld: Point
+): Point {
+  let nearestOrigin = getAxisGuideSourcePoint(axis, coordinate, sources[0], cursorWorld);
+  let nearestDistance = getAxisOffsetDistance(axis, nearestOrigin, cursorWorld);
+
+  for (let index = 1; index < sources.length; index += 1) {
+    const candidateOrigin = getAxisGuideSourcePoint(axis, coordinate, sources[index], cursorWorld);
+    const candidateDistance = getAxisOffsetDistance(axis, candidateOrigin, cursorWorld);
+    if (candidateDistance >= nearestDistance) continue;
+    nearestOrigin = candidateOrigin;
+    nearestDistance = candidateDistance;
+  }
+
+  return nearestOrigin;
+}
+
+function getAxisGuideSourcePoint(
+  axis: "vertical" | "horizontal",
+  coordinate: number,
+  source: AxisGuideSource,
+  cursorWorld: Point
+): Point {
+  if ("point" in source) {
+    return source.point;
+  }
+
+  if (axis === "vertical") {
+    return {
+      x: coordinate,
+      y: clampValue(cursorWorld.y, source.spanStart, source.spanEnd),
+    };
+  }
+
+  return {
+    x: clampValue(cursorWorld.x, source.spanStart, source.spanEnd),
+    y: coordinate,
+  };
+}
+
+function getAxisGuideSegment(
+  candidate: AxisGuideCandidate,
+  cursorWorld: Point
+): SnapGuideSegment | null {
+  if (candidate.axis === "vertical") {
+    const delta = cursorWorld.y - candidate.origin.y;
+    if (delta === 0) return null;
+    return {
+      start: candidate.origin,
+      end: {
+        x: candidate.coordinate,
+        y: candidate.origin.y + Math.sign(delta) * GUIDE_EXTENSION_MM,
+      },
+    };
+  }
+
+  const delta = cursorWorld.x - candidate.origin.x;
+  if (delta === 0) return null;
+  return {
+    start: candidate.origin,
+    end: {
+      x: candidate.origin.x + Math.sign(delta) * GUIDE_EXTENSION_MM,
+      y: candidate.coordinate,
+    },
+  };
+}
+
+function getAxisOffsetDistance(
+  axis: "vertical" | "horizontal",
+  point: Point,
+  cursorWorld: Point
+): number {
+  return axis === "vertical"
+    ? Math.abs(point.y - cursorWorld.y)
+    : Math.abs(point.x - cursorWorld.x);
+}
+
 function projectPointToPositiveDiagonal(point: Point, constant: number): Point {
   return {
     x: (point.x + point.y + constant) / 2,
@@ -441,4 +560,8 @@ function getNearestEightWayOctant(dx: number, dy: number): number {
   const angle = Math.atan2(dy, dx);
   const octant = Math.round(angle / (Math.PI / 4));
   return ((octant % 8) + 8) % 8;
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
