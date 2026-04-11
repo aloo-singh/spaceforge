@@ -34,7 +34,9 @@ import {
   getRoomInteriorAssetBounds,
 } from "@/lib/editor/interiorAssets";
 import {
+  getFortyFiveVertexHandleLayouts,
   getOrthogonalWallHandleLayouts,
+  isNonRectangularEightWayRoom,
   hitTestOrthogonalWallHandle,
 } from "@/lib/editor/orthogonalWallResize";
 import {
@@ -3316,7 +3318,9 @@ function drawRooms(
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
-    const vertexHandles = getConstrainedVertexHandleLayouts(room, camera, viewport);
+    const vertexHandles = isNonRectangularEightWayRoom(room)
+      ? getFortyFiveVertexHandleLayouts(room, camera, viewport)
+      : getConstrainedVertexHandleLayouts(room, camera, viewport);
     const wallSegmentHandles =
       vertexHandles.length > 0 ? getOrthogonalWallHandleLayouts(room, camera, viewport) : [];
 
@@ -3345,8 +3349,8 @@ function drawRooms(
             x: end.x - start.x,
             y: end.y - start.y,
           },
-          length: Math.max(handle.width, handle.height),
-          thickness: Math.min(handle.width, handle.height),
+          length: handle.length,
+          thickness: handle.thickness,
           fillColor: theme.interactiveAccent,
           fillAlpha,
           strokeColor: theme.roomOutline,
@@ -4528,6 +4532,7 @@ function drawActiveResizeDimensions(
   if (
     !roomResizeUi.activeWall &&
     !roomResizeUi.activeCorner &&
+    roomResizeUi.activeVertexIndex === null &&
     roomResizeUi.activeWallSegmentIndex === null
   ) {
     return;
@@ -4545,6 +4550,7 @@ function drawActiveResizeDimensions(
     bounds,
     roomResizeUi.activeWall,
     roomResizeUi.activeCorner,
+    roomResizeUi.activeVertexIndex,
     roomResizeUi.activeWallSegmentIndex,
     camera,
     viewport,
@@ -4734,6 +4740,7 @@ function getResizeDimensionLabelSpecs(
   bounds: { minX: number; maxX: number; minY: number; maxY: number } | null,
   activeWall: RectWall | null,
   activeCorner: RectCorner | null,
+  activeVertexIndex: number | null,
   activeWallSegmentIndex: number | null,
   camera: CameraState,
   viewport: ViewportSize,
@@ -4782,6 +4789,10 @@ function getResizeDimensionLabelSpecs(
         settings
       ),
     ];
+  }
+
+  if (activeVertexIndex !== null) {
+    return getResizeDimensionLabelSpecsForVertex(room, activeVertexIndex, camera, viewport);
   }
 
   if (activeWallSegmentIndex !== null) {
@@ -4844,6 +4855,35 @@ function getResizeDimensionLabelSpecsForOrthogonalWallSegment(
   const adjacentWallIndices = [
     (wallSegmentIndex - 1 + pointCount) % pointCount,
     (wallSegmentIndex + 1) % pointCount,
+  ];
+
+  return adjacentWallIndices.flatMap((wallIndex) => {
+    const wallMeasurement = getRoomWallMeasurement(room, wallIndex);
+    if (!wallMeasurement) return [];
+
+    const labelSpec = createDimensionLabelSpecForEdgeMeasurement(
+      room,
+      wallMeasurement,
+      camera,
+      viewport,
+      { wallMeasurementPosition: "outside" }
+    );
+    return labelSpec ? [labelSpec] : [];
+  });
+}
+
+function getResizeDimensionLabelSpecsForVertex(
+  room: Room,
+  vertexIndex: number,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec[] {
+  if (room.points.length < 4) return [];
+
+  const pointCount = room.points.length;
+  const adjacentWallIndices = [
+    (vertexIndex - 1 + pointCount) % pointCount,
+    vertexIndex,
   ];
 
   return adjacentWallIndices.flatMap((wallIndex) => {

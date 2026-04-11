@@ -1,6 +1,7 @@
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import {
   getConstrainedVertexAdjustmentResult,
   getConstrainedVertexHandleLayouts,
@@ -9,9 +10,13 @@ import {
 } from "@/lib/editor/constrainedVertexAdjustments";
 import { getRoomWallSegment } from "@/lib/editor/openings";
 import {
+  getFortyFiveVertexAdjustmentResult,
+  getFortyFiveVertexHandleLayouts,
   getOrthogonalWallAdjustmentResult,
   getOrthogonalWallHandleLayouts,
+  hitTestFortyFiveVertexHandle,
   hitTestOrthogonalWallHandle,
+  isNonRectangularEightWayRoom,
 } from "@/lib/editor/orthogonalWallResize";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
@@ -86,6 +91,7 @@ type RoomResizeInputCallbacks = {
 type ResizeSession = {
   pointerId: number;
   roomId: string;
+  shapeMode: "rect" | "constrained-orthogonal" | "eight-way";
   target:
     | { type: "wall"; wall: RectWall }
     | { type: "corner"; corner: RectCorner }
@@ -116,7 +122,11 @@ function getCursorForWall(wall: RectWall): string {
 function getCursorForWallSegment(room: Room, wallSegmentIndex: number): string {
   const segment = getRoomWallSegment(room, wallSegmentIndex);
   if (!segment) return "";
-  return segment.axis === "horizontal" ? NS_RESIZE_CURSOR : EW_RESIZE_CURSOR;
+  if (segment.axis === "horizontal") return NS_RESIZE_CURSOR;
+  if (segment.axis === "vertical") return EW_RESIZE_CURSOR;
+  return segment.originalStart.x < segment.originalEnd.x === segment.originalStart.y < segment.originalEnd.y
+    ? NWSE_RESIZE_CURSOR
+    : NESW_RESIZE_CURSOR;
 }
 
 function getCursorForCorner(corner: RectCorner): string {
@@ -351,9 +361,10 @@ export function attachRoomResizeInput(
 
     const bounds = getAxisAlignedRoomBounds(room);
     const isConstrainedVertexRoom = isNonRectangularOrthogonalRoom(room);
-    if (!bounds && !isConstrainedVertexRoom) return null;
+    const isEightWayRoom = isNonRectangularEightWayRoom(room);
+    if (!bounds && !isConstrainedVertexRoom && !isEightWayRoom) return null;
 
-    return { room, bounds, isConstrainedVertexRoom, state };
+    return { room, bounds, isConstrainedVertexRoom, isEightWayRoom, state };
   };
 
   const hasSelectedOpeningResizeHandleHit = (screenPoint: Point) => {
@@ -522,11 +533,19 @@ export function attachRoomResizeInput(
         magneticGuides
       );
       if (activeSession.target.type === "vertex") {
-        const nextPoints = getConstrainedVertexAdjustmentResult(
-          activeSession.startPoints,
-          activeSession.target.vertexIndex,
-          resolvedCursorWorld
-        );
+        const nextPoints =
+          activeSession.shapeMode === "eight-way"
+            ? getFortyFiveVertexAdjustmentResult(
+                activeSession.startPoints,
+                activeSession.target.vertexIndex,
+                resolvedCursorWorld,
+                { gridSizeMm: activeSnapStepMm ?? GRID_SIZE_MM }
+              )
+            : getConstrainedVertexAdjustmentResult(
+                activeSession.startPoints,
+                activeSession.target.vertexIndex,
+                resolvedCursorWorld
+              );
         if (!nextPoints) return;
 
         activeSession.latestSnappedPoints = nextPoints;
@@ -590,13 +609,21 @@ export function attachRoomResizeInput(
       screenToWorld(screenPoint, selected.state.camera, selected.state.viewport)
     );
 
-    if (selected.isConstrainedVertexRoom) {
-      const vertexHandles = getConstrainedVertexHandleLayouts(
-        selected.room,
-        selected.state.camera,
-        selected.state.viewport
-      );
-      const hitVertexIndex = hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
+    if (selected.isConstrainedVertexRoom || selected.isEightWayRoom) {
+      const vertexHandles = selected.isEightWayRoom
+        ? getFortyFiveVertexHandleLayouts(
+            selected.room,
+            selected.state.camera,
+            selected.state.viewport
+          )
+        : getConstrainedVertexHandleLayouts(
+            selected.room,
+            selected.state.camera,
+            selected.state.viewport
+          );
+      const hitVertexIndex = selected.isEightWayRoom
+        ? hitTestFortyFiveVertexHandle(vertexHandles, screenPoint)
+        : hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
       const wallHandles = getOrthogonalWallHandleLayouts(
         selected.room,
         selected.state.camera,
@@ -652,14 +679,27 @@ export function attachRoomResizeInput(
     const screenPoint = toCanvasPoint(event);
     if (hasSelectedOpeningResizeHandleHit(screenPoint)) return;
 
-    const hitVertexIndex = selected.isConstrainedVertexRoom
-      ? hitTestConstrainedVertexHandle(
-          getConstrainedVertexHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),
-          screenPoint
-        )
+    const hitVertexIndex = selected.isConstrainedVertexRoom || selected.isEightWayRoom
+      ? selected.isEightWayRoom
+        ? hitTestFortyFiveVertexHandle(
+            getFortyFiveVertexHandleLayouts(
+              selected.room,
+              selected.state.camera,
+              selected.state.viewport
+            ),
+            screenPoint
+          )
+        : hitTestConstrainedVertexHandle(
+            getConstrainedVertexHandleLayouts(
+              selected.room,
+              selected.state.camera,
+              selected.state.viewport
+            ),
+            screenPoint
+          )
       : null;
     const hitWallSegmentIndex =
-      selected.isConstrainedVertexRoom && hitVertexIndex === null
+      (selected.isConstrainedVertexRoom || selected.isEightWayRoom) && hitVertexIndex === null
         ? getHitOrthogonalWallSegment(
             selected.room,
             screenPoint,
@@ -706,6 +746,11 @@ export function attachRoomResizeInput(
       startPoints: selected.room.points.map((point) => ({ ...point })),
       latestSnappedPoints: null,
       latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
+      shapeMode: selected.isEightWayRoom
+        ? "eight-way"
+        : selected.isConstrainedVertexRoom
+          ? "constrained-orthogonal"
+          : "rect",
     };
     selected.state.setCanvasInteractionActive(true);
     if (hitWall) {
