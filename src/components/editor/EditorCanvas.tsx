@@ -15,9 +15,7 @@ import { Application, Container, Graphics, Text } from "pixi.js";
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { GRID_MINOR_SIZE_MM, GRID_SIZE_MM, INITIAL_PIXELS_PER_MM, ZOOM_STEP } from "@/lib/editor/constants";
 import {
-  getOrthogonalSnappedPoint,
   pointsEqual,
-  projectOrthogonalPoint,
   snapPointToGrid,
 } from "@/lib/editor/geometry";
 import { preloadEditorCanvasFonts } from "@/lib/editor/canvasTextFonts";
@@ -71,7 +69,6 @@ import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
   findRoomAtPoint,
   isAxisAlignedRectangle,
-  isOrthogonalPointPath,
   isPointInPolygon,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
@@ -104,10 +101,12 @@ import {
   getCornerResizeMeasurements,
 } from "@/lib/editor/measurements";
 import {
+  getConstrainedDrawPoint,
   getActiveSnapStepMm,
   getMagneticSnapGuidesForSettings,
   getPredictiveSnapGuides,
   getScaleOverlayState,
+  isSupportedDrawPointPath,
   getSnappedPointFromGuides,
   type SnapGuides,
 } from "@/lib/editor/snapping";
@@ -866,6 +865,7 @@ export default function EditorCanvas({
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
+  const draftConstraintModeRef = useRef<"orthogonal" | "diagonal45">("orthogonal");
   const transformAnimationFrameRef = useRef<number | null>(null);
   const stairRotationAnimationsRef = useRef<Map<string, StairRotationAnimation>>(new Map());
   const stairRotationAnimationFrameRef = useRef<number | null>(null);
@@ -1001,6 +1001,7 @@ export default function EditorCanvas({
       transformFeedbackRef.current,
       stairRotationAnimationsRef.current,
       snapGuidesRef.current,
+      draftConstraintModeRef.current,
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag)
     );
@@ -1429,6 +1430,7 @@ export default function EditorCanvas({
         exportViewport,
         getActiveSnapStepMm(exportCamera),
         getActiveSnapStepMm(exportCamera),
+        "orthogonal",
         null,
         exportTheme,
         false
@@ -1748,7 +1750,8 @@ export default function EditorCanvas({
 
   useEffect(() => {
     const syncDimensionsOverride = (isActive: boolean) => {
-      useEditorStore.getState().setDimensionsVisibilityOverrideActive(isActive);
+      const state = useEditorStore.getState();
+      state.setDimensionsVisibilityOverrideActive(state.roomDraft.points.length > 0 ? false : isActive);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2341,6 +2344,9 @@ export default function EditorCanvas({
         },
         onSnapGuidesChange: (guides) => {
           snapGuidesRef.current = guides;
+        },
+        onDraftConstraintModeChange: (mode) => {
+          draftConstraintModeRef.current = mode;
         },
         requestRender: () => {
           drawCurrentScene();
@@ -3045,20 +3051,26 @@ function drawScene(
   transformFeedback: TransformFeedback | null,
   stairRotationAnimations: Map<string, StairRotationAnimation>,
   snapGuides: SnapGuides | null,
+  draftConstraintMode: "orthogonal" | "diagonal45",
   theme: EditorCanvasTheme,
   hideCursorHud: boolean
 ) {
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
   const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+  const draftAnchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
   const predictiveGuides = cursorWorld
-    ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+    ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+        constraintMode: state.roomDraft.points.length > 0 ? draftConstraintMode : "orthogonal",
+        anchorPoint: state.roomDraft.points.length > 0 ? draftAnchorPoint ?? undefined : undefined,
+      })
     : null;
   const magneticGuides = cursorWorld
     ? getMagneticSnapGuidesForSettings(
         state.document.rooms,
         cursorWorld,
         state.camera,
-        state.settings
+        state.settings,
+        { constraintMode: state.roomDraft.points.length > 0 ? draftConstraintMode : "orthogonal" }
       )
     : null;
   const draftCursorWorld =
@@ -3148,6 +3160,7 @@ function drawScene(
       state.camera,
       state.viewport,
       activeSnapStepMm,
+      draftConstraintMode,
       state.settings,
       theme
     );
@@ -3160,6 +3173,7 @@ function drawScene(
     state.viewport,
     cursorSnapStepMm,
     activeSnapStepMm,
+    draftConstraintMode,
     visibleGuides,
     theme,
     hideCursorHud
@@ -4586,6 +4600,7 @@ function drawDraftDimensions(
   camera: CameraState,
   viewport: ViewportSize,
   activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45",
   settings: Pick<EditorSettings, "measurementFontSize">,
   theme: EditorCanvasTheme
 ) {
@@ -4594,7 +4609,8 @@ function drawDraftDimensions(
     cursorWorld,
     camera,
     viewport,
-    activeSnapStepMm
+    activeSnapStepMm,
+    constraintMode
   );
   if (activeSegmentLabelSpec) {
     const labelLayouts = getResolvedResizeDimensionLabelLayouts(
@@ -4608,7 +4624,12 @@ function drawDraftDimensions(
     return;
   }
 
-  const draftPreviewRoom = getDraftPreviewRoom(draftPoints, cursorWorld, activeSnapStepMm);
+  const draftPreviewRoom = getDraftPreviewRoom(
+    draftPoints,
+    cursorWorld,
+    activeSnapStepMm,
+    constraintMode
+  );
   if (!draftPreviewRoom) return;
 
   const bounds = getAxisAlignedRoomBounds(draftPreviewRoom);
@@ -5250,17 +5271,17 @@ function nudgeResizeDimensionLabel(
 function getDraftPreviewPoint(
   anchorPoint: Point,
   cursorWorld: Point,
-  activeSnapStepMm: number | null
+  activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45"
 ): Point {
-  return activeSnapStepMm
-    ? getOrthogonalSnappedPoint(anchorPoint, cursorWorld, activeSnapStepMm)
-    : projectOrthogonalPoint(anchorPoint, cursorWorld);
+  return getConstrainedDrawPoint(anchorPoint, cursorWorld, activeSnapStepMm, null, constraintMode);
 }
 
 function getDraftPreviewRoom(
   draftPoints: Point[],
   cursorWorld: Point | null,
-  activeSnapStepMm: number | null
+  activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45"
 ): Room | null {
   if (!cursorWorld) return null;
   if (draftPoints.length < 4) return null;
@@ -5268,10 +5289,11 @@ function getDraftPreviewRoom(
   const previewPoint = getDraftPreviewPoint(
     draftPoints[draftPoints.length - 1],
     cursorWorld,
-    activeSnapStepMm
+    activeSnapStepMm,
+    constraintMode
   );
   if (!pointsEqual(previewPoint, draftPoints[0])) return null;
-  if (!isOrthogonalPointPath(draftPoints, { closed: true }) || !isSimplePolygon(draftPoints)) {
+  if (!isSupportedDrawPointPath(draftPoints, { closed: true }) || !isSimplePolygon(draftPoints)) {
     return null;
   }
 
@@ -5371,14 +5393,16 @@ function getDraftActiveSegmentDimensionLabelSpec(
   cursorWorld: Point | null,
   camera: CameraState,
   viewport: ViewportSize,
-  activeSnapStepMm: number | null
+  activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45"
 ): ResizeDimensionLabelSpec | null {
   if (!cursorWorld || draftPoints.length === 0) return null;
 
   const anchorPoint = draftPoints[draftPoints.length - 1];
-  const previewPoint = getDraftPreviewPoint(anchorPoint, cursorWorld, activeSnapStepMm);
+  const previewPoint = getDraftPreviewPoint(anchorPoint, cursorWorld, activeSnapStepMm, constraintMode);
   if (anchorPoint.x === previewPoint.x && anchorPoint.y === previewPoint.y) return null;
   if (draftPoints.length >= 4 && pointsEqual(previewPoint, draftPoints[0])) return null;
+  if (anchorPoint.x !== previewPoint.x && anchorPoint.y !== previewPoint.y) return null;
 
   const startScreen = worldToScreen(anchorPoint, camera, viewport);
   const endScreen = worldToScreen(previewPoint, camera, viewport);
@@ -5460,6 +5484,18 @@ function drawSnapGuides(
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
+  if (guides.segments.length > 0) {
+    for (const segment of guides.segments) {
+      drawDashedGuideLine(
+        graphics,
+        worldToScreen(segment.start, camera, viewport),
+        worldToScreen(segment.end, camera, viewport),
+        theme.guidelineAccent
+      );
+    }
+    return;
+  }
+
   const screenPoint = worldToScreen(guides.point, camera, viewport);
   if (guides.showVertical) {
     drawDashedGuideLine(
@@ -5488,6 +5524,7 @@ function drawDraft(
   viewport: ViewportSize,
   cursorSnapStepMm: number,
   activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45",
   snapGuides: SnapGuides | null,
   theme: EditorCanvasTheme,
   hideCursorHud = false
@@ -5516,7 +5553,8 @@ function drawDraft(
     const previewWorld = getDraftPreviewPoint(
       draftPoints[draftPoints.length - 1],
       cursorWorld,
-      activeSnapStepMm
+      activeSnapStepMm,
+      constraintMode
     );
     const previewScreen = worldToScreen(previewWorld, camera, viewport);
     const lastScreenPoint = screenDraftPoints[screenDraftPoints.length - 1];
