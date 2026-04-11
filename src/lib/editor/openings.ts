@@ -27,7 +27,7 @@ const OPENING_WIDTH_HANDLE_HIT_RADIUS_PX = 10;
 export type RoomWallSegment = {
   wall: RoomWall;
   segmentIndex: number;
-  axis: "horizontal" | "vertical";
+  axis: "horizontal" | "vertical" | "diagonal";
   start: Point;
   end: Point;
   originalStart: Point;
@@ -51,7 +51,7 @@ export type OpeningWidthHandleHit = {
   roomId: string;
   openingId: string;
   edge: "start" | "end";
-  axis: RoomWallSegment["axis"];
+  axis: "horizontal" | "vertical";
 };
 
 export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
@@ -105,10 +105,9 @@ export function getRoomWallSegment(room: Room, wall: RoomWall): RoomWallSegment 
       ? "vertical"
       : originalStart.y === originalEnd.y
         ? "horizontal"
-        : null;
-  if (!axis) return null;
+        : "diagonal";
 
-  const interiorNormal = getOrthogonalSegmentInteriorNormal(room.points, originalStart, originalEnd);
+  const interiorNormal = getSegmentInteriorNormal(room.points, originalStart, originalEnd);
   if (!interiorNormal) return null;
   const { start, end } = getCanonicalSegmentEndpoints(originalStart, originalEnd, axis);
 
@@ -121,10 +120,7 @@ export function getRoomWallSegment(room: Room, wall: RoomWall): RoomWallSegment 
     originalStart,
     originalEnd,
     interiorNormal,
-    lengthMm:
-      axis === "horizontal"
-        ? Math.abs(originalEnd.x - originalStart.x)
-        : Math.abs(originalEnd.y - originalStart.y),
+    lengthMm: Math.hypot(originalEnd.x - originalStart.x, originalEnd.y - originalStart.y),
   };
 }
 
@@ -142,7 +138,7 @@ export function createCenteredRoomOpening(
   id: string
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, wall);
-  if (!segment || segment.lengthMm <= 0) return null;
+  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
 
   const widthMm = Math.min(getDefaultOpeningWidth(type), segment.lengthMm);
   if (widthMm <= 0) return null;
@@ -208,7 +204,7 @@ export function getOpeningOffsetForWorldPoint(
   options?: { gridSizeMm?: number }
 ): number | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.lengthMm <= 0) return null;
+  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
 
   const rawOffsetMm =
     segment.axis === "horizontal" ? worldPoint.x - segment.start.x : worldPoint.y - segment.start.y;
@@ -254,7 +250,7 @@ export function getUpdatedOpeningForWidth(
   options?: { gridSizeMm?: number }
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.lengthMm <= 0) return null;
+  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
 
   const nextWidthMm = constrainOpeningWidth(widthMm, segment.lengthMm, options);
   const nextOffsetMm = constrainOpeningOffset(
@@ -277,7 +273,7 @@ export function getSymmetricOpeningWidthForWorldPoint(
   options?: { gridSizeMm?: number }
 ): number | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.lengthMm <= 0) return null;
+  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
 
   const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
   const pointerOffsetMm =
@@ -300,7 +296,9 @@ export function getResolvedRoomOpeningLayoutFromRoom(
   opening: RoomOpening
 ): ResolvedRoomOpeningLayout | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.lengthMm <= 0 || opening.widthMm <= 0) return null;
+  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0 || opening.widthMm <= 0) {
+    return null;
+  }
 
   const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
   const halfWidthMm = opening.widthMm / 2;
@@ -336,11 +334,7 @@ export function findRoomWallAtScreenPoint(
 
     const start = worldToScreen(segment.start, camera, viewport);
     const end = worldToScreen(segment.end, camera, viewport);
-
-    const distancePx =
-      segment.axis === "horizontal"
-        ? getAxisAlignedHorizontalSegmentHitDistancePx(screenPoint, start, end, hitPaddingPx)
-        : getAxisAlignedVerticalSegmentHitDistancePx(screenPoint, start, end, hitPaddingPx);
+    const distancePx = getSegmentHitDistancePx(screenPoint, start, end, hitPaddingPx);
     if (distancePx === null) continue;
 
     if (!closestWall || distancePx < closestWall.distancePx) {
@@ -378,6 +372,7 @@ export function findSelectedOpeningWidthHandleAtScreenPoint(
   for (const handle of handles) {
     const distancePx = Math.hypot(screenPoint.x - handle.point.x, screenPoint.y - handle.point.y);
     if (distancePx > OPENING_WIDTH_HANDLE_HIT_RADIUS_PX) continue;
+    if (layout.axis === "diagonal") continue;
 
     return {
       roomId: room.id,
@@ -484,10 +479,18 @@ function getCanonicalSegmentEndpoints(
     return start.x <= end.x ? { start, end } : { start: end, end: start };
   }
 
+  if (axis === "vertical") {
+    return start.y <= end.y ? { start, end } : { start: end, end: start };
+  }
+
+  if (start.x !== end.x) {
+    return start.x <= end.x ? { start, end } : { start: end, end: start };
+  }
+
   return start.y <= end.y ? { start, end } : { start: end, end: start };
 }
 
-function getOrthogonalSegmentInteriorNormal(
+function getSegmentInteriorNormal(
   polygonPoints: Point[],
   start: Point,
   end: Point
@@ -496,16 +499,15 @@ function getOrthogonalSegmentInteriorNormal(
     x: (start.x + end.x) / 2,
     y: (start.y + end.y) / 2,
   };
-  const candidateNormals =
-    start.x === end.x
-      ? [
-          { x: -1, y: 0 },
-          { x: 1, y: 0 },
-        ]
-      : [
-          { x: 0, y: -1 },
-          { x: 0, y: 1 },
-        ];
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 0.001) return null;
+
+  const candidateNormals = [
+    { x: -dy / length, y: dx / length },
+    { x: dy / length, y: -dx / length },
+  ];
 
   for (const normal of candidateNormals) {
     const probe = {
@@ -551,45 +553,37 @@ function isPointOnSegment(point: Point, a: Point, b: Point, epsilon = 1e-6) {
   return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
 }
 
-function getAxisAlignedHorizontalSegmentHitDistancePx(
+function getSegmentHitDistancePx(
   point: Point,
   start: Point,
   end: Point,
   hitPaddingPx: number
 ) {
-  const minX = Math.min(start.x, end.x);
-  const maxX = Math.max(start.x, end.x);
-  if (point.x < minX - hitPaddingPx || point.x > maxX + hitPaddingPx) return null;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.001) return null;
 
-  const distancePx = Math.abs(point.y - start.y);
-  return distancePx <= hitPaddingPx ? distancePx : null;
-}
-
-function getAxisAlignedVerticalSegmentHitDistancePx(
-  point: Point,
-  start: Point,
-  end: Point,
-  hitPaddingPx: number
-) {
-  const minY = Math.min(start.y, end.y);
-  const maxY = Math.max(start.y, end.y);
-  if (point.y < minY - hitPaddingPx || point.y > maxY + hitPaddingPx) return null;
-
-  const distancePx = Math.abs(point.x - start.x);
+  const t = clamp(
+    ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
+    0,
+    1
+  );
+  const closestPoint = {
+    x: start.x + dx * t,
+    y: start.y + dy * t,
+  };
+  const distancePx = Math.hypot(point.x - closestPoint.x, point.y - closestPoint.y);
   return distancePx <= hitPaddingPx ? distancePx : null;
 }
 
 function getWallPointAtOffset(segment: RoomWallSegment, offsetMm: number): Point {
-  if (segment.axis === "horizontal") {
-    return {
-      x: segment.start.x + offsetMm,
-      y: segment.start.y,
-    };
-  }
+  const safeLengthMm = Math.max(segment.lengthMm, 0.001);
+  const t = clamp(offsetMm / safeLengthMm, 0, 1);
 
   return {
-    x: segment.start.x,
-    y: segment.start.y + offsetMm,
+    x: segment.start.x + (segment.end.x - segment.start.x) * t,
+    y: segment.start.y + (segment.end.y - segment.start.y) * t,
   };
 }
 

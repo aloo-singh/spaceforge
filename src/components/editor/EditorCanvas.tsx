@@ -4986,7 +4986,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
     x: (edge.start.x + edge.end.x) / 2,
     y: (edge.start.y + edge.end.y) / 2,
   };
-  const outwardOffsetWorld = getOrthogonalEdgeOutwardOffsetWorld(room.points, edge.start, edge.end);
+  const outwardOffsetWorld = getEdgeOutwardOffsetWorld(room.points, edge.start, edge.end);
   if (!outwardOffsetWorld) return null;
 
   const startScreen = worldToScreen(edge.start, camera, viewport);
@@ -5023,35 +5023,37 @@ function createDimensionLabelSpecForEdgeMeasurement(
   };
 }
 
-function getOrthogonalEdgeOutwardOffsetWorld(
+function getEdgeOutwardOffsetWorld(
   polygonPoints: Point[],
   start: Point,
   end: Point
 ): Point | null {
-  if (start.x === end.x) {
-    const midpoint = { x: start.x, y: (start.y + end.y) / 2 };
-    const negativeProbe = { x: midpoint.x - 1, y: midpoint.y };
-    const positiveProbe = { x: midpoint.x + 1, y: midpoint.y };
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 0.001) return null;
 
-    if (isPointInPolygon(negativeProbe, polygonPoints) && !isPointInPolygon(positiveProbe, polygonPoints)) {
-      return { x: 1, y: 0 };
-    }
-    if (isPointInPolygon(positiveProbe, polygonPoints) && !isPointInPolygon(negativeProbe, polygonPoints)) {
-      return { x: -1, y: 0 };
-    }
-    return null;
-  }
+  const candidateNormals = [
+    { x: -dy / length, y: dx / length },
+    { x: dy / length, y: -dx / length },
+  ];
 
-  if (start.y === end.y) {
-    const midpoint = { x: (start.x + end.x) / 2, y: start.y };
-    const negativeProbe = { x: midpoint.x, y: midpoint.y - 1 };
-    const positiveProbe = { x: midpoint.x, y: midpoint.y + 1 };
+  for (const normal of candidateNormals) {
+    const inwardProbe = {
+      x: midpoint.x - normal.x,
+      y: midpoint.y - normal.y,
+    };
+    const outwardProbe = {
+      x: midpoint.x + normal.x,
+      y: midpoint.y + normal.y,
+    };
 
-    if (isPointInPolygon(negativeProbe, polygonPoints) && !isPointInPolygon(positiveProbe, polygonPoints)) {
-      return { x: 0, y: 1 };
-    }
-    if (isPointInPolygon(positiveProbe, polygonPoints) && !isPointInPolygon(negativeProbe, polygonPoints)) {
-      return { x: 0, y: -1 };
+    if (isPointInPolygon(inwardProbe, polygonPoints) && !isPointInPolygon(outwardProbe, polygonPoints)) {
+      return normal;
     }
   }
 
