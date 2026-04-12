@@ -51,7 +51,7 @@ export type OpeningWidthHandleHit = {
   roomId: string;
   openingId: string;
   edge: "start" | "end";
-  axis: "horizontal" | "vertical";
+  axis: RoomWallSegment["axis"];
 };
 
 export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
@@ -138,7 +138,7 @@ export function createCenteredRoomOpening(
   id: string
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, wall);
-  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
+  if (!segment || segment.lengthMm <= 0) return null;
 
   const widthMm = Math.min(getDefaultOpeningWidth(type), segment.lengthMm);
   if (widthMm <= 0) return null;
@@ -170,25 +170,10 @@ export function findOpeningAtScreenPoint(
 
       const start = worldToScreen(layout.start, camera, viewport);
       const end = worldToScreen(layout.end, camera, viewport);
-      const center = worldToScreen(layout.center, camera, viewport);
+      const distancePx = getSegmentHitDistancePx(screenPoint, start, end, OPENING_HIT_DEPTH_PX);
+      if (distancePx === null) continue;
 
-      if (
-        layout.axis === "horizontal" &&
-        screenPoint.x >= Math.min(start.x, end.x) - OPENING_HIT_PADDING_PX &&
-        screenPoint.x <= Math.max(start.x, end.x) + OPENING_HIT_PADDING_PX &&
-        screenPoint.y >= center.y - OPENING_HIT_DEPTH_PX &&
-        screenPoint.y <= center.y + OPENING_HIT_DEPTH_PX
-      ) {
-        return { roomId: room.id, openingId: opening.id };
-      }
-
-      if (
-        layout.axis === "vertical" &&
-        screenPoint.y >= Math.min(start.y, end.y) - OPENING_HIT_PADDING_PX &&
-        screenPoint.y <= Math.max(start.y, end.y) + OPENING_HIT_PADDING_PX &&
-        screenPoint.x >= center.x - OPENING_HIT_DEPTH_PX &&
-        screenPoint.x <= center.x + OPENING_HIT_DEPTH_PX
-      ) {
+      if (isProjectedPointWithinSegmentPadding(screenPoint, start, end, OPENING_HIT_PADDING_PX)) {
         return { roomId: room.id, openingId: opening.id };
       }
     }
@@ -204,10 +189,9 @@ export function getOpeningOffsetForWorldPoint(
   options?: { gridSizeMm?: number }
 ): number | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
+  if (!segment || segment.lengthMm <= 0) return null;
 
-  const rawOffsetMm =
-    segment.axis === "horizontal" ? worldPoint.x - segment.start.x : worldPoint.y - segment.start.y;
+  const rawOffsetMm = getWallOffsetForWorldPoint(segment, worldPoint);
 
   return constrainOpeningOffset(opening, rawOffsetMm, segment.lengthMm, options);
 }
@@ -250,7 +234,7 @@ export function getUpdatedOpeningForWidth(
   options?: { gridSizeMm?: number }
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
+  if (!segment || segment.lengthMm <= 0) return null;
 
   const nextWidthMm = constrainOpeningWidth(widthMm, segment.lengthMm, options);
   const nextOffsetMm = constrainOpeningOffset(
@@ -273,11 +257,10 @@ export function getSymmetricOpeningWidthForWorldPoint(
   options?: { gridSizeMm?: number }
 ): number | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0) return null;
+  if (!segment || segment.lengthMm <= 0) return null;
 
   const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
-  const pointerOffsetMm =
-    segment.axis === "horizontal" ? worldPoint.x - segment.start.x : worldPoint.y - segment.start.y;
+  const pointerOffsetMm = getWallOffsetForWorldPoint(segment, worldPoint);
   const halfWidthMm = Math.abs(pointerOffsetMm - centerOffsetMm);
   const maxHalfWidthMm = Math.min(centerOffsetMm, segment.lengthMm - centerOffsetMm);
   if (maxHalfWidthMm <= 0) return 0;
@@ -296,7 +279,7 @@ export function getResolvedRoomOpeningLayoutFromRoom(
   opening: RoomOpening
 ): ResolvedRoomOpeningLayout | null {
   const segment = getRoomWallSegment(room, opening.wall);
-  if (!segment || segment.axis === "diagonal" || segment.lengthMm <= 0 || opening.widthMm <= 0) {
+  if (!segment || segment.lengthMm <= 0 || opening.widthMm <= 0) {
     return null;
   }
 
@@ -372,7 +355,6 @@ export function findSelectedOpeningWidthHandleAtScreenPoint(
   for (const handle of handles) {
     const distancePx = Math.hypot(screenPoint.x - handle.point.x, screenPoint.y - handle.point.y);
     if (distancePx > OPENING_WIDTH_HANDLE_HIT_RADIUS_PX) continue;
-    if (layout.axis === "diagonal") continue;
 
     return {
       roomId: room.id,
@@ -413,7 +395,8 @@ export function normalizeRoomOpeningForSegmentAnchoring(
 
   const usesDescendingOriginalDirection =
     (segment.axis === "horizontal" && segment.originalStart.x > segment.originalEnd.x) ||
-    (segment.axis === "vertical" && segment.originalStart.y > segment.originalEnd.y);
+    (segment.axis === "vertical" && segment.originalStart.y > segment.originalEnd.y) ||
+    (segment.axis === "diagonal" && segment.originalStart.x > segment.originalEnd.x);
   if (!usesDescendingOriginalDirection) {
     return normalizedOpening;
   }
@@ -585,6 +568,34 @@ function getWallPointAtOffset(segment: RoomWallSegment, offsetMm: number): Point
     x: segment.start.x + (segment.end.x - segment.start.x) * t,
     y: segment.start.y + (segment.end.y - segment.start.y) * t,
   };
+}
+
+function getWallOffsetForWorldPoint(segment: RoomWallSegment, worldPoint: Point): number {
+  const dx = segment.end.x - segment.start.x;
+  const dy = segment.end.y - segment.start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.001) return 0;
+
+  const projectedLengthMm =
+    ((worldPoint.x - segment.start.x) * dx + (worldPoint.y - segment.start.y) * dy) /
+    Math.sqrt(lengthSquared);
+
+  return projectedLengthMm;
+}
+
+function isProjectedPointWithinSegmentPadding(
+  point: Point,
+  start: Point,
+  end: Point,
+  paddingPx: number
+): boolean {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.001) return false;
+
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+  return t >= -paddingPx / Math.sqrt(lengthSquared) && t <= 1 + paddingPx / Math.sqrt(lengthSquared);
 }
 
 function getDefaultOpeningWidth(type: OpeningType) {

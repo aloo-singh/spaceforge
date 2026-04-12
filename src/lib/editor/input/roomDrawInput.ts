@@ -223,7 +223,12 @@ export function attachRoomDrawInput(
     | "bottom-left"
     | null = null;
   let hoveredOpeningWidthHandle:
-    | { roomId: string; openingId: string; edge: "start" | "end"; axis: "horizontal" | "vertical" }
+    | {
+        roomId: string;
+        openingId: string;
+        edge: "start" | "end";
+        axis: "horizontal" | "vertical" | "diagonal";
+      }
     | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
@@ -481,7 +486,13 @@ export function attachRoomDrawInput(
     }
 
     if (hoveredOpeningWidthHandle && !isSpaceHeld) {
-      setCursor(hoveredOpeningWidthHandle.axis === "horizontal" ? "ew-resize" : "ns-resize");
+      setCursor(
+        hoveredOpeningWidthHandle.axis === "horizontal"
+          ? "ew-resize"
+          : hoveredOpeningWidthHandle.axis === "vertical"
+            ? "ns-resize"
+            : "nwse-resize"
+      );
       return;
     }
 
