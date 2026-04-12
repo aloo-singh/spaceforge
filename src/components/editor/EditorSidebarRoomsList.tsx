@@ -46,6 +46,11 @@ function getRoomWalls(room: Room): SidebarWallEntry[] {
   return room.points.map((_, segmentIndex) => ({ wall: segmentIndex, segmentIndex }));
 }
 
+function getSelectedOpeningHostWall(room: Room, openingId: string | null): RoomWall | null {
+  if (!openingId) return null;
+  return room.openings.find((opening) => opening.id === openingId)?.wall ?? null;
+}
+
 function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
   return asset.name || "Stairs";
 }
@@ -148,11 +153,15 @@ export function EditorSidebarRoomsList() {
     <ImmediateTooltipProvider>
       <div className="flex flex-col gap-1">
       {rooms.map((room) => {
+        const selectedOpeningHostWall =
+          selectedOpening?.roomId === room.id
+            ? getSelectedOpeningHostWall(room, selectedOpening.openingId)
+            : null;
         const isSelected = selectedRoomId === room.id;
         const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
         const areaLabel = formatMetricRoomAreaForRoom(room);
         const roomWalls = getRoomWalls(room);
-        const isRoomExpanded = expandedRoomIds.includes(room.id);
+        const isRoomExpanded = isSelected || expandedRoomIds.includes(room.id);
         const hasInteriorAssets = room.interiorAssets.length > 0;
         const isAssetSectionExpanded = expandedAssetRoomIds.includes(room.id);
 
@@ -250,7 +259,10 @@ export function EditorSidebarRoomsList() {
                 <div className="mt-1 flex flex-col gap-1">
                   {roomWalls.map(({ wall, segmentIndex }) => {
                     const wallKey = `${room.id}:${wall}`;
-                    const isWallExpanded = expandedWallKeys.includes(wallKey);
+                    const isWallExpanded =
+                      expandedWallKeys.includes(wallKey) ||
+                      (selectedWall?.roomId === room.id && selectedWall.wall === wall) ||
+                      selectedOpeningHostWall === wall;
                     const wallOpenings = room.openings.filter((opening) => opening.wall === wall);
                     const isWallSelected =
                       selectedWall?.roomId === room.id && selectedWall.wall === wall;
