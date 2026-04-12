@@ -3070,11 +3070,22 @@ function drawScene(
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
-  if (draftConstraintMode === "diagonal45" && cursorWorld && state.roomDraft.points.length > 0) {
-    drawAngleIndicator(roomLabelContainer, worldToScreen(cursorWorld, state.camera, state.viewport), theme);
+  const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+  const angleIndicatorLabel = getDraftAngleIndicatorLabel(
+    state.roomDraft.points,
+    cursorWorld,
+    activeSnapStepMm,
+    draftConstraintMode
+  );
+  if (angleIndicatorLabel && cursorWorld) {
+    drawAngleIndicator(
+      roomLabelContainer,
+      worldToScreen(cursorWorld, state.camera, state.viewport),
+      angleIndicatorLabel,
+      theme
+    );
   }
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
-  const activeSnapStepMm = getActiveSnapStepMm(state.camera);
   const isDraftActive = state.roomDraft.points.length > 0;
   const draftAnchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
   const predictiveGuides = isDraftActive && cursorWorld
@@ -5766,11 +5777,12 @@ function drawCursorHud(
 function drawAngleIndicator(
   labelContainer: Container,
   point: Point,
+  label: string,
   theme: EditorCanvasTheme
 ) {
   const textResolution = getTextResolution();
   const text = new Text({
-    text: "45°",
+    text: label,
     resolution: textResolution,
     style: {
       fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
@@ -5793,6 +5805,26 @@ function drawAngleIndicator(
   );
   text.alpha = 0.9;
   labelContainer.addChild(text);
+}
+
+function getDraftAngleIndicatorLabel(
+  draftPoints: Point[],
+  cursorWorld: Point | null,
+  activeSnapStepMm: number | null,
+  constraintMode: "orthogonal" | "diagonal45"
+): string | null {
+  if (constraintMode !== "diagonal45" || !cursorWorld || draftPoints.length === 0) return null;
+
+  const anchorPoint = draftPoints[draftPoints.length - 1];
+  const previewPoint = getDraftPreviewPoint(anchorPoint, cursorWorld, activeSnapStepMm, constraintMode);
+  const dx = previewPoint.x - anchorPoint.x;
+  const dy = previewPoint.y - anchorPoint.y;
+  if (dx === 0 && dy === 0) return null;
+
+  const normalizedAngle = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+  const snappedAngle = Math.round(normalizedAngle / 45) * 45;
+
+  return `${snappedAngle % 360}°`;
 }
 
 function drawDashedGuideLine(
