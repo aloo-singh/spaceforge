@@ -10,6 +10,37 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.58.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-12</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>45&deg; wall support (and 135&deg;/225&deg;/315&deg; increments)</li>
+                <li>Hold Shift while drawing to enable 8-direction snapping (generous and forgiving)</li>
+                <li>Short predictive guidelines now show 45&deg; alignments</li>
+                <li>Full selection, move, and resize for 45&deg; walls (with performance polish)</li>
+                <li>Openings (doors/windows) attach, drag, and resize correctly on 45&deg; walls</li>
+                <li>Consistent wall naming (&ldquo;Wall 1&rdquo;, &ldquo;Wall 2&rdquo;, ...) across all room types</li>
+                <li>Drawing rules (extend wall on same-plane click + auto-close on crossing) now work in mixed orthogonal + 45&deg; rooms</li>
+                <li>Dynamic angle indicator during Shift drawing</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Sidebar hierarchy fully supports 45&deg; walls and their openings</li>
+                <li>All interactions remain fast and calm even with diagonal geometry</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.57.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-10</span>
           </div>

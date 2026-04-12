@@ -26,16 +26,12 @@ import {
   RESET_CAMERA_TRANSITION_DURATION_MS,
 } from "@/lib/editor/cameraTransition";
 import {
-  applyCandidatePointToDraftPath,
   getDraftLoopClosureResultFromPath,
-  getOrthogonalSegmentAxis,
-  projectOrthogonalPoint,
   normalizeDraftPointChain,
   isZeroLengthSegment,
   pointsEqual,
 } from "@/lib/editor/geometry";
 import {
-  isOrthogonalPointPath,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
 import { translateRoomPointsOnGrid } from "@/lib/editor/roomTranslation";
@@ -89,8 +85,12 @@ import {
 } from "@/lib/editor/openings";
 import {
   getActiveSnapStepMm,
+  getConstrainedDrawPoint,
+  getSupportedDrawSegmentDirection,
   getMagneticSnapGuidesForSettings,
+  isSupportedDrawPointPath,
   getSnappedPointFromGuides,
+  type DrawConstraintMode,
 } from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import type {
@@ -183,7 +183,10 @@ type EditorState = {
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
-  placeDraftPointFromCursor: (cursorWorld: Point) => void;
+  placeDraftPointFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
@@ -1544,15 +1547,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     }));
   },
-  placeDraftPointFromCursor: (cursorWorld) =>
+  placeDraftPointFromCursor: (cursorWorld, options) =>
     set((state) => {
       const draftPoints = normalizeDraftPointChain(state.roomDraft.points);
       const activeSnapStepMm = getEffectiveSnapStepMm(state);
+      const constraintMode = options?.constraintMode ?? "orthogonal";
       const predictiveGuides = getMagneticSnapGuidesForSettings(
         state.document.rooms,
         cursorWorld,
         state.camera,
-        state.settings
+        state.settings,
+        { constraintMode }
       );
       const resolvedCursorWorld = getSnappedPointFromGuides(
         cursorWorld,
@@ -1570,7 +1575,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const lastPoint = draftPoints[draftPoints.length - 1];
-      const nextPoint = projectOrthogonalPoint(lastPoint, resolvedCursorWorld);
+      const nextPoint = getConstrainedDrawPoint(
+        lastPoint,
+        resolvedCursorWorld,
+        activeSnapStepMm,
+        null,
+        constraintMode
+      );
 
       if (isZeroLengthSegment(lastPoint, nextPoint)) return state;
 
@@ -1581,7 +1592,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return completeDraftRoom(state, draftPoints);
       }
 
-      const nextDraftPoints = applyCandidatePointToDraftPath(draftPoints, nextPoint);
+      const nextDraftPoints = applyDraftCandidatePointToPath(draftPoints, nextPoint);
       const loopClosure = getDraftLoopClosureResultFromPath(nextDraftPoints);
       if (loopClosure && !pointsEqual(nextPoint, startPoint)) {
         return completeDraftRoom(state, loopClosure.committedLoop);
@@ -3008,7 +3019,7 @@ if (typeof window !== "undefined") {
 }
 
 function isValidDraftRoomClosure(points: Point[]): boolean {
-  return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+  return isSupportedDrawPointPath(points, { closed: true }) && isSimplePolygon(points);
 }
 
 function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
@@ -3210,8 +3221,8 @@ function isValidDraftPathProgression(
 
   const previousPoint = previousDraftPoints[previousDraftPoints.length - 2];
   const currentPoint = previousDraftPoints[previousDraftPoints.length - 1];
-  const previousAxis = getOrthogonalSegmentAxis(previousPoint, currentPoint);
-  const nextAxis = getOrthogonalSegmentAxis(currentPoint, rawNextPoint);
+  const previousAxis = getSupportedDrawSegmentDirection(previousPoint, currentPoint);
+  const nextAxis = getSupportedDrawSegmentDirection(currentPoint, rawNextPoint);
 
   if (!previousAxis || !nextAxis) return false;
   if (previousAxis === nextAxis) return false;
@@ -3219,4 +3230,23 @@ function isValidDraftPathProgression(
   return !nextDraftPoints
     .slice(0, -1)
     .some((point, index) => index !== 0 && pointsEqual(point, terminalPoint));
+}
+
+function applyDraftCandidatePointToPath(points: Point[], nextPoint: Point): Point[] {
+  const normalizedPoints = normalizeDraftPointChain(points);
+  if (normalizedPoints.length === 0) return [{ ...nextPoint }];
+  if (normalizedPoints.length === 1) {
+    return normalizeDraftPointChain([...normalizedPoints, nextPoint]);
+  }
+
+  const previousPoint = normalizedPoints[normalizedPoints.length - 2];
+  const currentPoint = normalizedPoints[normalizedPoints.length - 1];
+  const previousDirection = getSupportedDrawSegmentDirection(previousPoint, currentPoint);
+  const nextDirection = getSupportedDrawSegmentDirection(currentPoint, nextPoint);
+
+  if (previousDirection && nextDirection && previousDirection === nextDirection) {
+    return normalizeDraftPointChain([...normalizedPoints.slice(0, -1), nextPoint]);
+  }
+
+  return normalizeDraftPointChain([...normalizedPoints, nextPoint]);
 }

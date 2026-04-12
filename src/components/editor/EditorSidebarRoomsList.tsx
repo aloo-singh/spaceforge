@@ -10,36 +10,45 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
+import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 
-const DEFAULT_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
+type SidebarWallEntry = {
+  wall: RoomWall;
+  segmentIndex: number;
+};
+
+const RECTANGULAR_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
 const SIDEBAR_CHEVRON_BUTTON_CLASS =
   "flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5";
 
-function getWallLabel(wall: RoomWall): string {
-  switch (wall) {
-    case "top":
-      return "North wall";
-    case "right":
-      return "East wall";
-    case "bottom":
-      return "South wall";
-    case "left":
-      return "West wall";
-    default:
-      return `Wall ${wall + 1}`;
-  }
+function getWallLabel(segmentIndex: number): string {
+  return `Wall ${segmentIndex + 1}`;
 }
 
 function getOpeningLabel(opening: RoomOpening): string {
   return opening.type === "door" ? "Door" : "Window";
 }
 
-function getRoomWalls(room: Room): RoomWall[] {
-  if (room.points.length === 4) return DEFAULT_WALLS;
-  return room.points.map((_, index) => index);
+function getRoomWalls(room: Room): SidebarWallEntry[] {
+  if (room.points.length === 4) {
+    return RECTANGULAR_WALLS
+      .map((wall) => {
+        const segmentIndex = resolveRoomWallSegmentIndex(room, wall);
+        return segmentIndex === null ? null : { wall, segmentIndex };
+      })
+      .filter((entry): entry is SidebarWallEntry => entry !== null)
+      .sort((a, b) => a.segmentIndex - b.segmentIndex);
+  }
+
+  return room.points.map((_, segmentIndex) => ({ wall: segmentIndex, segmentIndex }));
+}
+
+function getSelectedOpeningHostWall(room: Room, openingId: string | null): RoomWall | null {
+  if (!openingId) return null;
+  return room.openings.find((opening) => opening.id === openingId)?.wall ?? null;
 }
 
 function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
@@ -144,11 +153,15 @@ export function EditorSidebarRoomsList() {
     <ImmediateTooltipProvider>
       <div className="flex flex-col gap-1">
       {rooms.map((room) => {
+        const selectedOpeningHostWall =
+          selectedOpening?.roomId === room.id
+            ? getSelectedOpeningHostWall(room, selectedOpening.openingId)
+            : null;
         const isSelected = selectedRoomId === room.id;
         const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
         const areaLabel = formatMetricRoomAreaForRoom(room);
         const roomWalls = getRoomWalls(room);
-        const isRoomExpanded = expandedRoomIds.includes(room.id);
+        const isRoomExpanded = isSelected || expandedRoomIds.includes(room.id);
         const hasInteriorAssets = room.interiorAssets.length > 0;
         const isAssetSectionExpanded = expandedAssetRoomIds.includes(room.id);
 
@@ -244,9 +257,12 @@ export function EditorSidebarRoomsList() {
             {isRoomExpanded ? (
               <div className="px-3 pb-2">
                 <div className="mt-1 flex flex-col gap-1">
-                  {roomWalls.map((wall) => {
+                  {roomWalls.map(({ wall, segmentIndex }) => {
                     const wallKey = `${room.id}:${wall}`;
-                    const isWallExpanded = expandedWallKeys.includes(wallKey);
+                    const isWallExpanded =
+                      expandedWallKeys.includes(wallKey) ||
+                      (selectedWall?.roomId === room.id && selectedWall.wall === wall) ||
+                      selectedOpeningHostWall === wall;
                     const wallOpenings = room.openings.filter((opening) => opening.wall === wall);
                     const isWallSelected =
                       selectedWall?.roomId === room.id && selectedWall.wall === wall;
@@ -266,8 +282,8 @@ export function EditorSidebarRoomsList() {
                             <SidebarIconTooltip
                               content={
                                 isWallExpanded
-                                  ? `Collapse ${getWallLabel(wall)}`
-                                  : `Expand ${getWallLabel(wall)}`
+                                  ? `Collapse ${getWallLabel(segmentIndex)}`
+                                  : `Expand ${getWallLabel(segmentIndex)}`
                               }
                             >
                               <button
@@ -283,8 +299,8 @@ export function EditorSidebarRoomsList() {
                                 className={SIDEBAR_CHEVRON_BUTTON_CLASS}
                                 aria-label={
                                   isWallExpanded
-                                    ? `Collapse ${getWallLabel(wall)}`
-                                    : `Expand ${getWallLabel(wall)}`
+                                    ? `Collapse ${getWallLabel(segmentIndex)}`
+                                    : `Expand ${getWallLabel(segmentIndex)}`
                                 }
                               >
                                 <ChevronRight
@@ -296,7 +312,7 @@ export function EditorSidebarRoomsList() {
                             <span className="size-6 shrink-0" aria-hidden="true" />
                           )}
                           <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                            <span className="truncate">{getWallLabel(wall)}</span>
+                            <span className="truncate">{getWallLabel(segmentIndex)}</span>
                             {wallOpenings.length > 0 ? (
                               <span className="ml-auto text-[11px] text-inherit/70">
                                 {wallOpenings.length}

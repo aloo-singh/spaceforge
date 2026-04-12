@@ -10,6 +10,21 @@ export function translateRoomPointsOnGrid(
   delta: Point,
   gridSizeMm: number
 ): Point[] {
+  if (points.length === 0) return [];
+  if (gridSizeMm <= 0) return translateRoomPointsWithOptionalGrid(points, delta);
+
+  if (arePointsAlignedToGrid(points, gridSizeMm)) {
+    const snappedDelta = {
+      x: snapToGrid(delta.x, gridSizeMm),
+      y: snapToGrid(delta.y, gridSizeMm),
+    };
+
+    return points.map((point) => ({
+      x: point.x + snappedDelta.x,
+      y: point.y + snappedDelta.y,
+    }));
+  }
+
   return translateRoomPointsWithOptionalGrid(points, delta, gridSizeMm);
 }
 
@@ -19,9 +34,15 @@ function translateRoomPointsWithOptionalGrid(
   gridSizeMm?: number
 ): Point[] {
   return points.map((point) => ({
-    x: gridSizeMm === undefined ? point.x + delta.x : snapToGrid(point.x + delta.x, gridSizeMm),
+      x: gridSizeMm === undefined ? point.x + delta.x : snapToGrid(point.x + delta.x, gridSizeMm),
     y: gridSizeMm === undefined ? point.y + delta.y : snapToGrid(point.y + delta.y, gridSizeMm),
   }));
+}
+
+function arePointsAlignedToGrid(points: Point[], gridSizeMm: number): boolean {
+  return points.every(
+    (point) => point.x % gridSizeMm === 0 && point.y % gridSizeMm === 0
+  );
 }
 
 export function getSnappedRoomTranslationDelta(

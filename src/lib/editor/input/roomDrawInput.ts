@@ -11,9 +11,11 @@ import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import {
   getActiveSnapStepMm,
+  getConstrainedDrawPoint,
   getMagneticSnapGuidesForSettings,
   getPredictiveSnapGuides,
   getSnappedPointFromGuides,
+  type DrawConstraintMode,
   type SnapGuides,
 } from "@/lib/editor/snapping";
 import {
@@ -60,7 +62,10 @@ type RoomDrawStoreState = {
   selectedWall: { roomId: string; wall: RoomWall } | null;
   selectedOpening: { roomId: string; openingId: string } | null;
   selectedInteriorAsset: { roomId: string; assetId: string } | null;
-  placeDraftPointFromCursor: (cursorWorld: Point) => void;
+  placeDraftPointFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
@@ -115,6 +120,7 @@ type RoomDrawInputCallbacks = {
   onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RoomWall } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onSnapGuidesChange?: (guides: SnapGuides | null) => void;
+  onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   requestRender: () => void;
 };
@@ -182,6 +188,7 @@ type SelectableWallHit = {
 
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
+const DRAFT_GUIDE_TAIL_PX = 44;
 
 /**
  * Handles room drawing interactions:
@@ -199,8 +206,10 @@ export function attachRoomDrawInput(
   callbacks: RoomDrawInputCallbacks
 ) {
   let isSpaceHeld = false;
+  let isShiftHeld = false;
   let shouldSuppressNextContextMenu = false;
   let activePointerCount = 0;
+  let latestCursorWorld: Point | null = null;
   let hoveredRoomLabelId: string | null = null;
   let hoveredSelectableRoomId: string | null = null;
   let hoveredSelectableWall: SelectableWallHit | null = null;
@@ -214,7 +223,12 @@ export function attachRoomDrawInput(
     | "bottom-left"
     | null = null;
   let hoveredOpeningWidthHandle:
-    | { roomId: string; openingId: string; edge: "start" | "end"; axis: "horizontal" | "vertical" }
+    | {
+        roomId: string;
+        openingId: string;
+        edge: "start" | "end";
+        axis: "horizontal" | "vertical" | "diagonal";
+      }
     | null = null;
   let currentCursor = "";
   let activeLabelDragSession: LabelDragSession | null = null;
@@ -263,6 +277,96 @@ export function attachRoomDrawInput(
   const setSnapGuides = (guides: SnapGuides | null) => {
     callbacks.onSnapGuidesChange?.(guides);
     callbacks.requestRender();
+  };
+
+  const getDrawConstraintMode = (shiftOverride?: boolean): DrawConstraintMode =>
+    shiftOverride ?? isShiftHeld ? "diagonal45" : "orthogonal";
+
+  const syncDraftConstraintMode = (shiftOverride?: boolean) => {
+    callbacks.onDraftConstraintModeChange?.(getDrawConstraintMode(shiftOverride));
+    callbacks.requestRender();
+  };
+
+  const getShortDraftGuideSegment = (
+    anchorPoint: Point,
+    constrainedPoint: Point,
+    pixelsPerMm: number
+  ) => {
+    const dx = constrainedPoint.x - anchorPoint.x;
+    const dy = constrainedPoint.y - anchorPoint.y;
+    const lengthMm = Math.hypot(dx, dy);
+    if (lengthMm <= 0) return null;
+
+    const visibleLengthMm = Math.min(lengthMm, DRAFT_GUIDE_TAIL_PX / pixelsPerMm);
+    const unitX = dx / lengthMm;
+    const unitY = dy / lengthMm;
+
+    return {
+      start: {
+        x: constrainedPoint.x - unitX * visibleLengthMm,
+        y: constrainedPoint.y - unitY * visibleLengthMm,
+      },
+      end: constrainedPoint,
+    };
+  };
+
+  const getDraftSnapGuides = (
+    state: Pick<RoomDrawStoreState, "document" | "camera" | "settings" | "roomDraft">,
+    cursorWorld: Point,
+    shiftOverride?: boolean
+  ): SnapGuides => {
+    const anchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
+    const constraintMode = getDrawConstraintMode(shiftOverride);
+    const guides =
+      anchorPoint
+        ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+            constraintMode,
+            anchorPoint,
+          })
+        : null;
+
+    const constrainedPoint =
+      anchorPoint
+        ? getConstrainedDrawPoint(
+            anchorPoint,
+            cursorWorld,
+            getActiveSnapStepMm(state.camera),
+            null,
+            constraintMode
+          )
+        : cursorWorld;
+    const fallbackSegment = anchorPoint
+      ? getShortDraftGuideSegment(anchorPoint, constrainedPoint, state.camera.pixelsPerMm)
+      : null;
+
+    return guides ?? {
+      point: cursorWorld,
+      showVertical: false,
+      showHorizontal: false,
+      diagonalLine: null,
+      segments: fallbackSegment ? [fallbackSegment] : [],
+      constraintMode,
+      diagonalGuideSegments: [],
+    };
+  };
+
+  const syncDraftSnapGuides = (shiftOverride?: boolean) => {
+    const state = store.getState();
+    if (state.roomDraft.points.length === 0 || !latestCursorWorld) {
+      setSnapGuides(null);
+      return;
+    }
+
+    const draftGuides = getDraftSnapGuides(state, latestCursorWorld, shiftOverride);
+    if (!state.settings.showGuidelines) {
+      setSnapGuides({
+        ...draftGuides,
+        segments: [],
+      });
+      return;
+    }
+
+    setSnapGuides(draftGuides);
   };
 
   const getInteriorAssetResizeCursorWorld = (
@@ -382,7 +486,13 @@ export function attachRoomDrawInput(
     }
 
     if (hoveredOpeningWidthHandle && !isSpaceHeld) {
-      setCursor(hoveredOpeningWidthHandle.axis === "horizontal" ? "ew-resize" : "ns-resize");
+      setCursor(
+        hoveredOpeningWidthHandle.axis === "horizontal"
+          ? "ew-resize"
+          : hoveredOpeningWidthHandle.axis === "vertical"
+            ? "ns-resize"
+            : "nwse-resize"
+      );
       return;
     }
 
@@ -506,6 +616,7 @@ export function attachRoomDrawInput(
     const screenPoint = toCanvasPoint(event);
     const state = store.getState();
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+    latestCursorWorld = cursorWorld;
     callbacks.onCursorWorldChange(cursorWorld);
 
     if (activeLabelDragSession) {
@@ -809,6 +920,12 @@ export function attachRoomDrawInput(
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
+    if (state.roomDraft.points.length > 0) {
+      syncDraftSnapGuides(event.shiftKey);
+      syncDraftConstraintMode(event.shiftKey);
+    } else {
+      setSnapGuides(null);
+    }
     updateCursor();
     callbacks.requestRender();
   };
@@ -824,6 +941,7 @@ export function attachRoomDrawInput(
       return;
     }
     callbacks.onCursorWorldChange(null);
+    latestCursorWorld = null;
     setSnapGuides(null);
     setHoveredRoomLabelId(null);
     hoveredOpeningWidthHandle = null;
@@ -900,7 +1018,10 @@ export function attachRoomDrawInput(
     );
 
     if (state.roomDraft.points.length > 0) {
-      state.placeDraftPointFromCursor(cursorWorld);
+      state.placeDraftPointFromCursor(cursorWorld, {
+        constraintMode: event.shiftKey || isShiftHeld ? "diagonal45" : "orthogonal",
+      });
+      syncDraftSnapGuides();
       updateCursor();
       return;
     }
@@ -1147,7 +1268,10 @@ export function attachRoomDrawInput(
       return;
     }
 
-    state.placeDraftPointFromCursor(cursorWorld);
+    state.placeDraftPointFromCursor(cursorWorld, {
+      constraintMode: event.shiftKey || isShiftHeld ? "diagonal45" : "orthogonal",
+    });
+    syncDraftSnapGuides();
     updateCursor();
   };
 
@@ -1478,6 +1602,13 @@ export function attachRoomDrawInput(
       return;
     }
 
+    if (event.key === "Shift") {
+      isShiftHeld = true;
+      syncDraftConstraintMode(true);
+      syncDraftSnapGuides();
+      return;
+    }
+
     if (event.code === "Escape") {
       const state = store.getState();
       if (state.roomDraft.points.length > 0) {
@@ -1502,6 +1633,7 @@ export function attachRoomDrawInput(
 
       event.preventDefault();
       state.stepBackDraft();
+      syncDraftSnapGuides();
       updateCursor();
       callbacks.requestRender();
     }
@@ -1513,11 +1645,21 @@ export function attachRoomDrawInput(
     if (event.code === "Space") {
       isSpaceHeld = false;
       updateCursor();
+      return;
+    }
+
+    if (event.key === "Shift") {
+      isShiftHeld = false;
+      syncDraftConstraintMode(false);
+      syncDraftSnapGuides(false);
     }
   };
 
   const onWindowBlur = () => {
     isSpaceHeld = false;
+    isShiftHeld = false;
+    latestCursorWorld = null;
+    syncDraftConstraintMode();
     if (activeLabelDragSession?.didDrag) {
       clearPendingTransformFeedbackTimeout();
     }

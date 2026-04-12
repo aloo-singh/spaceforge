@@ -1,6 +1,7 @@
 import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { GRID_SIZE_MM } from "@/lib/editor/constants";
 import {
   getConstrainedVertexAdjustmentResult,
   getConstrainedVertexHandleLayouts,
@@ -9,9 +10,13 @@ import {
 } from "@/lib/editor/constrainedVertexAdjustments";
 import { getRoomWallSegment } from "@/lib/editor/openings";
 import {
+  getFortyFiveVertexAdjustmentResult,
+  getFortyFiveVertexHandleLayouts,
   getOrthogonalWallAdjustmentResult,
   getOrthogonalWallHandleLayouts,
+  hitTestFortyFiveVertexHandle,
   hitTestOrthogonalWallHandle,
+  isNonRectangularEightWayRoom,
 } from "@/lib/editor/orthogonalWallResize";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
@@ -86,6 +91,7 @@ type RoomResizeInputCallbacks = {
 type ResizeSession = {
   pointerId: number;
   roomId: string;
+  shapeMode: "rect" | "constrained-orthogonal" | "eight-way";
   target:
     | { type: "wall"; wall: RectWall }
     | { type: "corner"; corner: RectCorner }
@@ -116,7 +122,11 @@ function getCursorForWall(wall: RectWall): string {
 function getCursorForWallSegment(room: Room, wallSegmentIndex: number): string {
   const segment = getRoomWallSegment(room, wallSegmentIndex);
   if (!segment) return "";
-  return segment.axis === "horizontal" ? NS_RESIZE_CURSOR : EW_RESIZE_CURSOR;
+  if (segment.axis === "horizontal") return NS_RESIZE_CURSOR;
+  if (segment.axis === "vertical") return EW_RESIZE_CURSOR;
+  return segment.originalStart.x < segment.originalEnd.x === segment.originalStart.y < segment.originalEnd.y
+    ? NWSE_RESIZE_CURSOR
+    : NESW_RESIZE_CURSOR;
 }
 
 function getCursorForCorner(corner: RectCorner): string {
@@ -280,6 +290,19 @@ export function attachRoomResizeInput(
   let currentCursor: string = "";
   const commitRoomResize = store.getState().commitRoomResize;
   let clearTransformFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let activeDragFrameId: number | null = null;
+  let pendingActiveDragScreenPoint: Point | null = null;
+  let cachedHandleLayouts:
+    | {
+        room: Room;
+        points: Point[];
+        camera: RoomResizeStoreState["camera"];
+        viewport: RoomResizeStoreState["viewport"];
+        mode: "constrained-orthogonal" | "eight-way";
+        vertexHandles: ReturnType<typeof getConstrainedVertexHandleLayouts>;
+        wallHandles: ReturnType<typeof getOrthogonalWallHandleLayouts>;
+      }
+    | null = null;
 
   const setTransformFeedback = (feedback: TransformFeedback | null) => {
     callbacks.onTransformFeedbackChange?.(feedback);
@@ -313,6 +336,12 @@ export function attachRoomResizeInput(
     clearTransformFeedbackTimeoutId = null;
   };
 
+  const clearPendingActiveDragFrame = () => {
+    if (activeDragFrameId === null) return;
+    cancelAnimationFrame(activeDragFrameId);
+    activeDragFrameId = null;
+  };
+
   const scheduleTransformFeedbackClear = () => {
     clearPendingTransformFeedbackTimeout();
     clearTransformFeedbackTimeoutId = setTimeout(() => {
@@ -330,6 +359,9 @@ export function attachRoomResizeInput(
       setTransformFeedback(
         getResizeTransformFeedback(roomId, activeSession.startPoints, nextPoints, nextPoints)
       );
+      if (activeSession.shapeMode !== "eight-way") {
+        store.getState().previewRoomResize(roomId, nextPoints);
+      }
     }
   };
 
@@ -351,9 +383,56 @@ export function attachRoomResizeInput(
 
     const bounds = getAxisAlignedRoomBounds(room);
     const isConstrainedVertexRoom = isNonRectangularOrthogonalRoom(room);
-    if (!bounds && !isConstrainedVertexRoom) return null;
+    const isEightWayRoom = isNonRectangularEightWayRoom(room);
+    if (!bounds && !isConstrainedVertexRoom && !isEightWayRoom) return null;
 
-    return { room, bounds, isConstrainedVertexRoom, state };
+    return { room, bounds, isConstrainedVertexRoom, isEightWayRoom, state };
+  };
+
+  const getSelectedRoomHandleLayouts = (
+    selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>
+  ) => {
+    const mode = selected.isEightWayRoom ? "eight-way" : "constrained-orthogonal";
+    if (
+      cachedHandleLayouts &&
+      cachedHandleLayouts.room === selected.room &&
+      cachedHandleLayouts.points === selected.room.points &&
+      cachedHandleLayouts.camera === selected.state.camera &&
+      cachedHandleLayouts.viewport === selected.state.viewport &&
+      cachedHandleLayouts.mode === mode
+    ) {
+      return cachedHandleLayouts;
+    }
+
+    const vertexHandles =
+      mode === "eight-way"
+        ? getFortyFiveVertexHandleLayouts(
+            selected.room,
+            selected.state.camera,
+            selected.state.viewport
+          )
+        : getConstrainedVertexHandleLayouts(
+            selected.room,
+            selected.state.camera,
+            selected.state.viewport
+          );
+    const wallHandles = getOrthogonalWallHandleLayouts(
+      selected.room,
+      selected.state.camera,
+      selected.state.viewport
+    );
+
+    cachedHandleLayouts = {
+      room: selected.room,
+      points: selected.room.points,
+      camera: selected.state.camera,
+      viewport: selected.state.viewport,
+      mode,
+      vertexHandles,
+      wallHandles,
+    };
+
+    return cachedHandleLayouts;
   };
 
   const hasSelectedOpeningResizeHandleHit = (screenPoint: Point) => {
@@ -469,6 +548,8 @@ export function attachRoomResizeInput(
 
   const stopSession = () => {
     if (!activeSession) return;
+    clearPendingActiveDragFrame();
+    pendingActiveDragScreenPoint = null;
     const pointerId = activeSession.pointerId;
     if (canvas.hasPointerCapture(pointerId)) {
       canvas.releasePointerCapture(pointerId);
@@ -484,87 +565,125 @@ export function attachRoomResizeInput(
     callbacks.requestRender();
   };
 
+  const processActiveDragScreenPoint = (screenPoint: Point, selectedRoom = getSelectedEditableRoom()) => {
+    if (!activeSession) return;
+
+    const fallbackState = store.getState();
+    const cursorWorld = screenToWorld(
+      screenPoint,
+      selectedRoom?.state.camera ?? fallbackState.camera,
+      selectedRoom?.state.viewport ?? fallbackState.viewport
+    );
+    callbacks.onCursorWorldChange?.(cursorWorld);
+    const activeState = selectedRoom?.state ?? fallbackState;
+    const activeSnapStepMm = getActiveSnapStepMm(activeState.camera);
+    const excludeRoomIds = new Set([activeSession.roomId]);
+    const visibleGuides = activeState.settings.showGuidelines
+      ? getPredictiveSnapGuides(activeState.document.rooms, cursorWorld, activeState.camera, {
+          excludeRoomIds,
+        })
+      : null;
+    const magneticGuides = activeState.settings.snappingEnabled
+      ? getMagneticSnapGuidesForSettings(
+          activeState.document.rooms,
+          cursorWorld,
+          activeState.camera,
+          activeState.settings,
+          {
+            excludeRoomIds,
+          }
+        )
+      : null;
+    const resolvedCursorWorld = getSnappedPointFromGuides(
+      cursorWorld,
+      activeSnapStepMm,
+      magneticGuides
+    );
+
+    if (activeSession.target.type === "vertex") {
+      const nextPoints =
+        activeSession.shapeMode === "eight-way"
+          ? getFortyFiveVertexAdjustmentResult(
+              activeSession.startPoints,
+              activeSession.target.vertexIndex,
+              resolvedCursorWorld,
+              { gridSizeMm: activeSnapStepMm ?? GRID_SIZE_MM }
+            )
+          : getConstrainedVertexAdjustmentResult(
+              activeSession.startPoints,
+              activeSession.target.vertexIndex,
+              resolvedCursorWorld
+            );
+      if (!nextPoints) return;
+
+      activeSession.latestSnappedPoints = nextPoints;
+      previewRoomResize(activeSession.roomId, nextPoints);
+      setSnapGuides(visibleGuides);
+      return;
+    }
+
+    if (activeSession.target.type === "wall-segment") {
+      const nextPoints = getOrthogonalWallAdjustmentResult(
+        activeSession.startPoints,
+        activeSession.target.wallSegmentIndex,
+        resolvedCursorWorld,
+        { gridSizeMm: 0 }
+      );
+      if (!nextPoints) return;
+
+      activeSession.latestSnappedPoints = nextPoints;
+      previewRoomResize(activeSession.roomId, nextPoints);
+      setSnapGuides(visibleGuides);
+      return;
+    }
+
+    if (!activeSession.startBounds) return;
+    const nextBounds =
+      activeSession.target.type === "corner"
+        ? resizeBoundsForCornerDrag(
+            activeSession.startBounds,
+            activeSession.target.corner,
+            resolvedCursorWorld,
+            {
+              gridSizeMm: 0,
+              minRoomSizeMm: MIN_ROOM_SIZE_MM,
+            }
+          )
+        : resizeBoundsForWallDrag(
+            activeSession.startBounds,
+            activeSession.target.wall,
+            resolvedCursorWorld,
+            {
+              gridSizeMm: 0,
+              minRoomSizeMm: MIN_ROOM_SIZE_MM,
+            }
+          );
+    const nextPoints = getRoomPointsFromBounds(nextBounds, activeSession.startPoints);
+    activeSession.latestSnappedPoints = nextPoints;
+    previewRoomResize(activeSession.roomId, nextPoints);
+    setSnapGuides(visibleGuides);
+  };
+
+  const scheduleActiveDragProcessing = (screenPoint: Point) => {
+    pendingActiveDragScreenPoint = screenPoint;
+    if (activeDragFrameId !== null) return;
+
+    activeDragFrameId = requestAnimationFrame(() => {
+      activeDragFrameId = null;
+      const nextScreenPoint = pendingActiveDragScreenPoint;
+      pendingActiveDragScreenPoint = null;
+      if (!nextScreenPoint || !activeSession) return;
+      processActiveDragScreenPoint(nextScreenPoint);
+    });
+  };
+
   const onPointerMove = (event: PointerEvent) => {
     const selected = getSelectedEditableRoom();
     const screenPoint = toCanvasPoint(event);
 
     if (activeSession) {
       if (event.pointerId !== activeSession.pointerId) return;
-      const fallbackState = store.getState();
-      const cursorWorld = screenToWorld(
-        screenPoint,
-        selected?.state.camera ?? fallbackState.camera,
-        selected?.state.viewport ?? fallbackState.viewport
-      );
-      callbacks.onCursorWorldChange?.(cursorWorld);
-      const activeState = selected?.state ?? fallbackState;
-      const activeSnapStepMm = getActiveSnapStepMm(activeState.camera);
-      const visibleGuides = getPredictiveSnapGuides(
-        activeState.document.rooms,
-        cursorWorld,
-        activeState.camera,
-        {
-          excludeRoomIds: new Set([activeSession.roomId]),
-        }
-      );
-      const magneticGuides = getMagneticSnapGuidesForSettings(
-        activeState.document.rooms,
-        cursorWorld,
-        activeState.camera,
-        activeState.settings,
-        {
-          excludeRoomIds: new Set([activeSession.roomId]),
-        }
-      );
-      const resolvedCursorWorld = getSnappedPointFromGuides(
-        cursorWorld,
-        activeSnapStepMm,
-        magneticGuides
-      );
-      if (activeSession.target.type === "vertex") {
-        const nextPoints = getConstrainedVertexAdjustmentResult(
-          activeSession.startPoints,
-          activeSession.target.vertexIndex,
-          resolvedCursorWorld
-        );
-        if (!nextPoints) return;
-
-        activeSession.latestSnappedPoints = nextPoints;
-        previewRoomResize(activeSession.roomId, nextPoints);
-        setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
-        return;
-      }
-
-      if (activeSession.target.type === "wall-segment") {
-        const nextPoints = getOrthogonalWallAdjustmentResult(
-          activeSession.startPoints,
-          activeSession.target.wallSegmentIndex,
-          resolvedCursorWorld,
-          { gridSizeMm: 0 }
-        );
-        if (!nextPoints) return;
-
-        activeSession.latestSnappedPoints = nextPoints;
-        previewRoomResize(activeSession.roomId, nextPoints);
-        setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
-        return;
-      }
-
-      if (!activeSession.startBounds) return;
-      const nextBounds =
-        activeSession.target.type === "corner"
-          ? resizeBoundsForCornerDrag(activeSession.startBounds, activeSession.target.corner, resolvedCursorWorld, {
-              gridSizeMm: 0,
-              minRoomSizeMm: MIN_ROOM_SIZE_MM,
-            })
-          : resizeBoundsForWallDrag(activeSession.startBounds, activeSession.target.wall, resolvedCursorWorld, {
-              gridSizeMm: 0,
-              minRoomSizeMm: MIN_ROOM_SIZE_MM,
-            });
-      const nextPoints = getRoomPointsFromBounds(nextBounds, activeSession.startPoints);
-      activeSession.latestSnappedPoints = nextPoints;
-      previewRoomResize(activeSession.roomId, nextPoints);
-      setSnapGuides(activeState.settings.showGuidelines ? visibleGuides : null);
+      scheduleActiveDragProcessing(screenPoint);
       return;
     }
 
@@ -590,18 +709,11 @@ export function attachRoomResizeInput(
       screenToWorld(screenPoint, selected.state.camera, selected.state.viewport)
     );
 
-    if (selected.isConstrainedVertexRoom) {
-      const vertexHandles = getConstrainedVertexHandleLayouts(
-        selected.room,
-        selected.state.camera,
-        selected.state.viewport
-      );
-      const hitVertexIndex = hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
-      const wallHandles = getOrthogonalWallHandleLayouts(
-        selected.room,
-        selected.state.camera,
-        selected.state.viewport
-      );
+    if (selected.isConstrainedVertexRoom || selected.isEightWayRoom) {
+      const { vertexHandles, wallHandles } = getSelectedRoomHandleLayouts(selected);
+      const hitVertexIndex = selected.isEightWayRoom
+        ? hitTestFortyFiveVertexHandle(vertexHandles, screenPoint)
+        : hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
       const hitWallSegmentIndex =
         hitVertexIndex === null
           ? getHitOrthogonalWallSegment(
@@ -652,14 +764,13 @@ export function attachRoomResizeInput(
     const screenPoint = toCanvasPoint(event);
     if (hasSelectedOpeningResizeHandleHit(screenPoint)) return;
 
-    const hitVertexIndex = selected.isConstrainedVertexRoom
-      ? hitTestConstrainedVertexHandle(
-          getConstrainedVertexHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),
-          screenPoint
-        )
+    const hitVertexIndex = selected.isConstrainedVertexRoom || selected.isEightWayRoom
+      ? selected.isEightWayRoom
+        ? hitTestFortyFiveVertexHandle(getSelectedRoomHandleLayouts(selected).vertexHandles, screenPoint)
+        : hitTestConstrainedVertexHandle(getSelectedRoomHandleLayouts(selected).vertexHandles, screenPoint)
       : null;
     const hitWallSegmentIndex =
-      selected.isConstrainedVertexRoom && hitVertexIndex === null
+      (selected.isConstrainedVertexRoom || selected.isEightWayRoom) && hitVertexIndex === null
         ? getHitOrthogonalWallSegment(
             selected.room,
             screenPoint,
@@ -667,7 +778,7 @@ export function attachRoomResizeInput(
             selected.state.viewport
           ) ??
           hitTestOrthogonalWallHandle(
-            getOrthogonalWallHandleLayouts(selected.room, selected.state.camera, selected.state.viewport),
+            getSelectedRoomHandleLayouts(selected).wallHandles,
             screenPoint
           )
         : null;
@@ -706,6 +817,11 @@ export function attachRoomResizeInput(
       startPoints: selected.room.points.map((point) => ({ ...point })),
       latestSnappedPoints: null,
       latestPreviewPoints: selected.room.points.map((point) => ({ ...point })),
+      shapeMode: selected.isEightWayRoom
+        ? "eight-way"
+        : selected.isConstrainedVertexRoom
+          ? "constrained-orthogonal"
+          : "rect",
     };
     selected.state.setCanvasInteractionActive(true);
     if (hitWall) {
@@ -737,6 +853,13 @@ export function attachRoomResizeInput(
   const onPointerUp = (event: PointerEvent) => {
     if (!activeSession || event.pointerId !== activeSession.pointerId) return;
 
+    if (pendingActiveDragScreenPoint) {
+      clearPendingActiveDragFrame();
+      const finalScreenPoint = pendingActiveDragScreenPoint;
+      pendingActiveDragScreenPoint = null;
+      processActiveDragScreenPoint(finalScreenPoint);
+    }
+
     const session = activeSession;
     const nextPoints = session.latestSnappedPoints ?? session.startPoints;
     if (arePointListsEqual(session.startPoints, nextPoints)) {
@@ -761,6 +884,8 @@ export function attachRoomResizeInput(
 
   const onPointerCancel = (event: PointerEvent) => {
     if (!activeSession || event.pointerId !== activeSession.pointerId) return;
+    clearPendingActiveDragFrame();
+    pendingActiveDragScreenPoint = null;
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
     stopSession();
@@ -825,6 +950,7 @@ export function attachRoomResizeInput(
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onWindowBlur);
+    clearPendingActiveDragFrame();
     clearPendingTransformFeedbackTimeout();
     setTransformFeedback(null);
     callbacks.onCursorWorldChange?.(null);

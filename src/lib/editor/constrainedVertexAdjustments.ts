@@ -16,6 +16,10 @@ export type ConstrainedVertexHandleLayout = {
 
 const VERTEX_HANDLE_SIZE_PX = 12;
 const VERTEX_HANDLE_HIT_PADDING_PX = 8;
+const ELIGIBLE_VERTEX_INDEX_CACHE = new WeakMap<
+  Room,
+  { points: Point[]; gridSizeMm: number; indices: number[] }
+>();
 const ELIGIBILITY_NUDGE_DIRECTIONS: Point[] = [
   { x: -1, y: -1 },
   { x: 0, y: -1 },
@@ -43,6 +47,11 @@ export function getEligibleConstrainedVertexIndices(
   if (!isNonRectangularOrthogonalRoom(room)) return [];
 
   const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
+  const cached = ELIGIBLE_VERTEX_INDEX_CACHE.get(room);
+  if (cached && cached.points === room.points && cached.gridSizeMm === gridSizeMm) {
+    return cached.indices;
+  }
+
   const eligibleIndices: number[] = [];
 
   for (let vertexIndex = 0; vertexIndex < room.points.length; vertexIndex += 1) {
@@ -50,6 +59,12 @@ export function getEligibleConstrainedVertexIndices(
       eligibleIndices.push(vertexIndex);
     }
   }
+
+  ELIGIBLE_VERTEX_INDEX_CACHE.set(room, {
+    points: room.points,
+    gridSizeMm,
+    indices: eligibleIndices,
+  });
 
   return eligibleIndices;
 }

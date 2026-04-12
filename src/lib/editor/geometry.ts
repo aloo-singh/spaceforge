@@ -1,5 +1,5 @@
 import type { Point } from "@/lib/editor/types";
-import { isOrthogonalPointPath, isSimplePolygon } from "@/lib/editor/roomGeometry";
+import { isSimplePolygon } from "@/lib/editor/roomGeometry";
 
 export type OrthogonalSegmentAxis = "horizontal" | "vertical";
 
@@ -167,7 +167,7 @@ function getEndpointOnSegmentDraftLoopClosureResult(
   for (let segmentStartIndex = 0; segmentStartIndex < terminalStartIndex - 1; segmentStartIndex += 1) {
     const segmentStart = nextDraftPath[segmentStartIndex];
     const segmentEnd = nextDraftPath[segmentStartIndex + 1];
-    if (!isPointStrictlyInsideOrthogonalSegment(loopEndpoint, segmentStart, segmentEnd)) {
+    if (!isPointStrictlyInsideSupportedSegment(loopEndpoint, segmentStart, segmentEnd)) {
       continue;
     }
 
@@ -198,7 +198,7 @@ function getSegmentIntersectionDraftLoopClosureResult(
   for (let segmentStartIndex = 0; segmentStartIndex < terminalStartIndex - 1; segmentStartIndex += 1) {
     const segmentStart = nextDraftPath[segmentStartIndex];
     const segmentEnd = nextDraftPath[segmentStartIndex + 1];
-    const intersectionPoint = getStrictOrthogonalSegmentIntersectionPoint(
+    const intersectionPoint = getStrictSupportedSegmentIntersectionPoint(
       segmentStart,
       segmentEnd,
       terminalStart,
@@ -224,29 +224,37 @@ function getSegmentIntersectionDraftLoopClosureResult(
 
 function isValidCommittedDraftLoop(points: Point[]): boolean {
   if (points.length < 4) return false;
-  return isOrthogonalPointPath(points, { closed: true }) && isSimplePolygon(points);
+  return isSupportedDrawPointPath(points, { closed: true }) && isSimplePolygon(points);
 }
 
-function getStrictOrthogonalSegmentIntersectionPoint(
+function getStrictSupportedSegmentIntersectionPoint(
   aStart: Point,
   aEnd: Point,
   bStart: Point,
   bEnd: Point
 ): Point | null {
-  const aAxis = getOrthogonalSegmentAxis(aStart, aEnd);
-  const bAxis = getOrthogonalSegmentAxis(bStart, bEnd);
-  if (!aAxis || !bAxis || aAxis === bAxis) return null;
+  const aDirection = getSupportedDrawSegmentDirection(aStart, aEnd);
+  const bDirection = getSupportedDrawSegmentDirection(bStart, bEnd);
+  if (!aDirection || !bDirection || aDirection === bDirection) return null;
 
-  const horizontalSegment = aAxis === "horizontal" ? { start: aStart, end: aEnd } : { start: bStart, end: bEnd };
-  const verticalSegment = aAxis === "vertical" ? { start: aStart, end: aEnd } : { start: bStart, end: bEnd };
+  const aDx = aEnd.x - aStart.x;
+  const aDy = aEnd.y - aStart.y;
+  const bDx = bEnd.x - bStart.x;
+  const bDy = bEnd.y - bStart.y;
+  const denominator = aDx * bDy - aDy * bDx;
+  if (denominator === 0) return null;
+
+  const tNumerator = (bStart.x - aStart.x) * bDy - (bStart.y - aStart.y) * bDx;
   const intersectionPoint = {
-    x: verticalSegment.start.x,
-    y: horizontalSegment.start.y,
+    x: aStart.x + (tNumerator * aDx) / denominator,
+    y: aStart.y + (tNumerator * aDy) / denominator,
   };
 
   if (
-    !isPointStrictlyInsideOrthogonalSegment(intersectionPoint, aStart, aEnd) ||
-    !isPointStrictlyInsideOrthogonalSegment(intersectionPoint, bStart, bEnd)
+    !Number.isFinite(intersectionPoint.x) ||
+    !Number.isFinite(intersectionPoint.y) ||
+    !isPointStrictlyInsideSupportedSegment(intersectionPoint, aStart, aEnd) ||
+    !isPointStrictlyInsideSupportedSegment(intersectionPoint, bStart, bEnd)
   ) {
     return null;
   }
@@ -254,22 +262,54 @@ function getStrictOrthogonalSegmentIntersectionPoint(
   return intersectionPoint;
 }
 
-function isPointStrictlyInsideOrthogonalSegment(point: Point, start: Point, end: Point): boolean {
-  if (!isOrthogonalSegment(start, end)) return false;
-
-  if (start.x === end.x) {
-    return (
-      point.x === start.x &&
-      point.y > Math.min(start.y, end.y) &&
-      point.y < Math.max(start.y, end.y)
-    );
-  }
+function isPointStrictlyInsideSupportedSegment(point: Point, start: Point, end: Point): boolean {
+  if (!getSupportedDrawSegmentDirection(start, end)) return false;
+  if (!isPointOnSupportedSegment(point, start, end)) return false;
 
   return (
-    point.y === start.y &&
-    point.x > Math.min(start.x, end.x) &&
-    point.x < Math.max(start.x, end.x)
+    !pointsEqual(point, start) &&
+    !pointsEqual(point, end)
   );
+}
+
+function isPointOnSupportedSegment(point: Point, start: Point, end: Point): boolean {
+  const cross = (point.y - start.y) * (end.x - start.x) - (point.x - start.x) * (end.y - start.y);
+  if (cross !== 0) return false;
+
+  return (
+    point.x >= Math.min(start.x, end.x) &&
+    point.x <= Math.max(start.x, end.x) &&
+    point.y >= Math.min(start.y, end.y) &&
+    point.y <= Math.max(start.y, end.y)
+  );
+}
+
+function getSupportedDrawSegmentDirection(
+  start: Point,
+  end: Point
+): "horizontal" | "vertical" | "diagonal-positive" | "diagonal-negative" | null {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) return null;
+  if (dy === 0) return "horizontal";
+  if (dx === 0) return "vertical";
+  if (Math.abs(dx) !== Math.abs(dy)) return null;
+  return dx * dy > 0 ? "diagonal-positive" : "diagonal-negative";
+}
+
+function isSupportedDrawPointPath(points: Point[], options?: { closed?: boolean }): boolean {
+  const segmentCount = options?.closed ? points.length : points.length - 1;
+  if (segmentCount < 1) return false;
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    if (!getSupportedDrawSegmentDirection(start, end)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
