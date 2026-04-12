@@ -260,6 +260,17 @@ const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
 const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
+const ROOM_HANDLE_LAYOUT_CACHE = new WeakMap<
+  Room,
+  {
+    points: Point[];
+    cameraKey: string;
+    viewportKey: string;
+    mode: "constrained-orthogonal" | "eight-way";
+    vertexHandles: ReturnType<typeof getConstrainedVertexHandleLayouts>;
+    wallSegmentHandles: ReturnType<typeof getOrthogonalWallHandleLayouts>;
+  }
+>();
 const STAIR_DIRECTION_LABEL_WORLD_MM = 60;
 const STAIR_DIRECTION_ARROW_LENGTH_RATIO = 0.56;
 const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
@@ -3064,20 +3075,21 @@ function drawScene(
   }
   const cursorSnapStepMm = getActiveSnapStepMm(state.camera);
   const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+  const isDraftActive = state.roomDraft.points.length > 0;
   const draftAnchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
-  const predictiveGuides = cursorWorld
+  const predictiveGuides = isDraftActive && cursorWorld
     ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
-        constraintMode: state.roomDraft.points.length > 0 ? draftConstraintMode : "orthogonal",
-        anchorPoint: state.roomDraft.points.length > 0 ? draftAnchorPoint ?? undefined : undefined,
+        constraintMode: draftConstraintMode,
+        anchorPoint: draftAnchorPoint ?? undefined,
       })
     : null;
-  const magneticGuides = cursorWorld
+  const magneticGuides = isDraftActive && cursorWorld
     ? getMagneticSnapGuidesForSettings(
         state.document.rooms,
         cursorWorld,
         state.camera,
         state.settings,
-        { constraintMode: state.roomDraft.points.length > 0 ? draftConstraintMode : "orthogonal" }
+        { constraintMode: draftConstraintMode }
       )
     : null;
   const draftCursorWorld =
@@ -3318,11 +3330,11 @@ function drawRooms(
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
-    const vertexHandles = isNonRectangularEightWayRoom(room)
-      ? getFortyFiveVertexHandleLayouts(room, camera, viewport)
-      : getConstrainedVertexHandleLayouts(room, camera, viewport);
-    const wallSegmentHandles =
-      vertexHandles.length > 0 ? getOrthogonalWallHandleLayouts(room, camera, viewport) : [];
+    const { vertexHandles, wallSegmentHandles } = getCachedRoomSelectionHandles(
+      room,
+      camera,
+      viewport
+    );
 
     if (vertexHandles.length > 0) {
       for (const handle of wallSegmentHandles) {
@@ -4329,6 +4341,46 @@ function drawSelectedWallHighlight(
   graphics.moveTo(from.x, from.y);
   graphics.lineTo(to.x, to.y);
   graphics.stroke();
+}
+
+function getCachedRoomSelectionHandles(
+  room: Room,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  const mode: "constrained-orthogonal" | "eight-way" = isNonRectangularEightWayRoom(room)
+    ? "eight-way"
+    : "constrained-orthogonal";
+  const cameraKey = `${camera.xMm}:${camera.yMm}:${camera.pixelsPerMm}:${camera.rotationDegrees}`;
+  const viewportKey = `${viewport.width}:${viewport.height}`;
+  const cached = ROOM_HANDLE_LAYOUT_CACHE.get(room);
+
+  if (
+    cached &&
+    cached.points === room.points &&
+    cached.cameraKey === cameraKey &&
+    cached.viewportKey === viewportKey &&
+    cached.mode === mode
+  ) {
+    return cached;
+  }
+
+  const vertexHandles =
+    mode === "eight-way"
+      ? getFortyFiveVertexHandleLayouts(room, camera, viewport)
+      : getConstrainedVertexHandleLayouts(room, camera, viewport);
+  const wallSegmentHandles =
+    vertexHandles.length > 0 ? getOrthogonalWallHandleLayouts(room, camera, viewport) : [];
+  const next = {
+    points: room.points,
+    cameraKey,
+    viewportKey,
+    mode,
+    vertexHandles,
+    wallSegmentHandles,
+  };
+  ROOM_HANDLE_LAYOUT_CACHE.set(room, next);
+  return next;
 }
 
 function getRoomWallScreenSegment(

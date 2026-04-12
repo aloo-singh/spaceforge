@@ -31,6 +31,10 @@ const MIN_HANDLE_LENGTH_PX = 14;
 const HANDLE_HIT_PADDING_PX = 8;
 const VERTEX_HANDLE_SIZE_PX = 12;
 const VERTEX_HANDLE_HIT_PADDING_PX = 8;
+const ELIGIBLE_FORTY_FIVE_VERTEX_INDEX_CACHE = new WeakMap<
+  Room,
+  { points: Point[]; gridSizeMm: number; indices: number[] }
+>();
 const ELIGIBILITY_NUDGE_DIRECTIONS: Point[] = [
   { x: -1, y: -1 },
   { x: 0, y: -1 },
@@ -139,7 +143,7 @@ export function getFortyFiveVertexHandleLayouts(
 ): FortyFiveVertexHandleLayout[] {
   if (!isNonRectangularEightWayRoom(room)) return [];
 
-  return getEligibleFortyFiveVertexIndices(room.points, options).map((vertexIndex) => ({
+  return getEligibleFortyFiveVertexIndices(room, options).map((vertexIndex) => ({
     vertexIndex,
     center: worldToScreen(room.points[vertexIndex], camera, viewport),
     size: VERTEX_HANDLE_SIZE_PX,
@@ -193,27 +197,17 @@ export function getOrthogonalWallAdjustmentResult(
   const direction = getSupportedDrawSegmentDirection(start, end);
   if (!direction) return null;
 
-  if (direction === "diagonal-positive" || direction === "diagonal-negative") {
-    return getDiagonalWallAdjustmentResult(points, wallIndex, cursorWorld);
-  }
-
   const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
-  const nextPoints = points.map((point) => ({ ...point }));
   const snappedX = gridSizeMm > 0 ? snapToGrid(cursorWorld.x, gridSizeMm) : cursorWorld.x;
   const snappedY = gridSizeMm > 0 ? snapToGrid(cursorWorld.y, gridSizeMm) : cursorWorld.y;
+  const snappedCursorWorld =
+    direction === "horizontal"
+      ? { x: start.x, y: snappedY }
+      : direction === "vertical"
+        ? { x: snappedX, y: start.y }
+        : { x: snappedX, y: snappedY };
 
-  if (direction === "horizontal") {
-    nextPoints[wallIndex] = { ...start, y: snappedY };
-    nextPoints[(wallIndex + 1) % points.length] = { ...end, y: snappedY };
-  } else {
-    nextPoints[wallIndex] = { ...start, x: snappedX };
-    nextPoints[(wallIndex + 1) % points.length] = { ...end, x: snappedX };
-  }
-
-  if (!isSupportedDrawPointPath(nextPoints, { closed: true })) return null;
-  if (!isSimplePolygon(nextPoints)) return null;
-
-  return nextPoints;
+  return getParallelWallAdjustmentResult(points, wallIndex, snappedCursorWorld);
 }
 
 export function getFortyFiveVertexAdjustmentResult(
@@ -281,12 +275,18 @@ function clampHandleLength(lengthPx: number) {
 }
 
 function getEligibleFortyFiveVertexIndices(
-  points: Point[],
+  room: Room,
   options?: { gridSizeMm?: number }
 ): number[] {
+  const points = room.points;
   if (points.length < 4) return [];
 
   const gridSizeMm = options?.gridSizeMm ?? GRID_SIZE_MM;
+  const cached = ELIGIBLE_FORTY_FIVE_VERTEX_INDEX_CACHE.get(room);
+  if (cached && cached.points === points && cached.gridSizeMm === gridSizeMm) {
+    return cached.indices;
+  }
+
   const eligible: number[] = [];
 
   for (let vertexIndex = 0; vertexIndex < points.length; vertexIndex += 1) {
@@ -310,10 +310,16 @@ function getEligibleFortyFiveVertexIndices(
     }
   }
 
+  ELIGIBLE_FORTY_FIVE_VERTEX_INDEX_CACHE.set(room, {
+    points,
+    gridSizeMm,
+    indices: eligible,
+  });
+
   return eligible;
 }
 
-function getDiagonalWallAdjustmentResult(
+function getParallelWallAdjustmentResult(
   points: Point[],
   wallIndex: number,
   cursorWorld: Point
