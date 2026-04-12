@@ -107,6 +107,7 @@ function isRoomInteriorAsset(value: unknown): boolean {
 function isRoom(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
   if (!value.points.every(isPoint)) return false;

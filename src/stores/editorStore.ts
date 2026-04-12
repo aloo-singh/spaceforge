@@ -7,6 +7,8 @@ import {
 import {
   applyEditorCommand,
   createEmptyEditorDocumentState,
+  getNormalizedActiveFloorId,
+  getRoomsForActiveFloor,
   type EditorCommand,
   type EditorDocumentState,
 } from "@/lib/editor/history";
@@ -182,6 +184,7 @@ type EditorState = {
   commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateNorthBearingDegrees: (degrees: number) => void;
   addFloor: () => void;
+  selectFloorById: (floorId: string) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
@@ -733,7 +736,7 @@ function syncCameraRotationToDocument(camera: CameraState, document: DocumentSta
 
 function getSelectionIfRoomExists(roomId: string | null, document: DocumentState): string | null {
   if (!roomId) return null;
-  return document.rooms.some((room) => room.id === roomId) ? roomId : null;
+  return getRoomsForActiveFloor(document).some((room) => room.id === roomId) ? roomId : null;
 }
 
 function getSelectedWallIfRoomExists(
@@ -741,7 +744,7 @@ function getSelectedWallIfRoomExists(
   document: DocumentState
 ): RoomWallSelection | null {
   if (!selectedWall) return null;
-  const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
+  const room = getRoomsForActiveFloor(document).find((candidate) => candidate.id === selectedWall.roomId);
   if (!room) return null;
   return getRoomWallSegment(room, selectedWall.wall) ? selectedWall : null;
 }
@@ -751,7 +754,9 @@ function getSelectedOpeningIfExists(
   document: DocumentState
 ): RoomOpeningSelection | null {
   if (!selectedOpening) return null;
-  const room = document.rooms.find((candidate) => candidate.id === selectedOpening.roomId);
+  const room = getRoomsForActiveFloor(document).find(
+    (candidate) => candidate.id === selectedOpening.roomId
+  );
   if (!room) return null;
   return room.openings.some((opening) => opening.id === selectedOpening.openingId)
     ? selectedOpening
@@ -763,7 +768,9 @@ function getSelectedInteriorAssetIfExists(
   document: DocumentState
 ): RoomInteriorAssetSelection | null {
   if (!selectedInteriorAsset) return null;
-  const room = document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId);
+  const room = getRoomsForActiveFloor(document).find(
+    (candidate) => candidate.id === selectedInteriorAsset.roomId
+  );
   if (!room) return null;
   return room.interiorAssets.some((asset) => asset.id === selectedInteriorAsset.assetId)
     ? selectedInteriorAsset
@@ -775,7 +782,7 @@ function getSelectedWallHostRoom(
   selectedWall: RoomWallSelection | null
 ): Room | null {
   if (!selectedWall) return null;
-  const room = document.rooms.find((candidate) => candidate.id === selectedWall.roomId);
+  const room = getRoomsForActiveFloor(document).find((candidate) => candidate.id === selectedWall.roomId);
   if (!room || !getRoomWallSegment(room, selectedWall.wall)) return null;
   return room;
 }
@@ -1035,6 +1042,7 @@ function getSafePersistedHistorySnapshot(
           northBearingDegrees: document.northBearingDegrees,
           rooms: document.rooms.map((room) => ({
             id: room.id,
+            floorId: room.floorId,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
             openings: cloneRoomOpenings(room.openings),
@@ -1119,7 +1127,7 @@ function getProjectOpenCamera(
   options?: { emptyLayoutPixelsPerMm?: number }
 ): CameraState {
   return getCameraFitTarget({
-    rooms: document.rooms,
+    rooms: getRoomsForActiveFloor(document),
     viewport,
     emptyLayoutCamera: {
       ...DEFAULT_CAMERA_STATE,
@@ -1550,6 +1558,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  selectFloorById: (floorId) =>
+    set((state) => {
+      const nextActiveFloorId = getNormalizedActiveFloorId({
+        floors: state.document.floors,
+        activeFloorId: floorId,
+      });
+      const previousActiveFloorId = getNormalizedActiveFloorId(state.document);
+      if (nextActiveFloorId === previousActiveFloorId) return state;
+
+      const command: EditorCommand = {
+        type: "switch-floor",
+        previousActiveFloorId,
+        nextActiveFloorId,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
+          state.selectedInteriorAsset,
+          nextDocument
+        ),
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   panCameraByPx: (delta) => {
     stopResetCameraAnimation();
     set((state) => ({
@@ -1559,7 +1604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   zoomAtScreenPoint: (screenPoint, scaleFactor) => {
     stopResetCameraAnimation();
     set((state) => {
-      const layoutBounds = getLayoutBoundsFromRooms(state.document.rooms);
+      const layoutBounds = getLayoutBoundsFromRooms(getRoomsForActiveFloor(state.document));
       const minimumPixelsPerMm = getDrawingAwareMinPixelsPerMm({
         layoutBounds,
         viewport: state.viewport,
@@ -1592,7 +1637,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const activeSnapStepMm = getEffectiveSnapStepMm(state);
       const constraintMode = options?.constraintMode ?? "orthogonal";
       const predictiveGuides = getMagneticSnapGuidesForSettings(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         cursorWorld,
         state.camera,
         state.settings,
@@ -1676,6 +1721,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectRoomById: (roomId) =>
     set((state) => {
+      if (roomId && !getRoomsForActiveFloor(state.document).some((room) => room.id === roomId)) {
+        return state;
+      }
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
@@ -1699,7 +1747,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
-      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!getRoomWallSegment(room, wall)) {
         return {
@@ -1737,7 +1785,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectOpeningById: (roomId, openingId) =>
     set((state) => {
-      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.openings.some((opening) => opening.id === openingId)) return state;
       if (
@@ -1762,7 +1810,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectInteriorAssetById: (roomId, assetId) =>
     set((state) => {
-      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.interiorAssets.some((asset) => asset.id === assetId)) return state;
       if (
@@ -2215,6 +2263,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "delete-room",
         room: {
           id: room.id,
+          floorId: room.floorId,
           name: room.name,
           points: room.points.map((point) => ({ ...point })),
           openings: cloneRoomOpenings(room.openings),
@@ -2728,7 +2777,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const isMobile = state.viewport.height < 600;
     const paddingPx = isLandscape && !isMobile ? 48 : 96;
     const targetCamera = getCameraFitTarget({
-      rooms: state.document.rooms,
+      rooms: getRoomsForActiveFloor(state.document),
       viewport: state.viewport,
       emptyLayoutCamera: syncCameraRotationToDocument(DEFAULT_CAMERA_STATE, state.document),
       paddingPx,
@@ -3068,7 +3117,8 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
 
   const room: Room = {
     id: createRoomId(),
-    name: `Room ${state.document.rooms.length + 1}`,
+    floorId: getNormalizedActiveFloorId(state.document),
+    name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),
     openings: [],
     interiorAssets: [],
@@ -3108,7 +3158,7 @@ export function getOpeningMoveOffsetForCursor(
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
   const predictiveGuides = getMagneticSnapGuidesForSettings(
-    state.document.rooms,
+    getRoomsForActiveFloor(state.document),
     cursorWorld,
     state.camera,
     state.settings
@@ -3131,7 +3181,7 @@ export function getOpeningResizeWidthForCursor(
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
   const predictiveGuides = getMagneticSnapGuidesForSettings(
-    state.document.rooms,
+    getRoomsForActiveFloor(state.document),
     cursorWorld,
     state.camera,
     state.settings
@@ -3155,7 +3205,7 @@ export function getInteriorAssetMoveCenterForCursor(
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
   const predictiveGuides = getMagneticSnapGuidesForSettings(
-    state.document.rooms,
+    getRoomsForActiveFloor(state.document),
     cursorWorld,
     state.camera,
     state.settings
@@ -3184,7 +3234,7 @@ export function getInteriorAssetResizeFromWallForCursor(
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
   const predictiveGuides = getMagneticSnapGuidesForSettings(
-    state.document.rooms,
+    getRoomsForActiveFloor(state.document),
     cursorWorld,
     state.camera,
     state.settings
@@ -3209,7 +3259,7 @@ export function getInteriorAssetResizeFromCornerForCursor(
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
   const predictiveGuides = getMagneticSnapGuidesForSettings(
-    state.document.rooms,
+    getRoomsForActiveFloor(state.document),
     cursorWorld,
     state.camera,
     state.settings

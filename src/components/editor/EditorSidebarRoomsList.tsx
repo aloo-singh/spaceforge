@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
+import { getRoomsForActiveFloor } from "@/lib/editor/history";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
@@ -114,22 +115,26 @@ function SidebarSection({
 function FloorRow({
   floor,
   isActive,
+  onSelect,
 }: {
   floor: Floor;
   isActive: boolean;
+  onSelect: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onSelect}
       className={cn(
-        "flex min-h-10 items-center rounded-lg px-3 py-2 text-sm transition-colors",
+        "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors",
         isActive
           ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
-          : "text-zinc-600 dark:text-zinc-400"
+          : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
       )}
     >
       <span className="truncate">{floor.name}</span>
       {isActive ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
-    </div>
+    </button>
   );
 }
 
@@ -139,9 +144,10 @@ export function EditorSidebarRoomsList() {
     () => true,
     () => false
   );
-  const floors = useEditorStore((state) => state.document.floors);
-  const activeFloorId = useEditorStore((state) => state.document.activeFloorId);
-  const rooms = useEditorStore((state) => state.document.rooms);
+  const document = useEditorStore((state) => state.document);
+  const floors = document.floors;
+  const activeFloorId = document.activeFloorId;
+  const rooms = getRoomsForActiveFloor(document);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
@@ -151,6 +157,7 @@ export function EditorSidebarRoomsList() {
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const addFloor = useEditorStore((state) => state.addFloor);
+  const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
   const selectWallByRoomId = useEditorStore((state) => state.selectWallByRoomId);
   const selectOpeningById = useEditorStore((state) => state.selectOpeningById);
@@ -221,7 +228,12 @@ export function EditorSidebarRoomsList() {
           <div className="flex flex-col gap-1">
             {floors.length > 0 ? (
               floors.map((floor) => (
-                <FloorRow key={floor.id} floor={floor} isActive={activeFloorId === floor.id} />
+                <FloorRow
+                  key={floor.id}
+                  floor={floor}
+                  isActive={activeFloorId === floor.id}
+                  onSelect={() => selectFloorById(floor.id)}
+                />
               ))
             ) : (
               <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">

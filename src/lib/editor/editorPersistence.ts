@@ -4,7 +4,13 @@ import {
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
 import type { CameraState, Floor, Point, Room } from "@/lib/editor/types";
-import type { EditorDocumentState } from "@/lib/editor/history";
+import {
+  DEFAULT_FLOOR_ID,
+  getNormalizedActiveFloorId,
+  getNormalizedFloors,
+  getRoomFloorId,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 import {
   cloneEditorSettings,
@@ -51,6 +57,7 @@ type PersistedPoint = Point;
 
 type PersistedRoom = {
   id: string;
+  floorId?: string;
   name: string;
   points: PersistedPoint[];
   openings?: Room["openings"];
@@ -270,6 +277,7 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
 function isRoom(value: unknown): value is PersistedRoom {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
@@ -346,6 +354,7 @@ function clonePoint(point: Point): Point {
 function cloneRoom(room: PersistedRoom | Room): Room {
   return {
     id: room.id,
+    floorId: room.floorId ?? DEFAULT_FLOOR_ID,
     name: room.name,
     points: room.points.map(clonePoint),
     openings: cloneRoomOpenings(room.openings ?? []),
@@ -353,30 +362,16 @@ function cloneRoom(room: PersistedRoom | Room): Room {
   };
 }
 
-function cloneFloors(floors: Floor[]): Floor[] {
-  return floors.map((floor) => ({
-    id: floor.id,
-    name: floor.name,
-  }));
-}
-
-function normalizeActiveFloorId(
-  floors: Floor[],
-  activeFloorId: string | null | undefined
-): string | null {
-  if (!activeFloorId) {
-    return floors[0]?.id ?? null;
-  }
-
-  return floors.some((floor) => floor.id === activeFloorId) ? activeFloorId : (floors[0]?.id ?? null);
-}
-
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
-  const floors = cloneFloors(document.floors ?? []);
+  const floors = getNormalizedFloors(document as EditorDocumentState);
+  const activeFloorId = getNormalizedActiveFloorId({
+    floors,
+    activeFloorId: document.activeFloorId ?? null,
+  });
 
   return {
     floors,
-    activeFloorId: normalizeActiveFloorId(floors, document.activeFloorId),
+    activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -384,7 +379,13 @@ function cloneDocument(document: PersistedDocument | EditorDocumentState): Edito
     northBearingDegrees: normalizeNorthBearingDegrees(
       document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
     ),
-    rooms: document.rooms.map(cloneRoom),
+    rooms: document.rooms.map((room) => ({
+      ...cloneRoom(room),
+      floorId: getRoomFloorId(room, {
+        floors,
+        activeFloorId,
+      }),
+    })),
   };
 }
 
@@ -423,11 +424,15 @@ function normalizeDocumentForSegmentAnchoring(
   options?: { migrateNumericSegmentOffsets?: boolean }
 ): EditorDocumentState {
   const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
-  const floors = cloneFloors(document.floors ?? []);
+  const floors = getNormalizedFloors(document as EditorDocumentState);
+  const activeFloorId = getNormalizedActiveFloorId({
+    floors,
+    activeFloorId: document.activeFloorId ?? null,
+  });
 
   return {
     floors,
-    activeFloorId: normalizeActiveFloorId(floors, document.activeFloorId),
+    activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -437,13 +442,20 @@ function normalizeDocumentForSegmentAnchoring(
     ),
     rooms: document.rooms.map((room) => {
       const clonedRoom = cloneRoom(room);
+      const normalizedRoom = {
+        ...clonedRoom,
+        floorId: getRoomFloorId(room, {
+          floors,
+          activeFloorId,
+        }),
+      };
       if (!migrateNumericSegmentOffsets || clonedRoom.openings.length === 0) {
-        return clonedRoom;
+        return normalizedRoom;
       }
 
       return {
-        ...clonedRoom,
-        openings: normalizeRoomOpeningsForSegmentAnchoring(clonedRoom),
+        ...normalizedRoom,
+        openings: normalizeRoomOpeningsForSegmentAnchoring(normalizedRoom),
       };
     }),
   };

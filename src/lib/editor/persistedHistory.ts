@@ -1,4 +1,11 @@
-import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
+import {
+  applyEditorCommand,
+  getNormalizedActiveFloorId,
+  getNormalizedFloors,
+  getRoomFloorId,
+  type EditorCommand,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
 import {
   areRoomInteriorAssetsEqual,
   cloneRoomInteriorAsset,
@@ -18,25 +25,6 @@ function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
   }
 
   return true;
-}
-
-function cloneFloors(floors: Floor[]): Floor[] {
-  return floors.map((floor) => ({
-    id: floor.id,
-    name: floor.name,
-  }));
-}
-
-function normalizeActiveFloorId(document: EditorDocumentState): string | null {
-  const floors = document.floors ?? [];
-
-  if (!document.activeFloorId) {
-    return floors[0]?.id ?? null;
-  }
-
-  return floors.some((floor) => floor.id === document.activeFloorId)
-    ? document.activeFloorId
-    : (floors[0]?.id ?? null);
 }
 
 export type PersistedHistorySnapshot = {
@@ -69,7 +57,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
 
   if (
     !areFloorsEqual(a.floors ?? [], b.floors ?? []) ||
-    normalizeActiveFloorId(a) !== normalizeActiveFloorId(b)
+    getNormalizedActiveFloorId(a) !== getNormalizedActiveFloorId(b)
   ) {
     return false;
   }
@@ -79,7 +67,13 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
   for (let i = 0; i < a.rooms.length; i += 1) {
     const roomA = a.rooms[i];
     const roomB = b.rooms[i];
-    if (roomA.id !== roomB.id || roomA.name !== roomB.name) return false;
+    if (
+      roomA.id !== roomB.id ||
+      roomA.name !== roomB.name ||
+      getRoomFloorId(roomA, a) !== getRoomFloorId(roomB, b)
+    ) {
+      return false;
+    }
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
     if (!areRoomOpeningsEqual(roomA.openings ?? [], roomB.openings ?? [])) return false;
     if (!areRoomInteriorAssetsEqual(roomA.interiorAssets ?? [], roomB.interiorAssets ?? [])) return false;
@@ -92,8 +86,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
   const exportConfig = normalizeProjectExportConfig(document.exportConfig);
 
   return {
-    floors: cloneFloors(document.floors ?? []),
-    activeFloorId: normalizeActiveFloorId(document),
+    floors: getNormalizedFloors(document),
+    activeFloorId: getNormalizedActiveFloorId(document),
     exportConfig: {
       title: exportConfig.title,
       description: exportConfig.description,
@@ -105,6 +99,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
       openings: cloneRoomOpenings(room.openings ?? []),
@@ -128,10 +123,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const nextCanvasRotation = normalizeCanvasRotationDegrees(next.canvasRotationDegrees);
   const previousNorthBearing = normalizeNorthBearingDegrees(previous.northBearingDegrees);
   const nextNorthBearing = normalizeNorthBearingDegrees(next.northBearingDegrees);
-  const previousFloors = previous.floors ?? [];
-  const nextFloors = next.floors ?? [];
-  const previousActiveFloorId = normalizeActiveFloorId(previous);
-  const nextActiveFloorId = normalizeActiveFloorId(next);
+  const previousFloors = getNormalizedFloors(previous);
+  const nextFloors = getNormalizedFloors(next);
+  const previousActiveFloorId = getNormalizedActiveFloorId(previous);
+  const nextActiveFloorId = getNormalizedActiveFloorId(next);
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
@@ -146,6 +141,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     const previousRoom = previousById.get(room.id);
     if (!previousRoom) continue;
 
+    const didFloorChange = getRoomFloorId(previousRoom, previous) !== getRoomFloorId(room, next);
     const didNameChange = previousRoom.name !== room.name;
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
     const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings ?? [], room.openings ?? []);
@@ -153,12 +149,30 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       previousRoom.interiorAssets ?? [],
       room.interiorAssets ?? []
     );
-    if (!didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) continue;
+    if (!didFloorChange && !didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) {
+      continue;
+    }
 
     changedRooms.push({
       previous: previousRoom,
       next: room,
     });
+  }
+
+  if (
+    previousActiveFloorId !== nextActiveFloorId &&
+    areFloorsEqual(previousFloors, nextFloors) &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    return {
+      type: "switch-floor",
+      previousActiveFloorId,
+      nextActiveFloorId,
+    };
   }
 
   if (
@@ -197,6 +211,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "delete-room",
       room: {
         id: deletedRoom.id,
+        floorId: getRoomFloorId(deletedRoom, previous),
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(deletedRoom.openings ?? []),
@@ -240,6 +255,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "complete-room",
       room: {
         id: addedRooms[0].id,
+        floorId: getRoomFloorId(addedRooms[0], next),
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(addedRooms[0].openings ?? []),

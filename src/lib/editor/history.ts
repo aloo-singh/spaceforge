@@ -15,6 +15,56 @@ import {
   type ProjectExportConfig,
 } from "@/lib/projects/exportConfig";
 
+export const DEFAULT_FLOOR_ID = "floor-1";
+export const DEFAULT_FLOOR_NAME = "Floor 1";
+
+export function createDefaultFloor(): Floor {
+  return {
+    id: DEFAULT_FLOOR_ID,
+    name: DEFAULT_FLOOR_NAME,
+  };
+}
+
+export function getNormalizedFloors(document: Pick<EditorDocumentState, "floors">): Floor[] {
+  const floors = document.floors ?? [];
+  if (floors.length > 0) {
+    return floors.map((floor) => ({
+      id: floor.id,
+      name: floor.name,
+    }));
+  }
+
+  return [createDefaultFloor()];
+}
+
+export function getNormalizedActiveFloorId(
+  document: Pick<EditorDocumentState, "floors" | "activeFloorId">
+): string {
+  const floors = getNormalizedFloors(document);
+  if (!document.activeFloorId) {
+    return floors[0].id;
+  }
+
+  return floors.some((floor) => floor.id === document.activeFloorId)
+    ? document.activeFloorId
+    : floors[0].id;
+}
+
+export function getRoomFloorId(
+  room: { floorId?: string | null },
+  document: Pick<EditorDocumentState, "floors" | "activeFloorId">
+): string {
+  return room.floorId ?? getNormalizedActiveFloorId(document);
+}
+
+export function getRoomsForFloor(document: EditorDocumentState, floorId: string): Room[] {
+  return document.rooms.filter((room) => getRoomFloorId(room, document) === floorId);
+}
+
+export function getRoomsForActiveFloor(document: EditorDocumentState): Room[] {
+  return getRoomsForFloor(document, getNormalizedActiveFloorId(document));
+}
+
 export type EditorDocumentState = {
   floors: Floor[];
   activeFloorId: string | null;
@@ -39,6 +89,11 @@ export type EditorCommand =
       type: "add-floor";
       floor: Floor;
       previousActiveFloorId: string | null;
+    }
+  | {
+      type: "switch-floor";
+      previousActiveFloorId: string;
+      nextActiveFloorId: string;
     }
   | {
       type: "complete-room";
@@ -141,6 +196,13 @@ export function applyEditorCommand(
     };
   }
 
+  if (command.type === "switch-floor") {
+    return {
+      ...document,
+      activeFloorId: direction === "undo" ? command.previousActiveFloorId : command.nextActiveFloorId,
+    };
+  }
+
   if (command.type === "complete-room") {
     if (direction === "undo") {
       return {
@@ -177,6 +239,7 @@ export function applyEditorCommand(
       const nextRooms = [...roomsWithoutDeletedRoom];
       nextRooms.splice(command.previousIndex, 0, {
         id: command.room.id,
+        floorId: command.room.floorId,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(command.room.openings),
@@ -421,8 +484,8 @@ export function applyEditorCommand(
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
-    floors: [],
-    activeFloorId: null,
+    floors: [createDefaultFloor()],
+    activeFloorId: DEFAULT_FLOOR_ID,
     rooms: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,

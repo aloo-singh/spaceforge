@@ -135,6 +135,7 @@ import {
   snapNorthBearingDegrees,
 } from "@/lib/editor/north";
 import { detectMacPlatform } from "@/lib/platform";
+import { DEFAULT_FLOOR_ID, getRoomsForActiveFloor } from "@/lib/editor/history";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -894,8 +895,9 @@ export default function EditorCanvas({
     () => true,
     () => false
   );
-  const roomCount = useEditorStore((state) => state.document.rooms.length);
-  const rooms = useEditorStore((state) => state.document.rooms);
+  const editorDocument = useEditorStore((state) => state.document);
+  const rooms = useMemo(() => getRoomsForActiveFloor(editorDocument), [editorDocument]);
+  const roomCount = rooms.length;
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
@@ -1391,7 +1393,7 @@ export default function EditorCanvas({
 
       drawRooms(
         exportRoomGraphics,
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         null,
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
@@ -1402,7 +1404,7 @@ export default function EditorCanvas({
       );
       drawOpenings(
         exportOpeningGraphics,
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         null,
         null,
         exportCamera,
@@ -1412,7 +1414,7 @@ export default function EditorCanvas({
       );
       drawWallInteractionOverlay(
         exportWallOverlayGraphics,
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         null,
         null,
         EMPTY_ROOM_RESIZE_UI,
@@ -1424,7 +1426,7 @@ export default function EditorCanvas({
       );
       drawRoomLabels(
         exportRoomLabels,
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         null,
         null,
         exportCamera,
@@ -1530,7 +1532,7 @@ export default function EditorCanvas({
     const effectiveScaleBarPosition = request.showScaleBar ? request.scaleBarPosition : "none";
     const exportLegendItems =
       effectiveLegendPosition !== "none"
-        ? useEditorStore.getState().document.rooms.map((room, index) => ({
+        ? getRoomsForActiveFloor(useEditorStore.getState().document).map((room, index) => ({
             name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
             area: formatMetricRoomAreaForRoom(room),
           }))
@@ -1690,7 +1692,7 @@ export default function EditorCanvas({
 
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe((state, previousState) => {
-      const didCreateRoom = state.document.rooms.length === previousState.document.rooms.length + 1;
+      const didCreateRoom = getRoomsForActiveFloor(state.document).length === getRoomsForActiveFloor(previousState.document).length + 1;
       if (!didCreateRoom) return;
 
       track(ANALYTICS_EVENTS.roomCreated, {
@@ -1734,7 +1736,7 @@ export default function EditorCanvas({
     const unsubscribe = useEditorStore.subscribe((state, previousState) => {
       if (activeHintIdRef.current !== "close-shape-to-make-room") return;
       const didCreateFirstRoom =
-        previousState.document.rooms.length === 0 && state.document.rooms.length > 0;
+        getRoomsForActiveFloor(previousState.document).length === 0 && getRoomsForActiveFloor(state.document).length > 0;
       if (!didCreateFirstRoom) return;
       completeHint("close-shape-to-make-room");
     });
@@ -2106,23 +2108,23 @@ export default function EditorCanvas({
     }
 
     if (
-      findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
+      findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport) ||
       findSelectedOpeningWidthHandleAtScreenPoint(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         state.selectedOpening,
         screenPoint,
         state.camera,
         state.viewport
       ) ||
-      findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport) ||
-      findInteriorAssetAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+      findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport) ||
+      findInteriorAssetAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
     ) {
       return false;
     }
 
     if (state.selectedInteriorAsset) {
       const room =
-        state.document.rooms.find((candidate) => candidate.id === state.selectedInteriorAsset?.roomId) ?? null;
+        getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === state.selectedInteriorAsset?.roomId) ?? null;
       const asset =
         room?.interiorAssets.find((candidate) => candidate.id === state.selectedInteriorAsset?.assetId) ?? null;
       if (asset) {
@@ -2138,7 +2140,7 @@ export default function EditorCanvas({
 
     if (state.selectedRoomId) {
       const selectedRoom =
-        state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId) ?? null;
+        getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === state.selectedRoomId) ?? null;
       if (selectedRoom) {
         const bounds = getAxisAlignedRoomBounds(selectedRoom);
         if (bounds) {
@@ -2168,7 +2170,7 @@ export default function EditorCanvas({
     }
 
     const worldPoint = screenToWorld(screenPoint, state.camera, state.viewport);
-    return !findRoomAtPoint(state.document.rooms, worldPoint);
+    return !findRoomAtPoint(getRoomsForActiveFloor(state.document), worldPoint);
   }, []);
 
   useEffect(() => {
@@ -2264,14 +2266,14 @@ export default function EditorCanvas({
           }
         >();
 
-        for (const room of previousState.document.rooms) {
+        for (const room of getRoomsForActiveFloor(previousState.document)) {
           for (const asset of room.interiorAssets) {
             previousAssets.set(asset.id, { roomId: room.id, asset });
           }
         }
 
         const nextAssetIds = new Set<string>();
-        for (const room of state.document.rooms) {
+        for (const room of getRoomsForActiveFloor(state.document)) {
           for (const asset of room.interiorAssets) {
             nextAssetIds.add(asset.id);
             const previousAssetState = previousAssets.get(asset.id);
@@ -3089,14 +3091,14 @@ function drawScene(
   const isDraftActive = state.roomDraft.points.length > 0;
   const draftAnchorPoint = state.roomDraft.points[state.roomDraft.points.length - 1] ?? null;
   const predictiveGuides = isDraftActive && cursorWorld
-    ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+    ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
         constraintMode: draftConstraintMode,
         anchorPoint: draftAnchorPoint ?? undefined,
       })
     : null;
   const magneticGuides = isDraftActive && cursorWorld
     ? getMagneticSnapGuidesForSettings(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         cursorWorld,
         state.camera,
         state.settings,
@@ -3113,8 +3115,8 @@ function drawScene(
     state.settings,
     state.isDimensionsVisibilityOverrideActive
   );
-  const renderedRooms = getRenderedRoomsForTransform(state.document.rooms, transformFeedback);
-  const renderedLabelRooms = getRenderedRoomsForLabelTransform(state.document.rooms, transformFeedback);
+  const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
+  const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
   drawRooms(
     roomGraphics,
     renderedRooms,
@@ -5409,6 +5411,7 @@ function getDraftPreviewRoom(
 
   return {
     id: "__draft-preview__",
+    floorId: DEFAULT_FLOOR_ID,
     name: "",
     points: draftPoints,
     openings: [],

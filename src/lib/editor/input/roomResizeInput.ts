@@ -2,6 +2,7 @@ import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { GRID_SIZE_MM } from "@/lib/editor/constants";
+import { getRoomsForActiveFloor, type EditorDocumentState } from "@/lib/editor/history";
 import {
   getConstrainedVertexAdjustmentResult,
   getConstrainedVertexHandleLayouts,
@@ -53,7 +54,7 @@ type RoomResizeStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean };
-  document: { rooms: Room[] };
+  document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
   selectedOpening: { roomId: string; openingId: string } | null;
@@ -375,7 +376,7 @@ export function attachRoomResizeInput(
     if (state.roomDraft.points.length > 0) return null;
     if (!state.selectedRoomId) return null;
 
-    const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
+    const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === state.selectedRoomId);
     if (!room) return null;
 
     const declutter = getRoomDeclutterState(room, state.camera, state.viewport);
@@ -439,7 +440,7 @@ export function attachRoomResizeInput(
     const state = store.getState();
     return (
       findSelectedOpeningWidthHandleAtScreenPoint(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         state.selectedOpening,
         screenPoint,
         state.camera,
@@ -579,13 +580,13 @@ export function attachRoomResizeInput(
     const activeSnapStepMm = getActiveSnapStepMm(activeState.camera);
     const excludeRoomIds = new Set([activeSession.roomId]);
     const visibleGuides = activeState.settings.showGuidelines
-      ? getPredictiveSnapGuides(activeState.document.rooms, cursorWorld, activeState.camera, {
+      ? getPredictiveSnapGuides(getRoomsForActiveFloor(activeState.document), cursorWorld, activeState.camera, {
           excludeRoomIds,
         })
       : null;
     const magneticGuides = activeState.settings.snappingEnabled
       ? getMagneticSnapGuidesForSettings(
-          activeState.document.rooms,
+          getRoomsForActiveFloor(activeState.document),
           cursorWorld,
           activeState.camera,
           activeState.settings,

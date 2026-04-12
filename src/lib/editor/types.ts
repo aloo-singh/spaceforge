@@ -105,6 +105,7 @@ export type Floor = {
 
 export type Room = {
   id: string;
+  floorId: string;
   name: string;
   points: Point[];
   openings: RoomOpening[];
