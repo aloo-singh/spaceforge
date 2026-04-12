@@ -98,6 +98,11 @@ export type RoomInteriorAssetSelection = {
   assetId: string;
 };
 
+export type Floor = {
+  id: string;
+  name: string;
+};
+
 export type Room = {
   id: string;
   name: string;

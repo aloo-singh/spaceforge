@@ -125,6 +125,20 @@ function isRoom(value: unknown): boolean {
 
 export function isProjectDocument(value: unknown): value is EditorDocumentState {
   if (!isObject(value)) return false;
+  if (value.floors !== undefined) {
+    if (!Array.isArray(value.floors)) return false;
+    if (
+      !value.floors.every(
+        (floor) =>
+          isObject(floor) && typeof floor.id === "string" && typeof floor.name === "string"
+      )
+    ) {
+      return false;
+    }
+  }
+  if (value.activeFloorId !== undefined && value.activeFloorId !== null && typeof value.activeFloorId !== "string") {
+    return false;
+  }
   if (!Array.isArray(value.rooms)) return false;
   if (!value.rooms.every(isRoom)) return false;
   if (

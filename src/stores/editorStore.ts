@@ -97,6 +97,7 @@ import type {
   CameraState,
   DoorHingeSide,
   DoorOpeningSide,
+  Floor,
   OpeningType,
   Point,
   Room,
@@ -180,6 +181,7 @@ type EditorState = {
   previewNorthBearingDegrees: (degrees: number) => void;
   commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateNorthBearingDegrees: (degrees: number) => void;
+  addFloor: () => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
   setCameraCenterMm: (xMm: number, yMm: number) => void;
@@ -321,6 +323,14 @@ function createInteriorAssetId(): string {
   }
 
   return `asset-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function createFloorId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `floor-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 function updateRoomNameInDocument(document: DocumentState, roomId: string, name: string): DocumentState {
@@ -1009,6 +1019,11 @@ function getSafePersistedHistorySnapshot(
     buildPersistedHistorySnapshot(document, history, PERSISTED_HISTORY_STATE_LIMIT) ?? {
       historyStack: [
         {
+          floors: document.floors.map((floor) => ({
+            id: floor.id,
+            name: floor.name,
+          })),
+          activeFloorId: document.activeFloorId,
           exportConfig: {
             title: document.exportConfig.title,
             description: document.exportConfig.description,
@@ -1505,6 +1520,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             previousBearingDegrees,
             nextBearingDegrees,
           }),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  addFloor: () =>
+    set((state) => {
+      const nextFloorNumber = state.document.floors.length + 1;
+      const floor: Floor = {
+        id: createFloorId(),
+        name: `Floor ${nextFloorNumber}`,
+      };
+      const command: EditorCommand = {
+        type: "add-floor",
+        floor,
+        previousActiveFloorId: state.document.activeFloorId,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
           future: [],
         },
         canUndo: true,

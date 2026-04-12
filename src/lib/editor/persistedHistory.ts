@@ -8,7 +8,36 @@ import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+
+function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false;
+  }
+
+  return true;
+}
+
+function cloneFloors(floors: Floor[]): Floor[] {
+  return floors.map((floor) => ({
+    id: floor.id,
+    name: floor.name,
+  }));
+}
+
+function normalizeActiveFloorId(document: EditorDocumentState): string | null {
+  const floors = document.floors ?? [];
+
+  if (!document.activeFloorId) {
+    return floors[0]?.id ?? null;
+  }
+
+  return floors.some((floor) => floor.id === document.activeFloorId)
+    ? document.activeFloorId
+    : (floors[0]?.id ?? null);
+}
 
 export type PersistedHistorySnapshot = {
   historyStack: EditorDocumentState[];
@@ -38,6 +67,13 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     return false;
   }
 
+  if (
+    !areFloorsEqual(a.floors ?? [], b.floors ?? []) ||
+    normalizeActiveFloorId(a) !== normalizeActiveFloorId(b)
+  ) {
+    return false;
+  }
+
   if (a.rooms.length !== b.rooms.length) return false;
 
   for (let i = 0; i < a.rooms.length; i += 1) {
@@ -56,6 +92,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
   const exportConfig = normalizeProjectExportConfig(document.exportConfig);
 
   return {
+    floors: cloneFloors(document.floors ?? []),
+    activeFloorId: normalizeActiveFloorId(document),
     exportConfig: {
       title: exportConfig.title,
       description: exportConfig.description,
@@ -90,6 +128,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const nextCanvasRotation = normalizeCanvasRotationDegrees(next.canvasRotationDegrees);
   const previousNorthBearing = normalizeNorthBearingDegrees(previous.northBearingDegrees);
   const nextNorthBearing = normalizeNorthBearingDegrees(next.northBearingDegrees);
+  const previousFloors = previous.floors ?? [];
+  const nextFloors = next.floors ?? [];
+  const previousActiveFloorId = normalizeActiveFloorId(previous);
+  const nextActiveFloorId = normalizeActiveFloorId(next);
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
@@ -117,6 +159,28 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       previous: previousRoom,
       next: room,
     });
+  }
+
+  if (
+    nextFloors.length === previousFloors.length + 1 &&
+    previousFloors.every((floor, index) => floor.id === nextFloors[index]?.id && floor.name === nextFloors[index]?.name) &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const addedFloor = nextFloors[nextFloors.length - 1];
+    if (!addedFloor || nextActiveFloorId !== addedFloor.id) return null;
+
+    return {
+      type: "add-floor",
+      floor: {
+        id: addedFloor.id,
+        name: addedFloor.name,
+      },
+      previousActiveFloorId,
+    };
   }
 
   if (

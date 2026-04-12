@@ -8,7 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
   DEFAULT_PROJECT_EXPORT_CONFIG,
@@ -16,6 +16,8 @@ import {
 } from "@/lib/projects/exportConfig";
 
 export type EditorDocumentState = {
+  floors: Floor[];
+  activeFloorId: string | null;
   rooms: Room[];
   exportConfig: ProjectExportConfig;
   northBearingDegrees: number;
@@ -32,6 +34,11 @@ export type EditorCommand =
       type: "update-north-bearing";
       previousBearingDegrees: number;
       nextBearingDegrees: number;
+    }
+  | {
+      type: "add-floor";
+      floor: Floor;
+      previousActiveFloorId: string | null;
     }
   | {
       type: "complete-room";
@@ -145,6 +152,22 @@ export function applyEditorCommand(
     return {
       ...document,
       rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
+    };
+  }
+
+  if (command.type === "add-floor") {
+    if (direction === "undo") {
+      return {
+        ...document,
+        floors: document.floors.filter((floor) => floor.id !== command.floor.id),
+        activeFloorId: command.previousActiveFloorId,
+      };
+    }
+
+    return {
+      ...document,
+      floors: [...document.floors.filter((floor) => floor.id !== command.floor.id), command.floor],
+      activeFloorId: command.floor.id,
     };
   }
 
@@ -398,6 +421,8 @@ export function applyEditorCommand(
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
+    floors: [],
+    activeFloorId: null,
     rooms: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,

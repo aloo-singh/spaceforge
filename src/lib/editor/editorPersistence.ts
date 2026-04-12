@@ -3,7 +3,7 @@ import {
   normalizeRoomOpeningsForSegmentAnchoring,
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
-import type { CameraState, Point, Room } from "@/lib/editor/types";
+import type { CameraState, Floor, Point, Room } from "@/lib/editor/types";
 import type { EditorDocumentState } from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 import {
@@ -40,10 +40,11 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 // - v8 payloads also persist opening-side and hinge-side fields for inspector editing.
 // - v9 payloads also persist export dialog session preferences.
 // - v10 payloads also persist canvas rotation with document + camera state.
+// - v11 payloads also persist floors and the active floor.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10/v11 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 10;
+export const EDITOR_PERSISTENCE_VERSION = 11;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 type PersistedPoint = Point;
@@ -57,6 +58,8 @@ type PersistedRoom = {
 };
 
 type PersistedDocument = {
+  floors?: Floor[];
+  activeFloorId?: string | null;
   rooms: PersistedRoom[];
   exportConfig?: EditorDocumentState["exportConfig"];
   northBearingDegrees?: number;
@@ -163,7 +166,7 @@ export type PersistedEditorPayloadV8 = {
   };
 };
 
-export type PersistedEditorPayloadV10 = {
+export type PersistedEditorPayloadV11 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -195,6 +198,11 @@ function isFiniteNumber(value: unknown): value is number {
 function isPoint(value: unknown): value is Point {
   if (!isObject(value)) return false;
   return isFiniteNumber(value.x) && isFiniteNumber(value.y);
+}
+
+function isFloor(value: unknown): value is Floor {
+  if (!isObject(value)) return false;
+  return typeof value.id === "string" && typeof value.name === "string";
 }
 
 function isOpeningType(value: unknown): value is Room["openings"][number]["type"] {
@@ -292,6 +300,12 @@ function isCameraState(value: unknown): value is CameraState {
 
 function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
+  if (value.floors !== undefined && (!Array.isArray(value.floors) || !value.floors.every(isFloor))) {
+    return false;
+  }
+  if (value.activeFloorId !== undefined && value.activeFloorId !== null && typeof value.activeFloorId !== "string") {
+    return false;
+  }
   if (!Array.isArray(value.rooms)) return false;
   if (value.exportConfig !== undefined && !isObject(value.exportConfig)) return false;
   if (
@@ -339,8 +353,30 @@ function cloneRoom(room: PersistedRoom | Room): Room {
   };
 }
 
+function cloneFloors(floors: Floor[]): Floor[] {
+  return floors.map((floor) => ({
+    id: floor.id,
+    name: floor.name,
+  }));
+}
+
+function normalizeActiveFloorId(
+  floors: Floor[],
+  activeFloorId: string | null | undefined
+): string | null {
+  if (!activeFloorId) {
+    return floors[0]?.id ?? null;
+  }
+
+  return floors.some((floor) => floor.id === activeFloorId) ? activeFloorId : (floors[0]?.id ?? null);
+}
+
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
+  const floors = cloneFloors(document.floors ?? []);
+
   return {
+    floors,
+    activeFloorId: normalizeActiveFloorId(floors, document.activeFloorId),
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -387,8 +423,11 @@ function normalizeDocumentForSegmentAnchoring(
   options?: { migrateNumericSegmentOffsets?: boolean }
 ): EditorDocumentState {
   const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
+  const floors = cloneFloors(document.floors ?? []);
 
   return {
+    floors,
+    activeFloorId: normalizeActiveFloorId(floors, document.activeFloorId),
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -444,6 +483,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 7 &&
         parsed.version !== 8 &&
         parsed.version !== 9 &&
+        parsed.version !== 10 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -507,7 +547,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV10 = {
+  const payload: PersistedEditorPayloadV11 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
