@@ -901,6 +901,7 @@ export default function EditorCanvas({
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
+  const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
@@ -915,6 +916,8 @@ export default function EditorCanvas({
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const resetDraft = useEditorStore((state) => state.resetDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
+  const floors = editorDocument.floors;
+  const activeFloorId = editorDocument.activeFloorId;
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
@@ -2768,6 +2771,45 @@ export default function EditorCanvas({
                   </div>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {floors.length > 1 ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4",
+                hydratedShowCanvasHud
+                  ? "translate-x-0 opacity-100"
+                  : "-translate-x-1 opacity-85"
+              )}
+            >
+              <div className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]">
+                <div className="flex flex-col gap-1">
+                  {floors.map((floor) => {
+                    const isActiveFloor = floor.id === activeFloorId;
+                    const floorLabel = floor.name.replace(/^Floor\s+/u, "");
+
+                    return (
+                      <button
+                        key={floor.id}
+                        type="button"
+                        onClick={() => selectFloorById(floor.id)}
+                        aria-pressed={isActiveFloor}
+                        aria-label={`Switch to ${floor.name}`}
+                        className={cn(
+                          "min-h-8 rounded-full px-3 py-1 text-left text-[11px] font-medium transition-colors",
+                          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                          isActiveFloor
+                            ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-950"
+                            : "text-zinc-600 hover:bg-zinc-200/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50"
+                        )}
+                        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+                      >
+                        {floorLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           ) : null}
           {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
