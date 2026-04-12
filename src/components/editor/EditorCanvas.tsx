@@ -917,6 +917,7 @@ export default function EditorCanvas({
   const resetDraft = useEditorStore((state) => state.resetDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const floors = editorDocument.floors;
+  const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
@@ -2784,7 +2785,7 @@ export default function EditorCanvas({
             >
               <div className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]">
                 <div className="flex flex-col gap-1">
-                  {floors.map((floor) => {
+                  {displayedFloors.map((floor) => {
                     const isActiveFloor = floor.id === activeFloorId;
                     const floorLabel = floor.name.replace(/^Floor\s+/u, "");
 

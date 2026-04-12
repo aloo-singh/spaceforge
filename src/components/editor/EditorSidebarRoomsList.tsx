@@ -146,6 +146,7 @@ export function EditorSidebarRoomsList() {
   );
   const document = useEditorStore((state) => state.document);
   const floors = document.floors;
+  const displayedFloors = [...floors].reverse();
   const activeFloorId = document.activeFloorId;
   const rooms = getRoomsForActiveFloor(document);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
@@ -227,7 +228,7 @@ export function EditorSidebarRoomsList() {
         >
           <div className="flex flex-col gap-1">
             {floors.length > 0 ? (
-              floors.map((floor) => (
+              displayedFloors.map((floor) => (
                 <FloorRow
                   key={floor.id}
                   floor={floor}
