@@ -32,7 +32,6 @@ import {
   pointsEqual,
 } from "@/lib/editor/geometry";
 import {
-  isOrthogonalPointPath,
   isSimplePolygon,
 } from "@/lib/editor/roomGeometry";
 import { translateRoomPointsOnGrid } from "@/lib/editor/roomTranslation";
@@ -1594,8 +1593,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const nextDraftPoints = applyDraftCandidatePointToPath(draftPoints, nextPoint);
-      const loopClosure =
-        isOrthogonalPointPath(nextDraftPoints) ? getDraftLoopClosureResultFromPath(nextDraftPoints) : null;
+      const loopClosure = getDraftLoopClosureResultFromPath(nextDraftPoints);
       if (loopClosure && !pointsEqual(nextPoint, startPoint)) {
         return completeDraftRoom(state, loopClosure.committedLoop);
       }
