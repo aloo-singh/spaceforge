@@ -449,6 +449,7 @@ function buildConnectedFloorDocument(
         connectionId,
         arrowEnabled: true,
         arrowLabel: connectedArrowLabel,
+        arrowDirection: asset.arrowDirection === "forward" ? "reverse" : "forward",
       },
     ],
   };
@@ -852,7 +853,7 @@ function syncConnectedStairTransformInDocument(
       ),
     };
   } else {
-    // Position sync: copy position from primary to peer
+    // Position/arrow sync: copy position and sync arrow direction (opposite) from primary to peer
     return {
       ...document,
       rooms: document.rooms.map((candidateRoom) =>
@@ -865,6 +866,7 @@ function syncConnectedStairTransformInDocument(
                       ...cloneRoomInteriorAsset(candidateAsset),
                       xMm: asset.xMm,
                       yMm: asset.yMm,
+                      arrowDirection: asset.arrowDirection === "forward" ? "reverse" : "forward",
                     }
                   : candidateAsset
               ),
@@ -893,7 +895,8 @@ function updateSelectedInteriorAsset(
     (asset.connectionId ?? null) !== null &&
     (asset.xMm !== nextAsset.xMm ||
       asset.yMm !== nextAsset.yMm ||
-      asset.rotationDegrees !== nextAsset.rotationDegrees);
+      asset.rotationDegrees !== nextAsset.rotationDegrees ||
+      asset.arrowDirection !== nextAsset.arrowDirection);
 
   if (didTransformConnectedStair) {
     const updatedDocument = updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset);
