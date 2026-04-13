@@ -12,7 +12,7 @@ import {
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
 import { getRoomsForActiveFloor } from "@/lib/editor/history";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
+import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -112,32 +112,6 @@ function SidebarSection({
   );
 }
 
-function FloorRow({
-  floor,
-  isActive,
-  onSelect,
-}: {
-  floor: Floor;
-  isActive: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors",
-        isActive
-          ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
-          : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
-      )}
-    >
-      <span className="truncate">{floor.name}</span>
-      {isActive ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
-    </button>
-  );
-}
-
 export function EditorSidebarRoomsList() {
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -179,12 +153,20 @@ export function EditorSidebarRoomsList() {
   const updateRoomRenameDraft = useEditorStore((state) => state.updateRoomRenameDraft);
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
+  const startFloorRename = useEditorStore((state) => state.startFloorRename);
+  const updateFloorRenameDraft = useEditorStore((state) => state.updateFloorRenameDraft);
+  const commitFloorRenameSession = useEditorStore((state) => state.commitFloorRenameSession);
+  const cancelFloorRename = useEditorStore((state) => state.cancelFloorRename);
+  const floorRenameSession = useEditorStore((state) => state.floorRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const interiorAssetInputRef = useRef<HTMLInputElement | null>(null);
+  const floorRenameInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoFocusRenameInputRef = useRef(false);
   const shouldAutoFocusInteriorAssetRenameInputRef = useRef(false);
+  const shouldAutoFocusFloorRenameInputRef = useRef(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
+  const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -213,6 +195,13 @@ export function EditorSidebarRoomsList() {
     shouldAutoFocusInteriorAssetRenameInputRef.current = false;
   }, [interiorAssetRenameSession, isRenameBlocked]);
 
+  useEffect(() => {
+    if (!floorRenameSession || isRenameBlocked || !shouldAutoFocusFloorRenameInputRef.current) return;
+    floorRenameInputRef.current?.focus();
+    floorRenameInputRef.current?.select();
+    shouldAutoFocusFloorRenameInputRef.current = false;
+  }, [floorRenameSession, isRenameBlocked]);
+
   if (!hasHydrated) {
     return null;
   }
@@ -228,14 +217,66 @@ export function EditorSidebarRoomsList() {
         >
           <div className="flex flex-col gap-1">
             {floors.length > 0 ? (
-              displayedFloors.map((floor) => (
-                <FloorRow
-                  key={floor.id}
-                  floor={floor}
-                  isActive={activeFloorId === floor.id}
-                  onSelect={() => selectFloorById(floor.id)}
-                />
-              ))
+              displayedFloors.map((floor) => {
+                const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
+                return (
+                  <div key={floor.id}>
+                    {isRenaming ? (
+                      <div className="flex min-h-10 items-center gap-2 px-3 py-2">
+                        <EditorSidebarRenameInput
+                          ref={floorRenameInputRef}
+                          value={floor.name}
+                          onChange={(event) => updateFloorRenameDraft(floor.id, event.target.value)}
+                          onBlur={() => {
+                            commitFloorRenameSession();
+                            setSidebarRenameFloorId(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.nativeEvent.isComposing) return;
+
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              commitFloorRenameSession();
+                              setSidebarRenameFloorId(null);
+                              return;
+                            }
+
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              cancelFloorRename();
+                              setSidebarRenameFloorId(null);
+                            }
+                          }}
+                          aria-label={`Rename ${floor.name}`}
+                          className="flex-1"
+                          disabled={isRenameBlocked}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => selectFloorById(floor.id)}
+                        onDoubleClick={(event) => {
+                          event.stopPropagation();
+                          setSidebarRenameFloorId(floor.id);
+                          shouldAutoFocusFloorRenameInputRef.current = true;
+                          selectFloorById(floor.id);
+                          startFloorRename(floor.id);
+                        }}
+                        className={cn(
+                          "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                          activeFloorId === floor.id
+                            ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
+                            : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
+                        )}
+                      >
+                        <span className="truncate">{floor.name}</span>
+                        {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
+                      </button>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
                 No floors yet.
