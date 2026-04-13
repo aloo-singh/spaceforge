@@ -202,6 +202,22 @@ export function EditorSidebarRoomsList() {
     shouldAutoFocusFloorRenameInputRef.current = false;
   }, [floorRenameSession, isRenameBlocked]);
 
+  useEffect(() => {
+    const activeFloorRenamingId = floorRenameSession?.floorId;
+    if (!activeFloorRenamingId || !sidebarRenameFloorId) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (floorRenameInputRef.current && !floorRenameInputRef.current.contains(target)) {
+        useEditorStore.getState().commitFloorRenameSession();
+        setSidebarRenameFloorId(null);
+      }
+    };
+
+    globalThis.document.addEventListener("mousedown", handleClickOutside);
+    return () => globalThis.document.removeEventListener("mousedown", handleClickOutside);
+  }, [floorRenameSession, sidebarRenameFloorId]);
+
   if (!hasHydrated) {
     return null;
   }
