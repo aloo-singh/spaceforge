@@ -222,7 +222,8 @@ const ANCHORED_HINT_MAX_WIDTH_PX = 352;
 const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
-const FLOOR_FOOTPRINT_MAX_ALPHA = 0.14;
+const FLOOR_FOOTPRINT_MAX_ALPHA = 0.26;
+const FLOOR_FOOTPRINT_STROKE_WIDTH_PX = 2.25;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
@@ -2876,7 +2877,10 @@ export default function EditorCanvas({
                   : "-translate-x-1 opacity-85"
               )}
             >
-              <div className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]">
+              <div
+                className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]"
+                onPointerLeave={() => setHoveredFloorPreviewId(null)}
+              >
                 <div className="flex flex-col gap-1">
                   {displayedFloors.map((floor) => {
                     const isActiveFloor = floor.id === activeFloorId;
@@ -2888,7 +2892,11 @@ export default function EditorCanvas({
                         type="button"
                         onClick={() => selectFloorById(floor.id)}
                         onPointerEnter={() => setHoveredFloorPreviewId(floor.id)}
+                        onPointerMove={() => setHoveredFloorPreviewId(floor.id)}
                         onPointerLeave={() => setHoveredFloorPreviewId(null)}
+                        onPointerCancel={() => setHoveredFloorPreviewId(null)}
+                        onFocus={() => setHoveredFloorPreviewId(floor.id)}
+                        onBlur={() => setHoveredFloorPreviewId(null)}
                         aria-pressed={isActiveFloor}
                         aria-label={`Switch to ${floor.name}`}
                         className={cn(
@@ -3419,9 +3427,9 @@ function drawFloorFootprint(
       room.points,
       camera,
       viewport,
-      theme.gridMajor,
+      theme.originAxis,
       0,
-      1.5,
+      FLOOR_FOOTPRINT_STROKE_WIDTH_PX,
       FLOOR_FOOTPRINT_MAX_ALPHA * opacity
     );
   }
