@@ -2702,8 +2702,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
+      const didNameChange = floor.name !== floorRenameSession.initialName;
+      if (!didNameChange) {
+        return {
+          floorRenameSession: null,
+        };
+      }
+
+      const command: EditorCommand = {
+        type: "rename-floor",
+        floorId: floorRenameSession.floorId,
+        previousName: floorRenameSession.initialName,
+        nextName: floor.name,
+      };
+
       return {
         floorRenameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
       };
     }),
   cancelFloorRename: () =>

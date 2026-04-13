@@ -124,6 +124,12 @@ export type EditorCommand =
       nextName: string;
     }
   | {
+      type: "rename-floor";
+      floorId: string;
+      previousName: string;
+      nextName: string;
+    }
+  | {
       type: "resize-room";
       roomId: string;
       previousPoints: Room["points"];
@@ -493,18 +499,37 @@ export function applyEditorCommand(
     };
   }
 
-  const nextName = direction === "undo" ? command.previousName : command.nextName;
-  return {
-    ...document,
+  if (command.type === "rename-room") {
+    const nextName = direction === "undo" ? command.previousName : command.nextName;
+    return {
+      ...document,
       rooms: document.rooms.map((room) =>
         room.id === command.roomId
           ? {
               ...room,
               name: nextName,
-          }
-        : room
-    ),
-  };
+            }
+          : room
+      ),
+    };
+  }
+
+  if (command.type === "rename-floor") {
+    const nextName = direction === "undo" ? command.previousName : command.nextName;
+    return {
+      ...document,
+      floors: document.floors.map((floor) =>
+        floor.id === command.floorId
+          ? {
+              ...floor,
+              name: nextName,
+            }
+          : floor
+      ),
+    };
+  }
+
+  return document;
 }
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
