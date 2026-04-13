@@ -8,14 +8,66 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
   DEFAULT_PROJECT_EXPORT_CONFIG,
   type ProjectExportConfig,
 } from "@/lib/projects/exportConfig";
 
+export const DEFAULT_FLOOR_ID = "floor-1";
+export const DEFAULT_FLOOR_NAME = "Floor 1";
+
+export function createDefaultFloor(): Floor {
+  return {
+    id: DEFAULT_FLOOR_ID,
+    name: DEFAULT_FLOOR_NAME,
+  };
+}
+
+export function getNormalizedFloors(document: Pick<EditorDocumentState, "floors">): Floor[] {
+  const floors = document.floors ?? [];
+  if (floors.length > 0) {
+    return floors.map((floor) => ({
+      id: floor.id,
+      name: floor.name,
+    }));
+  }
+
+  return [createDefaultFloor()];
+}
+
+export function getNormalizedActiveFloorId(
+  document: Pick<EditorDocumentState, "floors" | "activeFloorId">
+): string {
+  const floors = getNormalizedFloors(document);
+  if (!document.activeFloorId) {
+    return floors[0].id;
+  }
+
+  return floors.some((floor) => floor.id === document.activeFloorId)
+    ? document.activeFloorId
+    : floors[0].id;
+}
+
+export function getRoomFloorId(
+  room: { floorId?: string | null },
+  document: Pick<EditorDocumentState, "floors" | "activeFloorId">
+): string {
+  return room.floorId ?? getNormalizedActiveFloorId(document);
+}
+
+export function getRoomsForFloor(document: EditorDocumentState, floorId: string): Room[] {
+  return document.rooms.filter((room) => getRoomFloorId(room, document) === floorId);
+}
+
+export function getRoomsForActiveFloor(document: EditorDocumentState): Room[] {
+  return getRoomsForFloor(document, getNormalizedActiveFloorId(document));
+}
+
 export type EditorDocumentState = {
+  floors: Floor[];
+  activeFloorId: string | null;
   rooms: Room[];
   exportConfig: ProjectExportConfig;
   northBearingDegrees: number;
@@ -34,6 +86,29 @@ export type EditorCommand =
       nextBearingDegrees: number;
     }
   | {
+      type: "add-floor";
+      floor: Floor;
+      previousActiveFloorId: string | null;
+    }
+  | {
+      type: "switch-floor";
+      previousActiveFloorId: string;
+      nextActiveFloorId: string;
+    }
+  | {
+      type: "create-connected-floor";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+      createdFloorId: string;
+      createdRoomId: string;
+      createdAssetId: string;
+    }
+  | {
+      type: "sync-connected-stairs";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+    }
+  | {
       type: "complete-room";
       room: Room;
     }
@@ -47,6 +122,21 @@ export type EditorCommand =
       roomId: string;
       previousName: string;
       nextName: string;
+    }
+  | {
+      type: "rename-floor";
+      floorId: string;
+      previousName: string;
+      nextName: string;
+    }
+  | {
+      type: "delete-floor";
+      floor: Floor;
+      previousFloorIndex: number;
+      roomsToDelete: Array<{
+        room: Room;
+        previousIndex: number;
+      }>;
     }
   | {
       type: "resize-room";
@@ -116,6 +206,18 @@ export function applyEditorCommand(
   command: EditorCommand,
   direction: "undo" | "redo"
 ): EditorDocumentState {
+  if (command.type === "create-connected-floor") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
+  if (command.type === "sync-connected-stairs") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
   if (command.type === "update-canvas-rotation") {
     return {
       ...document,
@@ -134,6 +236,13 @@ export function applyEditorCommand(
     };
   }
 
+  if (command.type === "switch-floor") {
+    return {
+      ...document,
+      activeFloorId: direction === "undo" ? command.previousActiveFloorId : command.nextActiveFloorId,
+    };
+  }
+
   if (command.type === "complete-room") {
     if (direction === "undo") {
       return {
@@ -148,12 +257,29 @@ export function applyEditorCommand(
     };
   }
 
+  if (command.type === "add-floor") {
+    if (direction === "undo") {
+      return {
+        ...document,
+        floors: document.floors.filter((floor) => floor.id !== command.floor.id),
+        activeFloorId: command.previousActiveFloorId,
+      };
+    }
+
+    return {
+      ...document,
+      floors: [...document.floors.filter((floor) => floor.id !== command.floor.id), command.floor],
+      activeFloorId: command.floor.id,
+    };
+  }
+
   if (command.type === "delete-room") {
     if (direction === "undo") {
       const roomsWithoutDeletedRoom = document.rooms.filter((room) => room.id !== command.room.id);
       const nextRooms = [...roomsWithoutDeletedRoom];
       nextRooms.splice(command.previousIndex, 0, {
         id: command.room.id,
+        floorId: command.room.floorId,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(command.room.openings),
@@ -382,26 +508,106 @@ export function applyEditorCommand(
     };
   }
 
-  const nextName = direction === "undo" ? command.previousName : command.nextName;
-  return {
-    ...document,
+  if (command.type === "rename-room") {
+    const nextName = direction === "undo" ? command.previousName : command.nextName;
+    return {
+      ...document,
       rooms: document.rooms.map((room) =>
         room.id === command.roomId
           ? {
               ...room,
               name: nextName,
-          }
-        : room
-    ),
-  };
+            }
+          : room
+      ),
+    };
+  }
+
+  if (command.type === "rename-floor") {
+    const nextName = direction === "undo" ? command.previousName : command.nextName;
+    return {
+      ...document,
+      floors: document.floors.map((floor) =>
+        floor.id === command.floorId
+          ? {
+              ...floor,
+              name: nextName,
+            }
+          : floor
+      ),
+    };
+  }
+
+  if (command.type === "delete-floor") {
+    if (direction === "undo") {
+      const floorsWithoutDeletedFloor = document.floors.filter((f) => f.id !== command.floor.id);
+      const nextFloors = [...floorsWithoutDeletedFloor];
+      nextFloors.splice(command.previousFloorIndex, 0, {
+        id: command.floor.id,
+        name: command.floor.name,
+      });
+
+      const roomsWithoutDeletedRooms = document.rooms.filter(
+        (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
+      );
+      const nextRooms = [...roomsWithoutDeletedRooms];
+
+      for (const { room, previousIndex } of command.roomsToDelete) {
+        nextRooms.splice(previousIndex, 0, {
+          id: room.id,
+          floorId: room.floorId,
+          name: room.name,
+          points: room.points.map((point) => ({ ...point })),
+          openings: cloneRoomOpenings(room.openings),
+          interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+        });
+      }
+
+      return {
+        ...document,
+        floors: nextFloors,
+        rooms: nextRooms,
+      };
+    }
+
+    return {
+      ...document,
+      floors: document.floors.filter((f) => f.id !== command.floor.id),
+      rooms: document.rooms.filter(
+        (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
+      ),
+    };
+  }
+
+  return document;
 }
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
+    floors: [createDefaultFloor()],
+    activeFloorId: DEFAULT_FLOOR_ID,
     rooms: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,
     canvasRotationDegrees: DEFAULT_CANVAS_ROTATION_DEGREES,
+  };
+}
+
+function cloneEditorDocumentState(document: EditorDocumentState): EditorDocumentState {
+  return {
+    floors: getNormalizedFloors(document),
+    activeFloorId: getNormalizedActiveFloorId(document),
+    rooms: document.rooms.map((room) => ({
+      id: room.id,
+      floorId: getRoomFloorId(room, document),
+      name: room.name,
+      points: room.points.map((point) => ({ ...point })),
+      openings: cloneRoomOpenings(room.openings),
+      interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+    })),
+    exportConfig: cloneProjectExportConfig(document.exportConfig),
+    northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
   };
 }
 

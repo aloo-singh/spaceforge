@@ -165,6 +165,7 @@ export function EditorProjectBootstrap({
             } else {
               fitCameraOnProjectOpen(projectOpenCameraOptions);
             }
+            useEditorStore.getState().setMaxFloors(fallbackProject.maxFloors);
 
             saveActiveProjectId(fallbackProject.id);
             onProjectResolvedRef.current?.({
@@ -229,6 +230,7 @@ export function EditorProjectBootstrap({
         } else {
           fitCameraOnProjectOpen(projectOpenCameraOptions);
         }
+        useEditorStore.getState().setMaxFloors(selectedProject.maxFloors);
 
         saveActiveProjectId(selectedProject.id);
         onProjectResolvedRef.current?.({
@@ -293,7 +295,7 @@ export function EditorProjectBootstrap({
     }
 
     const nextDocument = cloneDocumentState(document);
-    const nextSignature = getThumbnailDocumentSignature(nextDocument);
+    const nextSignature = getDocumentSignature(nextDocument);
     if (nextSignature === lastSyncedSignatureRef.current) {
       return;
     }
@@ -322,7 +324,7 @@ export function EditorProjectBootstrap({
     }
 
     const nextDocument = cloneDocumentState(document);
-    const nextSignature = getDocumentSignature(nextDocument);
+    const nextSignature = getThumbnailDocumentSignature(nextDocument);
     if (nextSignature === lastSyncedThumbnailSignatureRef.current) {
       return;
     }

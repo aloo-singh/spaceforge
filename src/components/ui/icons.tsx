@@ -47,6 +47,8 @@ export {
   IconThumbDown as ThumbsDown,
   IconThumbUp as ThumbsUp,
   IconTransfer as Transfer,
+  IconTriangle as IconTriangle,
+  IconTriangleInverted as IconTriangleInverted,
   IconTrash as Trash2,
   IconWindow as WindowIcon,
   IconX as X,

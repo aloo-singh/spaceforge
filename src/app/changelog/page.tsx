@@ -10,6 +10,48 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.59.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-13</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Multi-floor foundation with bottom-to-top floor ordering (0–9)</li>
+                <li>Sidebar &ldquo;Floors&rdquo; section with &ldquo;Add Floor&rdquo; button</li>
+                <li>Magic connected-floor prompt when placing stairs</li>
+                <li>Inspector buttons for &ldquo;Add floor above/below&rdquo; on selected stairs with automatic &ldquo;UP&rdquo;/&ldquo;DOWN&rdquo; labels and opposite arrows</li>
+                <li>Apple Maps-style vertical floor selector pill with circular floor badges</li>
+                <li>Faint outline footprint of the floor below with hover preview and settings toggle</li>
+                <li>Floor rename support in sidebar (click-to-edit)</li>
+                <li>Floor delete with confirmation dialog and undo Sonner</li>
+                <li>Proper transform sync for connected stairs (position, rotation, opposite arrows)</li>
+                <li>Subscription gating data model foundation with 10-floor maximum</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Floor creation, switching, and persistence fully integrated with undo/redo</li>
+                <li>Sidebar hierarchy now supports Floor → Rooms → Walls → Openings → Stairs</li>
+                <li>All floor actions are undoable with descriptive Sonner feedback</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Polish</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Full-width clickable area for sidebar floor selection</li>
+                <li>&ldquo;Add Floor&rdquo; button disabled when max floors (10) reached</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.58.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-12</span>
           </div>

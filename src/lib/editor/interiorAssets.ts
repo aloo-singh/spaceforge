@@ -38,6 +38,7 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
   return {
     id: asset.id,
     type: asset.type,
+    connectionId: asset.connectionId ?? null,
     name: asset.name ?? DEFAULT_STAIR_NAME,
     xMm: asset.xMm,
     yMm: asset.yMm,
@@ -66,6 +67,7 @@ export function areRoomInteriorAssetsEqual(
     if (
       assetA.id !== assetB.id ||
       assetA.type !== assetB.type ||
+      (assetA.connectionId ?? null) !== (assetB.connectionId ?? null) ||
       assetA.name !== assetB.name ||
       assetA.xMm !== assetB.xMm ||
       assetA.yMm !== assetB.yMm ||
@@ -122,6 +124,7 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
   return {
     id,
     type: "stairs",
+    connectionId: null,
     name: DEFAULT_STAIR_NAME,
     xMm: center.x,
     yMm: center.y,
@@ -455,6 +458,7 @@ function findConstrainedInteriorAssetCenter(
   const directCandidate = {
     id: "__candidate__",
     type: "stairs" as const,
+    connectionId: null,
     name: DEFAULT_STAIR_NAME,
     xMm: clampedPreferred.x,
     yMm: clampedPreferred.y,
@@ -478,6 +482,7 @@ function findConstrainedInteriorAssetCenter(
       const candidate = {
         id: "__candidate__",
         type: "stairs" as const,
+        connectionId: null,
         name: DEFAULT_STAIR_NAME,
         xMm: x,
         yMm: y,

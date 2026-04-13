@@ -26,6 +26,7 @@ export type ProjectRecord = {
   name: string;
   document: EditorDocumentState;
   thumbnailDataUrl: string | null;
+  maxFloors: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -82,6 +83,9 @@ function isRoomInteriorAsset(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
   if (!isInteriorAssetType(value.type)) return false;
+  if (value.connectionId !== undefined && value.connectionId !== null && typeof value.connectionId !== "string") {
+    return false;
+  }
   if (value.name !== undefined && typeof value.name !== "string") return false;
   if (value.arrowEnabled !== undefined && typeof value.arrowEnabled !== "boolean") return false;
   if (
@@ -107,6 +111,7 @@ function isRoomInteriorAsset(value: unknown): boolean {
 function isRoom(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
   if (!value.points.every(isPoint)) return false;
@@ -125,6 +130,20 @@ function isRoom(value: unknown): boolean {
 
 export function isProjectDocument(value: unknown): value is EditorDocumentState {
   if (!isObject(value)) return false;
+  if (value.floors !== undefined) {
+    if (!Array.isArray(value.floors)) return false;
+    if (
+      !value.floors.every(
+        (floor) =>
+          isObject(floor) && typeof floor.id === "string" && typeof floor.name === "string"
+      )
+    ) {
+      return false;
+    }
+  }
+  if (value.activeFloorId !== undefined && value.activeFloorId !== null && typeof value.activeFloorId !== "string") {
+    return false;
+  }
   if (!Array.isArray(value.rooms)) return false;
   if (!value.rooms.every(isRoom)) return false;
   if (
@@ -192,6 +211,17 @@ export function isProjectThumbnailDataUrl(value: unknown): value is string | nul
   }
 
   return /^data:image\/(png|webp|jpeg);base64,/u.test(value);
+}
+
+export function isProjectMaxFloors(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+export function resolveProjectMaxFloors(value: unknown): number {
+  if (isProjectMaxFloors(value)) {
+    return value;
+  }
+  return 2; // fallback for older projects
 }
 
 export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {

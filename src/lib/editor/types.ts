@@ -82,6 +82,7 @@ export type StairDirection = "forward" | "reverse";
 export type RoomInteriorAsset = {
   id: string;
   type: InteriorAssetType;
+  connectionId?: string | null;
   name: string;
   xMm: number;
   yMm: number;
@@ -98,8 +99,14 @@ export type RoomInteriorAssetSelection = {
   assetId: string;
 };
 
+export type Floor = {
+  id: string;
+  name: string;
+};
+
 export type Room = {
   id: string;
+  floorId: string;
   name: string;
   points: Point[];
   openings: RoomOpening[];

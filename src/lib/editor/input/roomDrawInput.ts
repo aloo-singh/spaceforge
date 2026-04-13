@@ -46,6 +46,10 @@ import {
   getOpeningResizeWidthForCursor,
 } from "@/stores/editorStore";
 import {
+  getRoomsForActiveFloor,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
+import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
   TRANSFORM_SETTLE_TOTAL_MS,
@@ -56,7 +60,7 @@ type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean };
-  document: { rooms: Room[] };
+  document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
   selectedWall: { roomId: string; wall: RoomWall } | null;
@@ -319,7 +323,7 @@ export function attachRoomDrawInput(
     const constraintMode = getDrawConstraintMode(shiftOverride);
     const guides =
       anchorPoint
-        ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+        ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
             constraintMode,
             anchorPoint,
           })
@@ -599,7 +603,7 @@ export function attachRoomDrawInput(
     const selectedInteriorAsset = state.selectedInteriorAsset;
     if (!selectedInteriorAsset) return null;
 
-    const room = state.document.rooms.find((candidate) => candidate.id === selectedInteriorAsset.roomId) ?? null;
+    const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === selectedInteriorAsset.roomId) ?? null;
     const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedInteriorAsset.assetId) ?? null;
     if (!room || !asset) return null;
 
@@ -623,7 +627,7 @@ export function attachRoomDrawInput(
       const session = activeLabelDragSession;
       if (event.pointerId !== session.pointerId) return;
 
-      const room = state.document.rooms.find((candidate) => candidate.id === session.roomId) ?? null;
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === session.roomId) ?? null;
       if (!room) {
         stopLabelDragSession();
         setHoveredRoomLabelId(null);
@@ -651,11 +655,11 @@ export function attachRoomDrawInput(
       }
 
       const activeSnapStepMm = getActiveSnapStepMm(state.camera);
-      const visibleGuides = getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera, {
+      const visibleGuides = getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
         excludeRoomIds: new Set([session.roomId]),
       });
       const magneticGuides = getMagneticSnapGuidesForSettings(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         cursorWorld,
         state.camera,
         state.settings,
@@ -704,7 +708,7 @@ export function attachRoomDrawInput(
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
       setSnapGuides(
         state.settings.showGuidelines
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -742,7 +746,7 @@ export function attachRoomDrawInput(
         .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm);
       setSnapGuides(
         state.settings.showGuidelines
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -792,7 +796,7 @@ export function attachRoomDrawInput(
       store.getState().previewInteriorAssetResize(session.roomId, session.assetId, session.latestAsset);
       setSnapGuides(
         state.settings.showGuidelines
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -832,7 +836,7 @@ export function attachRoomDrawInput(
       store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
       setSnapGuides(
         state.settings.showGuidelines
-          ? getPredictiveSnapGuides(state.document.rooms, cursorWorld, state.camera)
+          ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
           : null
       );
       updateCursor();
@@ -841,7 +845,7 @@ export function attachRoomDrawInput(
 
     if (!isSpaceHeld && state.roomDraft.points.length === 0) {
       const hoveredRoom = findRoomLabelAtScreenPoint(
-        state.document.rooms,
+        getRoomsForActiveFloor(state.document),
         screenPoint,
         state.camera,
         state.viewport
@@ -871,20 +875,20 @@ export function attachRoomDrawInput(
               ) as "left" | "right" | "top" | "bottom" | null)
             : null;
         hoveredOpeningWidthHandle = findSelectedOpeningWidthHandleAtScreenPoint(
-          state.document.rooms,
+          getRoomsForActiveFloor(state.document),
           state.selectedOpening,
           screenPoint,
           state.camera,
           state.viewport
         );
         hoveredOpening = findOpeningAtScreenPoint(
-          state.document.rooms,
+          getRoomsForActiveFloor(state.document),
           screenPoint,
           state.camera,
           state.viewport
         );
         hoveredInteriorAsset = findInteriorAssetAtScreenPoint(
-          state.document.rooms,
+          getRoomsForActiveFloor(state.document),
           screenPoint,
           state.camera,
           state.viewport
@@ -1011,7 +1015,7 @@ export function attachRoomDrawInput(
         )
       : null;
     const labelHitRoom = findRoomLabelAtScreenPoint(
-      state.document.rooms,
+      getRoomsForActiveFloor(state.document),
       screenPoint,
       state.camera,
       state.viewport
@@ -1040,7 +1044,7 @@ export function attachRoomDrawInput(
         cursorWorld,
         getActiveSnapStepMm(state.camera),
         getMagneticSnapGuidesForSettings(
-          state.document.rooms,
+          getRoomsForActiveFloor(state.document),
           cursorWorld,
           state.camera,
           state.settings,
@@ -1070,7 +1074,7 @@ export function attachRoomDrawInput(
     }
 
     const openingWidthHandleHit = findSelectedOpeningWidthHandleAtScreenPoint(
-      state.document.rooms,
+      getRoomsForActiveFloor(state.document),
       state.selectedOpening,
       screenPoint,
       state.camera,
@@ -1084,7 +1088,7 @@ export function attachRoomDrawInput(
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(openingWidthHandleHit.roomId);
       const room =
-        state.document.rooms.find((candidate) => candidate.id === openingWidthHandleHit.roomId) ?? null;
+        getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === openingWidthHandleHit.roomId) ?? null;
       const opening =
         room?.openings.find((candidate) => candidate.id === openingWidthHandleHit.openingId) ?? null;
       if (room && opening) {
@@ -1159,7 +1163,7 @@ export function attachRoomDrawInput(
     }
 
     const openingHit = findOpeningAtScreenPoint(
-      state.document.rooms,
+      getRoomsForActiveFloor(state.document),
       screenPoint,
       state.camera,
       state.viewport
@@ -1170,7 +1174,7 @@ export function attachRoomDrawInput(
       hoveredOpening = openingHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(openingHit.roomId);
-      const room = state.document.rooms.find((candidate) => candidate.id === openingHit.roomId) ?? null;
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === openingHit.roomId) ?? null;
       const opening = room?.openings.find((candidate) => candidate.id === openingHit.openingId) ?? null;
       if (room && opening) {
         canvas.setPointerCapture(event.pointerId);
@@ -1189,7 +1193,7 @@ export function attachRoomDrawInput(
     }
 
     const interiorAssetHit = findInteriorAssetAtScreenPoint(
-      state.document.rooms,
+      getRoomsForActiveFloor(state.document),
       screenPoint,
       state.camera,
       state.viewport
@@ -1200,7 +1204,7 @@ export function attachRoomDrawInput(
       hoveredInteriorAsset = interiorAssetHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(interiorAssetHit.roomId);
-      const room = state.document.rooms.find((candidate) => candidate.id === interiorAssetHit.roomId) ?? null;
+      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === interiorAssetHit.roomId) ?? null;
       const asset = room?.interiorAssets.find((candidate) => candidate.id === interiorAssetHit.assetId) ?? null;
       if (room && asset) {
         canvas.setPointerCapture(event.pointerId);
@@ -1252,7 +1256,7 @@ export function attachRoomDrawInput(
 
     if (state.selectedRoomId) {
       const selectedRoom =
-        state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
+        getRoomsForActiveFloor(state.document).find((room) => room.id === state.selectedRoomId) ?? null;
       const clickedInsideSelectedRoom =
         selectedRoom !== null && isPointInPolygon(cursorWorld, selectedRoom.points);
 
@@ -1298,12 +1302,12 @@ export function attachRoomDrawInput(
       const state = store.getState();
       const hoveredRoom =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       hoveredOpening =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
@@ -1325,13 +1329,13 @@ export function attachRoomDrawInput(
       const state = store.getState();
       const hoveredRoom =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       hoveredOpeningWidthHandle =
         !isSpaceHeld && state.roomDraft.points.length === 0
           ? findSelectedOpeningWidthHandleAtScreenPoint(
-              state.document.rooms,
+              getRoomsForActiveFloor(state.document),
               state.selectedOpening,
               screenPoint,
               state.camera,
@@ -1340,7 +1344,7 @@ export function attachRoomDrawInput(
           : null;
       hoveredOpening =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
@@ -1367,16 +1371,16 @@ export function attachRoomDrawInput(
       const state = store.getState();
       const hoveredRoom =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       hoveredInteriorAsset =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findInteriorAssetAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findInteriorAssetAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       hoveredOpening =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
@@ -1403,18 +1407,18 @@ export function attachRoomDrawInput(
       const state = store.getState();
       const hoveredRoom =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredRoomLabelId(hoveredRoom?.id ?? null);
       hoveredInteriorAsset =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findInteriorAssetAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findInteriorAssetAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       hoveredInteriorAssetCornerHandle = null;
       hoveredInteriorAssetWallHandle = null;
       hoveredOpening =
         !isSpaceHeld && state.roomDraft.points.length === 0
-          ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+          ? findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
           : null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
@@ -1451,12 +1455,12 @@ export function attachRoomDrawInput(
     const state = store.getState();
     const hoveredRoom =
       !isSpaceHeld && state.roomDraft.points.length === 0
-        ? findRoomLabelAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+        ? findRoomLabelAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
         : null;
     setHoveredRoomLabelId(hoveredRoom?.id ?? null);
     hoveredOpening =
       !isSpaceHeld && state.roomDraft.points.length === 0
-        ? findOpeningAtScreenPoint(state.document.rooms, screenPoint, state.camera, state.viewport)
+        ? findOpeningAtScreenPoint(getRoomsForActiveFloor(state.document), screenPoint, state.camera, state.viewport)
         : null;
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
@@ -1753,7 +1757,7 @@ function findSelectableRoomAtScreenPoint(
   state: Pick<RoomDrawStoreState, "camera" | "viewport" | "document">,
   worldPoint: Point
 ): Room | null {
-  return findRoomAtPoint(state.document.rooms, worldPoint);
+  return findRoomAtPoint(getRoomsForActiveFloor(state.document), worldPoint);
 }
 
 function findSelectableWallAtScreenPoint(
@@ -1765,7 +1769,7 @@ function findSelectableWallAtScreenPoint(
     return null;
   }
 
-  const selectedRoom = state.document.rooms.find((room) => room.id === state.selectedRoomId);
+  const selectedRoom = getRoomsForActiveFloor(state.document).find((room) => room.id === state.selectedRoomId);
   if (!selectedRoom || !isAxisAlignedRectangle(selectedRoom.points)) {
     const nonRectWall = selectedRoom
       ? findRoomWallAtScreenPoint(selectedRoom, screenPoint, state.camera, state.viewport)
@@ -1785,8 +1789,8 @@ function findSelectableWallAtScreenPoint(
     clickCameFromInterior: boolean;
   }> = [];
 
-  for (let index = state.document.rooms.length - 1; index >= 0; index -= 1) {
-    const room = state.document.rooms[index];
+  for (let index = getRoomsForActiveFloor(state.document).length - 1; index >= 0; index -= 1) {
+    const room = getRoomsForActiveFloor(state.document)[index];
     const bounds = getAxisAlignedRoomBounds(room);
     if (!bounds) continue;
 

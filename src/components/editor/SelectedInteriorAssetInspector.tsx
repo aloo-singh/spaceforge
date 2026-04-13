@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, RotateCw, Transfer } from "@/components/ui/icons";
+import { IconTriangle, IconTriangleInverted, RotateCcw, RotateCw, Transfer } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -81,6 +81,35 @@ export function SelectedInteriorAssetInspector({
     (state) => state.swapSelectedInteriorAssetArrowDirection
   );
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const promptConnectedFloorForSelectedStair = useEditorStore(
+    (state) => state.promptConnectedFloorForSelectedStair
+  );
+  const addConnectedFloorAboveFromSelectedStair = useEditorStore(
+    (state) => state.addConnectedFloorAboveFromSelectedStair
+  );
+  const addConnectedFloorBelowFromSelectedStair = useEditorStore(
+    (state) => state.addConnectedFloorBelowFromSelectedStair
+  );
+  const canAddFloorAbove = useEditorStore((state) => {
+    const roomId = state.selectedInteriorAsset?.roomId;
+    if (!roomId) return false;
+    const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+    if (!room) return false;
+    const activeFloorId = state.document.activeFloorId;
+    if ((room.floorId ?? activeFloorId) !== activeFloorId) return false;
+    const activeFloorIndex = state.document.floors.findIndex((floor) => floor.id === activeFloorId);
+    return activeFloorIndex === state.document.floors.length - 1;
+  });
+  const canAddFloorBelow = useEditorStore((state) => {
+    const roomId = state.selectedInteriorAsset?.roomId;
+    if (!roomId) return false;
+    const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+    if (!room) return false;
+    const activeFloorId = state.document.activeFloorId;
+    if ((room.floorId ?? activeFloorId) !== activeFloorId) return false;
+    const activeFloorIndex = state.document.floors.findIndex((floor) => floor.id === activeFloorId);
+    return activeFloorIndex === 0;
+  });
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
     const assetId = state.selectedInteriorAsset?.assetId;
@@ -202,6 +231,69 @@ export function SelectedInteriorAssetInspector({
               </InspectorIconTooltip>
             </ButtonGroup>
           </ImmediateTooltipProvider>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Connected floor</p>
+          <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+            <ImmediateTooltipProvider>
+              <div className="flex items-center gap-2">
+                <ButtonGroup>
+                  <InspectorIconTooltip
+                    groupItem
+                    content={
+                      canAddFloorAbove
+                        ? "Add floor above"
+                        : "A higher floor already exists"
+                    }
+                  >
+                    <span tabIndex={canAddFloorAbove ? -1 : 0}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={addConnectedFloorAboveFromSelectedStair}
+                        aria-label="Add floor above"
+                        disabled={!canAddFloorAbove}
+                      >
+                        <IconTriangle />
+                      </Button>
+                    </span>
+                  </InspectorIconTooltip>
+                  <InspectorIconTooltip
+                    groupItem
+                    content={
+                      canAddFloorBelow
+                        ? "Add floor below"
+                        : "A lower floor already exists"
+                    }
+                  >
+                    <span tabIndex={canAddFloorBelow ? -1 : 0}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={addConnectedFloorBelowFromSelectedStair}
+                        aria-label="Add floor below"
+                        disabled={!canAddFloorBelow}
+                      >
+                        <IconTriangleInverted />
+                      </Button>
+                    </span>
+                  </InspectorIconTooltip>
+                </ButtonGroup>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={promptConnectedFloorForSelectedStair}
+                  className="rounded-full"
+                >
+                  More options
+                </Button>
+              </div>
+            </ImmediateTooltipProvider>
+          </div>
         </div>
 
         <div className="space-y-1.5">

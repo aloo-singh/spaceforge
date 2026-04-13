@@ -3,8 +3,14 @@ import {
   normalizeRoomOpeningsForSegmentAnchoring,
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
-import type { CameraState, Point, Room } from "@/lib/editor/types";
-import type { EditorDocumentState } from "@/lib/editor/history";
+import type { CameraState, Floor, Point, Room } from "@/lib/editor/types";
+import {
+  DEFAULT_FLOOR_ID,
+  getNormalizedActiveFloorId,
+  getNormalizedFloors,
+  getRoomFloorId,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
 import { normalizePersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 import {
   cloneEditorSettings,
@@ -40,16 +46,22 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 // - v8 payloads also persist opening-side and hinge-side fields for inspector editing.
 // - v9 payloads also persist export dialog session preferences.
 // - v10 payloads also persist canvas rotation with document + camera state.
+// - v11 payloads also persist floors and the active floor.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10/v11 payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 10;
+export const EDITOR_PERSISTENCE_VERSION = 11;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
+
+function warnEditorPersistence(message: string, details?: unknown) {
+  console.warn(`[spaceforge] ${message}`, details);
+}
 
 type PersistedPoint = Point;
 
 type PersistedRoom = {
   id: string;
+  floorId?: string;
   name: string;
   points: PersistedPoint[];
   openings?: Room["openings"];
@@ -57,6 +69,8 @@ type PersistedRoom = {
 };
 
 type PersistedDocument = {
+  floors?: Floor[];
+  activeFloorId?: string | null;
   rooms: PersistedRoom[];
   exportConfig?: EditorDocumentState["exportConfig"];
   northBearingDegrees?: number;
@@ -163,7 +177,7 @@ export type PersistedEditorPayloadV8 = {
   };
 };
 
-export type PersistedEditorPayloadV10 = {
+export type PersistedEditorPayloadV11 = {
   version: typeof EDITOR_PERSISTENCE_VERSION;
   document: PersistedDocument;
   camera: CameraState;
@@ -195,6 +209,11 @@ function isFiniteNumber(value: unknown): value is number {
 function isPoint(value: unknown): value is Point {
   if (!isObject(value)) return false;
   return isFiniteNumber(value.x) && isFiniteNumber(value.y);
+}
+
+function isFloor(value: unknown): value is Floor {
+  if (!isObject(value)) return false;
+  return typeof value.id === "string" && typeof value.name === "string";
 }
 
 function isOpeningType(value: unknown): value is Room["openings"][number]["type"] {
@@ -237,6 +256,9 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
   if (!isInteriorAssetType(value.type)) return false;
+  if (value.connectionId !== undefined && value.connectionId !== null && typeof value.connectionId !== "string") {
+    return false;
+  }
   if (value.name !== undefined && typeof value.name !== "string") return false;
   if (value.arrowEnabled !== undefined && typeof value.arrowEnabled !== "boolean") return false;
   if (
@@ -262,6 +284,7 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
 function isRoom(value: unknown): value is PersistedRoom {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
@@ -292,6 +315,12 @@ function isCameraState(value: unknown): value is CameraState {
 
 function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
+  if (value.floors !== undefined && (!Array.isArray(value.floors) || !value.floors.every(isFloor))) {
+    return false;
+  }
+  if (value.activeFloorId !== undefined && value.activeFloorId !== null && typeof value.activeFloorId !== "string") {
+    return false;
+  }
   if (!Array.isArray(value.rooms)) return false;
   if (value.exportConfig !== undefined && !isObject(value.exportConfig)) return false;
   if (
@@ -332,6 +361,7 @@ function clonePoint(point: Point): Point {
 function cloneRoom(room: PersistedRoom | Room): Room {
   return {
     id: room.id,
+    floorId: room.floorId ?? DEFAULT_FLOOR_ID,
     name: room.name,
     points: room.points.map(clonePoint),
     openings: cloneRoomOpenings(room.openings ?? []),
@@ -340,7 +370,15 @@ function cloneRoom(room: PersistedRoom | Room): Room {
 }
 
 function cloneDocument(document: PersistedDocument | EditorDocumentState): EditorDocumentState {
+  const floors = getNormalizedFloors(document as EditorDocumentState);
+  const activeFloorId = getNormalizedActiveFloorId({
+    floors,
+    activeFloorId: document.activeFloorId ?? null,
+  });
+
   return {
+    floors,
+    activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -348,7 +386,13 @@ function cloneDocument(document: PersistedDocument | EditorDocumentState): Edito
     northBearingDegrees: normalizeNorthBearingDegrees(
       document.northBearingDegrees ?? DEFAULT_NORTH_BEARING_DEGREES
     ),
-    rooms: document.rooms.map(cloneRoom),
+    rooms: document.rooms.map((room) => ({
+      ...cloneRoom(room),
+      floorId: getRoomFloorId(room, {
+        floors,
+        activeFloorId,
+      }),
+    })),
   };
 }
 
@@ -387,8 +431,15 @@ function normalizeDocumentForSegmentAnchoring(
   options?: { migrateNumericSegmentOffsets?: boolean }
 ): EditorDocumentState {
   const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
+  const floors = getNormalizedFloors(document as EditorDocumentState);
+  const activeFloorId = getNormalizedActiveFloorId({
+    floors,
+    activeFloorId: document.activeFloorId ?? null,
+  });
 
   return {
+    floors,
+    activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
@@ -398,13 +449,20 @@ function normalizeDocumentForSegmentAnchoring(
     ),
     rooms: document.rooms.map((room) => {
       const clonedRoom = cloneRoom(room);
+      const normalizedRoom = {
+        ...clonedRoom,
+        floorId: getRoomFloorId(room, {
+          floors,
+          activeFloorId,
+        }),
+      };
       if (!migrateNumericSegmentOffsets || clonedRoom.openings.length === 0) {
-        return clonedRoom;
+        return normalizedRoom;
       }
 
       return {
-        ...clonedRoom,
-        openings: normalizeRoomOpeningsForSegmentAnchoring(clonedRoom),
+        ...normalizedRoom,
+        openings: normalizeRoomOpeningsForSegmentAnchoring(normalizedRoom),
       };
     }),
   };
@@ -444,6 +502,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 7 &&
         parsed.version !== 8 &&
         parsed.version !== 9 &&
+        parsed.version !== 10 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -507,7 +566,7 @@ export function serializeEditorSnapshot(snapshot: PersistedEditorSnapshot): stri
     PERSISTED_HISTORY_STATE_LIMIT,
     snapshot.document
   );
-  const payload: PersistedEditorPayloadV10 = {
+  const payload: PersistedEditorPayloadV11 = {
     version: EDITOR_PERSISTENCE_VERSION,
     document: cloneDocument(snapshot.document),
     camera: cloneCamera(snapshot.camera),
@@ -560,7 +619,8 @@ export function saveEditorSnapshot(
   try {
     storage.setItem(EDITOR_PERSISTENCE_STORAGE_KEY, serializeEditorSnapshot(snapshot));
     return true;
-  } catch {
+  } catch (error) {
+    warnEditorPersistence("Failed to save editor snapshot to localStorage.", error);
     return false;
   }
 }
@@ -573,8 +633,13 @@ export function loadEditorSnapshot(
   try {
     const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     if (!raw) return null;
-    return deserializeEditorSnapshot(raw);
-  } catch {
+    const snapshot = deserializeEditorSnapshot(raw);
+    if (!snapshot) {
+      warnEditorPersistence("Ignoring invalid persisted editor snapshot.");
+    }
+    return snapshot;
+  } catch (error) {
+    warnEditorPersistence("Failed to load persisted editor snapshot.", error);
     return null;
   }
 }
@@ -587,8 +652,13 @@ export function loadEditorSnapshotForHydration(
   try {
     const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     if (!raw) return null;
-    return deserializeEditorSnapshotForHydration(raw);
-  } catch {
+    const snapshot = deserializeEditorSnapshotForHydration(raw);
+    if (!snapshot) {
+      warnEditorPersistence("Ignoring invalid persisted editor hydration snapshot.");
+    }
+    return snapshot;
+  } catch (error) {
+    warnEditorPersistence("Failed to load persisted editor hydration snapshot.", error);
     return null;
   }
 }
@@ -599,7 +669,8 @@ export function clearEditorSnapshot(storage: Storage | null = getBrowserStorage(
   try {
     storage.removeItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     return true;
-  } catch {
+  } catch (error) {
+    warnEditorPersistence("Failed to clear persisted editor snapshot.", error);
     return false;
   }
 }

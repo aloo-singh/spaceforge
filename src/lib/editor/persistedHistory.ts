@@ -1,4 +1,11 @@
-import { applyEditorCommand, type EditorCommand, type EditorDocumentState } from "@/lib/editor/history";
+import {
+  applyEditorCommand,
+  getNormalizedActiveFloorId,
+  getNormalizedFloors,
+  getRoomFloorId,
+  type EditorCommand,
+  type EditorDocumentState,
+} from "@/lib/editor/history";
 import {
   areRoomInteriorAssetsEqual,
   cloneRoomInteriorAsset,
@@ -8,7 +15,17 @@ import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import type { Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+
+function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false;
+  }
+
+  return true;
+}
 
 export type PersistedHistorySnapshot = {
   historyStack: EditorDocumentState[];
@@ -38,12 +55,25 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     return false;
   }
 
+  if (
+    !areFloorsEqual(a.floors ?? [], b.floors ?? []) ||
+    getNormalizedActiveFloorId(a) !== getNormalizedActiveFloorId(b)
+  ) {
+    return false;
+  }
+
   if (a.rooms.length !== b.rooms.length) return false;
 
   for (let i = 0; i < a.rooms.length; i += 1) {
     const roomA = a.rooms[i];
     const roomB = b.rooms[i];
-    if (roomA.id !== roomB.id || roomA.name !== roomB.name) return false;
+    if (
+      roomA.id !== roomB.id ||
+      roomA.name !== roomB.name ||
+      getRoomFloorId(roomA, a) !== getRoomFloorId(roomB, b)
+    ) {
+      return false;
+    }
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
     if (!areRoomOpeningsEqual(roomA.openings ?? [], roomB.openings ?? [])) return false;
     if (!areRoomInteriorAssetsEqual(roomA.interiorAssets ?? [], roomB.interiorAssets ?? [])) return false;
@@ -56,6 +86,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
   const exportConfig = normalizeProjectExportConfig(document.exportConfig);
 
   return {
+    floors: getNormalizedFloors(document),
+    activeFloorId: getNormalizedActiveFloorId(document),
     exportConfig: {
       title: exportConfig.title,
       description: exportConfig.description,
@@ -67,6 +99,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
       openings: cloneRoomOpenings(room.openings ?? []),
@@ -90,6 +123,10 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const nextCanvasRotation = normalizeCanvasRotationDegrees(next.canvasRotationDegrees);
   const previousNorthBearing = normalizeNorthBearingDegrees(previous.northBearingDegrees);
   const nextNorthBearing = normalizeNorthBearingDegrees(next.northBearingDegrees);
+  const previousFloors = getNormalizedFloors(previous);
+  const nextFloors = getNormalizedFloors(next);
+  const previousActiveFloorId = getNormalizedActiveFloorId(previous);
+  const nextActiveFloorId = getNormalizedActiveFloorId(next);
   const previousById = new Map(previous.rooms.map((room) => [room.id, room]));
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
@@ -104,6 +141,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     const previousRoom = previousById.get(room.id);
     if (!previousRoom) continue;
 
+    const didFloorChange = getRoomFloorId(previousRoom, previous) !== getRoomFloorId(room, next);
     const didNameChange = previousRoom.name !== room.name;
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
     const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings ?? [], room.openings ?? []);
@@ -111,12 +149,122 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       previousRoom.interiorAssets ?? [],
       room.interiorAssets ?? []
     );
-    if (!didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) continue;
+    if (!didFloorChange && !didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) {
+      continue;
+    }
 
     changedRooms.push({
       previous: previousRoom,
       next: room,
     });
+  }
+
+  if (
+    nextFloors.length === previousFloors.length &&
+    areFloorsEqual(previousFloors, nextFloors) &&
+    previousActiveFloorId === nextActiveFloorId &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 2 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const [firstChangedRoom, secondChangedRoom] = changedRooms;
+    const previousFirstAsset = inferChangedConnectedStairAsset(
+      firstChangedRoom.previous.interiorAssets ?? [],
+      firstChangedRoom.next.interiorAssets ?? []
+    );
+    const previousSecondAsset = inferChangedConnectedStairAsset(
+      secondChangedRoom.previous.interiorAssets ?? [],
+      secondChangedRoom.next.interiorAssets ?? []
+    );
+
+    if (
+      previousFirstAsset &&
+      previousSecondAsset &&
+      previousFirstAsset.previous.connectionId &&
+      previousFirstAsset.previous.connectionId === previousSecondAsset.previous.connectionId
+    ) {
+      return {
+        type: "sync-connected-stairs",
+        previousDocument: cloneDocumentState(previous),
+        nextDocument: cloneDocumentState(next),
+      };
+    }
+  }
+
+  if (
+    nextFloors.length === previousFloors.length + 1 &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 1 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const createdRoom = addedRooms[0];
+    const createdFloorId = getRoomFloorId(createdRoom, next);
+    const createdFloor = nextFloors.find((floor) => floor.id === createdFloorId) ?? null;
+    const addedFloorIds = nextFloors
+      .filter((floor) => !previousFloors.some((candidate) => candidate.id === floor.id))
+      .map((floor) => floor.id);
+    const createdAsset = createdRoom.interiorAssets[0] ?? null;
+
+    if (
+      createdFloor &&
+      addedFloorIds.length === 1 &&
+      addedFloorIds[0] === createdFloorId &&
+      nextActiveFloorId === createdFloorId &&
+      createdRoom.openings.length === 0 &&
+      createdRoom.interiorAssets.length === 1 &&
+      createdAsset
+    ) {
+      return {
+        type: "create-connected-floor",
+        previousDocument: cloneDocumentState(previous),
+        nextDocument: cloneDocumentState(next),
+        createdFloorId,
+        createdRoomId: createdRoom.id,
+        createdAssetId: createdAsset.id,
+      };
+    }
+  }
+
+  if (
+    previousActiveFloorId !== nextActiveFloorId &&
+    areFloorsEqual(previousFloors, nextFloors) &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    return {
+      type: "switch-floor",
+      previousActiveFloorId,
+      nextActiveFloorId,
+    };
+  }
+
+  if (
+    nextFloors.length === previousFloors.length + 1 &&
+    previousFloors.every((floor, index) => floor.id === nextFloors[index]?.id && floor.name === nextFloors[index]?.name) &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const addedFloor = nextFloors[nextFloors.length - 1];
+    if (!addedFloor || nextActiveFloorId !== addedFloor.id) return null;
+
+    return {
+      type: "add-floor",
+      floor: {
+        id: addedFloor.id,
+        name: addedFloor.name,
+      },
+      previousActiveFloorId,
+    };
   }
 
   if (
@@ -133,6 +281,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "delete-room",
       room: {
         id: deletedRoom.id,
+        floorId: getRoomFloorId(deletedRoom, previous),
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(deletedRoom.openings ?? []),
@@ -176,6 +325,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "complete-room",
       room: {
         id: addedRooms[0].id,
+        floorId: getRoomFloorId(addedRooms[0], next),
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(addedRooms[0].openings ?? []),
@@ -353,6 +503,33 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   return null;
+}
+
+function inferChangedConnectedStairAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+): { previous: RoomInteriorAsset; next: RoomInteriorAsset } | null {
+  if (previousAssets.length !== nextAssets.length) return null;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  let changedAsset: { previous: RoomInteriorAsset; next: RoomInteriorAsset } | null = null;
+
+  for (const previousAsset of previousAssets) {
+    const nextAsset = nextById.get(previousAsset.id);
+    if (!nextAsset) return null;
+    if ((previousAsset.connectionId ?? null) === null) continue;
+    if (areRoomInteriorAssetsEqual([previousAsset], [nextAsset])) continue;
+    if (previousAsset.widthMm !== nextAsset.widthMm || previousAsset.depthMm !== nextAsset.depthMm) {
+      return null;
+    }
+    if (changedAsset) return null;
+    changedAsset = {
+      previous: cloneRoomInteriorAsset(previousAsset),
+      next: cloneRoomInteriorAsset(nextAsset),
+    };
+  }
+
+  return changedAsset;
 }
 
 function inferAddedOpening(
