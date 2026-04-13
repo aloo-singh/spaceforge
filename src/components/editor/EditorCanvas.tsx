@@ -2881,7 +2881,7 @@ export default function EditorCanvas({
                 className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]"
                 onPointerLeave={() => setHoveredFloorPreviewId(null)}
               >
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   {displayedFloors.map((floor) => {
                     const isActiveFloor = floor.id === activeFloorId;
                     const floorLabel = floor.name.replace(/^Floor\s+/u, "");
@@ -3266,14 +3266,16 @@ function drawScene(
   );
   const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
-  drawFloorFootprint(
-    floorFootprintGraphics,
-    footprintFloorId ? getRoomsForFloor(state.document, footprintFloorId) : [],
-    state.camera,
-    state.viewport,
-    theme,
-    footprintOpacity
-  );
+  if (state.settings.showFloorFootprint) {
+    drawFloorFootprint(
+      floorFootprintGraphics,
+      footprintFloorId ? getRoomsForFloor(state.document, footprintFloorId) : [],
+      state.camera,
+      state.viewport,
+      theme,
+      footprintOpacity
+    );
+  }
   drawRooms(
     roomGraphics,
     renderedRooms,

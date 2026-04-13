@@ -13,6 +13,7 @@ export type EditorSettings = {
   showMiniMap: boolean;
   showGuidelines: boolean;
   snappingEnabled: boolean;
+  showFloorFootprint: boolean;
   exportSignatureText: string;
 };
 
@@ -25,6 +26,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showMiniMap: true,
   showGuidelines: true,
   snappingEnabled: true,
+  showFloorFootprint: true,
   exportSignatureText: "",
 };
 
@@ -38,6 +40,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showMiniMap: settings.showMiniMap,
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
+    showFloorFootprint: settings.showFloorFootprint,
     exportSignatureText: settings.exportSignatureText,
   };
 }
@@ -52,6 +55,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showMiniMap === b.showMiniMap &&
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
+    a.showFloorFootprint === b.showFloorFootprint &&
     a.exportSignatureText === b.exportSignatureText
   );
 }
@@ -132,6 +136,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "snappingEnabled" in value && typeof value.snappingEnabled === "boolean"
         ? value.snappingEnabled
         : DEFAULT_EDITOR_SETTINGS.snappingEnabled,
+    showFloorFootprint:
+      "showFloorFootprint" in value && typeof value.showFloorFootprint === "boolean"
+        ? value.showFloorFootprint
+        : DEFAULT_EDITOR_SETTINGS.showFloorFootprint,
     exportSignatureText:
       "exportSignatureText" in value && typeof value.exportSignatureText === "string"
         ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)

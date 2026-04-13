@@ -295,7 +295,7 @@ export function EditorSidebarRoomsList() {
                             selectFloorById(floor.id);
                             startFloorRename(floor.id);
                           }}
-                          className="flex flex-1 min-w-0 items-center gap-2 text-left"
+                          className="flex w-full flex-1 min-w-0 items-center gap-2 text-left"
                         >
                           <span className="truncate">{floor.name}</span>
                           {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
