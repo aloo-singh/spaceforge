@@ -2901,7 +2901,7 @@ export default function EditorCanvas({
                         aria-pressed={isActiveFloor}
                         aria-label={`Switch to ${floor.name}`}
                         className={cn(
-                          "min-h-8 rounded-full px-3 py-1 text-left text-[11px] font-medium transition-colors",
+                          "flex items-center justify-center rounded-full w-8 h-8 text-sm font-medium transition-colors",
                           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                           isActiveFloor
                             ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-950"

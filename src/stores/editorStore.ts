@@ -1663,7 +1663,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
-  maxFloors: 2,
+  maxFloors: 10,
   setMaxFloors: (maxFloors) =>
     set((state) => {
       if (state.maxFloors === maxFloors) return state;

@@ -54,7 +54,7 @@ function createLocalFallbackProject(
     name: input.name,
     document: cloneProjectDocument(input.document),
     thumbnailDataUrl: input.thumbnailDataUrl ?? null,
-    maxFloors: 2,
+    maxFloors: 10,
     createdAt: now,
     updatedAt: now,
   };
