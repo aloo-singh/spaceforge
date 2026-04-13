@@ -1,4 +1,5 @@
 const ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY = "spaceforge.client-token";
+const ANONYMOUS_CLIENT_TOKEN_BACKUP_STORAGE_KEY = "spaceforge.client-token.backup";
 const ACTIVE_PROJECT_ID_STORAGE_KEY = "spaceforge.active-project-id";
 
 function getBrowserStorage() {
@@ -14,6 +15,23 @@ function createClientToken() {
   return `client-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+function warnClientIdentity(message: string, details?: unknown) {
+  console.warn(`[spaceforge] ${message}`, details);
+}
+
+function isValidClientToken(value: string | null) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function persistClientToken(storage: Storage, clientToken: string) {
+  try {
+    storage.setItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY, clientToken);
+    storage.setItem(ANONYMOUS_CLIENT_TOKEN_BACKUP_STORAGE_KEY, clientToken);
+  } catch (error) {
+    warnClientIdentity("Failed to persist anonymous client token to localStorage.", error);
+  }
+}
+
 export function getOrCreateAnonymousClientToken() {
   const storage = getBrowserStorage();
   if (!storage) return createClientToken();
@@ -22,7 +40,7 @@ export function getOrCreateAnonymousClientToken() {
   if (existing) return existing;
 
   const nextToken = createClientToken();
-  storage.setItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY, nextToken);
+  persistClientToken(storage, nextToken);
   return nextToken;
 }
 
@@ -30,8 +48,23 @@ export function getAnonymousClientToken() {
   const storage = getBrowserStorage();
   if (!storage) return null;
 
-  const existing = storage.getItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY)?.trim() ?? "";
-  return existing || null;
+  const primaryToken = storage.getItem(ANONYMOUS_CLIENT_TOKEN_STORAGE_KEY)?.trim() ?? "";
+  if (isValidClientToken(primaryToken)) {
+    const backupToken = storage.getItem(ANONYMOUS_CLIENT_TOKEN_BACKUP_STORAGE_KEY)?.trim() ?? "";
+    if (backupToken !== primaryToken) {
+      persistClientToken(storage, primaryToken);
+    }
+    return primaryToken;
+  }
+
+  const backupToken = storage.getItem(ANONYMOUS_CLIENT_TOKEN_BACKUP_STORAGE_KEY)?.trim() ?? "";
+  if (isValidClientToken(backupToken)) {
+    warnClientIdentity("Recovered anonymous client token from backup storage.");
+    persistClientToken(storage, backupToken);
+    return backupToken;
+  }
+
+  return null;
 }
 
 export function loadActiveProjectId() {

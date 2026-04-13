@@ -53,6 +53,10 @@ export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
 export const EDITOR_PERSISTENCE_VERSION = 11;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
+function warnEditorPersistence(message: string, details?: unknown) {
+  console.warn(`[spaceforge] ${message}`, details);
+}
+
 type PersistedPoint = Point;
 
 type PersistedRoom = {
@@ -612,7 +616,8 @@ export function saveEditorSnapshot(
   try {
     storage.setItem(EDITOR_PERSISTENCE_STORAGE_KEY, serializeEditorSnapshot(snapshot));
     return true;
-  } catch {
+  } catch (error) {
+    warnEditorPersistence("Failed to save editor snapshot to localStorage.", error);
     return false;
   }
 }
@@ -625,8 +630,13 @@ export function loadEditorSnapshot(
   try {
     const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     if (!raw) return null;
-    return deserializeEditorSnapshot(raw);
-  } catch {
+    const snapshot = deserializeEditorSnapshot(raw);
+    if (!snapshot) {
+      warnEditorPersistence("Ignoring invalid persisted editor snapshot.");
+    }
+    return snapshot;
+  } catch (error) {
+    warnEditorPersistence("Failed to load persisted editor snapshot.", error);
     return null;
   }
 }
@@ -639,8 +649,13 @@ export function loadEditorSnapshotForHydration(
   try {
     const raw = storage.getItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     if (!raw) return null;
-    return deserializeEditorSnapshotForHydration(raw);
-  } catch {
+    const snapshot = deserializeEditorSnapshotForHydration(raw);
+    if (!snapshot) {
+      warnEditorPersistence("Ignoring invalid persisted editor hydration snapshot.");
+    }
+    return snapshot;
+  } catch (error) {
+    warnEditorPersistence("Failed to load persisted editor hydration snapshot.", error);
     return null;
   }
 }
@@ -651,7 +666,8 @@ export function clearEditorSnapshot(storage: Storage | null = getBrowserStorage(
   try {
     storage.removeItem(EDITOR_PERSISTENCE_STORAGE_KEY);
     return true;
-  } catch {
+  } catch (error) {
+    warnEditorPersistence("Failed to clear persisted editor snapshot.", error);
     return false;
   }
 }

@@ -37,7 +37,6 @@ export function ProjectsPageClient() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
@@ -57,11 +56,9 @@ export function ProjectsPageClient() {
 
       setProjects(sortProjectsByUpdatedAt(loadedProjects));
       setErrorMessage(null);
-      setErrorStatus(null);
       didLoadProjectsRef.current = true;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load projects.");
-      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
     } finally {
       if (showLoadingState) {
         setIsLoading(false);
@@ -103,12 +100,10 @@ export function ProjectsPageClient() {
     };
   }, [errorMessage, isLoading]);
 
-  const isProjectsApiUnavailable = errorStatus === 404 && errorMessage === "Projects API unavailable.";
   const canCreateProject =
     !isCreatingProject &&
     renamingProjectId === null &&
-    deletingProjectId === null &&
-    !isProjectsApiUnavailable;
+    deletingProjectId === null;
 
   const handleCreateProject = () => {
     if (!canCreateProject) return;
@@ -117,7 +112,6 @@ export function ProjectsPageClient() {
       void (async () => {
         try {
           setErrorMessage(null);
-          setErrorStatus(null);
           const clientToken = getOrCreateAnonymousClientToken();
           await createOrFetchAnonymousUser(clientToken);
 
@@ -133,7 +127,6 @@ export function ProjectsPageClient() {
           router.push(`/editor/${project.id}`);
         } catch (error) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to create project.");
-          setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
         }
       })();
     });
@@ -146,7 +139,6 @@ export function ProjectsPageClient() {
 
     try {
       setErrorMessage(null);
-      setErrorStatus(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const project = await updateProject(clientToken, projectId, { name });
       completeEditorOnboardingHint("project-name");
@@ -154,7 +146,6 @@ export function ProjectsPageClient() {
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to rename project.");
-      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
       throw error;
     } finally {
       setRenamingProjectId(null);
@@ -168,7 +159,6 @@ export function ProjectsPageClient() {
 
     try {
       setErrorMessage(null);
-      setErrorStatus(null);
       const clientToken = getOrCreateAnonymousClientToken();
       const deletedProject = await deleteProject(clientToken, projectId);
 
@@ -180,7 +170,6 @@ export function ProjectsPageClient() {
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
-      setErrorStatus(error instanceof Error && "status" in error ? Number(error.status) || null : null);
       throw error;
     } finally {
       setDeletingProjectId(null);
@@ -327,7 +316,6 @@ export function ProjectsPageClient() {
                 isDeleting={deletingProjectId === project.id}
                 isInteractionDisabled={
                   isCreatingProject ||
-                  isProjectsApiUnavailable ||
                   (deletingProjectId !== null && deletingProjectId !== project.id)
                 }
               />
