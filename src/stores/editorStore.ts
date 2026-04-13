@@ -813,7 +813,8 @@ function updateRoomInteriorAssetInDocument(
 function syncConnectedStairTransformInDocument(
   document: DocumentState,
   roomId: string,
-  assetId: string
+  assetId: string,
+  deltaDegrees?: number
 ): DocumentState {
   const room = document.rooms.find((candidate) => candidate.id === roomId) ?? null;
   const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId) ?? null;
@@ -823,26 +824,55 @@ function syncConnectedStairTransformInDocument(
     return document;
   }
 
-  return {
-    ...document,
-    rooms: document.rooms.map((candidateRoom) =>
-      candidateRoom.id === connectedPeer.roomId
-        ? {
-            ...candidateRoom,
-            interiorAssets: candidateRoom.interiorAssets.map((candidateAsset) =>
-              candidateAsset.id === connectedPeer.asset.id
-                ? {
-                    ...cloneRoomInteriorAsset(candidateAsset),
-                    xMm: asset.xMm,
-                    yMm: asset.yMm,
-                    rotationDegrees: asset.rotationDegrees,
-                  }
-                : candidateAsset
-            ),
-          }
-        : candidateRoom
-    ),
-  };
+  if (deltaDegrees && deltaDegrees !== 0) {
+    // Rotation sync: apply the rotation transformation to the peer in its own room
+    const peerRoom = document.rooms.find((candidate) => candidate.id === connectedPeer.roomId) ?? null;
+    if (!peerRoom) {
+      return document;
+    }
+
+    const rotatedPeerAsset = getRotatedInteriorAssetForRoom(peerRoom, connectedPeer.asset, deltaDegrees);
+    if (!rotatedPeerAsset) {
+      return document;
+    }
+
+    return {
+      ...document,
+      rooms: document.rooms.map((candidateRoom) =>
+        candidateRoom.id === connectedPeer.roomId
+          ? {
+              ...candidateRoom,
+              interiorAssets: candidateRoom.interiorAssets.map((candidateAsset) =>
+                candidateAsset.id === connectedPeer.asset.id
+                  ? rotatedPeerAsset
+                  : candidateAsset
+              ),
+            }
+          : candidateRoom
+      ),
+    };
+  } else {
+    // Position sync: copy position from primary to peer
+    return {
+      ...document,
+      rooms: document.rooms.map((candidateRoom) =>
+        candidateRoom.id === connectedPeer.roomId
+          ? {
+              ...candidateRoom,
+              interiorAssets: candidateRoom.interiorAssets.map((candidateAsset) =>
+                candidateAsset.id === connectedPeer.asset.id
+                  ? {
+                      ...cloneRoomInteriorAsset(candidateAsset),
+                      xMm: asset.xMm,
+                      yMm: asset.yMm,
+                    }
+                  : candidateAsset
+              ),
+            }
+          : candidateRoom
+      ),
+    };
+  }
 }
 
 function updateSelectedInteriorAsset(
@@ -2833,10 +2863,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   rotateSelectedInteriorAsset: (deltaDegrees) =>
     set((state) => {
-      const nextState = updateSelectedInteriorAsset(state, (room, asset) => {
-        return getRotatedInteriorAssetForRoom(room, asset, deltaDegrees);
-      });
-      return nextState ?? state;
+      const selectedAsset = state.selectedInteriorAsset;
+      if (!selectedAsset) return state;
+
+      const room = state.document.rooms.find((candidate) => candidate.id === selectedAsset.roomId);
+      const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedAsset.assetId);
+      if (!room || !asset) return state;
+
+      const nextAsset = getRotatedInteriorAssetForRoom(room, asset, deltaDegrees);
+      if (!nextAsset) return state;
+
+      const updatedDocument = updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset);
+      const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, room.id, nextAsset.id, deltaDegrees);
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId: room.id,
+        previousAsset: cloneRoomInteriorAsset(asset),
+        nextAsset: cloneRoomInteriorAsset(nextAsset),
+      };
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   setSelectedInteriorAssetArrowEnabled: (isEnabled) =>
     set((state) => {
@@ -2998,12 +3053,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (previousCenter.x === nextCenter.x && previousCenter.y === nextCenter.y) return state;
 
       if ((asset.connectionId ?? null) !== null) {
-        const nextDocument = updateRoomInteriorAssetPositionInDocument(
+        const updatedDocument = updateRoomInteriorAssetPositionInDocument(
           state.document,
           roomId,
           assetId,
           nextCenter
         );
+        const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, roomId, assetId);
         const command: EditorCommand = {
           type: "sync-connected-stairs",
           previousDocument: cloneDocumentState(state.document),
