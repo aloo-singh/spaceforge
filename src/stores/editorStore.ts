@@ -231,6 +231,7 @@ type EditorState = {
   updateFloorRenameDraft: (floorId: string, name: string) => void;
   commitFloorRenameSession: () => void;
   cancelFloorRename: () => void;
+  deleteFloor: (floorId: string) => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
@@ -307,6 +308,7 @@ let activeStairsAdjustedToast:
     }
   | null = null;
 let activeConnectedFloorPromptToastId: string | number | null = null;
+let activeFloorRenameToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
@@ -1079,6 +1081,44 @@ function dismissStairsAdjustedToastForCommand(command: EditorCommand) {
 
   toast.dismiss(activeStairsAdjustedToast.id);
   activeStairsAdjustedToast = null;
+}
+
+function showFloorRenameToast(floorId: string, newName: string) {
+  if (activeFloorRenameToastId !== null) {
+    toast.dismiss(activeFloorRenameToastId);
+  }
+
+  const id = toast(`Floor renamed to "${newName}"`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeFloorRenameToastId === id) {
+        activeFloorRenameToastId = null;
+      }
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "rename-floor" || latestCommand.floorId !== floorId) {
+          return;
+        }
+
+        state.undo();
+      },
+    },
+  });
+
+  activeFloorRenameToastId = id;
+}
+
+function dismissFloorRenameToastForCommand(command: EditorCommand) {
+  if (command.type !== "rename-floor" || activeFloorRenameToastId === null) {
+    return;
+  }
+
+  toast.dismiss(activeFloorRenameToastId);
+  activeFloorRenameToastId = null;
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
@@ -2716,6 +2756,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         nextName: floor.name,
       };
 
+      showFloorRenameToast(floorRenameSession.floorId, floor.name);
+
       return {
         floorRenameSession: null,
         history: {
@@ -2740,6 +2782,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         floorRenameSession: null,
+      };
+    }),
+  deleteFloor: (floorId) =>
+    set((state) => {
+      const floor = state.document.floors.find((candidate) => candidate.id === floorId);
+      if (!floor) return state;
+
+      const previousFloorIndex = state.document.floors.findIndex((f) => f.id === floorId);
+      const roomsToDelete = state.document.rooms.filter((room) => room.floorId === floorId);
+
+      const roomsToDeleteWithIndex = roomsToDelete.map((room) => {
+        const previousIndex = state.document.rooms.findIndex((r) => r.id === room.id);
+        return {
+          room: {
+            id: room.id,
+            floorId: room.floorId,
+            name: room.name,
+            points: room.points.map((point) => ({ ...point })),
+            openings: cloneRoomOpenings(room.openings),
+            interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+          },
+          previousIndex,
+        };
+      });
+
+      const command: EditorCommand = {
+        type: "delete-floor",
+        floor: {
+          id: floor.id,
+          name: floor.name,
+        },
+        previousFloorIndex,
+        roomsToDelete: roomsToDeleteWithIndex,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        floorRenameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
       };
     }),
   deleteSelectedRoom: () =>
@@ -3500,6 +3592,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command = state.history.past[state.history.past.length - 1];
       if (!command) return state;
       dismissStairsAdjustedToastForCommand(command);
+      dismissFloorRenameToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];

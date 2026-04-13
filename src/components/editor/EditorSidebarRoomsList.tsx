@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
-import { ChevronRight, Plus } from "@/components/ui/icons";
+import { ChevronRight, Plus, Trash2 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -157,6 +158,7 @@ export function EditorSidebarRoomsList() {
   const updateFloorRenameDraft = useEditorStore((state) => state.updateFloorRenameDraft);
   const commitFloorRenameSession = useEditorStore((state) => state.commitFloorRenameSession);
   const cancelFloorRename = useEditorStore((state) => state.cancelFloorRename);
+  const deleteFloor = useEditorStore((state) => state.deleteFloor);
   const floorRenameSession = useEditorStore((state) => state.floorRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const interiorAssetInputRef = useRef<HTMLInputElement | null>(null);
@@ -167,6 +169,7 @@ export function EditorSidebarRoomsList() {
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
+  const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -217,6 +220,47 @@ export function EditorSidebarRoomsList() {
     globalThis.document.addEventListener("mousedown", handleClickOutside);
     return () => globalThis.document.removeEventListener("mousedown", handleClickOutside);
   }, [floorRenameSession, sidebarRenameFloorId]);
+
+  useEffect(() => {
+    if (!floorToDelete) return;
+
+    const floor = document.floors.find((f) => f.id === floorToDelete);
+    if (!floor) return;
+
+    toast.custom(
+      (id) => (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-foreground">Delete {floor.name} and all its rooms?</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                deleteFloor(floorToDelete);
+                setFloorToDelete(null);
+                toast.dismiss(id);
+              }}
+              className="rounded px-3 py-1.5 text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFloorToDelete(null);
+                toast.dismiss(id);
+              }}
+              className="rounded px-3 py-1.5 text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: Infinity,
+      }
+    );
+  }, [floorToDelete, document.floors, deleteFloor]);
 
   if (!hasHydrated) {
     return null;
@@ -269,26 +313,43 @@ export function EditorSidebarRoomsList() {
                         />
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => selectFloorById(floor.id)}
-                        onDoubleClick={(event) => {
-                          event.stopPropagation();
-                          setSidebarRenameFloorId(floor.id);
-                          shouldAutoFocusFloorRenameInputRef.current = true;
-                          selectFloorById(floor.id);
-                          startFloorRename(floor.id);
-                        }}
+                      <div
                         className={cn(
-                          "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                          "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm transition-colors group",
                           activeFloorId === floor.id
                             ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
                             : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
                         )}
                       >
-                        <span className="truncate">{floor.name}</span>
-                        {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => selectFloorById(floor.id)}
+                          onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            setSidebarRenameFloorId(floor.id);
+                            shouldAutoFocusFloorRenameInputRef.current = true;
+                            selectFloorById(floor.id);
+                            startFloorRename(floor.id);
+                          }}
+                          className="flex flex-1 min-w-0 items-center gap-2 text-left"
+                        >
+                          <span className="truncate">{floor.name}</span>
+                          {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
+                        </button>
+                        <SidebarIconTooltip content="Delete floor">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setFloorToDelete(floor.id);
+                            }}
+                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                            aria-label={`Delete ${floor.name}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </SidebarIconTooltip>
+                      </div>
                     )}
                   </div>
                 );

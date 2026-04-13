@@ -130,6 +130,15 @@ export type EditorCommand =
       nextName: string;
     }
   | {
+      type: "delete-floor";
+      floor: Floor;
+      previousFloorIndex: number;
+      roomsToDelete: Array<{
+        room: Room;
+        previousIndex: number;
+      }>;
+    }
+  | {
       type: "resize-room";
       roomId: string;
       previousPoints: Room["points"];
@@ -525,6 +534,47 @@ export function applyEditorCommand(
               name: nextName,
             }
           : floor
+      ),
+    };
+  }
+
+  if (command.type === "delete-floor") {
+    if (direction === "undo") {
+      const floorsWithoutDeletedFloor = document.floors.filter((f) => f.id !== command.floor.id);
+      const nextFloors = [...floorsWithoutDeletedFloor];
+      nextFloors.splice(command.previousFloorIndex, 0, {
+        id: command.floor.id,
+        name: command.floor.name,
+      });
+
+      const roomsWithoutDeletedRooms = document.rooms.filter(
+        (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
+      );
+      const nextRooms = [...roomsWithoutDeletedRooms];
+
+      for (const { room, previousIndex } of command.roomsToDelete) {
+        nextRooms.splice(previousIndex, 0, {
+          id: room.id,
+          floorId: room.floorId,
+          name: room.name,
+          points: room.points.map((point) => ({ ...point })),
+          openings: cloneRoomOpenings(room.openings),
+          interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+        });
+      }
+
+      return {
+        ...document,
+        floors: nextFloors,
+        rooms: nextRooms,
+      };
+    }
+
+    return {
+      ...document,
+      floors: document.floors.filter((f) => f.id !== command.floor.id),
+      rooms: document.rooms.filter(
+        (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
       ),
     };
   }
