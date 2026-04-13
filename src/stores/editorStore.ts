@@ -227,6 +227,8 @@ type EditorState = {
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
   promptConnectedFloorForSelectedStair: () => void;
+  addConnectedFloorAboveFromSelectedStair: () => void;
+  addConnectedFloorBelowFromSelectedStair: () => void;
   createConnectedFloorFromStair: (
     roomId: string,
     assetId: string,
@@ -409,6 +411,8 @@ function buildConnectedFloorDocument(
   const createdFloorId = createFloorId();
   const createdRoomId = createRoomId();
   const createdAssetId = createInteriorAssetId();
+  const sourceArrowLabel = direction === "above" ? "UP" : "DOWN";
+  const connectedArrowLabel = direction === "above" ? "DOWN" : "UP";
   const createdFloor: Floor = {
     id: createdFloorId,
     name: direction === "below" ? "Floor 1" : `Floor ${document.floors.length + 1}`,
@@ -433,16 +437,34 @@ function buildConnectedFloorDocument(
       {
         ...cloneRoomInteriorAsset(asset),
         id: createdAssetId,
+        arrowEnabled: true,
+        arrowLabel: connectedArrowLabel,
       },
     ],
   };
+  const nextRooms = document.rooms.map((candidate) =>
+    candidate.id === room.id
+      ? {
+          ...cloneRoom(candidate),
+          interiorAssets: candidate.interiorAssets.map((candidateAsset) =>
+            candidateAsset.id === asset.id
+              ? {
+                  ...cloneRoomInteriorAsset(candidateAsset),
+                  arrowEnabled: true,
+                  arrowLabel: sourceArrowLabel,
+                }
+              : cloneRoomInteriorAsset(candidateAsset)
+          ),
+        }
+      : cloneRoom(candidate)
+  );
 
   return {
     nextDocument: {
       ...cloneDocumentState(document),
       floors: nextFloors,
       activeFloorId: createdFloorId,
-      rooms: [...document.rooms.map((candidate) => cloneRoom(candidate)), connectedRoom],
+      rooms: [...nextRooms, connectedRoom],
     },
     createdFloorId,
     createdRoomId,
@@ -2604,6 +2626,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selectedInteriorAsset = state.selectedInteriorAsset;
     if (!selectedInteriorAsset) return;
     showConnectedFloorPrompt(selectedInteriorAsset.roomId, selectedInteriorAsset.assetId);
+  },
+  addConnectedFloorAboveFromSelectedStair: () => {
+    const state = useEditorStore.getState();
+    const selectedInteriorAsset = state.selectedInteriorAsset;
+    if (!selectedInteriorAsset) return;
+    state.createConnectedFloorFromStair(
+      selectedInteriorAsset.roomId,
+      selectedInteriorAsset.assetId,
+      "above"
+    );
+  },
+  addConnectedFloorBelowFromSelectedStair: () => {
+    const state = useEditorStore.getState();
+    const selectedInteriorAsset = state.selectedInteriorAsset;
+    if (!selectedInteriorAsset) return;
+    state.createConnectedFloorFromStair(
+      selectedInteriorAsset.roomId,
+      selectedInteriorAsset.assetId,
+      "below"
+    );
   },
   createConnectedFloorFromStair: (roomId, assetId, direction) =>
     set((state) => {
