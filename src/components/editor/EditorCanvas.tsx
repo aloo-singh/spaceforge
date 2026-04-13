@@ -135,7 +135,11 @@ import {
   snapNorthBearingDegrees,
 } from "@/lib/editor/north";
 import { detectMacPlatform } from "@/lib/platform";
-import { DEFAULT_FLOOR_ID, getRoomsForActiveFloor } from "@/lib/editor/history";
+import {
+  DEFAULT_FLOOR_ID,
+  getRoomsForActiveFloor,
+  getRoomsForFloor,
+} from "@/lib/editor/history";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -218,6 +222,7 @@ const ANCHORED_HINT_MAX_WIDTH_PX = 352;
 const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
+const FLOOR_FOOTPRINT_MAX_ALPHA = 0.14;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
@@ -853,6 +858,7 @@ export default function EditorCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const gridRef = useRef<Graphics | null>(null);
+  const floorFootprintRef = useRef<Graphics | null>(null);
   const roomRef = useRef<Graphics | null>(null);
   const openingRef = useRef<Graphics | null>(null);
   const wallOverlayRef = useRef<Graphics | null>(null);
@@ -883,6 +889,9 @@ export default function EditorCanvas({
   const transformAnimationFrameRef = useRef<number | null>(null);
   const stairRotationAnimationsRef = useRef<Map<string, StairRotationAnimation>>(new Map());
   const stairRotationAnimationFrameRef = useRef<number | null>(null);
+  const footprintFadeAnimationFrameRef = useRef<number | null>(null);
+  const footprintPreviewFloorIdRef = useRef<string | null>(null);
+  const footprintPreviewOpacityRef = useRef(0);
   const instructionsId = "editor-canvas-controls";
   const { resolvedTheme } = useTheme();
   const editorThemeMode = useMemo(() => resolveEditorThemeMode(resolvedTheme), [resolvedTheme]);
@@ -919,6 +928,15 @@ export default function EditorCanvas({
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
+  const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
+  const footprintFloorId = useMemo(() => {
+    if (hoveredFloorPreviewId) {
+      return hoveredFloorPreviewId;
+    }
+
+    const activeFloorIndex = floors.findIndex((floor) => floor.id === activeFloorId);
+    return activeFloorIndex > 0 ? floors[activeFloorIndex - 1]?.id ?? null : null;
+  }, [activeFloorId, floors, hoveredFloorPreviewId]);
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
@@ -985,15 +1003,17 @@ export default function EditorCanvas({
   const drawCurrentScene = useCallback(() => {
     const app = appRef.current;
     const grid = gridRef.current;
+    const floorFootprint = floorFootprintRef.current;
     const rooms = roomRef.current;
     const openings = openingRef.current;
     const wallOverlay = wallOverlayRef.current;
     const roomLabels = roomLabelRef.current;
     const draft = draftRef.current;
     const dimensionOverlay = dimensionOverlayRef.current;
-    if (!grid || !rooms || !openings || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
+    if (!grid || !floorFootprint || !rooms || !openings || !wallOverlay || !roomLabels || !draft || !dimensionOverlay) return;
     if (
       grid.destroyed ||
+      floorFootprint.destroyed ||
       rooms.destroyed ||
       openings.destroyed ||
       wallOverlay.destroyed ||
@@ -1006,6 +1026,7 @@ export default function EditorCanvas({
 
     drawScene(
       grid,
+      floorFootprint,
       rooms,
       openings,
       wallOverlay,
@@ -1022,7 +1043,9 @@ export default function EditorCanvas({
       snapGuidesRef.current,
       draftConstraintModeRef.current,
       editorThemeRef.current,
-      Boolean(activeNorthDragRef.current?.didDrag)
+      Boolean(activeNorthDragRef.current?.didDrag),
+      footprintPreviewFloorIdRef.current,
+      footprintPreviewOpacityRef.current
     );
 
     if (app) {
@@ -1040,6 +1063,12 @@ export default function EditorCanvas({
     if (stairRotationAnimationFrameRef.current === null) return;
     cancelAnimationFrame(stairRotationAnimationFrameRef.current);
     stairRotationAnimationFrameRef.current = null;
+  }, []);
+
+  const stopFootprintFadeAnimation = useCallback(() => {
+    if (footprintFadeAnimationFrameRef.current === null) return;
+    cancelAnimationFrame(footprintFadeAnimationFrameRef.current);
+    footprintFadeAnimationFrameRef.current = null;
   }, []);
 
   const startTransformAnimation = useCallback(() => {
@@ -1095,6 +1124,29 @@ export default function EditorCanvas({
     stairRotationAnimationFrameRef.current = requestAnimationFrame(step);
   }, [drawCurrentScene]);
 
+  const startFootprintFadeAnimation = useCallback(() => {
+    stopFootprintFadeAnimation();
+
+    const step = () => {
+      const targetOpacity = footprintPreviewFloorIdRef.current ? 1 : 0;
+      const currentOpacity = footprintPreviewOpacityRef.current;
+      const delta = targetOpacity - currentOpacity;
+
+      if (Math.abs(delta) <= 0.02) {
+        footprintPreviewOpacityRef.current = targetOpacity;
+        footprintFadeAnimationFrameRef.current = null;
+        drawCurrentScene();
+        return;
+      }
+
+      footprintPreviewOpacityRef.current = currentOpacity + delta * 0.22;
+      drawCurrentScene();
+      footprintFadeAnimationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    footprintFadeAnimationFrameRef.current = requestAnimationFrame(step);
+  }, [drawCurrentScene, stopFootprintFadeAnimation]);
+
   const setTransformFeedback = useCallback(
     (feedback: TransformFeedback | null) => {
       transformFeedbackRef.current = feedback;
@@ -1116,7 +1168,14 @@ export default function EditorCanvas({
   }, [drawCurrentScene, northDragTooltip]);
 
   useEffect(() => {
+    footprintPreviewFloorIdRef.current = footprintFloorId;
+    startFootprintFadeAnimation();
+    drawCurrentScene();
+  }, [drawCurrentScene, footprintFloorId, startFootprintFadeAnimation]);
+
+  useEffect(() => {
     return () => {
+      stopFootprintFadeAnimation();
       stopStairRotationAnimation();
       if (hintTransitionTimeoutRef.current) {
         clearTimeout(hintTransitionTimeoutRef.current);
@@ -1131,7 +1190,7 @@ export default function EditorCanvas({
         clearTimeout(hintPauseTimeoutRef.current);
       }
     };
-  }, [stopStairRotationAnimation]);
+  }, [stopFootprintFadeAnimation, stopStairRotationAnimation]);
 
   useEffect(() => {
     if (!isHintFlowPaused) {
@@ -2177,7 +2236,44 @@ export default function EditorCanvas({
     return !findRoomAtPoint(getRoomsForActiveFloor(state.document), worldPoint);
   }, []);
 
+  const canvasBootstrapCallbacks = useMemo(
+    () => ({
+      canStartCanvasRotation,
+      completeHint,
+      drawCurrentScene,
+      setTransformFeedback,
+      startStairRotationAnimation,
+      stopFootprintFadeAnimation,
+      stopStairRotationAnimation,
+      stopTransformAnimation,
+      updateCanvasRotationTooltip,
+    }),
+    [
+      canStartCanvasRotation,
+      completeHint,
+      drawCurrentScene,
+      setTransformFeedback,
+      startStairRotationAnimation,
+      stopFootprintFadeAnimation,
+      stopStairRotationAnimation,
+      stopTransformAnimation,
+      updateCanvasRotationTooltip,
+    ]
+  );
+
   useEffect(() => {
+    const {
+      canStartCanvasRotation,
+      completeHint,
+      drawCurrentScene,
+      setTransformFeedback,
+      startStairRotationAnimation,
+      stopFootprintFadeAnimation,
+      stopStairRotationAnimation,
+      stopTransformAnimation,
+      updateCanvasRotationTooltip,
+    } = canvasBootstrapCallbacks;
+
     const host = containerRef.current;
     if (!host) return;
     const resizeTarget: HTMLElement = host;
@@ -2214,6 +2310,7 @@ export default function EditorCanvas({
       app.canvas.style.height = "100%";
 
       const grid = new Graphics();
+      const floorFootprint = new Graphics();
       const rooms = new Graphics();
       const openings = new Graphics();
       const wallOverlay = new Graphics();
@@ -2221,6 +2318,7 @@ export default function EditorCanvas({
       const draft = new Graphics();
       const dimensionOverlay = new Container();
       gridRef.current = grid;
+      floorFootprintRef.current = floorFootprint;
       roomRef.current = rooms;
       openingRef.current = openings;
       wallOverlayRef.current = wallOverlay;
@@ -2228,6 +2326,7 @@ export default function EditorCanvas({
       draftRef.current = draft;
       dimensionOverlayRef.current = dimensionOverlay;
       app.stage.addChild(grid);
+      app.stage.addChild(floorFootprint);
       app.stage.addChild(rooms);
       app.stage.addChild(openings);
       app.stage.addChild(wallOverlay);
@@ -2382,6 +2481,7 @@ export default function EditorCanvas({
         appRef.current = null;
         setIsCanvasReadyForExport(false);
         gridRef.current = null;
+        floorFootprintRef.current = null;
         roomRef.current = null;
         openingRef.current = null;
         wallOverlayRef.current = null;
@@ -2391,6 +2491,7 @@ export default function EditorCanvas({
         setTransformFeedback(null);
         stopTransformAnimation();
         stopStairRotationAnimation();
+        stopFootprintFadeAnimation();
       };
     }
 
@@ -2403,20 +2504,12 @@ export default function EditorCanvas({
       destroyed = true;
       teardown?.();
       stopStairRotationAnimation();
+      stopFootprintFadeAnimation();
       if (initialized) {
         app.destroy(true, { children: true });
       }
     };
-  }, [
-    canStartCanvasRotation,
-    completeHint,
-    drawCurrentScene,
-    startStairRotationAnimation,
-    setTransformFeedback,
-    stopStairRotationAnimation,
-    stopTransformAnimation,
-    updateCanvasRotationTooltip,
-  ]);
+  }, [canvasBootstrapCallbacks]);
 
   useEffect(() => {
     const app = appRef.current;
@@ -2794,6 +2887,8 @@ export default function EditorCanvas({
                         key={floor.id}
                         type="button"
                         onClick={() => selectFloorById(floor.id)}
+                        onPointerEnter={() => setHoveredFloorPreviewId(floor.id)}
+                        onPointerLeave={() => setHoveredFloorPreviewId(null)}
                         aria-pressed={isActiveFloor}
                         aria-label={`Switch to ${floor.name}`}
                         className={cn(
@@ -3081,6 +3176,7 @@ type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 
 function drawScene(
   gridGraphics: Graphics,
+  floorFootprintGraphics: Graphics,
   roomGraphics: Graphics,
   openingGraphics: Graphics,
   wallOverlayGraphics: Graphics,
@@ -3111,7 +3207,9 @@ function drawScene(
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
   theme: EditorCanvasTheme,
-  hideCursorHud: boolean
+  hideCursorHud: boolean,
+  footprintFloorId: string | null,
+  footprintOpacity: number
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
@@ -3160,6 +3258,14 @@ function drawScene(
   );
   const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
+  drawFloorFootprint(
+    floorFootprintGraphics,
+    footprintFloorId ? getRoomsForFloor(state.document, footprintFloorId) : [],
+    state.camera,
+    state.viewport,
+    theme,
+    footprintOpacity
+  );
   drawRooms(
     roomGraphics,
     renderedRooms,
@@ -3293,6 +3399,32 @@ function drawGrid(
   graphics.moveTo(horizontalOriginStart.x, horizontalOriginStart.y);
   graphics.lineTo(horizontalOriginEnd.x, horizontalOriginEnd.y);
   graphics.stroke();
+}
+
+function drawFloorFootprint(
+  graphics: Graphics,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme,
+  opacity: number
+) {
+  graphics.clear();
+  if (rooms.length === 0 || opacity <= 0.01) return;
+
+  for (const room of rooms) {
+    if (room.points.length < 3) continue;
+    drawRoomShape(
+      graphics,
+      room.points,
+      camera,
+      viewport,
+      theme.gridMajor,
+      0,
+      1.5,
+      FLOOR_FOOTPRINT_MAX_ALPHA * opacity
+    );
+  }
 }
 
 function drawRooms(
