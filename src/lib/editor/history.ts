@@ -96,6 +96,14 @@ export type EditorCommand =
       nextActiveFloorId: string;
     }
   | {
+      type: "create-connected-floor";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+      createdFloorId: string;
+      createdRoomId: string;
+      createdAssetId: string;
+    }
+  | {
       type: "complete-room";
       room: Room;
     }
@@ -178,6 +186,12 @@ export function applyEditorCommand(
   command: EditorCommand,
   direction: "undo" | "redo"
 ): EditorDocumentState {
+  if (command.type === "create-connected-floor") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
   if (command.type === "update-canvas-rotation") {
     return {
       ...document,
@@ -490,6 +504,24 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,
     canvasRotationDegrees: DEFAULT_CANVAS_ROTATION_DEGREES,
+  };
+}
+
+function cloneEditorDocumentState(document: EditorDocumentState): EditorDocumentState {
+  return {
+    floors: getNormalizedFloors(document),
+    activeFloorId: getNormalizedActiveFloorId(document),
+    rooms: document.rooms.map((room) => ({
+      id: room.id,
+      floorId: getRoomFloorId(room, document),
+      name: room.name,
+      points: room.points.map((point) => ({ ...point })),
+      openings: cloneRoomOpenings(room.openings),
+      interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+    })),
+    exportConfig: cloneProjectExportConfig(document.exportConfig),
+    northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
+    canvasRotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
   };
 }
 

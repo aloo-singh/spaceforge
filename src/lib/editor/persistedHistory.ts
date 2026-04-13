@@ -160,6 +160,42 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (
+    nextFloors.length === previousFloors.length + 1 &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 1 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const createdRoom = addedRooms[0];
+    const createdFloorId = getRoomFloorId(createdRoom, next);
+    const createdFloor = nextFloors.find((floor) => floor.id === createdFloorId) ?? null;
+    const addedFloorIds = nextFloors
+      .filter((floor) => !previousFloors.some((candidate) => candidate.id === floor.id))
+      .map((floor) => floor.id);
+    const createdAsset = createdRoom.interiorAssets[0] ?? null;
+
+    if (
+      createdFloor &&
+      addedFloorIds.length === 1 &&
+      addedFloorIds[0] === createdFloorId &&
+      nextActiveFloorId === createdFloorId &&
+      createdRoom.openings.length === 0 &&
+      createdRoom.interiorAssets.length === 1 &&
+      createdAsset
+    ) {
+      return {
+        type: "create-connected-floor",
+        previousDocument: cloneDocumentState(previous),
+        nextDocument: cloneDocumentState(next),
+        createdFloorId,
+        createdRoomId: createdRoom.id,
+        createdAssetId: createdAsset.id,
+      };
+    }
+  }
+
+  if (
     previousActiveFloorId !== nextActiveFloorId &&
     areFloorsEqual(previousFloors, nextFloors) &&
     removedRooms.length === 0 &&

@@ -81,6 +81,9 @@ export function SelectedInteriorAssetInspector({
     (state) => state.swapSelectedInteriorAssetArrowDirection
   );
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const promptConnectedFloorForSelectedStair = useEditorStore(
+    (state) => state.promptConnectedFloorForSelectedStair
+  );
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
     const assetId = state.selectedInteriorAsset?.assetId;
@@ -202,6 +205,21 @@ export function SelectedInteriorAssetInspector({
               </InspectorIconTooltip>
             </ButtonGroup>
           </ImmediateTooltipProvider>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Connected floor</p>
+          <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={promptConnectedFloorForSelectedStair}
+              className="rounded-full"
+            >
+              Create connected floor
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-1.5">
