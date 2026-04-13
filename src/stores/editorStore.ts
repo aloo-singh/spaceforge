@@ -144,6 +144,11 @@ type InteriorAssetArrowLabelSessionState = {
   initialArrowLabel: string;
 } | null;
 
+type FloorRenameSessionState = {
+  floorId: string;
+  initialName: string;
+} | null;
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
@@ -167,6 +172,7 @@ type EditorState = {
   renameSession: RenameSessionState;
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
   interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
+  floorRenameSession: FloorRenameSessionState;
   history: {
     past: EditorCommand[];
     future: EditorCommand[];
@@ -221,6 +227,10 @@ type EditorState = {
   updateInteriorAssetArrowLabelDraft: (roomId: string, assetId: string, label: string) => void;
   commitInteriorAssetArrowLabelSession: () => void;
   cancelInteriorAssetArrowLabelSession: () => void;
+  startFloorRename: (floorId: string) => void;
+  updateFloorRenameDraft: (floorId: string, name: string) => void;
+  commitFloorRenameSession: () => void;
+  cancelFloorRename: () => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
@@ -571,6 +581,20 @@ function updateRoomNameInDocument(document: DocumentState, roomId: string, name:
             name,
           }
         : room
+    ),
+  };
+}
+
+function updateFloorNameInDocument(document: DocumentState, floorId: string, name: string): DocumentState {
+  return {
+    ...document,
+    floors: document.floors.map((floor) =>
+      floor.id === floorId
+        ? {
+            ...floor,
+            name,
+          }
+        : floor
     ),
   };
 }
@@ -1579,6 +1603,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   renameSession: null,
   interiorAssetRenameSession: null,
   interiorAssetArrowLabelSession: null,
+  floorRenameSession: null,
   history: {
     past: hydratedHistoryState.past,
     future: hydratedHistoryState.future,
@@ -2628,6 +2653,73 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         interiorAssetArrowLabelSession: null,
+      };
+    }),
+  startFloorRename: (floorId) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const floor = state.document.floors.find((candidate) => candidate.id === floorId);
+      if (!floor) return state;
+      if (state.floorRenameSession?.floorId === floorId) return state;
+
+      return {
+        floorRenameSession: {
+          floorId,
+          initialName: floor.name,
+        },
+      };
+    }),
+  updateFloorRenameDraft: (floorId, name) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive || state.roomDraft.points.length > 0) return state;
+      const floor = state.document.floors.find((candidate) => candidate.id === floorId);
+      if (!floor) return state;
+
+      const floorRenameSession =
+        state.floorRenameSession?.floorId === floorId
+          ? state.floorRenameSession
+          : {
+              floorId,
+              initialName: floor.name,
+            };
+
+      if (floor.name === name && state.floorRenameSession?.floorId === floorId) return state;
+
+      return {
+        document: updateFloorNameInDocument(state.document, floorId, name),
+        floorRenameSession,
+      };
+    }),
+  commitFloorRenameSession: () =>
+    set((state) => {
+      const floorRenameSession = state.floorRenameSession;
+      if (!floorRenameSession) return state;
+
+      const floor = state.document.floors.find((candidate) => candidate.id === floorRenameSession.floorId);
+      if (!floor) {
+        return {
+          floorRenameSession: null,
+        };
+      }
+
+      return {
+        floorRenameSession: null,
+      };
+    }),
+  cancelFloorRename: () =>
+    set((state) => {
+      const floorRenameSession = state.floorRenameSession;
+      if (!floorRenameSession) return state;
+
+      const floor = state.document.floors.find((candidate) => candidate.id === floorRenameSession.floorId);
+      const nextDocument =
+        floor && floor.name !== floorRenameSession.initialName
+          ? updateFloorNameInDocument(state.document, floorRenameSession.floorId, floorRenameSession.initialName)
+          : state.document;
+
+      return {
+        document: nextDocument,
+        floorRenameSession: null,
       };
     }),
   deleteSelectedRoom: () =>
