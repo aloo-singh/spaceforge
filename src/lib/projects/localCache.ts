@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneProjectDocument, isProjectDocument, isProjectThumbnailDataUrl, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
+import { cloneProjectDocument, isProjectDocument, isProjectThumbnailDataUrl, resolveProjectMaxFloors, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
 import { sortProjectsByUpdatedAt } from "@/lib/projects/listState";
 
 const PROJECT_CACHE_STORAGE_KEY = "spaceforge.projects.cache.v1";
@@ -53,6 +53,7 @@ function normalizeCachedProjectRecord(value: unknown): ProjectRecord | null {
     name,
     document: cloneProjectDocument(value.document),
     thumbnailDataUrl,
+    maxFloors: resolveProjectMaxFloors(value.maxFloors),
     createdAt,
     updatedAt,
   };
@@ -147,6 +148,7 @@ function toProjectListItem(project: ProjectRecord): ProjectListItem {
     userId: project.userId,
     name: project.name,
     thumbnailDataUrl: project.thumbnailDataUrl,
+    maxFloors: project.maxFloors,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };

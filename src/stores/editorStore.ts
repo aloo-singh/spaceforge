@@ -154,6 +154,8 @@ type EditorState = {
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
+  maxFloors: number;
+  setMaxFloors: (maxFloors: number) => void;
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
@@ -1558,6 +1560,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
+  maxFloors: 2,
+  setMaxFloors: (maxFloors) =>
+    set((state) => {
+      if (state.maxFloors === maxFloors) return state;
+      return {
+        maxFloors,
+      };
+    }),
   roomDraft: EMPTY_ROOM_DRAFT,
   selectedNorthIndicator: false,
   selectedRoomId: null,
@@ -1910,6 +1920,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   addFloor: () =>
     set((state) => {
+      if (state.document.floors.length >= state.maxFloors) {
+        console.warn(`Cannot add floor: project is already at the maximum of ${state.maxFloors} floors.`);
+        return state;
+      }
+
       const nextFloorNumber = state.document.floors.length + 1;
       const floor: Floor = {
         id: createFloorId(),

@@ -165,6 +165,7 @@ export function EditorProjectBootstrap({
             } else {
               fitCameraOnProjectOpen(projectOpenCameraOptions);
             }
+            useEditorStore.getState().setMaxFloors(fallbackProject.maxFloors);
 
             saveActiveProjectId(fallbackProject.id);
             onProjectResolvedRef.current?.({
@@ -229,6 +230,7 @@ export function EditorProjectBootstrap({
         } else {
           fitCameraOnProjectOpen(projectOpenCameraOptions);
         }
+        useEditorStore.getState().setMaxFloors(selectedProject.maxFloors);
 
         saveActiveProjectId(selectedProject.id);
         onProjectResolvedRef.current?.({

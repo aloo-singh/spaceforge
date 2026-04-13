@@ -26,6 +26,7 @@ export type ProjectRecord = {
   name: string;
   document: EditorDocumentState;
   thumbnailDataUrl: string | null;
+  maxFloors: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -210,6 +211,17 @@ export function isProjectThumbnailDataUrl(value: unknown): value is string | nul
   }
 
   return /^data:image\/(png|webp|jpeg);base64,/u.test(value);
+}
+
+export function isProjectMaxFloors(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+export function resolveProjectMaxFloors(value: unknown): number {
+  if (isProjectMaxFloors(value)) {
+    return value;
+  }
+  return 2; // fallback for older projects
 }
 
 export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {
