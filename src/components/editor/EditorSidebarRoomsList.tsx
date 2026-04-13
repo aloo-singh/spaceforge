@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { toast } from "sonner";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
+import { Button } from "@/components/ui/button";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { ChevronRight, Plus, Trash2 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
@@ -169,7 +170,9 @@ export function EditorSidebarRoomsList() {
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
+  const [isFloorDeleteDialogOpen, setIsFloorDeleteDialogOpen] = useState(false);
   const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
+  const [isDeletingFloor, setIsDeletingFloor] = useState(false);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -221,46 +224,7 @@ export function EditorSidebarRoomsList() {
     return () => globalThis.document.removeEventListener("mousedown", handleClickOutside);
   }, [floorRenameSession, sidebarRenameFloorId]);
 
-  useEffect(() => {
-    if (!floorToDelete) return;
 
-    const floor = document.floors.find((f) => f.id === floorToDelete);
-    if (!floor) return;
-
-    toast.custom(
-      (id) => (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-foreground">Delete {floor.name} and all its rooms?</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                deleteFloor(floorToDelete);
-                setFloorToDelete(null);
-                toast.dismiss(id);
-              }}
-              className="rounded px-3 py-1.5 text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFloorToDelete(null);
-                toast.dismiss(id);
-              }}
-              className="rounded px-3 py-1.5 text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ),
-      {
-        duration: Infinity,
-      }
-    );
-  }, [floorToDelete, document.floors, deleteFloor]);
 
   if (!hasHydrated) {
     return null;
@@ -342,6 +306,7 @@ export function EditorSidebarRoomsList() {
                             onClick={(event) => {
                               event.stopPropagation();
                               setFloorToDelete(floor.id);
+                              setIsFloorDeleteDialogOpen(true);
                             }}
                             className="flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
                             aria-label={`Delete ${floor.name}`}
@@ -724,6 +689,53 @@ export function EditorSidebarRoomsList() {
             </div>
           )}
         </SidebarSection>
+
+        {floorToDelete && (
+          <ResponsiveAlertDialog
+            open={isFloorDeleteDialogOpen}
+            onOpenChange={(open) => {
+              setIsFloorDeleteDialogOpen(open);
+              if (!open) {
+                setFloorToDelete(null);
+              }
+            }}
+            title="Delete floor?"
+            description={
+              document.floors.find((f) => f.id === floorToDelete)
+                ? `Delete "${document.floors.find((f) => f.id === floorToDelete)?.name}" and all its rooms. You can undo this if needed.`
+                : "Delete this floor and all its rooms. You can undo this if needed."
+            }
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsFloorDeleteDialogOpen(false)}
+                  disabled={isDeletingFloor}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={async () => {
+                    setIsDeletingFloor(true);
+                    await deleteFloor(floorToDelete);
+                    setIsDeletingFloor(false);
+                    setIsFloorDeleteDialogOpen(false);
+                    setFloorToDelete(null);
+                  }}
+                  disabled={isDeletingFloor}
+                  className="w-full sm:w-auto"
+                >
+                  <Trash2 className="size-4" />
+                  {isDeletingFloor ? "Deleting..." : "Delete floor"}
+                </Button>
+              </>
+            }
+          />
+        )}
       </div>
     </ImmediateTooltipProvider>
   );
