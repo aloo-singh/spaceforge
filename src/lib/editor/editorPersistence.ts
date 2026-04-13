@@ -256,6 +256,9 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
   if (!isInteriorAssetType(value.type)) return false;
+  if (value.connectionId !== undefined && value.connectionId !== null && typeof value.connectionId !== "string") {
+    return false;
+  }
   if (value.name !== undefined && typeof value.name !== "string") return false;
   if (value.arrowEnabled !== undefined && typeof value.arrowEnabled !== "boolean") return false;
   if (

@@ -160,6 +160,40 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   if (
+    nextFloors.length === previousFloors.length &&
+    areFloorsEqual(previousFloors, nextFloors) &&
+    previousActiveFloorId === nextActiveFloorId &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 2 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing
+  ) {
+    const [firstChangedRoom, secondChangedRoom] = changedRooms;
+    const previousFirstAsset = inferChangedConnectedStairAsset(
+      firstChangedRoom.previous.interiorAssets ?? [],
+      firstChangedRoom.next.interiorAssets ?? []
+    );
+    const previousSecondAsset = inferChangedConnectedStairAsset(
+      secondChangedRoom.previous.interiorAssets ?? [],
+      secondChangedRoom.next.interiorAssets ?? []
+    );
+
+    if (
+      previousFirstAsset &&
+      previousSecondAsset &&
+      previousFirstAsset.previous.connectionId &&
+      previousFirstAsset.previous.connectionId === previousSecondAsset.previous.connectionId
+    ) {
+      return {
+        type: "sync-connected-stairs",
+        previousDocument: cloneDocumentState(previous),
+        nextDocument: cloneDocumentState(next),
+      };
+    }
+  }
+
+  if (
     nextFloors.length === previousFloors.length + 1 &&
     removedRooms.length === 0 &&
     addedRooms.length === 1 &&
@@ -469,6 +503,33 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   }
 
   return null;
+}
+
+function inferChangedConnectedStairAsset(
+  previousAssets: RoomInteriorAsset[],
+  nextAssets: RoomInteriorAsset[]
+): { previous: RoomInteriorAsset; next: RoomInteriorAsset } | null {
+  if (previousAssets.length !== nextAssets.length) return null;
+
+  const nextById = new Map(nextAssets.map((asset) => [asset.id, asset]));
+  let changedAsset: { previous: RoomInteriorAsset; next: RoomInteriorAsset } | null = null;
+
+  for (const previousAsset of previousAssets) {
+    const nextAsset = nextById.get(previousAsset.id);
+    if (!nextAsset) return null;
+    if ((previousAsset.connectionId ?? null) === null) continue;
+    if (areRoomInteriorAssetsEqual([previousAsset], [nextAsset])) continue;
+    if (previousAsset.widthMm !== nextAsset.widthMm || previousAsset.depthMm !== nextAsset.depthMm) {
+      return null;
+    }
+    if (changedAsset) return null;
+    changedAsset = {
+      previous: cloneRoomInteriorAsset(previousAsset),
+      next: cloneRoomInteriorAsset(nextAsset),
+    };
+  }
+
+  return changedAsset;
 }
 
 function inferAddedOpening(

@@ -104,6 +104,11 @@ export type EditorCommand =
       createdAssetId: string;
     }
   | {
+      type: "sync-connected-stairs";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+    }
+  | {
       type: "complete-room";
       room: Room;
     }
@@ -187,6 +192,12 @@ export function applyEditorCommand(
   direction: "undo" | "redo"
 ): EditorDocumentState {
   if (command.type === "create-connected-floor") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
+  if (command.type === "sync-connected-stairs") {
     return cloneEditorDocumentState(
       direction === "undo" ? command.previousDocument : command.nextDocument
     );
