@@ -241,7 +241,8 @@ export function EditorSidebarRoomsList() {
         >
           <div className="flex flex-col gap-1">
             {floors.length > 0 ? (
-              displayedFloors.map((floor) => {
+              displayedFloors.map((floor, floorIndex) => {
+                const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 return (
                   <div key={floor.id}>
@@ -297,6 +298,9 @@ export function EditorSidebarRoomsList() {
                           }}
                           className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
                         >
+                          <span className="inline-flex shrink-0 items-center justify-center rounded-full min-w-5 h-5 bg-zinc-300/50 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300">
+                            {floorNumber}
+                          </span>
                           <span className="truncate">{floor.name}</span>
                           {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
                         </button>

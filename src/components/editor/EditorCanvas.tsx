@@ -2882,9 +2882,10 @@ export default function EditorCanvas({
                 onPointerLeave={() => setHoveredFloorPreviewId(null)}
               >
                 <div className="flex flex-col gap-1.5">
-                  {displayedFloors.map((floor) => {
+                  {displayedFloors.map((floor, floorIndex) => {
                     const isActiveFloor = floor.id === activeFloorId;
                     const floorLabel = floor.name.replace(/^Floor\s+/u, "");
+                    const floorNumber = displayedFloors.length - 1 - floorIndex;
 
                     return (
                       <button
@@ -2908,7 +2909,7 @@ export default function EditorCanvas({
                         )}
                         style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                       >
-                        {floorLabel}
+                        <span>{floorNumber}</span>
                       </button>
                     );
                   })}
