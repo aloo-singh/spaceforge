@@ -309,6 +309,7 @@ let activeStairsAdjustedToast:
   | null = null;
 let activeConnectedFloorPromptToastId: string | number | null = null;
 let activeFloorRenameToastId: string | number | null = null;
+let activeDeleteFloorToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
@@ -1119,6 +1120,44 @@ function dismissFloorRenameToastForCommand(command: EditorCommand) {
 
   toast.dismiss(activeFloorRenameToastId);
   activeFloorRenameToastId = null;
+}
+
+function showDeleteFloorToast(floorName: string, floorId: string) {
+  if (activeDeleteFloorToastId !== null) {
+    toast.dismiss(activeDeleteFloorToastId);
+  }
+
+  const id = toast(`Floor "${floorName}" deleted`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeDeleteFloorToastId === id) {
+        activeDeleteFloorToastId = null;
+      }
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "delete-floor" || latestCommand.floor.id !== floorId) {
+          return;
+        }
+
+        state.undo();
+      },
+    },
+  });
+
+  activeDeleteFloorToastId = id;
+}
+
+function dismissDeleteFloorToastForCommand(command: EditorCommand) {
+  if (command.type !== "delete-floor" || activeDeleteFloorToastId === null) {
+    return;
+  }
+
+  toast.dismiss(activeDeleteFloorToastId);
+  activeDeleteFloorToastId = null;
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
@@ -2817,6 +2856,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomsToDelete: roomsToDeleteWithIndex,
       };
 
+      showDeleteFloorToast(floor.name, floor.id);
+
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       return {
@@ -3593,6 +3634,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!command) return state;
       dismissStairsAdjustedToastForCommand(command);
       dismissFloorRenameToastForCommand(command);
+      dismissDeleteFloorToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];
