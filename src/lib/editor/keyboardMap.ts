@@ -8,6 +8,8 @@ export type EditorKeyboardShortcutId =
   | "toggle-snapping"
   | "undo"
   | "redo"
+  | "copy"
+  | "paste"
   | "delete-selection"
   | "hold-pan"
   | "cancel-draft-or-clear-selection"
@@ -100,6 +102,28 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "y", code: "KeyY", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false },
     ],
     sonnerMessage: ({ actionLabel }) => `Redo ${actionLabel ?? "action"}`,
+  },
+  {
+    id: "copy",
+    section: "Edit",
+    keyCombination: "Primary+C",
+    description: "Copy the current selection",
+    macKeys: "Cmd+C",
+    windowsKeys: "Ctrl+C",
+    type: "action",
+    bindings: [{ key: "c", code: "KeyC", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Copied to clipboard",
+  },
+  {
+    id: "paste",
+    section: "Edit",
+    keyCombination: "Primary+V",
+    description: "Paste the copied selection",
+    macKeys: "Cmd+V",
+    windowsKeys: "Ctrl+V",
+    type: "action",
+    bindings: [{ key: "v", code: "KeyV", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Pasted from clipboard",
   },
   {
     id: "delete-selection",

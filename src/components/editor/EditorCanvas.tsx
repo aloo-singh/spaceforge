@@ -61,6 +61,7 @@ import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
+import { attachCopyPasteHotkeys } from "@/lib/editor/input/copyPasteHotkeys";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
@@ -1825,6 +1826,10 @@ export default function EditorCanvas({
 
   useEffect(() => {
     return attachDeleteRoomHotkeys(useEditorStore);
+  }, []);
+
+  useEffect(() => {
+    return attachCopyPasteHotkeys(useEditorStore);
   }, []);
 
   useEffect(() => {

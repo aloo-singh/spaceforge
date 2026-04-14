@@ -199,6 +199,26 @@ export type EditorCommand =
       roomId: string;
       previousOpening: RoomOpening;
       nextOpening: RoomOpening;
+    }
+  | {
+      type: "copy-rooms";
+      rooms: Room[];
+    }
+  | {
+      type: "paste-rooms";
+      pastedRooms: Room[];
+      floorId: string;
+    }
+  | {
+      type: "copy-interior-asset";
+      asset: RoomInteriorAsset;
+      sourceRoomId: string;
+    }
+  | {
+      type: "paste-interior-asset";
+      pastedAsset: RoomInteriorAsset;
+      targetRoomId: string;
+      sourceRoomId: string;
     };
 
 export function applyEditorCommand(
@@ -506,6 +526,69 @@ export function applyEditorCommand(
         };
       }),
     };
+  }
+
+  if (command.type === "copy-rooms") {
+    // Copy is informational only - just return the document unchanged
+    return cloneEditorDocumentState(document);
+  }
+
+  if (command.type === "paste-rooms") {
+    if (direction === "undo") {
+      // Remove pasted rooms
+      const pastedIds = new Set(command.pastedRooms.map((r) => r.id));
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => !pastedIds.has(room.id)),
+      };
+    } else {
+      // Add pasted rooms
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms,
+          ...command.pastedRooms.map((r) => ({
+            ...r,
+            floorId: command.floorId,
+          })),
+        ],
+      };
+    }
+  }
+
+  if (command.type === "copy-interior-asset") {
+    // Copy is informational only - just return the document unchanged
+    return cloneEditorDocumentState(document);
+  }
+
+  if (command.type === "paste-interior-asset") {
+    if (direction === "undo") {
+      // Remove pasted asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => asset.id !== command.pastedAsset.id
+            ),
+          };
+        }),
+      };
+    } else {
+      // Add pasted asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.pastedAsset)],
+          };
+        }),
+      };
+    }
   }
 
   if (command.type === "rename-room") {
