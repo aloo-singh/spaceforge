@@ -137,6 +137,7 @@ type RoomDrawInputCallbacks = {
   onSnapGuidesChange?: (guides: SnapGuides | null) => void;
   onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
   onRoomLabelSelected?: (roomId: string) => void;
+  onInteriorAssetDragTargetChange?: (roomId: string | null) => void;
   requestRender: () => void;
 };
 
@@ -646,6 +647,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetDragSession = null;
+    callbacks.onInteriorAssetDragTargetChange?.(null);
     store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
@@ -901,6 +903,9 @@ export function attachRoomDrawInput(
         state.viewport
       );
       session.targetRoomId = hoveredRoom?.id ?? session.roomId;
+      // Notify when drag target switches to a different room
+      const isDifferentRoom = session.targetRoomId !== session.roomId;
+      callbacks.onInteriorAssetDragTargetChange?.(isDifferentRoom ? session.targetRoomId : null);
 
       session.didDrag = true;
       store.getState().setCanvasInteractionActive(true);

@@ -312,7 +312,7 @@ export function EditorSidebarRoomsList() {
                         className={cn(
                           "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm transition-colors group",
                           dragOverFloorId === floor.id
-                            ? "bg-blue-200/80 text-blue-950 dark:bg-blue-900/60 dark:text-blue-50 ring-2 ring-blue-400 dark:ring-blue-600"
+                            ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
                             : activeFloorId === floor.id
                             ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
                             : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
@@ -456,7 +456,7 @@ export function EditorSidebarRoomsList() {
                       isDraggingThisRoom
                         ? "border-zinc-300 bg-zinc-100 text-zinc-600 opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
                         : isDragOverThisRoom
-                        ? "border-amber-400 bg-amber-100/50 dark:border-amber-600 dark:bg-amber-950/30"
+                        ? "border-brand/60 bg-brand/10 dark:border-brand/50 dark:bg-brand/15"
                         : isSelected
                         ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
                         : isInMultiSelection
