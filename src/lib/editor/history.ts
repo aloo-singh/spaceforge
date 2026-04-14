@@ -219,6 +219,16 @@ export type EditorCommand =
       pastedAsset: RoomInteriorAsset;
       targetRoomId: string;
       sourceRoomId: string;
+    }
+  | {
+      type: "cut-rooms";
+      cutRooms: Room[];
+      previousIndex: number;
+    }
+  | {
+      type: "cut-interior-asset";
+      cutAsset: RoomInteriorAsset;
+      roomId: string;
     };
 
 export function applyEditorCommand(
@@ -585,6 +595,64 @@ export function applyEditorCommand(
           return {
             ...room,
             interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.pastedAsset)],
+          };
+        }),
+      };
+    }
+  }
+
+  if (command.type === "cut-rooms") {
+    if (direction === "undo") {
+      // Restore cut rooms to their previous position
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms.slice(0, command.previousIndex),
+          ...command.cutRooms.map((r) => ({
+            id: r.id,
+            floorId: r.floorId,
+            name: r.name,
+            points: r.points.map((point) => ({ ...point })),
+            openings: cloneRoomOpenings(r.openings),
+            interiorAssets: cloneRoomInteriorAssets(r.interiorAssets),
+          })),
+          ...document.rooms.slice(command.previousIndex),
+        ],
+      };
+    } else {
+      // Remove cut rooms
+      const cutIds = new Set(command.cutRooms.map((r) => r.id));
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => !cutIds.has(room.id)),
+      };
+    }
+  }
+
+  if (command.type === "cut-interior-asset") {
+    if (direction === "undo") {
+      // Restore cut asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.roomId) return room;
+          return {
+            ...room,
+            interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.cutAsset)],
+          };
+        }),
+      };
+    } else {
+      // Remove cut asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.roomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => asset.id !== command.cutAsset.id
+            ),
           };
         }),
       };

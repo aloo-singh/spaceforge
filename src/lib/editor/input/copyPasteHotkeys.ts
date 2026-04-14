@@ -7,6 +7,7 @@ export type CopyPasteStore = {
     selection: SharedSelectionItem[];
     clipboard: unknown;
     copySelection: () => void;
+    cutSelection: () => void;
     pasteSelection: () => void;
     keyboardShortcutFeedbackEnabled: boolean;
   };
@@ -17,7 +18,7 @@ export function attachCopyPasteHotkeys(store: CopyPasteStore) {
     if (isEditableTarget(event.target)) return;
     if (event.defaultPrevented) return;
 
-    const shortcut = matchEditorKeyboardShortcut(event, ["copy", "paste"]);
+    const shortcut = matchEditorKeyboardShortcut(event, ["copy", "cut", "paste"]);
     if (!shortcut) return;
 
     const state = store.getState();
@@ -29,6 +30,20 @@ export function attachCopyPasteHotkeys(store: CopyPasteStore) {
       event.stopPropagation();
 
       state.copySelection();
+
+      showKeyboardShortcutFeedback(shortcut.id, {
+        feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+      });
+      return;
+    }
+
+    if (shortcut.id === "cut") {
+      if (state.selection.length === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      state.cutSelection();
 
       showKeyboardShortcutFeedback(shortcut.id, {
         feedbackEnabled: state.keyboardShortcutFeedbackEnabled,

@@ -9,6 +9,7 @@ export type EditorKeyboardShortcutId =
   | "undo"
   | "redo"
   | "copy"
+  | "cut"
   | "paste"
   | "delete-selection"
   | "hold-pan"
@@ -124,6 +125,17 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "action",
     bindings: [{ key: "v", code: "KeyV", primaryModifier: true, altKey: false, shiftKey: false }],
     sonnerMessage: "Pasted from clipboard",
+  },
+  {
+    id: "cut",
+    section: "Edit",
+    keyCombination: "Primary+X",
+    description: "Cut the current selection",
+    macKeys: "Cmd+X",
+    windowsKeys: "Ctrl+X",
+    type: "action",
+    bindings: [{ key: "x", code: "KeyX", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Cut to clipboard",
   },
   {
     id: "delete-selection",

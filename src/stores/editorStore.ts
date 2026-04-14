@@ -231,6 +231,8 @@ type EditorState = {
   copySelection: () => void;
   /** Paste item(s) from clipboard to current floor */
   pasteSelection: () => void;
+  /** Cut selected room(s) or stair(s) to clipboard (remove from location) */
+  cutSelection: () => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -2586,6 +2588,77 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedOpening: null,
           selectedInteriorAsset: { roomId: targetRoomId, assetId: newAssetId },
           selection: [{ type: "stair" as const, roomId: targetRoomId, id: newAssetId }],
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      return state;
+    }),
+  cutSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const item = state.selection[0];
+      if (!item) return state;
+
+      if (item.type === "room") {
+        const roomIndex = state.document.rooms.findIndex((r) => r.id === item.id);
+        const room = state.document.rooms[roomIndex];
+        if (!room || roomIndex === -1) return state;
+
+        const command: EditorCommand = {
+          type: "cut-rooms",
+          cutRooms: [cloneRoom(room)],
+          previousIndex: roomIndex,
+        };
+
+        return {
+          clipboard: {
+            type: "room",
+            rooms: [cloneRoom(room)],
+          },
+          document: applyEditorCommand(state.document, command, "redo"),
+          selectedRoomId: null,
+          selectedWall: null,
+          selectedOpening: null,
+          selectedInteriorAsset: null,
+          selection: [],
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      if (item.type === "stair") {
+        const room = state.document.rooms.find((r) => r.id === item.roomId);
+        const assetIndex = room?.interiorAssets.findIndex((a) => a.id === item.id);
+        const asset = room?.interiorAssets[assetIndex ?? -1];
+        if (!room || !asset || assetIndex === undefined || assetIndex === -1) return state;
+
+        const command: EditorCommand = {
+          type: "cut-interior-asset",
+          cutAsset: cloneRoomInteriorAsset(asset),
+          roomId: item.roomId,
+        };
+
+        return {
+          clipboard: {
+            type: "stair",
+            asset: cloneRoomInteriorAsset(asset),
+            sourceRoomId: item.roomId,
+          },
+          document: applyEditorCommand(state.document, command, "redo"),
+          selectedRoomId: item.roomId,
+          selectedInteriorAsset: null,
+          selection: [{ type: "room" as const, id: item.roomId }],
           history: {
             past: pushToPast(state.history.past, command),
             future: [],
