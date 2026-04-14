@@ -15,6 +15,7 @@ import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
 import { getRoomsForActiveFloor } from "@/lib/editor/history";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
+import type { SharedSelectionItem } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -59,6 +60,26 @@ function getSelectedOpeningHostWall(room: Room, openingId: string | null): RoomW
 
 function getInteriorAssetLabel(asset: RoomInteriorAsset): string {
   return asset.name || "Stairs";
+}
+
+/** Check if an item is in the selection array */
+function isItemInSelection(item: SharedSelectionItem, selection: SharedSelectionItem[]): boolean {
+  return selection.some((selected) => {
+    if (item.type !== selected.type) return false;
+    
+    if (item.type === "room" && selected.type === "room") {
+      return item.id === selected.id;
+    } else if (item.type === "floor" && selected.type === "floor") {
+      return item.id === selected.id;
+    } else if (item.type === "wall" && selected.type === "wall") {
+      return item.roomId === selected.roomId && item.wall === selected.wall;
+    } else if (item.type === "opening" && selected.type === "opening") {
+      return item.roomId === selected.roomId && item.id === selected.id;
+    } else if (item.type === "stair" && selected.type === "stair") {
+      return item.roomId === selected.roomId && item.id === selected.id;
+    }
+    return false;
+  });
 }
 
 function SidebarIconTooltip({
@@ -130,6 +151,7 @@ export function EditorSidebarRoomsList() {
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const selection = useEditorStore((state) => state.selection);
   const renameSession = useEditorStore((state) => state.renameSession);
   const interiorAssetRenameSession = useEditorStore((state) => state.interiorAssetRenameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
@@ -140,6 +162,8 @@ export function EditorSidebarRoomsList() {
   const selectWallByRoomId = useEditorStore((state) => state.selectWallByRoomId);
   const selectOpeningById = useEditorStore((state) => state.selectOpeningById);
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const addToSelection = useEditorStore((state) => state.addToSelection);
+  const removeFromSelection = useEditorStore((state) => state.removeFromSelection);
   const startInteriorAssetRenameSession = useEditorStore(
     (state) => state.startInteriorAssetRenameSession
   );
@@ -360,6 +384,8 @@ export function EditorSidebarRoomsList() {
                     ? getSelectedOpeningHostWall(room, selectedOpening.openingId)
                     : null;
                 const isSelected = selectedRoomId === room.id;
+                const roomItem: SharedSelectionItem = { type: "room", id: room.id };
+                const isInMultiSelection = isItemInSelection(roomItem, selection) && !isSelected;
                 const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
                 const areaLabel = formatMetricRoomAreaForRoom(room);
                 const roomWalls = getRoomWalls(room);
@@ -374,6 +400,8 @@ export function EditorSidebarRoomsList() {
                       "rounded-lg border transition-colors",
                       isSelected
                         ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                        : isInMultiSelection
+                        ? "border-zinc-400/50 bg-zinc-200/60 text-zinc-900 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-100"
                         : "border-transparent text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
                     )}
                   >
@@ -420,7 +448,25 @@ export function EditorSidebarRoomsList() {
                     ) : (
                       <div
                         className="flex min-h-10 items-center gap-2 px-3 py-2"
-                        onClick={() => selectRoomById(room.id)}
+                        onClick={(e) => {
+                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                            // Ctrl/Cmd + Click for multi-select
+                            const roomItem: SharedSelectionItem = { type: "room", id: room.id };
+                            if (isItemInSelection(roomItem, selection)) {
+                              removeFromSelection(roomItem);
+                            } else {
+                              addToSelection(roomItem);
+                            }
+                          } else {
+                            // Regular click for single selection
+                            selectRoomById(room.id);
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                            e.preventDefault();
+                          }
+                        }}
                       >
                         <SidebarIconTooltip
                           content={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
@@ -539,16 +585,37 @@ export function EditorSidebarRoomsList() {
                                           const isOpeningSelected =
                                             selectedOpening?.roomId === room.id &&
                                             selectedOpening.openingId === opening.id;
+                                          const openingItem: SharedSelectionItem = { type: "opening", roomId: room.id, id: opening.id };
+                                          const isInMultiSelection = isItemInSelection(openingItem, selection) && !isOpeningSelected;
 
                                           return (
                                             <button
                                               key={opening.id}
                                               type="button"
-                                              onClick={() => selectOpeningById(room.id, opening.id)}
+                                              onClick={(e) => {
+                                                if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                  // Ctrl/Cmd + Click for multi-select
+                                                  if (isItemInSelection(openingItem, selection)) {
+                                                    removeFromSelection(openingItem);
+                                                  } else {
+                                                    addToSelection(openingItem);
+                                                  }
+                                                } else {
+                                                  // Regular click for single selection
+                                                  selectOpeningById(room.id, opening.id);
+                                                }
+                                              }}
+                                              onMouseDown={(e) => {
+                                                if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                  e.preventDefault();
+                                                }
+                                              }}
                                               className={cn(
                                                 "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                                                 isOpeningSelected
                                                   ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                                  : isInMultiSelection
+                                                  ? "bg-zinc-300/50 text-zinc-900 dark:bg-zinc-700/50 dark:text-zinc-100"
                                                   : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                                               )}
                                             >
@@ -608,6 +675,8 @@ export function EditorSidebarRoomsList() {
                                     const isAssetSelected =
                                       selectedInteriorAsset?.roomId === room.id &&
                                       selectedInteriorAsset.assetId === asset.id;
+                                    const assetItem: SharedSelectionItem = { type: "stair", roomId: room.id, id: asset.id };
+                                    const isInMultiSelection = isItemInSelection(assetItem, selection) && !isAssetSelected;
                                     const isAssetRenaming =
                                       interiorAssetRenameSession?.roomId === room.id &&
                                       interiorAssetRenameSession.assetId === asset.id &&
@@ -657,11 +726,30 @@ export function EditorSidebarRoomsList() {
                                         ) : (
                                           <button
                                             type="button"
-                                            onClick={() => selectInteriorAssetById(room.id, asset.id)}
+                                            onClick={(e) => {
+                                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                // Ctrl/Cmd + Click for multi-select
+                                                if (isItemInSelection(assetItem, selection)) {
+                                                  removeFromSelection(assetItem);
+                                                } else {
+                                                  addToSelection(assetItem);
+                                                }
+                                              } else {
+                                                // Regular click for single selection
+                                                selectInteriorAssetById(room.id, asset.id);
+                                              }
+                                            }}
+                                            onMouseDown={(e) => {
+                                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                e.preventDefault();
+                                              }
+                                            }}
                                             className={cn(
                                               "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                                               isAssetSelected
                                                 ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                                : isInMultiSelection
+                                                ? "bg-zinc-300/50 text-zinc-900 dark:bg-zinc-700/50 dark:text-zinc-100"
                                                 : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                                             )}
                                           >
