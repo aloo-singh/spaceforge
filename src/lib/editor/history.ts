@@ -229,6 +229,13 @@ export type EditorCommand =
       type: "cut-interior-asset";
       cutAsset: RoomInteriorAsset;
       roomId: string;
+    }
+  | {
+      type: "move-interior-asset-to-room";
+      assetId: string;
+      fromRoomId: string;
+      toRoomId: string;
+      asset: RoomInteriorAsset;
     };
 
 export function applyEditorCommand(
@@ -654,6 +661,54 @@ export function applyEditorCommand(
               (asset) => asset.id !== command.cutAsset.id
             ),
           };
+        }),
+      };
+    }
+  }
+
+  if (command.type === "move-interior-asset-to-room") {
+    if (direction === "undo") {
+      // Move asset back to original room
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id === command.fromRoomId) {
+            // Add asset back to original room
+            return {
+              ...room,
+              interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.asset)],
+            };
+          }
+          if (room.id === command.toRoomId) {
+            // Remove asset from target room
+            return {
+              ...room,
+              interiorAssets: room.interiorAssets.filter((a) => a.id !== command.assetId),
+            };
+          }
+          return room;
+        }),
+      };
+    } else {
+      // Move asset to target room
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id === command.fromRoomId) {
+            // Remove asset from original room
+            return {
+              ...room,
+              interiorAssets: room.interiorAssets.filter((a) => a.id !== command.assetId),
+            };
+          }
+          if (room.id === command.toRoomId) {
+            // Add asset to target room
+            return {
+              ...room,
+              interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.asset)],
+            };
+          }
+          return room;
         }),
       };
     }

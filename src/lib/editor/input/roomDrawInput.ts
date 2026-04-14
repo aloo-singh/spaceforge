@@ -98,6 +98,12 @@ type RoomDrawStoreState = {
     previousCenter: Point,
     nextCenter: Point
   ) => void;
+  commitInteriorAssetMoveToRoom: (
+    fromRoomId: string,
+    toRoomId: string,
+    assetId: string,
+    nextCenter: Point
+  ) => void;
   previewInteriorAssetResize: (
     roomId: string,
     assetId: string,
@@ -162,6 +168,7 @@ type OpeningResizeSession = {
 type InteriorAssetDragSession = {
   pointerId: number;
   roomId: string;
+  targetRoomId: string | null;
   assetId: string;
   startScreenPoint: Point;
   startWorldPoint: Point;
@@ -830,6 +837,15 @@ export function attachRoomDrawInput(
         return;
       }
 
+      // Detect which room is under the cursor for cross-room drag
+      const hoveredRoom = findRoomLabelAtScreenPoint(
+        getRoomsForActiveFloor(state.document),
+        screenPoint,
+        state.camera,
+        state.viewport
+      );
+      session.targetRoomId = hoveredRoom?.id ?? session.roomId;
+
       session.didDrag = true;
       store.getState().setCanvasInteractionActive(true);
       session.latestCenter = moveTarget.nextCenter;
@@ -1211,6 +1227,7 @@ export function attachRoomDrawInput(
         activeInteriorAssetDragSession = {
           pointerId: event.pointerId,
           roomId: interiorAssetHit.roomId,
+          targetRoomId: interiorAssetHit.roomId,
           assetId: interiorAssetHit.assetId,
           startScreenPoint: screenPoint,
           startWorldPoint: cursorWorld,
@@ -1357,12 +1374,22 @@ export function attachRoomDrawInput(
       if (session.didDrag) {
         const nextCenter = session.latestCenter ?? session.startCenter;
         if (nextCenter.x !== session.startCenter.x || nextCenter.y !== session.startCenter.y) {
-          commitInteriorAssetMove(
-            session.roomId,
-            session.assetId,
-            session.startCenter,
-            nextCenter
-          );
+          // Check if asset was dragged to a different room
+          if (session.targetRoomId && session.targetRoomId !== session.roomId) {
+            store.getState().commitInteriorAssetMoveToRoom(
+              session.roomId,
+              session.targetRoomId,
+              session.assetId,
+              nextCenter
+            );
+          } else {
+            commitInteriorAssetMove(
+              session.roomId,
+              session.assetId,
+              session.startCenter,
+              nextCenter
+            );
+          }
         }
       }
       stopInteriorAssetDragSession();

@@ -296,6 +296,12 @@ type EditorState = {
     previousCenter: Point,
     nextCenter: Point
   ) => void;
+  commitInteriorAssetMoveToRoom: (
+    fromRoomId: string,
+    toRoomId: string,
+    assetId: string,
+    nextCenter: Point
+  ) => void;
   previewInteriorAssetResize: (
     roomId: string,
     assetId: string,
@@ -3667,6 +3673,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: updateRoomInteriorAssetPositionInDocument(state.document, roomId, assetId, nextCenter),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  commitInteriorAssetMoveToRoom: (fromRoomId, toRoomId, assetId, nextCenter) =>
+    set((state) => {
+      const fromRoom = state.document.rooms.find((candidate) => candidate.id === fromRoomId);
+      const toRoom = state.document.rooms.find((candidate) => candidate.id === toRoomId);
+      const asset = fromRoom?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!fromRoom || !toRoom || !asset) return state;
+
+      const movedAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        xMm: nextCenter.x,
+        yMm: nextCenter.y,
+      };
+
+      const command: EditorCommand = {
+        type: "move-interior-asset-to-room",
+        assetId,
+        fromRoomId,
+        toRoomId,
+        asset: movedAsset,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: toRoomId,
+        selectedInteriorAsset: { roomId: toRoomId, assetId },
+        selection: [{ type: "stair" as const, roomId: toRoomId, id: assetId }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
