@@ -112,3 +112,15 @@ export type Room = {
   openings: RoomOpening[];
   interiorAssets: RoomInteriorAsset[];
 };
+
+/**
+ * Shared selection model — single source of truth for all selections.
+ * Supports rooms, walls, openings, stairs, and floors.
+ * Each selection item has a type and associated identifiers.
+ */
+export type SharedSelectionItem =
+  | { type: "room"; id: string }
+  | { type: "wall"; roomId: string; wall: RoomWall }
+  | { type: "opening"; roomId: string; id: string }
+  | { type: "stair"; roomId: string; id: string }
+  | { type: "floor"; id: string };

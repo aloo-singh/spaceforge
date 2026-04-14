@@ -111,6 +111,7 @@ import type {
   RoomOpeningSelection,
   RoomWallSelection,
   ScreenPoint,
+  SharedSelectionItem,
   ViewportSize,
 } from "@/lib/editor/types";
 
@@ -167,6 +168,8 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  /** Shared selection model: single source of truth for all selections */
+  selection: SharedSelectionItem[];
   isCanvasInteractionActive: boolean;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
@@ -213,6 +216,11 @@ type EditorState = {
   clearSelectedInteriorAsset: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
+  /** Shared selection model actions */
+  selectItems: (items: SharedSelectionItem[]) => void;
+  clearSelection: () => void;
+  addToSelection: (item: SharedSelectionItem) => void;
+  removeFromSelection: (item: SharedSelectionItem) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -1677,6 +1685,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  selection: [],
   isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
@@ -2360,6 +2369,84 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       renameSession: null,
       interiorAssetRenameSession: null,
       interiorAssetArrowLabelSession: null,
+    }),
+  selectItems: (items) =>
+    set((state) => {
+      if (
+        state.selection.length === items.length &&
+        state.selection.every((existing, index) => {
+          const item = items[index];
+          if (existing.type !== item.type) return false;
+          if (existing.type === "room" && item.type === "room") return existing.id === item.id;
+          if (existing.type === "wall" && item.type === "wall") {
+            return existing.roomId === item.roomId && existing.wall === item.wall;
+          }
+          if (existing.type === "opening" && item.type === "opening") {
+            return existing.roomId === item.roomId && existing.id === item.id;
+          }
+          if (existing.type === "stair" && item.type === "stair") {
+            return existing.roomId === item.roomId && existing.id === item.id;
+          }
+          if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
+          return false;
+        })
+      ) {
+        return state;
+      }
+      return {
+        selection: items,
+      };
+    }),
+  clearSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+      return {
+        selection: [],
+      };
+    }),
+  addToSelection: (item) =>
+    set((state) => {
+      const exists = state.selection.some((existing) => {
+        if (existing.type !== item.type) return false;
+        if (existing.type === "room" && item.type === "room") return existing.id === item.id;
+        if (existing.type === "wall" && item.type === "wall") {
+          return existing.roomId === item.roomId && existing.wall === item.wall;
+        }
+        if (existing.type === "opening" && item.type === "opening") {
+          return existing.roomId === item.roomId && existing.id === item.id;
+        }
+        if (existing.type === "stair" && item.type === "stair") {
+          return existing.roomId === item.roomId && existing.id === item.id;
+        }
+        if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
+        return false;
+      });
+      if (exists) return state;
+      return {
+        selection: [...state.selection, item],
+      };
+    }),
+  removeFromSelection: (item) =>
+    set((state) => {
+      const nextSelection = state.selection.filter((existing) => {
+        if (existing.type !== item.type) return true;
+        if (existing.type === "room" && item.type === "room") return existing.id !== item.id;
+        if (existing.type === "wall" && item.type === "wall") {
+          return !(existing.roomId === item.roomId && existing.wall === item.wall);
+        }
+        if (existing.type === "opening" && item.type === "opening") {
+          return !(existing.roomId === item.roomId && existing.id === item.id);
+        }
+        if (existing.type === "stair" && item.type === "stair") {
+          return !(existing.roomId === item.roomId && existing.id === item.id);
+        }
+        if (existing.type === "floor" && item.type === "floor") return existing.id !== item.id;
+        return true;
+      });
+      if (nextSelection.length === state.selection.length) return state;
+      return {
+        selection: nextSelection,
+      };
     }),
   setCanvasInteractionActive: (isActive) =>
     set((state) => {
@@ -3768,6 +3855,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
