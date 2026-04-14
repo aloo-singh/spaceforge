@@ -931,37 +931,27 @@ export function applyEditorCommand(
   }
 
   if (command.type === "reorder-rooms-in-floor") {
-    // Get rooms for this floor
+    // Get rooms for this floor (preserves relative order)
     const floorRooms = document.rooms.filter((room) => room.floorId === command.floorId);
-    
+
     // Determine source and target indices based on direction
     const sourceIndex = direction === "undo" ? command.toIndex : command.fromIndex;
     const targetIndex = direction === "undo" ? command.fromIndex : command.toIndex;
-    
-    // Clone floor rooms and reorder
+
+    // Reorder the floor rooms
     const reorderedFloorRooms = [...floorRooms];
     const [movedRoom] = reorderedFloorRooms.splice(sourceIndex, 1);
     reorderedFloorRooms.splice(targetIndex, 0, movedRoom);
-    
-    // Build result: collect non-floor rooms, insert reordered floor rooms at their original position
-    const reorderedRooms: Room[] = [];
-    const firstFloorRoomGlobalIndex = document.rooms.findIndex(
-      (room) => room.floorId === command.floorId
-    );
-    
-    // Add all non-floor rooms before the first floor room
-    for (let i = 0; i < firstFloorRoomGlobalIndex; i++) {
-      reorderedRooms.push(document.rooms[i]);
-    }
-    
-    // Add reordered floor rooms
-    reorderedRooms.push(...reorderedFloorRooms);
-    
-    // Add all remaining non-floor rooms after the floor rooms
-    for (let i = firstFloorRoomGlobalIndex + floorRooms.length; i < document.rooms.length; i++) {
-      reorderedRooms.push(document.rooms[i]);
-    }
-    
+
+    // Walk the full rooms array, replacing each floor room with the next
+    // reordered room in sequence. Non-floor rooms stay in place.
+    // This avoids duplicates regardless of whether floor rooms are contiguous.
+    let floorRoomIndex = 0;
+    const reorderedRooms = document.rooms.map((room) => {
+      if (room.floorId !== command.floorId) return room;
+      return reorderedFloorRooms[floorRoomIndex++];
+    });
+
     return {
       ...document,
       rooms: reorderedRooms,
