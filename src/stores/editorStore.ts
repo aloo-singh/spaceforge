@@ -75,6 +75,7 @@ import {
   getRotatedInteriorAssetForRoom,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
+  isInteriorAssetWithinRoom,
 } from "@/lib/editor/interiorAssets";
 import {
   areRoomOpeningsEqual,
@@ -2548,9 +2549,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const PASTE_OFFSET_MM = 500; // Offset new items 500mm from originals
 
       if (state.clipboard.type === "room") {
-        // Paste rooms with offset
+        // Paste rooms with offset and smart naming
+        const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
         const pastedRooms = state.clipboard.rooms.map((room) => {
           const newId = createRoomId();
+          const pasteName = generateDuplicateName(room.name, existingRoomNames);
+          existingRoomNames.add(pasteName);
           const offsetPoints = room.points.map((p) => ({
             x: p.x + PASTE_OFFSET_MM,
             y: p.y + PASTE_OFFSET_MM,
@@ -2558,6 +2562,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return {
             ...cloneRoom(room),
             id: newId,
+            name: pasteName,
             floorId: activeFloorId,
             points: offsetPoints,
           };
@@ -2598,14 +2603,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
         if (!targetRoom) return state;
 
-        // Create offset asset
+        // Create offset asset with smart naming
         const newAssetId = createInteriorAssetId();
-        const pastedAsset = {
+        const existingAssetNames = new Set(
+          targetRoom.interiorAssets.map((a) => a.name)
+        );
+        const pasteName = generateDuplicateName(
+          state.clipboard.asset.name,
+          existingAssetNames
+        );
+        let pastedAsset: RoomInteriorAsset = {
           ...cloneRoomInteriorAsset(state.clipboard.asset),
           id: newAssetId,
+          name: pasteName,
           xMm: state.clipboard.asset.xMm + PASTE_OFFSET_MM,
           yMm: state.clipboard.asset.yMm + PASTE_OFFSET_MM,
         };
+
+        // Bounds check: nudge into room if out of bounds
+        let wasAdjusted = false;
+        if (!isInteriorAssetWithinRoom(targetRoom, pastedAsset)) {
+          const constrained = constrainInteriorAssetCenter(
+            targetRoom,
+            pastedAsset,
+            { x: pastedAsset.xMm, y: pastedAsset.yMm }
+          );
+          if (constrained) {
+            pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
+            wasAdjusted = true;
+          } else {
+            // Room is too small — abort and notify
+            toast("Stairs don't fit in that room.", {
+              description: "Try a smaller stair block or a larger room.",
+            });
+            return state;
+          }
+        }
+
+        if (wasAdjusted) {
+          toast("Stairs adjusted to fit room.", {
+            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
+          });
+        }
 
         const command: EditorCommand = {
           type: "paste-interior-asset",
@@ -4042,10 +4081,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const asset = fromRoom?.interiorAssets.find((candidate) => candidate.id === assetId);
       if (!fromRoom || !toRoom || !asset) return state;
 
-      const movedAsset: RoomInteriorAsset = {
+      let finalCenter = nextCenter;
+
+      // Bounds check: if the asset center would land outside the target room, nudge it in
+      const candidateAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
         xMm: nextCenter.x,
         yMm: nextCenter.y,
+      };
+      if (!isInteriorAssetWithinRoom(toRoom, candidateAsset)) {
+        const constrained = constrainInteriorAssetCenter(toRoom, candidateAsset, nextCenter);
+        if (constrained) {
+          finalCenter = constrained;
+          toast("Stairs adjusted to fit room.", {
+            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
+          });
+        } else {
+          toast("Stairs don't fit in that room.", {
+            description: "Try a smaller stair block or a larger room.",
+          });
+          return state;
+        }
+      }
+
+      const movedAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        xMm: finalCenter.x,
+        yMm: finalCenter.y,
       };
 
       const command: EditorCommand = {
