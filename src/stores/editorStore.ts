@@ -9,6 +9,7 @@ import {
   applyEditorCommand,
   createEmptyEditorDocumentState,
   getNormalizedActiveFloorId,
+  getRoomFloorId,
   getRoomsForActiveFloor,
   type EditorCommand,
   type EditorDocumentState,
@@ -1310,6 +1311,96 @@ function getSelectedInteriorAssetAfterHistoryCommand(
   return getSelectedInteriorAssetIfExists(selectedInteriorAsset, nextDocument);
 }
 
+/**
+ * Returns the floor the user should be viewing immediately after undoing a command,
+ * so the restored or modified item is visible. Returns null if no floor switch is needed.
+ */
+function getTargetFloorForUndo(
+  command: EditorCommand,
+  documentAfterUndo: DocumentState
+): string | null {
+  const findFloorForRoom = (roomId: string): string | null => {
+    const room = documentAfterUndo.rooms.find((r) => r.id === roomId);
+    return room ? getRoomFloorId(room, documentAfterUndo) : null;
+  };
+
+  switch (command.type) {
+    case "complete-room":
+      // Room removed by undo — floor was recorded on the room at creation time.
+      return command.room.floorId ?? null;
+
+    case "delete-room":
+      // Room restored by undo — find it in post-undo document.
+      return findFloorForRoom(command.room.id);
+
+    case "rename-room":
+    case "resize-room":
+    case "move-room":
+      return findFloorForRoom(command.roomId);
+
+    case "add-opening":
+    case "delete-opening":
+    case "move-opening":
+    case "update-opening":
+    case "add-interior-asset":
+    case "delete-interior-asset":
+    case "move-interior-asset":
+    case "update-interior-asset":
+      return findFloorForRoom(command.roomId);
+
+    case "paste-rooms":
+      return command.floorId;
+
+    case "paste-interior-asset":
+      return findFloorForRoom(command.targetRoomId);
+
+    case "cut-rooms": {
+      if (command.cutRooms.length === 0) return null;
+      return findFloorForRoom(command.cutRooms[0].id) ?? command.cutRooms[0].floorId ?? null;
+    }
+
+    case "cut-interior-asset":
+      return findFloorForRoom(command.roomId);
+
+    case "move-interior-asset-to-room":
+      return findFloorForRoom(command.fromRoomId);
+
+    case "bulk-delete": {
+      for (const sub of command.deleteCommands) {
+        if (sub.type === "delete-room") {
+          return findFloorForRoom(sub.room.id) ?? sub.room.floorId ?? null;
+        }
+      }
+      for (const sub of command.deleteCommands) {
+        if (sub.type !== "delete-room") {
+          const floor = findFloorForRoom(sub.roomId);
+          if (floor) return floor;
+        }
+      }
+      return null;
+    }
+
+    case "bulk-duplicate": {
+      if (command.duplicatedRooms.length > 0) return command.duplicatedRooms[0].floorId ?? null;
+      if (command.duplicatedAssets.length > 0) {
+        return findFloorForRoom(command.duplicatedAssets[0].roomId);
+      }
+      return null;
+    }
+
+    case "move-selection-to-floor":
+      if (command.movedRooms.length > 0) return command.movedRooms[0].previousFloorId;
+      if (command.movedAssets.length > 0) return findFloorForRoom(command.movedAssets[0].roomId);
+      return null;
+
+    case "reorder-rooms-in-floor":
+      return command.floorId;
+
+    default:
+      return null;
+  }
+}
+
 function getSelectedWallHostRoom(
   document: DocumentState,
   selectedWall: RoomWallSelection | null
@@ -2118,12 +2209,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const previousActiveFloorId = getNormalizedActiveFloorId(state.document);
       if (nextActiveFloorId === previousActiveFloorId) return state;
 
-      const command: EditorCommand = {
-        type: "switch-floor",
-        previousActiveFloorId,
-        nextActiveFloorId,
-      };
-      const nextDocument = applyEditorCommand(state.document, command, "redo");
+      // Floor switches are not undoable — update activeFloorId directly without history entry.
+      const nextDocument = { ...state.document, activeFloorId: nextActiveFloorId };
 
       return {
         document: nextDocument,
@@ -2139,12 +2226,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-        history: {
-          past: pushToPast(state.history.past, command),
-          future: [],
-        },
-        canUndo: true,
-        canRedo: false,
       };
     }),
   panCameraByPx: (delta) => {
@@ -4425,21 +4506,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];
 
+      // If the command happened on a different floor than the one currently viewed,
+      // restore the view to that floor so the user sees the undone change.
+      const targetFloor = getTargetFloorForUndo(command, nextDocument);
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
       return {
-        document: nextDocument,
-        camera: syncCameraRotationToDocument(state.camera, nextDocument),
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
-          nextDocument,
+          restoredDocument,
           command,
           "undo"
         ),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
-          nextDocument,
+          restoredDocument,
           command,
           "undo"
         ),
