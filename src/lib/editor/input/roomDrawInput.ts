@@ -38,6 +38,7 @@ import {
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 import type { RoomWall } from "@/lib/editor/types";
+import type { SharedSelectionItem } from "@/lib/editor/types";
 import {
   getInteriorAssetResizeFromCornerForCursor,
   getInteriorAssetResizeFromWallForCursor,
@@ -59,7 +60,7 @@ import {
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
-  settings: { showGuidelines: boolean; snappingEnabled: boolean };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -77,6 +78,9 @@ type RoomDrawStoreState = {
   selectOpeningById: (roomId: string, openingId: string) => void;
   selectInteriorAssetById: (roomId: string, assetId: string) => void;
   clearRoomSelection: () => void;
+  selection: SharedSelectionItem[];
+  addToSelection: (item: SharedSelectionItem) => void;
+  removeFromSelection: (item: SharedSelectionItem) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
   commitOpeningMove: (
@@ -200,6 +204,57 @@ type SelectableWallHit = {
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 const DRAFT_GUIDE_TAIL_PX = 44;
+
+/**
+ * Determines if multi-select should be active based on event and settings.
+ * Returns true if:
+ * - Cmd/Ctrl is held, OR
+ * - Multi-select mode is enabled in settings
+ */
+function isMultiSelectActive(event: PointerEvent, multiSelectModeEnabled: boolean): boolean {
+  const isModifierHeld = event.metaKey || event.ctrlKey;
+  return isModifierHeld || multiSelectModeEnabled;
+}
+
+/**
+ * Determines if item is already in current selection.
+ */
+function isItemSelected(
+  selection: SharedSelectionItem[],
+  type: SharedSelectionItem["type"],
+  roomId?: string,
+  itemId?: string,
+  wall?: RoomWall
+): boolean {
+  return selection.some((existing) => {
+    if (existing.type !== type) return false;
+    
+    switch (type) {
+      case "room":
+        if (itemId && existing.type === "room") return existing.id === itemId;
+        return false;
+      case "wall":
+        if (roomId && wall && existing.type === "wall") {
+          return existing.roomId === roomId && existing.wall === wall;
+        }
+        return false;
+      case "opening":
+        if (roomId && itemId && existing.type === "opening") {
+          return existing.roomId === roomId && existing.id === itemId;
+        }
+        return false;
+      case "stair":
+        if (roomId && itemId && existing.type === "stair") {
+          return existing.roomId === roomId && existing.id === itemId;
+        }
+        return false;
+      case "floor":
+        return false;
+      default:
+        return false;
+    }
+  });
+}
 
 /**
  * Handles room drawing interactions:
@@ -1071,7 +1126,19 @@ export function attachRoomDrawInput(
       );
 
       const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
-      state.selectRoomById(labelHitRoom.id);
+      
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        // Multi-select: toggle room in/out of selection
+        const roomItem: SharedSelectionItem = { type: "room", id: labelHitRoom.id };
+        if (isItemSelected(state.selection, "room", undefined, labelHitRoom.id)) {
+          state.removeFromSelection(roomItem);
+        } else {
+          state.addToSelection(roomItem);
+        }
+      } else {
+        // Normal mode: replace selection
+        state.selectRoomById(labelHitRoom.id);
+      }
       activeLabelDragSession = {
         pointerId: event.pointerId,
         roomId: labelHitRoom.id,
@@ -1098,7 +1165,16 @@ export function attachRoomDrawInput(
     );
     if (openingWidthHandleHit) {
       event.preventDefault();
-      state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, id: openingWidthHandleHit.openingId };
+        if (isItemSelected(state.selection, "opening", openingWidthHandleHit.roomId, openingWidthHandleHit.openingId)) {
+          state.removeFromSelection(openingItem);
+        } else {
+          state.addToSelection(openingItem);
+        }
+      } else {
+        state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
+      }
       hoveredOpeningWidthHandle = openingWidthHandleHit;
       hoveredOpening = { roomId: openingWidthHandleHit.roomId, openingId: openingWidthHandleHit.openingId };
       setHoveredSelectableWall(null);
@@ -1186,7 +1262,16 @@ export function attachRoomDrawInput(
     );
     if (openingHit) {
       event.preventDefault();
-      state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, id: openingHit.openingId };
+        if (isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId)) {
+          state.removeFromSelection(openingItem);
+        } else {
+          state.addToSelection(openingItem);
+        }
+      } else {
+        state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      }
       hoveredOpening = openingHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(openingHit.roomId);
@@ -1216,7 +1301,16 @@ export function attachRoomDrawInput(
     );
     if (interiorAssetHit) {
       event.preventDefault();
-      state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const stairItem: SharedSelectionItem = { type: "stair", roomId: interiorAssetHit.roomId, id: interiorAssetHit.assetId };
+        if (isItemSelected(state.selection, "stair", interiorAssetHit.roomId, interiorAssetHit.assetId)) {
+          state.removeFromSelection(stairItem);
+        } else {
+          state.addToSelection(stairItem);
+        }
+      } else {
+        state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+      }
       hoveredInteriorAsset = interiorAssetHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(interiorAssetHit.roomId);
@@ -1245,7 +1339,16 @@ export function attachRoomDrawInput(
       const didChangeSelectedWall =
         state.selectedWall?.roomId !== wallHit.roomId || state.selectedWall.wall !== wallHit.wall;
 
-      state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const wallItem: SharedSelectionItem = { type: "wall", roomId: wallHit.roomId, wall: wallHit.wall };
+        if (isItemSelected(state.selection, "wall", wallHit.roomId, undefined, wallHit.wall)) {
+          state.removeFromSelection(wallItem);
+        } else {
+          state.addToSelection(wallItem);
+        }
+      } else {
+        state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      }
       setHoveredSelectableWall(wallHit);
       setHoveredSelectableRoomId(wallHit.roomId);
       if (didChangeSelectedWall) {
@@ -1264,7 +1367,16 @@ export function attachRoomDrawInput(
 
     const bodyHitRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
     if (bodyHitRoom) {
-      state.selectRoomById(bodyHitRoom.id);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const roomItem: SharedSelectionItem = { type: "room", id: bodyHitRoom.id };
+        if (isItemSelected(state.selection, "room", undefined, bodyHitRoom.id)) {
+          state.removeFromSelection(roomItem);
+        } else {
+          state.addToSelection(roomItem);
+        }
+      } else {
+        state.selectRoomById(bodyHitRoom.id);
+      }
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(bodyHitRoom.id);
       updateCursor();
