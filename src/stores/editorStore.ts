@@ -152,8 +152,8 @@ type FloorRenameSessionState = {
 } | null;
 
 type ClipboardData =
-  | { type: "room"; rooms: Room[] }
-  | { type: "stair"; asset: RoomInteriorAsset; sourceRoomId: string }
+  | { type: "room"; source: "copy" | "cut"; rooms: Room[] }
+  | { type: "stair"; source: "copy" | "cut"; asset: RoomInteriorAsset; sourceRoomId: string }
   | null;
 
 type EditorState = {
@@ -2521,6 +2521,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           clipboard: {
             type: "room",
+            source: "copy" as const,
             rooms: [cloneRoom(room)],
           },
         };
@@ -2533,6 +2534,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           clipboard: {
             type: "stair",
+            source: "copy" as const,
             asset: cloneRoomInteriorAsset(asset),
             sourceRoomId: item.roomId,
           },
@@ -2549,22 +2551,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const PASTE_OFFSET_MM = 500; // Offset new items 500mm from originals
 
       if (state.clipboard.type === "room") {
-        // Paste rooms with offset and smart naming
-        const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
+        // Paste rooms with offset; apply smart naming only for copies
+        const isCopy = state.clipboard.source === "copy";
+        const existingRoomNames = isCopy
+          ? new Set(state.document.rooms.map((r) => r.name))
+          : null;
         const pastedRooms = state.clipboard.rooms.map((room) => {
           const newId = createRoomId();
-          const pasteName = generateDuplicateName(room.name, existingRoomNames);
-          existingRoomNames.add(pasteName);
-          const offsetPoints = room.points.map((p) => ({
-            x: p.x + PASTE_OFFSET_MM,
-            y: p.y + PASTE_OFFSET_MM,
-          }));
+          let pasteName = room.name;
+          if (isCopy && existingRoomNames) {
+            pasteName = generateDuplicateName(room.name, existingRoomNames);
+            existingRoomNames.add(pasteName);
+          }
+          const points = isCopy
+            ? room.points.map((p) => ({ x: p.x + PASTE_OFFSET_MM, y: p.y + PASTE_OFFSET_MM }))
+            : room.points.map((p) => ({ ...p }));
           return {
             ...cloneRoom(room),
             id: newId,
             name: pasteName,
             floorId: activeFloorId,
-            points: offsetPoints,
+            points,
           };
         });
 
@@ -2603,21 +2610,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
         if (!targetRoom) return state;
 
-        // Create offset asset with smart naming
+        // Create offset asset; apply smart naming only for copies
         const newAssetId = createInteriorAssetId();
-        const existingAssetNames = new Set(
-          targetRoom.interiorAssets.map((a) => a.name)
-        );
-        const pasteName = generateDuplicateName(
-          state.clipboard.asset.name,
-          existingAssetNames
-        );
+        let pasteName = state.clipboard.asset.name;
+        if (state.clipboard.source === "copy") {
+          const existingAssetNames = new Set(
+            targetRoom.interiorAssets.map((a) => a.name)
+          );
+          pasteName = generateDuplicateName(
+            state.clipboard.asset.name,
+            existingAssetNames
+          );
+        }
+        const isCopyStair = state.clipboard.source === "copy";
         let pastedAsset: RoomInteriorAsset = {
           ...cloneRoomInteriorAsset(state.clipboard.asset),
           id: newAssetId,
           name: pasteName,
-          xMm: state.clipboard.asset.xMm + PASTE_OFFSET_MM,
-          yMm: state.clipboard.asset.yMm + PASTE_OFFSET_MM,
+          xMm: isCopyStair ? state.clipboard.asset.xMm + PASTE_OFFSET_MM : state.clipboard.asset.xMm,
+          yMm: isCopyStair ? state.clipboard.asset.yMm + PASTE_OFFSET_MM : state.clipboard.asset.yMm,
         };
 
         // Bounds check: nudge into room if out of bounds
@@ -2692,6 +2703,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           clipboard: {
             type: "room",
+            source: "cut" as const,
             rooms: [cloneRoom(room)],
           },
           document: applyEditorCommand(state.document, command, "redo"),
@@ -2724,6 +2736,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           clipboard: {
             type: "stair",
+            source: "cut" as const,
             asset: cloneRoomInteriorAsset(asset),
             sourceRoomId: item.roomId,
           },
