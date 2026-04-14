@@ -784,6 +784,15 @@ export function EditorSidebarRoomsList() {
           )}
         </SidebarSection>
 
+        {selection.length > 0 && (
+          <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 px-3 py-2 dark:border-blue-700/50 dark:bg-blue-900/20">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-blue-900 dark:text-blue-100">Multi-select</span>
+              <span className="text-blue-800 dark:text-blue-200">{selection.length} item{selection.length !== 1 ? "s" : ""}</span>
+            </div>
+          </div>
+        )}
+
         {floorToDelete && (
           <ResponsiveAlertDialog
             open={isFloorDeleteDialogOpen}
