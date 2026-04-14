@@ -185,6 +185,7 @@ export function EditorSidebarRoomsList() {
   const commitFloorRenameSession = useEditorStore((state) => state.commitFloorRenameSession);
   const cancelFloorRename = useEditorStore((state) => state.cancelFloorRename);
   const deleteFloor = useEditorStore((state) => state.deleteFloor);
+  const moveSelectionToFloor = useEditorStore((state) => state.moveSelectionToFloor);
   const floorRenameSession = useEditorStore((state) => state.floorRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const interiorAssetInputRef = useRef<HTMLInputElement | null>(null);
@@ -198,6 +199,7 @@ export function EditorSidebarRoomsList() {
   const [isFloorDeleteDialogOpen, setIsFloorDeleteDialogOpen] = useState(false);
   const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
   const [isDeletingFloor, setIsDeletingFloor] = useState(false);
+  const [dragOverFloorId, setDragOverFloorId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -306,10 +308,30 @@ export function EditorSidebarRoomsList() {
                       <div
                         className={cn(
                           "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm transition-colors group",
-                          activeFloorId === floor.id
+                          dragOverFloorId === floor.id
+                            ? "bg-blue-200/80 text-blue-950 dark:bg-blue-900/60 dark:text-blue-50 ring-2 ring-blue-400 dark:ring-blue-600"
+                            : activeFloorId === floor.id
                             ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
                             : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
                         )}
+                        onDragOver={(e) => {
+                          // Only allow drop if selection is not empty
+                          if (selection.length > 0 && floor.id !== activeFloorId) {
+                            e.preventDefault();
+                            e.dataTransfer!.dropEffect = "move";
+                            setDragOverFloorId(floor.id);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          setDragOverFloorId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOverFloorId(null);
+                          if (selection.length > 0 && floor.id !== activeFloorId) {
+                            moveSelectionToFloor(floor.id);
+                          }
+                        }}
                       >
                         <button
                           type="button"

@@ -235,6 +235,8 @@ type EditorState = {
   cutSelection: () => void;
   /** Duplicate selected room(s) or stair(s) with smart naming and offset placement */
   duplicateSelection: () => void;
+  /** Move selected room(s) and stair(s) to a different floor */
+  moveSelectionToFloor: (targetFloorId: string) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -2800,6 +2802,73 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               }
             : null,
         selection: newSelection.length > 0 ? newSelection : [],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  moveSelectionToFloor: (targetFloorId) =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const targetFloor = state.document.floors.find((f) => f.id === targetFloorId);
+      if (!targetFloor) return state;
+
+      const movedRooms: Array<{ room: Room; previousFloorId: string }> = [];
+      const movedAssets: Array<{ roomId: string; asset: RoomInteriorAsset; previousRoomId: string }> = [];
+
+      // Process each item in selection
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const room = state.document.rooms.find((r) => r.id === item.id);
+          if (!room) continue;
+
+          // Only move if the floor is different
+          if (room.floorId === targetFloorId) continue;
+
+          movedRooms.push({
+            room: cloneRoom(room),
+            previousFloorId: room.floorId,
+          });
+        }
+
+        if (item.type === "stair") {
+          const room = state.document.rooms.find((r) => r.id === item.roomId);
+          const asset = room?.interiorAssets.find((a) => a.id === item.id);
+          if (!room || !asset) continue;
+
+          movedAssets.push({
+            roomId: item.roomId,
+            asset: cloneRoomInteriorAsset(asset),
+            previousRoomId: item.roomId,
+          });
+        }
+      }
+
+      // If nothing was moved, return unchanged state
+      if (movedRooms.length === 0 && movedAssets.length === 0) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "move-selection-to-floor",
+        targetFloorId,
+        movedRooms,
+        movedAssets,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: movedRooms[0]?.room.id ?? state.selectedRoomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: state.selection,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

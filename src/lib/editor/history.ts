@@ -264,6 +264,19 @@ export type EditorCommand =
         roomId: string;
         asset: RoomInteriorAsset;
       }>;
+    }
+  | {
+      type: "move-selection-to-floor";
+      targetFloorId: string;
+      movedRooms: Array<{
+        room: Room;
+        previousFloorId: string;
+      }>;
+      movedAssets: Array<{
+        roomId: string;
+        asset: RoomInteriorAsset;
+        previousRoomId: string;
+      }>;
     };
 
 export function applyEditorCommand(
@@ -874,6 +887,38 @@ export function applyEditorCommand(
           (room, idx, arr) =>
             idx === arr.findIndex((r) => r.id === room.id) // Remove duplicates by ID
         ),
+      };
+    }
+  }
+
+  if (command.type === "move-selection-to-floor") {
+    if (direction === "undo") {
+      // Restore rooms to their previous floors
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
+          if (!movedRoomInfo) return room;
+
+          return {
+            ...room,
+            floorId: movedRoomInfo.previousFloorId,
+          };
+        }),
+      };
+    } else {
+      // Move rooms to target floor
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
+          if (!movedRoomInfo) return room;
+
+          return {
+            ...room,
+            floorId: command.targetFloorId,
+          };
+        }),
       };
     }
   }
