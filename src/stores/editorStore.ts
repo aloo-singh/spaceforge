@@ -255,6 +255,7 @@ type EditorState = {
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
+  bulkDeleteSelection: () => void;
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
@@ -3298,6 +3299,120 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedInteriorAsset: null,
         selection: [{ type: "room" as const, id: room.id }],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  bulkDeleteSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      // If only one item selected, route to specific delete functions
+      if (state.selection.length === 1) {
+        return state; // Caller should handle single-item delete
+      }
+
+      // Collect all delete commands from selection
+      const deleteCommands: EditorCommand[] = [];
+      const roomsToDelete = new Set<string>();
+      let roomCount = 0;
+      let openingCount = 0;
+      let stairCount = 0;
+
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const roomIndex = state.document.rooms.findIndex((r) => r.id === item.id);
+          if (roomIndex >= 0) {
+            const room = state.document.rooms[roomIndex];
+            deleteCommands.push({
+              type: "delete-room",
+              room: {
+                id: room.id,
+                floorId: room.floorId,
+                name: room.name,
+                points: room.points.map((p) => ({ ...p })),
+                openings: cloneRoomOpenings(room.openings),
+                interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+              },
+              previousIndex: roomIndex,
+            } as EditorCommand);
+            roomsToDelete.add(room.id);
+            roomCount++;
+          }
+        } else if (item.type === "opening" && item.roomId && item.id) {
+          // Only delete openings from rooms that aren't being deleted
+          if (!roomsToDelete.has(item.roomId)) {
+            const room = state.document.rooms.find((r) => r.id === item.roomId);
+            const opening = room?.openings.find((o) => o.id === item.id);
+            if (room && opening) {
+              deleteCommands.push({
+                type: "delete-opening",
+                roomId: room.id,
+                opening: cloneRoomOpening(opening),
+              } as EditorCommand);
+              openingCount++;
+            }
+          }
+        } else if (item.type === "stair" && item.roomId && item.id) {
+          // Only delete stairs from rooms that aren't being deleted
+          if (!roomsToDelete.has(item.roomId)) {
+            const room = state.document.rooms.find((r) => r.id === item.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === item.id);
+            if (room && asset) {
+              deleteCommands.push({
+                type: "delete-interior-asset",
+                roomId: room.id,
+                asset: cloneRoomInteriorAsset(asset),
+              } as EditorCommand);
+              stairCount++;
+            }
+          }
+        }
+      }
+
+      if (deleteCommands.length === 0) return state;
+
+      // Build bulk delete command
+      const command: EditorCommand = {
+        type: "bulk-delete",
+        deleteCommands,
+      } as EditorCommand;
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      // Show confirmation toast with counts
+      const parts = [];
+      if (roomCount > 0) parts.push(`${roomCount} room${roomCount > 1 ? "s" : ""}`);
+      if (openingCount > 0) parts.push(`${openingCount} opening${openingCount > 1 ? "s" : ""}`);
+      if (stairCount > 0) parts.push(`${stairCount} stair${stairCount > 1 ? "s" : ""}`);
+      const confirmationText = parts.join(" and ");
+
+      toast(`Deleted ${confirmationText}`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const currentState = useEditorStore.getState();
+            const latestCommand = currentState.history.past[currentState.history.past.length - 1];
+            if (latestCommand?.type !== "bulk-delete") {
+              return;
+            }
+            currentState.undo();
+          },
+        },
+      });
+
+      return {
+        document: nextDocument,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

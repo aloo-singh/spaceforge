@@ -236,6 +236,26 @@ export type EditorCommand =
       fromRoomId: string;
       toRoomId: string;
       asset: RoomInteriorAsset;
+    }
+  | {
+      type: "bulk-delete";
+      deleteCommands: (
+        | {
+            type: "delete-room";
+            room: Room;
+            previousIndex: number;
+          }
+        | {
+            type: "delete-opening";
+            roomId: string;
+            opening: RoomOpening;
+          }
+        | {
+            type: "delete-interior-asset";
+            roomId: string;
+            asset: RoomInteriorAsset;
+          }
+      )[];
     };
 
 export function applyEditorCommand(
@@ -783,6 +803,15 @@ export function applyEditorCommand(
         (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
       ),
     };
+  }
+
+  if (command.type === "bulk-delete") {
+    // Apply all delete commands in sequence
+    let nextDocument = document;
+    for (const deleteCmd of command.deleteCommands) {
+      nextDocument = applyEditorCommand(nextDocument, deleteCmd, direction);
+    }
+    return nextDocument;
   }
 
   return document;
