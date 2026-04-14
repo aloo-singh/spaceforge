@@ -256,6 +256,14 @@ export type EditorCommand =
             asset: RoomInteriorAsset;
           }
       )[];
+    }
+  | {
+      type: "bulk-duplicate";
+      duplicatedRooms: Room[];
+      duplicatedAssets: Array<{
+        roomId: string;
+        asset: RoomInteriorAsset;
+      }>;
     };
 
 export function applyEditorCommand(
@@ -812,6 +820,62 @@ export function applyEditorCommand(
       nextDocument = applyEditorCommand(nextDocument, deleteCmd, direction);
     }
     return nextDocument;
+  }
+
+  if (command.type === "bulk-duplicate") {
+    if (direction === "undo") {
+      // Remove duplicated rooms and assets
+      const duplicatedRoomIds = new Set(command.duplicatedRooms.map((r) => r.id));
+      const duplicatedAssetIds = new Set(command.duplicatedAssets.map((da) => da.asset.id));
+
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => {
+          if (duplicatedRoomIds.has(room.id)) return false;
+          // Keep the room but filter out duplicated assets
+          return true;
+        }).map((room) => {
+          const duplicatedAssetsInRoom = command.duplicatedAssets.filter(
+            (da) => da.roomId === room.id
+          );
+          if (duplicatedAssetsInRoom.length === 0) return room;
+
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => !duplicatedAssetIds.has(asset.id)
+            ),
+          };
+        }),
+      };
+    } else {
+      // Add duplicated rooms and assets
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms,
+          ...command.duplicatedRooms,
+          ...document.rooms.map((room) => {
+            const assetsToAdd = command.duplicatedAssets.filter((da) => da.roomId === room.id);
+            if (assetsToAdd.length === 0) return room;
+
+            return {
+              ...room,
+              interiorAssets: [
+                ...room.interiorAssets,
+                ...assetsToAdd.map((da) => cloneRoomInteriorAsset(da.asset)),
+              ],
+            };
+          }).filter((_, idx) => {
+            // Only keep rooms that have assets to add
+            return command.duplicatedAssets.some((da) => da.roomId === document.rooms[idx].id);
+          }),
+        ].filter(
+          (room, idx, arr) =>
+            idx === arr.findIndex((r) => r.id === room.id) // Remove duplicates by ID
+        ),
+      };
+    }
   }
 
   return document;

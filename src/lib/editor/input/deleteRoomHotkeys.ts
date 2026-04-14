@@ -3,12 +3,13 @@ import {
   matchEditorKeyboardShortcut,
   showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
+import type { SharedSelectionItem } from "@/lib/editor/types";
 
 type DeleteRoomStoreState = {
   selectedRoomId: string | null;
   selectedOpening: { roomId: string; openingId: string } | null;
   selectedInteriorAsset: { roomId: string; assetId: string } | null;
-  selection: any[];
+  selection: SharedSelectionItem[];
   keyboardShortcutFeedbackEnabled: boolean;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;

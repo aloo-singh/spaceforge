@@ -78,6 +78,7 @@ type RoomDrawStoreState = {
   selectOpeningById: (roomId: string, openingId: string) => void;
   selectInteriorAssetById: (roomId: string, assetId: string) => void;
   clearRoomSelection: () => void;
+  clearSelection: () => void;
   selection: SharedSelectionItem[];
   addToSelection: (item: SharedSelectionItem) => void;
   removeFromSelection: (item: SharedSelectionItem) => void;

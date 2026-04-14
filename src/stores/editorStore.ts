@@ -233,6 +233,8 @@ type EditorState = {
   pasteSelection: () => void;
   /** Cut selected room(s) or stair(s) to clipboard (remove from location) */
   cutSelection: () => void;
+  /** Duplicate selected room(s) or stair(s) with smart naming and offset placement */
+  duplicateSelection: () => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -396,6 +398,26 @@ function createStairConnectionId(): string {
   }
 
   return `stair-connection-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+/**
+ * Generate a duplicate name with smart incrementing.
+ * E.g., "Living Room" -> "Copy of Living Room" -> "Copy of Living Room 2" -> "Copy of Living Room 3"
+ */
+function generateDuplicateName(baseName: string, existingNames: Set<string>): string {
+  const copyPrefix = "Copy of ";
+  const candidateName = `${copyPrefix}${baseName}`;
+
+  if (!existingNames.has(candidateName)) {
+    return candidateName;
+  }
+
+  let counter = 2;
+  while (existingNames.has(`${copyPrefix}${baseName} ${counter}`)) {
+    counter++;
+  }
+
+  return `${copyPrefix}${baseName} ${counter}`;
 }
 
 function getConnectedFloorAvailability(document: DocumentState, floorId: string) {
@@ -2676,6 +2698,115 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return state;
+    }),
+  duplicateSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const activeFloorId = getNormalizedActiveFloorId(state.document);
+      const DUPLICATE_OFFSET_MM = 500; // Offset duplicates 500mm from originals
+
+      // Collect all existing names for smart naming
+      const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
+      const existingAssetNames = new Map<string, Set<string>>();
+      for (const room of state.document.rooms) {
+        existingAssetNames.set(
+          room.id,
+          new Set(room.interiorAssets.map((a) => a.name))
+        );
+      }
+
+      const duplicatedRooms: Room[] = [];
+      const duplicatedAssets: Array<{ roomId: string; asset: RoomInteriorAsset }> = [];
+      const newSelection: SharedSelectionItem[] = [];
+
+      // Process each item in selection
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.id);
+          if (!sourceRoom) continue;
+
+          // Create duplicate with new ID and smart name
+          const duplicateName = generateDuplicateName(sourceRoom.name, existingRoomNames);
+          existingRoomNames.add(duplicateName);
+
+          const newRoomId = createRoomId();
+          const offsetPoints = sourceRoom.points.map((p) => ({
+            x: p.x + DUPLICATE_OFFSET_MM,
+            y: p.y + DUPLICATE_OFFSET_MM,
+          }));
+
+          const duplicateRoom: Room = {
+            ...cloneRoom(sourceRoom),
+            id: newRoomId,
+            name: duplicateName,
+            floorId: sourceRoom.floorId ?? activeFloorId,
+            points: offsetPoints,
+          };
+
+          duplicatedRooms.push(duplicateRoom);
+          newSelection.push({ type: "room" as const, id: newRoomId });
+        }
+
+        if (item.type === "stair") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.roomId);
+          const sourceAsset = sourceRoom?.interiorAssets.find((a) => a.id === item.id);
+          if (!sourceRoom || !sourceAsset) continue;
+
+          // Create duplicate with new ID and smart name
+          const roomAssetNames = existingAssetNames.get(sourceRoom.id) ?? new Set();
+          const duplicateName = generateDuplicateName(sourceAsset.name, roomAssetNames);
+          roomAssetNames.add(duplicateName);
+          existingAssetNames.set(sourceRoom.id, roomAssetNames);
+
+          const newAssetId = createInteriorAssetId();
+          const duplicateAsset: RoomInteriorAsset = {
+            ...cloneRoomInteriorAsset(sourceAsset),
+            id: newAssetId,
+            name: duplicateName,
+            xMm: sourceAsset.xMm + DUPLICATE_OFFSET_MM,
+            yMm: sourceAsset.yMm + DUPLICATE_OFFSET_MM,
+          };
+
+          duplicatedAssets.push({
+            roomId: sourceRoom.id,
+            asset: duplicateAsset,
+          });
+          newSelection.push({ type: "stair" as const, roomId: sourceRoom.id, id: newAssetId });
+        }
+      }
+
+      // If nothing was duplicated, return unchanged state
+      if (duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "bulk-duplicate",
+        duplicatedRooms,
+        duplicatedAssets,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRoomId: duplicatedRooms[0]?.id ?? state.selectedRoomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset:
+          duplicatedAssets[0] && duplicatedAssets[0].roomId
+            ? {
+                roomId: duplicatedAssets[0].roomId,
+                assetId: duplicatedAssets[0].asset.id,
+              }
+            : null,
+        selection: newSelection.length > 0 ? newSelection : [],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   setCanvasInteractionActive: (isActive) =>
     set((state) => {
