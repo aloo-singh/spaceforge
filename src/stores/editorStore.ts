@@ -1300,6 +1300,7 @@ function insertOpeningOnSelectedWall(
     selectedWall: null,
     selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
     selectedInteriorAsset: null,
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, id: opening.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -1330,6 +1331,7 @@ function insertDefaultStairOnSelectedRoom(
     selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
     selectedOpening: null,
     selectedWall: null,
+    selection: [{ type: "stair" as const, roomId: room.id, id: asset.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2085,6 +2087,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           state.selectedInteriorAsset,
           nextDocument
         ),
+        selection: [{ type: "floor" as const, id: nextActiveFloorId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2241,6 +2244,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: roomId ? [{ type: "room" as const, id: roomId }] : [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2258,6 +2262,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedWall: null,
           selectedOpening: null,
           selectedInteriorAsset: null,
+          selection: [{ type: "room" as const, id: roomId }],
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
           interiorAssetRenameSession: null,
@@ -2279,6 +2284,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: { roomId, wall },
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [{ type: "wall" as const, roomId, wall }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2304,6 +2310,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: { roomId, openingId },
         selectedInteriorAsset: null,
+        selection: [{ type: "opening" as const, roomId, id: openingId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2329,6 +2336,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: { roomId, assetId },
+        selection: [{ type: "stair" as const, roomId, id: assetId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2340,6 +2348,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedOpening === null) return state;
       return {
         selectedOpening: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       };
     }),
   clearSelectedInteriorAsset: () =>
@@ -2347,6 +2356,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedInteriorAsset === null) return state;
       return {
         selectedInteriorAsset: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
       };
@@ -2356,6 +2366,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedWall === null) return state;
       return {
         selectedWall: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       };
     }),
   clearRoomSelection: () =>
@@ -2365,6 +2376,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedWall: null,
       selectedOpening: null,
       selectedInteriorAsset: null,
+      selection: [],
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       interiorAssetRenameSession: null,
@@ -2974,6 +2986,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedWall: null,
           selectedOpening: null,
           selectedInteriorAsset: null,
+          selection: [],
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -3000,6 +3013,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -3020,6 +3034,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room || !opening) {
         return {
           selectedOpening: null,
+          selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         };
       }
 
@@ -3033,6 +3048,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedOpening: null,
+        selection: [{ type: "room" as const, id: room.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -3051,6 +3067,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room || !asset) {
         return {
           selectedInteriorAsset: null,
+          selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         };
       }
 
@@ -3064,6 +3081,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: room.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
