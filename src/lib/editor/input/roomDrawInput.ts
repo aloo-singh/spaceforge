@@ -1136,7 +1136,8 @@ export function attachRoomDrawInput(
           state.addToSelection(roomItem);
         }
       } else {
-        // Normal mode: replace selection
+        // Normal mode: replace selection and clear multi-selection
+        state.clearSelection();
         state.selectRoomById(labelHitRoom.id);
       }
       activeLabelDragSession = {
@@ -1173,6 +1174,7 @@ export function attachRoomDrawInput(
           state.addToSelection(openingItem);
         }
       } else {
+        state.clearSelection();
         state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
       }
       hoveredOpeningWidthHandle = openingWidthHandleHit;
@@ -1270,6 +1272,7 @@ export function attachRoomDrawInput(
           state.addToSelection(openingItem);
         }
       } else {
+        state.clearSelection();
         state.selectOpeningById(openingHit.roomId, openingHit.openingId);
       }
       hoveredOpening = openingHit;
@@ -1309,6 +1312,7 @@ export function attachRoomDrawInput(
           state.addToSelection(stairItem);
         }
       } else {
+        state.clearSelection();
         state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
       }
       hoveredInteriorAsset = interiorAssetHit;
@@ -1347,6 +1351,7 @@ export function attachRoomDrawInput(
           state.addToSelection(wallItem);
         }
       } else {
+        state.clearSelection();
         state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
       }
       setHoveredSelectableWall(wallHit);
@@ -1375,6 +1380,7 @@ export function attachRoomDrawInput(
           state.addToSelection(roomItem);
         }
       } else {
+        state.clearSelection();
         state.selectRoomById(bodyHitRoom.id);
       }
       setHoveredSelectableWall(null);
@@ -1390,6 +1396,7 @@ export function attachRoomDrawInput(
         selectedRoom !== null && isPointInPolygon(cursorWorld, selectedRoom.points);
 
       if (!clickedInsideSelectedRoom) {
+        state.clearSelection();
         state.clearRoomSelection();
         return;
       }
