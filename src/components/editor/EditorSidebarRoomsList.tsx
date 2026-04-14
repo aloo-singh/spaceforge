@@ -186,6 +186,7 @@ export function EditorSidebarRoomsList() {
   const cancelFloorRename = useEditorStore((state) => state.cancelFloorRename);
   const deleteFloor = useEditorStore((state) => state.deleteFloor);
   const moveSelectionToFloor = useEditorStore((state) => state.moveSelectionToFloor);
+  const reorderRoomInFloor = useEditorStore((state) => state.reorderRoomInFloor);
   const floorRenameSession = useEditorStore((state) => state.floorRenameSession);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const interiorAssetInputRef = useRef<HTMLInputElement | null>(null);
@@ -200,6 +201,8 @@ export function EditorSidebarRoomsList() {
   const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
   const [isDeletingFloor, setIsDeletingFloor] = useState(false);
   const [dragOverFloorId, setDragOverFloorId] = useState<string | null>(null);
+  const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
+  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
@@ -414,13 +417,47 @@ export function EditorSidebarRoomsList() {
                 const isRoomExpanded = isSelected || expandedRoomIds.includes(room.id);
                 const hasInteriorAssets = room.interiorAssets.length > 0;
                 const isAssetSectionExpanded = expandedAssetRoomIds.includes(room.id);
+                const isDraggingThisRoom = draggedRoomId === room.id;
+                const isDragOverThisRoom = dragOverRoomId === room.id && draggedRoomId !== null && draggedRoomId !== room.id;
 
                 return (
                   <div
                     key={room.id}
+                    draggable
+                    onDragStart={() => setDraggedRoomId(room.id)}
+                    onDragEnd={() => {
+                      setDraggedRoomId(null);
+                      setDragOverRoomId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (draggedRoomId && draggedRoomId !== room.id) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDragOverRoomId(room.id);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      setDragOverRoomId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverRoomId(null);
+                      if (draggedRoomId && draggedRoomId !== room.id) {
+                        // Find the target index within the floor
+                        const targetIndex = rooms.findIndex((r) => r.id === room.id);
+                        if (targetIndex !== -1) {
+                          reorderRoomInFloor(draggedRoomId, targetIndex);
+                        }
+                      }
+                      setDraggedRoomId(null);
+                    }}
                     className={cn(
                       "rounded-lg border transition-colors",
-                      isSelected
+                      isDraggingThisRoom
+                        ? "border-zinc-300 bg-zinc-100 text-zinc-600 opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
+                        : isDragOverThisRoom
+                        ? "border-amber-400 bg-amber-100/50 dark:border-amber-600 dark:bg-amber-950/30"
+                        : isSelected
                         ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
                         : isInMultiSelection
                         ? "border-zinc-400/50 bg-zinc-200/60 text-zinc-900 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-100"

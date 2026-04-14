@@ -237,6 +237,8 @@ type EditorState = {
   duplicateSelection: () => void;
   /** Move selected room(s) and stair(s) to a different floor */
   moveSelectionToFloor: (targetFloorId: string) => void;
+  /** Reorder a room within its floor */
+  reorderRoomInFloor: (roomId: string, targetIndex: number) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -2869,6 +2871,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: null,
         selectedInteriorAsset: null,
         selection: state.selection,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  reorderRoomInFloor: (roomId, targetIndex) =>
+    set((state) => {
+      const room = state.document.rooms.find((r) => r.id === roomId);
+      if (!room) return state;
+
+      // Get rooms for this floor
+      const floorRooms = state.document.rooms.filter((r) => r.floorId === room.floorId);
+      
+      // Find current index of room within floor
+      const currentIndex = floorRooms.findIndex((r) => r.id === roomId);
+      if (currentIndex === -1 || targetIndex < 0 || targetIndex >= floorRooms.length) {
+        return state;
+      }
+
+      // If already at target, no-op
+      if (currentIndex === targetIndex) return state;
+
+      const command: EditorCommand = {
+        type: "reorder-rooms-in-floor",
+        floorId: room.floorId,
+        roomId,
+        fromIndex: currentIndex,
+        toIndex: targetIndex,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

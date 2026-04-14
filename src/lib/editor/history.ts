@@ -277,6 +277,13 @@ export type EditorCommand =
         asset: RoomInteriorAsset;
         previousRoomId: string;
       }>;
+    }
+  | {
+      type: "reorder-rooms-in-floor";
+      floorId: string;
+      roomId: string;
+      fromIndex: number;
+      toIndex: number;
     };
 
 export function applyEditorCommand(
@@ -921,6 +928,44 @@ export function applyEditorCommand(
         }),
       };
     }
+  }
+
+  if (command.type === "reorder-rooms-in-floor") {
+    // Get rooms for this floor
+    const floorRooms = document.rooms.filter((room) => room.floorId === command.floorId);
+    
+    // Determine source and target indices based on direction
+    const sourceIndex = direction === "undo" ? command.toIndex : command.fromIndex;
+    const targetIndex = direction === "undo" ? command.fromIndex : command.toIndex;
+    
+    // Clone floor rooms and reorder
+    const reorderedFloorRooms = [...floorRooms];
+    const [movedRoom] = reorderedFloorRooms.splice(sourceIndex, 1);
+    reorderedFloorRooms.splice(targetIndex, 0, movedRoom);
+    
+    // Build result: collect non-floor rooms, insert reordered floor rooms at their original position
+    const reorderedRooms: Room[] = [];
+    const firstFloorRoomGlobalIndex = document.rooms.findIndex(
+      (room) => room.floorId === command.floorId
+    );
+    
+    // Add all non-floor rooms before the first floor room
+    for (let i = 0; i < firstFloorRoomGlobalIndex; i++) {
+      reorderedRooms.push(document.rooms[i]);
+    }
+    
+    // Add reordered floor rooms
+    reorderedRooms.push(...reorderedFloorRooms);
+    
+    // Add all remaining non-floor rooms after the floor rooms
+    for (let i = firstFloorRoomGlobalIndex + floorRooms.length; i < document.rooms.length; i++) {
+      reorderedRooms.push(document.rooms[i]);
+    }
+    
+    return {
+      ...document,
+      rooms: reorderedRooms,
+    };
   }
 
   return document;
