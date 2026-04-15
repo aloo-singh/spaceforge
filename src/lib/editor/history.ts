@@ -221,6 +221,14 @@ export type EditorCommand =
       sourceRoomId: string;
     }
   | {
+      type: "paste-interior-assets";
+      pastedAssets: Array<{
+        asset: RoomInteriorAsset;
+        sourceRoomId: string;
+      }>;
+      targetRoomId: string;
+    }
+  | {
       type: "cut-rooms";
       cutRooms: Room[];
       previousIndex: number;
@@ -654,6 +662,36 @@ export function applyEditorCommand(
         }),
       };
     }
+  }
+
+  if (command.type === "paste-interior-assets") {
+    if (direction === "undo") {
+      const pastedIds = new Set(command.pastedAssets.map((item) => item.asset.id));
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter((asset) => !pastedIds.has(asset.id)),
+          };
+        }),
+      };
+    }
+
+    return {
+      ...document,
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.targetRoomId) return room;
+        return {
+          ...room,
+          interiorAssets: [
+            ...room.interiorAssets,
+            ...command.pastedAssets.map((item) => cloneRoomInteriorAsset(item.asset)),
+          ],
+        };
+      }),
+    };
   }
 
   if (command.type === "cut-rooms") {

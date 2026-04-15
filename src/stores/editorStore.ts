@@ -1365,6 +1365,9 @@ function getTargetFloorForHistoryCommand(
     case "paste-interior-asset":
       return findFloorForRoom(command.targetRoomId);
 
+    case "paste-interior-assets":
+      return findFloorForRoom(command.targetRoomId);
+
     case "cut-rooms": {
       if (command.cutRooms.length === 0) return null;
       return findFloorForRoom(command.cutRooms[0].id) ?? command.cutRooms[0].floorId ?? null;
@@ -2833,24 +2836,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           });
         }
 
-        let nextDocument = state.document;
-        let nextPast = state.history.past;
         const newSelection: SharedSelectionItem[] = [];
         for (const pastedItem of pastedItems) {
-          const command: EditorCommand = {
-            type: "paste-interior-asset",
-            pastedAsset: pastedItem.asset,
-            targetRoomId,
-            sourceRoomId: pastedItem.sourceRoomId,
-          };
-          nextDocument = applyEditorCommand(nextDocument, command, "redo");
-          nextPast = pushToPast(nextPast, command);
           newSelection.push({
             type: "stair" as const,
             roomId: targetRoomId,
             id: pastedItem.asset.id,
           });
         }
+
+        const command: EditorCommand = {
+          type: "paste-interior-assets",
+          pastedAssets: pastedItems.map((item) => ({
+            asset: cloneRoomInteriorAsset(item.asset),
+            sourceRoomId: item.sourceRoomId,
+          })),
+          targetRoomId,
+        };
+
+        const nextDocument = applyEditorCommand(state.document, command, "redo");
 
         return {
           document: nextDocument,
@@ -2863,7 +2867,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               : null,
           selection: newSelection,
           history: {
-            past: nextPast,
+            past: pushToPast(state.history.past, command),
             future: [],
           },
           canUndo: true,

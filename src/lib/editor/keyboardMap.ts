@@ -340,6 +340,18 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "interior asset move";
   }
 
+  if (command.type === "paste-rooms") {
+    return command.pastedRooms.length === 1 ? "room paste" : "rooms paste";
+  }
+
+  if (command.type === "paste-interior-asset") {
+    return getInteriorAssetActionLabel(command.pastedAsset.type, "creation");
+  }
+
+  if (command.type === "paste-interior-assets") {
+    return command.pastedAssets.length === 1 ? "stair paste" : "stairs paste";
+  }
+
   if (command.type === "update-interior-asset") {
     const previousAsset = command.previousAsset;
     const nextAsset = command.nextAsset;
