@@ -12,6 +12,7 @@ export type EditorKeyboardShortcutId =
   | "copy"
   | "cut"
   | "paste"
+  | "duplicate-selection"
   | "delete-selection"
   | "hold-pan"
   | "cancel-draft-or-clear-selection"
@@ -152,6 +153,17 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "action",
     bindings: [{ key: "x", code: "KeyX", primaryModifier: true, altKey: false, shiftKey: false }],
     sonnerMessage: "Cut to clipboard",
+  },
+  {
+    id: "duplicate-selection",
+    section: "Edit",
+    keyCombination: "Primary+D",
+    description: "Duplicate the current selection",
+    macKeys: "Cmd+D",
+    windowsKeys: "Ctrl+D",
+    type: "action",
+    bindings: [{ key: "d", code: "KeyD", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: ({ actionLabel }) => actionLabel ?? "Selection duplicated",
   },
   {
     id: "delete-selection",
@@ -338,6 +350,17 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
 
   if (command.type === "move-interior-asset") {
     return "interior asset move";
+  }
+
+  if (command.type === "bulk-duplicate") {
+    const roomCount = command.duplicatedRooms.length;
+    const stairCount = command.duplicatedAssets.length;
+    if (roomCount > 0 && stairCount > 0) return "rooms and stairs duplication";
+    if (roomCount > 1) return "rooms duplication";
+    if (roomCount === 1) return "room duplication";
+    if (stairCount > 1) return "stairs duplication";
+    if (stairCount === 1) return "stair duplication";
+    return "selection duplication";
   }
 
   if (command.type === "paste-rooms") {
