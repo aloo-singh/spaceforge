@@ -2648,21 +2648,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const PASTE_OFFSET_MM = 500; // Offset new items 500mm from originals
 
       if (state.clipboard.type === "room") {
-        // Paste rooms with offset; apply smart naming only for copies
+        // Paste rooms with offset and smart naming for all inserted rooms
         const isCopy = state.clipboard.source === "copy";
-        const existingRoomNames = isCopy
-          ? new Set(state.document.rooms.map((r) => r.name))
-          : null;
+        const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
         let stairsWereAdjusted = false;
         const pastedRooms: Room[] = [];
 
         for (const room of state.clipboard.rooms) {
           const newId = createRoomId();
-          let pasteName = room.name;
-          if (isCopy && existingRoomNames) {
-            pasteName = generateDuplicateName(room.name, existingRoomNames);
-            existingRoomNames.add(pasteName);
-          }
+          const pasteName = generateDuplicateName(room.name, existingRoomNames);
+          existingRoomNames.add(pasteName);
           const points = isCopy
             ? room.points.map((p) => ({ x: p.x + PASTE_OFFSET_MM, y: p.y + PASTE_OFFSET_MM }))
             : room.points.map((p) => ({ ...p }));
@@ -2755,11 +2750,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const stairClipboardItem of clipboardAssets) {
           const sourceAsset = stairClipboardItem.asset;
           const newAssetId = createInteriorAssetId();
-          let pasteName = sourceAsset.name;
-          if (isCopyStair) {
-            pasteName = generateDuplicateName(sourceAsset.name, existingAssetNames);
-            existingAssetNames.add(pasteName);
-          }
+          const pasteName = generateDuplicateName(sourceAsset.name, existingAssetNames);
+          existingAssetNames.add(pasteName);
 
           let pastedAsset: RoomInteriorAsset = {
             ...cloneRoomInteriorAsset(sourceAsset),
