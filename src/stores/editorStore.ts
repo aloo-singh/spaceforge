@@ -2647,7 +2647,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const existingRoomNames = isCopy
           ? new Set(state.document.rooms.map((r) => r.name))
           : null;
-        const pastedRooms = state.clipboard.rooms.map((room) => {
+        let stairsWereAdjusted = false;
+        const pastedRooms: Room[] = [];
+
+        for (const room of state.clipboard.rooms) {
           const newId = createRoomId();
           let pasteName = room.name;
           if (isCopy && existingRoomNames) {
@@ -2657,14 +2660,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const points = isCopy
             ? room.points.map((p) => ({ x: p.x + PASTE_OFFSET_MM, y: p.y + PASTE_OFFSET_MM }))
             : room.points.map((p) => ({ ...p }));
-          return {
+
+          const pastedRoom: Room = {
             ...cloneRoom(room),
             id: newId,
             name: pasteName,
             floorId: activeFloorId,
             points,
           };
-        });
+
+          for (const asset of pastedRoom.interiorAssets) {
+            if (isInteriorAssetWithinRoom(pastedRoom, asset)) continue;
+
+            const constrained = constrainInteriorAssetCenter(pastedRoom, asset, {
+              x: asset.xMm,
+              y: asset.yMm,
+            });
+
+            if (!constrained) {
+              toast("Stairs don't fit in that room.");
+              return state;
+            }
+
+            asset.xMm = constrained.x;
+            asset.yMm = constrained.y;
+            stairsWereAdjusted = true;
+          }
+
+          pastedRooms.push(pastedRoom);
+        }
+
+        if (stairsWereAdjusted) {
+          toast("Stairs adjusted to fit room.", {
+            duration: 5000,
+            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
+          });
+        }
 
         const command: EditorCommand = {
           type: "paste-rooms",
@@ -2735,15 +2766,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             wasAdjusted = true;
           } else {
             // Room is too small — abort and notify
-            toast("Stairs don't fit in that room.", {
-              description: "Try a smaller stair block or a larger room.",
-            });
+            toast("Stairs don't fit in that room.");
             return state;
           }
         }
 
         if (wasAdjusted) {
           toast("Stairs adjusted to fit room.", {
+            duration: 5000,
             action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
           });
         }
