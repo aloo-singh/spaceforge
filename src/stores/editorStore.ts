@@ -1312,16 +1312,17 @@ function getSelectedInteriorAssetAfterHistoryCommand(
 }
 
 /**
- * Returns the floor the user should be viewing immediately after undoing a command,
- * so the restored or modified item is visible. Returns null if no floor switch is needed.
+ * Returns the floor the user should be viewing immediately after applying a history command,
+ * so the modified item is visible. Returns null if no floor switch is needed.
  */
-function getTargetFloorForUndo(
+function getTargetFloorForHistoryCommand(
   command: EditorCommand,
-  documentAfterUndo: DocumentState
+  documentAfterCommand: DocumentState,
+  direction: "undo" | "redo"
 ): string | null {
   const findFloorForRoom = (roomId: string): string | null => {
-    const room = documentAfterUndo.rooms.find((r) => r.id === roomId);
-    return room ? getRoomFloorId(room, documentAfterUndo) : null;
+    const room = documentAfterCommand.rooms.find((r) => r.id === roomId);
+    return room ? getRoomFloorId(room, documentAfterCommand) : null;
   };
 
   switch (command.type) {
@@ -1330,8 +1331,12 @@ function getTargetFloorForUndo(
       return command.room.floorId ?? null;
 
     case "delete-room":
+      if (direction === "redo") {
+        // Room is removed again on redo, so rely on recorded room floor.
+        return command.room.floorId ?? null;
+      }
       // Room restored by undo — find it in post-undo document.
-      return findFloorForRoom(command.room.id);
+      return findFloorForRoom(command.room.id) ?? command.room.floorId ?? null;
 
     case "rename-room":
     case "resize-room":
@@ -1363,7 +1368,7 @@ function getTargetFloorForUndo(
       return findFloorForRoom(command.roomId);
 
     case "move-interior-asset-to-room":
-      return findFloorForRoom(command.fromRoomId);
+      return findFloorForRoom(direction === "undo" ? command.fromRoomId : command.toRoomId);
 
     case "bulk-delete": {
       for (const sub of command.deleteCommands) {
@@ -1389,8 +1394,13 @@ function getTargetFloorForUndo(
     }
 
     case "move-selection-to-floor":
-      if (command.movedRooms.length > 0) return command.movedRooms[0].previousFloorId;
-      if (command.movedAssets.length > 0) return findFloorForRoom(command.movedAssets[0].roomId);
+      if (command.movedRooms.length > 0) {
+        return direction === "undo" ? command.movedRooms[0].previousFloorId : command.targetFloorId;
+      }
+      if (command.movedAssets.length > 0) {
+        if (direction === "redo") return command.targetFloorId;
+        return findFloorForRoom(command.movedAssets[0].roomId);
+      }
       return null;
 
     case "reorder-rooms-in-floor":
@@ -4508,7 +4518,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // If the command happened on a different floor than the one currently viewed,
       // restore the view to that floor so the user sees the undone change.
-      const targetFloor = getTargetFloorForUndo(command, nextDocument);
+      const targetFloor = getTargetFloorForHistoryCommand(command, nextDocument, "undo");
       const currentFloor = getNormalizedActiveFloorId(state.document);
       const restoredDocument =
         targetFloor !== null && targetFloor !== currentFloor
@@ -4552,21 +4562,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
       const nextPast = pushToPast(state.history.past, command);
 
+      const targetFloor = getTargetFloorForHistoryCommand(command, nextDocument, "redo");
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
       return {
-        document: nextDocument,
-        camera: syncCameraRotationToDocument(state.camera, nextDocument),
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
-          nextDocument,
+          restoredDocument,
           command,
           "redo"
         ),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
-          nextDocument,
+          restoredDocument,
           command,
           "redo"
         ),
