@@ -2608,32 +2608,60 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selection.length === 0) return state;
 
-      // Only support copying single items for now
       const item = state.selection[0];
       if (!item) return state;
 
       if (item.type === "room") {
-        const room = state.document.rooms.find((r) => r.id === item.id);
-        if (!room) return state;
+        const selectedRoomItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "room" }> =>
+            selectionItem.type === "room"
+        );
+        const rooms = selectedRoomItems
+          .map((selectionItem) => state.document.rooms.find((r) => r.id === selectionItem.id))
+          .filter((room): room is Room => Boolean(room))
+          .map((room) => cloneRoom(room));
+        if (rooms.length === 0) return state;
+
         return {
           clipboard: {
             type: "room",
             source: "copy" as const,
-            rooms: [cloneRoom(room)],
+            rooms,
           },
         };
       }
 
       if (item.type === "stair") {
-        const room = state.document.rooms.find((r) => r.id === item.roomId);
-        const asset = room?.interiorAssets.find((a) => a.id === item.id);
-        if (!room || !asset) return state;
+        const selectedStairItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
+            selectionItem.type === "stair"
+        );
+        const assets = selectedStairItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
+            if (!room || !asset) return null;
+
+            return {
+              asset: cloneRoomInteriorAsset(asset),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { asset: RoomInteriorAsset; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (assets.length === 0) return state;
+
+        const firstAsset = assets[0];
+        if (!firstAsset) return state;
+
         return {
           clipboard: {
             type: "stair",
             source: "copy" as const,
-            asset: cloneRoomInteriorAsset(asset),
-            sourceRoomId: item.roomId,
+            asset: firstAsset.asset,
+            sourceRoomId: firstAsset.sourceRoomId,
+            assets,
           },
         };
       }
@@ -2733,13 +2761,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
         if (!targetRoom) return state;
 
-        const clipboardAssets =
-          state.clipboard.assets ?? [
-            {
-              asset: state.clipboard.asset,
-              sourceRoomId: state.clipboard.sourceRoomId,
-            },
-          ];
+        // Support both single-item and multi-item stair clipboard payloads
+        // without requiring clipboard shape changes.
+        const rawClipboard = state.clipboard as unknown as {
+          asset?: RoomInteriorAsset | RoomInteriorAsset[];
+          sourceRoomId?: string;
+          assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
+        };
+        const clipboardAssets = Array.isArray(rawClipboard.assets)
+          ? rawClipboard.assets
+          : Array.isArray(rawClipboard.asset)
+            ? rawClipboard.asset.map((asset) => ({
+                asset,
+                sourceRoomId: rawClipboard.sourceRoomId ?? targetRoomId,
+              }))
+            : rawClipboard.asset
+              ? [
+                  {
+                    asset: rawClipboard.asset,
+                    sourceRoomId: rawClipboard.sourceRoomId ?? targetRoomId,
+                  },
+                ]
+              : [];
         if (clipboardAssets.length === 0) return state;
 
         const existingAssetNames = new Set(targetRoom.interiorAssets.map((a) => a.name));
@@ -2870,30 +2913,58 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       if (item.type === "stair") {
-        const room = state.document.rooms.find((r) => r.id === item.roomId);
-        const assetIndex = room?.interiorAssets.findIndex((a) => a.id === item.id);
-        const asset = room?.interiorAssets[assetIndex ?? -1];
-        if (!room || !asset || assetIndex === undefined || assetIndex === -1) return state;
+        const selectedStairItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
+            selectionItem.type === "stair"
+        );
+        const assetsToCut = selectedStairItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
+            if (!room || !asset) return null;
 
-        const command: EditorCommand = {
-          type: "cut-interior-asset",
-          cutAsset: cloneRoomInteriorAsset(asset),
-          roomId: item.roomId,
-        };
+            return {
+              asset: cloneRoomInteriorAsset(asset),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { asset: RoomInteriorAsset; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (assetsToCut.length === 0) return state;
+
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+        for (const stairToCut of assetsToCut) {
+          const command: EditorCommand = {
+            type: "cut-interior-asset",
+            cutAsset: cloneRoomInteriorAsset(stairToCut.asset),
+            roomId: stairToCut.sourceRoomId,
+          };
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+        }
+
+        const firstAsset = assetsToCut[0];
+        if (!firstAsset) return state;
 
         return {
           clipboard: {
             type: "stair",
             source: "cut" as const,
-            asset: cloneRoomInteriorAsset(asset),
-            sourceRoomId: item.roomId,
+            asset: cloneRoomInteriorAsset(firstAsset.asset),
+            sourceRoomId: firstAsset.sourceRoomId,
+            assets: assetsToCut.map((stairToCut) => ({
+              asset: cloneRoomInteriorAsset(stairToCut.asset),
+              sourceRoomId: stairToCut.sourceRoomId,
+            })),
           },
-          document: applyEditorCommand(state.document, command, "redo"),
-          selectedRoomId: item.roomId,
+          document: nextDocument,
+          selectedRoomId: firstAsset.sourceRoomId,
           selectedInteriorAsset: null,
-          selection: [{ type: "room" as const, id: item.roomId }],
+          selection: [{ type: "room" as const, id: firstAsset.sourceRoomId }],
           history: {
-            past: pushToPast(state.history.past, command),
+            past: nextPast,
             future: [],
           },
           canUndo: true,
