@@ -154,7 +154,13 @@ type FloorRenameSessionState = {
 
 type ClipboardData =
   | { type: "room"; source: "copy" | "cut"; rooms: Room[] }
-  | { type: "stair"; source: "copy" | "cut"; asset: RoomInteriorAsset; sourceRoomId: string }
+  | {
+      type: "stair";
+      source: "copy" | "cut";
+      asset: RoomInteriorAsset;
+      sourceRoomId: string;
+      assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
+    }
   | null;
 
 type EditorState = {
@@ -2709,7 +2715,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedWall: null,
           selectedOpening: null,
           selectedInteriorAsset: null,
-          selection: pastedRooms[0] ? [{ type: "room" as const, id: pastedRooms[0].id }] : [],
+          selection: pastedRooms.map((room) => ({ type: "room" as const, id: room.id })),
           history: {
             past: pushToPast(state.history.past, command),
             future: [],
@@ -2732,43 +2738,57 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
         if (!targetRoom) return state;
 
-        // Create offset asset; apply smart naming only for copies
-        const newAssetId = createInteriorAssetId();
-        let pasteName = state.clipboard.asset.name;
-        if (state.clipboard.source === "copy") {
-          const existingAssetNames = new Set(
-            targetRoom.interiorAssets.map((a) => a.name)
-          );
-          pasteName = generateDuplicateName(
-            state.clipboard.asset.name,
-            existingAssetNames
-          );
-        }
-        const isCopyStair = state.clipboard.source === "copy";
-        let pastedAsset: RoomInteriorAsset = {
-          ...cloneRoomInteriorAsset(state.clipboard.asset),
-          id: newAssetId,
-          name: pasteName,
-          xMm: isCopyStair ? state.clipboard.asset.xMm + PASTE_OFFSET_MM : state.clipboard.asset.xMm,
-          yMm: isCopyStair ? state.clipboard.asset.yMm + PASTE_OFFSET_MM : state.clipboard.asset.yMm,
-        };
+        const clipboardAssets =
+          state.clipboard.assets ?? [
+            {
+              asset: state.clipboard.asset,
+              sourceRoomId: state.clipboard.sourceRoomId,
+            },
+          ];
+        if (clipboardAssets.length === 0) return state;
 
-        // Bounds check: nudge into room if out of bounds
+        const existingAssetNames = new Set(targetRoom.interiorAssets.map((a) => a.name));
+        const isCopyStair = state.clipboard.source === "copy";
+        const pastedItems: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }> = [];
         let wasAdjusted = false;
-        if (!isInteriorAssetWithinRoom(targetRoom, pastedAsset)) {
-          const constrained = constrainInteriorAssetCenter(
-            targetRoom,
-            pastedAsset,
-            { x: pastedAsset.xMm, y: pastedAsset.yMm }
-          );
-          if (constrained) {
-            pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
-            wasAdjusted = true;
-          } else {
-            // Room is too small — abort and notify
-            toast("Stairs don't fit in that room.");
-            return state;
+
+        for (const stairClipboardItem of clipboardAssets) {
+          const sourceAsset = stairClipboardItem.asset;
+          const newAssetId = createInteriorAssetId();
+          let pasteName = sourceAsset.name;
+          if (isCopyStair) {
+            pasteName = generateDuplicateName(sourceAsset.name, existingAssetNames);
+            existingAssetNames.add(pasteName);
           }
+
+          let pastedAsset: RoomInteriorAsset = {
+            ...cloneRoomInteriorAsset(sourceAsset),
+            id: newAssetId,
+            name: pasteName,
+            xMm: isCopyStair ? sourceAsset.xMm + PASTE_OFFSET_MM : sourceAsset.xMm,
+            yMm: isCopyStair ? sourceAsset.yMm + PASTE_OFFSET_MM : sourceAsset.yMm,
+          };
+
+          // Bounds check: nudge into room if out of bounds
+          if (!isInteriorAssetWithinRoom(targetRoom, pastedAsset)) {
+            const constrained = constrainInteriorAssetCenter(targetRoom, pastedAsset, {
+              x: pastedAsset.xMm,
+              y: pastedAsset.yMm,
+            });
+            if (constrained) {
+              pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
+              wasAdjusted = true;
+            } else {
+              // Room is too small — abort and notify
+              toast("Stairs don't fit in that room.");
+              return state;
+            }
+          }
+
+          pastedItems.push({
+            asset: pastedAsset,
+            sourceRoomId: stairClipboardItem.sourceRoomId,
+          });
         }
 
         if (wasAdjusted) {
@@ -2778,22 +2798,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           });
         }
 
-        const command: EditorCommand = {
-          type: "paste-interior-asset",
-          pastedAsset,
-          targetRoomId,
-          sourceRoomId: state.clipboard.sourceRoomId,
-        };
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+        const newSelection: SharedSelectionItem[] = [];
+        for (const pastedItem of pastedItems) {
+          const command: EditorCommand = {
+            type: "paste-interior-asset",
+            pastedAsset: pastedItem.asset,
+            targetRoomId,
+            sourceRoomId: pastedItem.sourceRoomId,
+          };
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+          newSelection.push({
+            type: "stair" as const,
+            roomId: targetRoomId,
+            id: pastedItem.asset.id,
+          });
+        }
 
         return {
-          document: applyEditorCommand(state.document, command, "redo"),
+          document: nextDocument,
           selectedRoomId: targetRoomId,
           selectedWall: null,
           selectedOpening: null,
-          selectedInteriorAsset: { roomId: targetRoomId, assetId: newAssetId },
-          selection: [{ type: "stair" as const, roomId: targetRoomId, id: newAssetId }],
+          selectedInteriorAsset:
+            pastedItems.length > 0
+              ? { roomId: targetRoomId, assetId: pastedItems[pastedItems.length - 1].asset.id }
+              : null,
+          selection: newSelection,
           history: {
-            past: pushToPast(state.history.past, command),
+            past: nextPast,
             future: [],
           },
           canUndo: true,
