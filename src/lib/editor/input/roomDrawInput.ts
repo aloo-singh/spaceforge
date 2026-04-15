@@ -50,6 +50,7 @@ import {
   getRoomsForActiveFloor,
   type EditorDocumentState,
 } from "@/lib/editor/history";
+import { showKeyboardShortcutFeedback } from "@/lib/editor/keyboardMap";
 import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
@@ -61,6 +62,7 @@ type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
+  keyboardShortcutFeedbackEnabled: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -275,6 +277,7 @@ export function attachRoomDrawInput(
 ) {
   let isSpaceHeld = false;
   let isShiftHeld = false;
+  let isMultiSelectModifierHeld = false;
   let shouldSuppressNextContextMenu = false;
   let activePointerCount = 0;
   let latestCursorWorld: Point | null = null;
@@ -1752,6 +1755,17 @@ export function attachRoomDrawInput(
   const onKeyDown = (event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) return;
 
+    if ((event.key === "Meta" || event.key === "Control") && !event.repeat) {
+      const state = store.getState();
+      if (!state.settings.multiSelectModeEnabled && !isMultiSelectModifierHeld) {
+        isMultiSelectModifierHeld = true;
+        showKeyboardShortcutFeedback("multi-select-toggle", {
+          feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: true },
+        });
+      }
+    }
+
     if (event.code === "Space") {
       isSpaceHeld = true;
       updateCursor();
@@ -1798,6 +1812,17 @@ export function attachRoomDrawInput(
   const onKeyUp = (event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) return;
 
+    if (event.key === "Meta" || event.key === "Control") {
+      const state = store.getState();
+      if (!state.settings.multiSelectModeEnabled && isMultiSelectModifierHeld && !event.metaKey && !event.ctrlKey) {
+        isMultiSelectModifierHeld = false;
+        showKeyboardShortcutFeedback("multi-select-toggle", {
+          feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: false },
+        });
+      }
+    }
+
     if (event.code === "Space") {
       isSpaceHeld = false;
       updateCursor();
@@ -1814,6 +1839,7 @@ export function attachRoomDrawInput(
   const onWindowBlur = () => {
     isSpaceHeld = false;
     isShiftHeld = false;
+    isMultiSelectModifierHeld = false;
     latestCursorWorld = null;
     syncDraftConstraintMode();
     if (activeLabelDragSession?.didDrag) {

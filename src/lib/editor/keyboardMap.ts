@@ -6,6 +6,7 @@ export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
   | "toggle-guidelines"
   | "toggle-snapping"
+  | "multi-select-toggle"
   | "undo"
   | "redo"
   | "copy"
@@ -78,6 +79,21 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "toggle",
     bindings: [{ key: "s", code: "KeyS" }],
     sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
+  },
+  {
+    id: "multi-select-toggle",
+    section: "Edit",
+    keyCombination: "Hold Primary (Cmd/Ctrl)",
+    description: "Temporarily enable multi-select while held",
+    macKeys: "Hold Cmd",
+    windowsKeys: "Hold Ctrl",
+    type: "toggle",
+    bindings: [
+      { key: "Meta", metaKey: true, ctrlKey: false, altKey: false },
+      { key: "Control", ctrlKey: true, metaKey: false, altKey: false },
+    ],
+    sonnerMessage: ({ isEnabled }) =>
+      isEnabled ? "Multi-select mode enabled" : "Multi-select mode disabled",
   },
   {
     id: "undo",
