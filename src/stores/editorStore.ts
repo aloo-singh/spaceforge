@@ -372,6 +372,18 @@ function pushToPast(past: EditorCommand[], command: EditorCommand): EditorComman
   return nextPast.slice(nextPast.length - HISTORY_LIMIT);
 }
 
+function preserveHistoryForSelectionUpdate(
+  state: EditorState,
+  nextState: Partial<EditorState>
+): Partial<EditorState> {
+  return {
+    ...nextState,
+    history: state.history,
+    canUndo: state.canUndo,
+    canRedo: state.canRedo,
+  };
+}
+
 function createRoomId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -1989,7 +2001,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: true,
         selectedRoomId: null,
         selectedWall: null,
@@ -1999,14 +2011,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   clearNorthIndicatorSelection: () =>
     set((state) => {
       if (!state.selectedNorthIndicator) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: false,
-      };
+      });
     }),
   previewCanvasRotationDegrees: (degrees) =>
     set((state) => {
@@ -2258,7 +2270,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Floor switches are not undoable — update activeFloorId directly without history entry.
       const nextDocument = { ...state.document, activeFloorId: nextActiveFloorId };
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
         selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
@@ -2272,7 +2284,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   panCameraByPx: (delta) => {
     stopResetCameraAnimation();
@@ -2412,7 +2424,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2423,14 +2435,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
       const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!getRoomWallSegment(room, wall)) {
-        return {
+        return preserveHistoryForSelectionUpdate(state, {
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -2441,7 +2453,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           renameSession: null,
           interiorAssetRenameSession: null,
           interiorAssetArrowLabelSession: null,
-        };
+        });
       }
 
       if (
@@ -2452,7 +2464,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -2463,7 +2475,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   selectOpeningById: (roomId, openingId) =>
     set((state) => {
@@ -2478,7 +2490,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2489,7 +2501,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   selectInteriorAssetById: (roomId, assetId) =>
     set((state) => {
@@ -2504,7 +2516,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2515,47 +2527,49 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   clearSelectedOpening: () =>
     set((state) => {
       if (state.selectedOpening === null) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedOpening: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
-      };
+      });
     }),
   clearSelectedInteriorAsset: () =>
     set((state) => {
       if (state.selectedInteriorAsset === null) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedInteriorAsset: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-      };
+      });
     }),
   clearSelectedWall: () =>
     set((state) => {
       if (state.selectedWall === null) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selectedWall: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
-      };
+      });
     }),
   clearRoomSelection: () =>
-    set({
-      selectedNorthIndicator: false,
-      selectedRoomId: null,
-      selectedWall: null,
-      selectedOpening: null,
-      selectedInteriorAsset: null,
-      selection: [],
-      shouldFocusSelectedRoomNameInput: false,
-      renameSession: null,
-      interiorAssetRenameSession: null,
-      interiorAssetArrowLabelSession: null,
-    }),
+    set((state) =>
+      preserveHistoryForSelectionUpdate(state, {
+        selectedNorthIndicator: false,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [],
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+      })
+    ),
   selectItems: (items) =>
     set((state) => {
       if (
@@ -2579,16 +2593,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ) {
         return state;
       }
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selection: items,
-      };
+      });
     }),
   clearSelection: () =>
     set((state) => {
       if (state.selection.length === 0) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selection: [],
-      };
+      });
     }),
   addToSelection: (item) =>
     set((state) => {
@@ -2608,9 +2622,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return false;
       });
       if (exists) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selection: [...state.selection, item],
-      };
+      });
     }),
   removeFromSelection: (item) =>
     set((state) => {
@@ -2630,9 +2644,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return true;
       });
       if (nextSelection.length === state.selection.length) return state;
-      return {
+      return preserveHistoryForSelectionUpdate(state, {
         selection: nextSelection,
-      };
+      });
     }),
   copySelection: () =>
     set((state) => {
