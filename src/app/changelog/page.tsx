@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.61.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Undo Semantics Polish</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Defined and enforced clear undo/redo semantics across the editor</li>
+                <li>Drag-between-rooms is now one atomic undo step with exact original position restoration</li>
+                <li>Selection changes never create undo entries (global guard)</li>
+                <li>Floor switching never pollutes the undo stack</li>
+                <li>Undo/redo of cross-floor actions automatically restores the correct floor view</li>
+                <li>Consistent atomic behaviour with copy/paste/duplicate</li>
+                <li>Added explicit parent-child hierarchy documentation (floors &rarr; rooms &rarr; walls/assets)</li>
+                <li>Many small UX polish fixes for calm, precise feel</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.60.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-16</span>
           </div>
