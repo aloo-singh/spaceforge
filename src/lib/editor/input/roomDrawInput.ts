@@ -112,6 +112,7 @@ type RoomDrawStoreState = {
     fromRoomId: string,
     toRoomId: string,
     assetId: string,
+    previousCenter: Point,
     nextCenter: Point
   ) => void;
   previewInteriorAssetResize: (
@@ -1527,6 +1528,7 @@ export function attachRoomDrawInput(
               session.roomId,
               session.targetRoomId,
               session.assetId,
+              session.startCenter,
               nextCenter
             );
           } else {

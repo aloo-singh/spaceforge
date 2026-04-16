@@ -315,6 +315,7 @@ type EditorState = {
     fromRoomId: string,
     toRoomId: string,
     assetId: string,
+    previousCenter: Point,
     nextCenter: Point
   ) => void;
   previewInteriorAssetResize: (
@@ -4356,7 +4357,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
-  commitInteriorAssetMoveToRoom: (fromRoomId, toRoomId, assetId, nextCenter) =>
+  commitInteriorAssetMoveToRoom: (fromRoomId, toRoomId, assetId, previousCenter, nextCenter) =>
     set((state) => {
       const fromRoom = state.document.rooms.find((candidate) => candidate.id === fromRoomId);
       const toRoom = state.document.rooms.find((candidate) => candidate.id === toRoomId);
@@ -4390,8 +4391,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         yMm: finalCenter.y,
       };
 
-      const nextDocument = moveInteriorAssetToRoomInDocument(
+      // During drag preview, the document tracks live pointer movement. Rebuild an exact
+      // pre-move snapshot from the drag start center so undo restores the original position.
+      const previousDocument = updateRoomInteriorAssetPositionInDocument(
         state.document,
+        fromRoomId,
+        assetId,
+        previousCenter
+      );
+
+      const nextDocument = moveInteriorAssetToRoomInDocument(
+        previousDocument,
         fromRoomId,
         toRoomId,
         assetId,
@@ -4404,7 +4414,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fromRoomId,
         toRoomId,
         asset: movedAsset,
-        previousDocument: cloneDocumentState(state.document),
+        previousDocument: cloneDocumentState(previousDocument),
         nextDocument: cloneDocumentState(nextDocument),
       };
 
