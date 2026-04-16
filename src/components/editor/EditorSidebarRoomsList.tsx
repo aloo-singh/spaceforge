@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
-import { getRoomsForActiveFloor } from "@/lib/editor/history";
+import { getRoomsForFloor } from "@/lib/editor/history";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import type { SharedSelectionItem } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
@@ -146,7 +146,7 @@ export function EditorSidebarRoomsList() {
   const floors = document.floors;
   const displayedFloors = [...floors].reverse();
   const activeFloorId = document.activeFloorId;
-  const rooms = getRoomsForActiveFloor(document);
+  const rooms = document.rooms;
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
@@ -206,8 +206,8 @@ export function EditorSidebarRoomsList() {
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
-  const [isFloorsSectionExpanded, setIsFloorsSectionExpanded] = useState(true);
-  const [isRoomsSectionExpanded, setIsRoomsSectionExpanded] = useState(true);
+  const [collapsedFloorIds, setCollapsedFloorIds] = useState<string[]>([]);
+  const [isStructureSectionExpanded, setIsStructureSectionExpanded] = useState(true);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
 
@@ -264,18 +264,24 @@ export function EditorSidebarRoomsList() {
     <ImmediateTooltipProvider>
       <div className="flex flex-col gap-3">
         <SidebarSection
-          title="Floors"
-          count={floors.length}
-          isExpanded={isFloorsSectionExpanded}
-          onToggle={() => setIsFloorsSectionExpanded((current) => !current)}
+          title="Structure"
+          count={rooms.length}
+          isExpanded={isStructureSectionExpanded}
+          onToggle={() => setIsStructureSectionExpanded((current) => !current)}
         >
-          <div className="flex flex-col gap-1">
-            {floors.length > 0 ? (
-              displayedFloors.map((floor, floorIndex) => {
+          {floors.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
+              No floors yet.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {displayedFloors.map((floor, floorIndex) => {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
+                const floorRooms = getRoomsForFloor(document, floor.id);
+                const isFloorExpanded = !collapsedFloorIds.includes(floor.id);
                 return (
-                  <div key={floor.id}>
+                  <div key={floor.id} className="rounded-lg border border-transparent">
                     {isRenaming ? (
                       <div className="flex min-h-10 items-center gap-2 px-3 py-2">
                         <EditorSidebarRenameInput
@@ -318,7 +324,6 @@ export function EditorSidebarRoomsList() {
                             : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
                         )}
                         onDragOver={(e) => {
-                          // Only allow drop if selection is not empty
                           if (selection.length > 0 && floor.id !== activeFloorId) {
                             e.preventDefault();
                             e.dataTransfer!.dropEffect = "move";
@@ -336,6 +341,25 @@ export function EditorSidebarRoomsList() {
                           }
                         }}
                       >
+                        <SidebarIconTooltip
+                          content={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setCollapsedFloorIds((current) =>
+                                current.includes(floor.id)
+                                  ? current.filter((id) => id !== floor.id)
+                                  : [...current, floor.id]
+                              );
+                            }}
+                            className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                            aria-label={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                          >
+                            <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
+                          </button>
+                        </SidebarIconTooltip>
                         <button
                           type="button"
                           onClick={() => selectFloorById(floor.id)}
@@ -352,6 +376,7 @@ export function EditorSidebarRoomsList() {
                             {floorNumber}
                           </span>
                           <span className="truncate">{floor.name}</span>
+                          <span className={SECTION_COUNT_CLASS}>{floorRooms.length}</span>
                           {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
                         </button>
                         <SidebarIconTooltip content="Delete floor">
@@ -370,40 +395,15 @@ export function EditorSidebarRoomsList() {
                         </SidebarIconTooltip>
                       </div>
                     )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
-                No floors yet.
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={addFloor}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70"
-              disabled={isRenameBlocked || floors.length >= maxFloors}
-              title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
-            >
-              <Plus className="size-4" />
-              <span>Add Floor</span>
-            </button>
-          </div>
-        </SidebarSection>
 
-        <SidebarSection
-          title="Rooms"
-          count={rooms.length}
-          isExpanded={isRoomsSectionExpanded}
-          onToggle={() => setIsRoomsSectionExpanded((current) => !current)}
-        >
-          {rooms.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 p-3 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
-              Rooms will appear here as you draw them.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {rooms.map((room) => {
+                    {isFloorExpanded ? (
+                      <div className="ml-6 mt-1 flex flex-col gap-1">
+                        {floorRooms.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 p-3 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
+                            Rooms will appear here as you draw them.
+                          </div>
+                        ) : (
+                          floorRooms.map((room) => {
                 const selectedOpeningHostWall =
                   selectedOpening?.roomId === room.id
                     ? getSelectedOpeningHostWall(room, selectedOpening.openingId)
@@ -443,9 +443,9 @@ export function EditorSidebarRoomsList() {
                       e.preventDefault();
                       setDragOverRoomId(null);
                       if (draggedRoomId && draggedRoomId !== room.id) {
-                        // Find the target index within the floor
-                        const targetIndex = rooms.findIndex((r) => r.id === room.id);
-                        if (targetIndex !== -1) {
+                        const draggedRoom = document.rooms.find((r) => r.id === draggedRoomId);
+                        const targetIndex = floorRooms.findIndex((r) => r.id === room.id);
+                        if (draggedRoom && draggedRoom.floorId === room.floorId && targetIndex !== -1) {
                           reorderRoomInFloor(draggedRoomId, targetIndex);
                         }
                       }
@@ -838,7 +838,23 @@ export function EditorSidebarRoomsList() {
                     ) : null}
                   </div>
                 );
+                          })
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
               })}
+              <button
+                type="button"
+                onClick={addFloor}
+                className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70"
+                disabled={isRenameBlocked || floors.length >= maxFloors}
+                title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
+              >
+                <Plus className="size-4" />
+                <span>Add Floor</span>
+              </button>
             </div>
           )}
         </SidebarSection>
