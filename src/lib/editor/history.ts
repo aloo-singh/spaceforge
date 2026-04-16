@@ -199,6 +199,100 @@ export type EditorCommand =
       roomId: string;
       previousOpening: RoomOpening;
       nextOpening: RoomOpening;
+    }
+  | {
+      type: "copy-rooms";
+      rooms: Room[];
+    }
+  | {
+      type: "paste-rooms";
+      pastedRooms: Room[];
+      floorId: string;
+    }
+  | {
+      type: "copy-interior-asset";
+      asset: RoomInteriorAsset;
+      sourceRoomId: string;
+    }
+  | {
+      type: "paste-interior-asset";
+      pastedAsset: RoomInteriorAsset;
+      targetRoomId: string;
+      sourceRoomId: string;
+    }
+  | {
+      type: "paste-interior-assets";
+      pastedAssets: Array<{
+        asset: RoomInteriorAsset;
+        sourceRoomId: string;
+      }>;
+      targetRoomId: string;
+    }
+  | {
+      type: "cut-rooms";
+      cutRooms: Room[];
+      previousIndex: number;
+    }
+  | {
+      type: "cut-interior-asset";
+      cutAsset: RoomInteriorAsset;
+      roomId: string;
+    }
+  | {
+      type: "move-interior-asset-to-room";
+      assetId: string;
+      fromRoomId: string;
+      toRoomId: string;
+      asset: RoomInteriorAsset;
+    }
+  | {
+      type: "bulk-delete";
+      deleteCommands: (
+        | {
+            type: "delete-room";
+            room: Room;
+            previousIndex: number;
+          }
+        | {
+            type: "delete-opening";
+            roomId: string;
+            opening: RoomOpening;
+          }
+        | {
+            type: "delete-interior-asset";
+            roomId: string;
+            asset: RoomInteriorAsset;
+          }
+      )[];
+    }
+  | {
+      type: "bulk-duplicate";
+      duplicatedRooms: Room[];
+      duplicatedAssets: Array<{
+        roomId: string;
+        asset: RoomInteriorAsset;
+      }>;
+    }
+  | {
+      type: "move-selection-to-floor";
+      targetFloorId: string;
+      targetRoomId: string | null;
+      movedRooms: Array<{
+        room: Room;
+        previousFloorId: string;
+      }>;
+      movedAssets: Array<{
+        roomId: string;
+        asset: RoomInteriorAsset;
+        previousRoomId: string;
+      }>;
+    }
+  | {
+      type: "reorder-rooms-in-floor";
+      floorId: string;
+      roomId: string;
+      fromIndex: number;
+      toIndex: number;
     };
 
 export function applyEditorCommand(
@@ -508,6 +602,205 @@ export function applyEditorCommand(
     };
   }
 
+  if (command.type === "copy-rooms") {
+    // Copy is informational only - just return the document unchanged
+    return cloneEditorDocumentState(document);
+  }
+
+  if (command.type === "paste-rooms") {
+    if (direction === "undo") {
+      // Remove pasted rooms
+      const pastedIds = new Set(command.pastedRooms.map((r) => r.id));
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => !pastedIds.has(room.id)),
+      };
+    } else {
+      // Add pasted rooms
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms,
+          ...command.pastedRooms.map((r) => ({
+            ...r,
+            floorId: command.floorId,
+          })),
+        ],
+      };
+    }
+  }
+
+  if (command.type === "copy-interior-asset") {
+    // Copy is informational only - just return the document unchanged
+    return cloneEditorDocumentState(document);
+  }
+
+  if (command.type === "paste-interior-asset") {
+    if (direction === "undo") {
+      // Remove pasted asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => asset.id !== command.pastedAsset.id
+            ),
+          };
+        }),
+      };
+    } else {
+      // Add pasted asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.pastedAsset)],
+          };
+        }),
+      };
+    }
+  }
+
+  if (command.type === "paste-interior-assets") {
+    if (direction === "undo") {
+      const pastedIds = new Set(command.pastedAssets.map((item) => item.asset.id));
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.targetRoomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter((asset) => !pastedIds.has(asset.id)),
+          };
+        }),
+      };
+    }
+
+    return {
+      ...document,
+      rooms: document.rooms.map((room) => {
+        if (room.id !== command.targetRoomId) return room;
+        return {
+          ...room,
+          interiorAssets: [
+            ...room.interiorAssets,
+            ...command.pastedAssets.map((item) => cloneRoomInteriorAsset(item.asset)),
+          ],
+        };
+      }),
+    };
+  }
+
+  if (command.type === "cut-rooms") {
+    if (direction === "undo") {
+      // Restore cut rooms to their previous position
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms.slice(0, command.previousIndex),
+          ...command.cutRooms.map((r) => ({
+            id: r.id,
+            floorId: r.floorId,
+            name: r.name,
+            points: r.points.map((point) => ({ ...point })),
+            openings: cloneRoomOpenings(r.openings),
+            interiorAssets: cloneRoomInteriorAssets(r.interiorAssets),
+          })),
+          ...document.rooms.slice(command.previousIndex),
+        ],
+      };
+    } else {
+      // Remove cut rooms
+      const cutIds = new Set(command.cutRooms.map((r) => r.id));
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => !cutIds.has(room.id)),
+      };
+    }
+  }
+
+  if (command.type === "cut-interior-asset") {
+    if (direction === "undo") {
+      // Restore cut asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.roomId) return room;
+          return {
+            ...room,
+            interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.cutAsset)],
+          };
+        }),
+      };
+    } else {
+      // Remove cut asset
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id !== command.roomId) return room;
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => asset.id !== command.cutAsset.id
+            ),
+          };
+        }),
+      };
+    }
+  }
+
+  if (command.type === "move-interior-asset-to-room") {
+    if (direction === "undo") {
+      // Move asset back to original room
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id === command.fromRoomId) {
+            // Add asset back to original room
+            return {
+              ...room,
+              interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.asset)],
+            };
+          }
+          if (room.id === command.toRoomId) {
+            // Remove asset from target room
+            return {
+              ...room,
+              interiorAssets: room.interiorAssets.filter((a) => a.id !== command.assetId),
+            };
+          }
+          return room;
+        }),
+      };
+    } else {
+      // Move asset to target room
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          if (room.id === command.fromRoomId) {
+            // Remove asset from original room
+            return {
+              ...room,
+              interiorAssets: room.interiorAssets.filter((a) => a.id !== command.assetId),
+            };
+          }
+          if (room.id === command.toRoomId) {
+            // Add asset to target room
+            return {
+              ...room,
+              interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(command.asset)],
+            };
+          }
+          return room;
+        }),
+      };
+    }
+  }
+
   if (command.type === "rename-room") {
     const nextName = direction === "undo" ? command.previousName : command.nextName;
     return {
@@ -576,6 +869,190 @@ export function applyEditorCommand(
       rooms: document.rooms.filter(
         (room) => !command.roomsToDelete.some((rt) => rt.room.id === room.id)
       ),
+    };
+  }
+
+  if (command.type === "bulk-delete") {
+    // Apply all delete commands in sequence
+    let nextDocument = document;
+    for (const deleteCmd of command.deleteCommands) {
+      nextDocument = applyEditorCommand(nextDocument, deleteCmd, direction);
+    }
+    return nextDocument;
+  }
+
+  if (command.type === "bulk-duplicate") {
+    if (direction === "undo") {
+      // Remove duplicated rooms and assets
+      const duplicatedRoomIds = new Set(command.duplicatedRooms.map((r) => r.id));
+      const duplicatedAssetIds = new Set(command.duplicatedAssets.map((da) => da.asset.id));
+
+      return {
+        ...document,
+        rooms: document.rooms.filter((room) => {
+          if (duplicatedRoomIds.has(room.id)) return false;
+          // Keep the room but filter out duplicated assets
+          return true;
+        }).map((room) => {
+          const duplicatedAssetsInRoom = command.duplicatedAssets.filter(
+            (da) => da.roomId === room.id
+          );
+          if (duplicatedAssetsInRoom.length === 0) return room;
+
+          return {
+            ...room,
+            interiorAssets: room.interiorAssets.filter(
+              (asset) => !duplicatedAssetIds.has(asset.id)
+            ),
+          };
+        }),
+      };
+    } else {
+      // Add duplicated rooms and assets
+      return {
+        ...document,
+        rooms: [
+          ...document.rooms,
+          ...command.duplicatedRooms,
+          ...document.rooms.map((room) => {
+            const assetsToAdd = command.duplicatedAssets.filter((da) => da.roomId === room.id);
+            if (assetsToAdd.length === 0) return room;
+
+            return {
+              ...room,
+              interiorAssets: [
+                ...room.interiorAssets,
+                ...assetsToAdd.map((da) => cloneRoomInteriorAsset(da.asset)),
+              ],
+            };
+          }).filter((_, idx) => {
+            // Only keep rooms that have assets to add
+            return command.duplicatedAssets.some((da) => da.roomId === document.rooms[idx].id);
+          }),
+        ].filter(
+          (room, idx, arr) =>
+            idx === arr.findIndex((r) => r.id === room.id) // Remove duplicates by ID
+        ),
+      };
+    }
+  }
+
+  if (command.type === "move-selection-to-floor") {
+    if (direction === "undo") {
+      // Restore rooms to previous floors and move stairs back to previous rooms.
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
+          let nextRoom = movedRoomInfo
+            ? {
+                ...room,
+                floorId: movedRoomInfo.previousFloorId,
+              }
+            : room;
+
+          // Remove moved stairs from target room.
+          if (command.targetRoomId && room.id === command.targetRoomId) {
+            const movedAssetIds = new Set(command.movedAssets.map((moved) => moved.asset.id));
+            nextRoom = {
+              ...nextRoom,
+              interiorAssets: nextRoom.interiorAssets.filter(
+                (asset) => !movedAssetIds.has(asset.id)
+              ),
+            };
+          }
+
+          // Restore moved stairs to their previous rooms.
+          const assetsReturningToRoom = command.movedAssets.filter(
+            (moved) => moved.previousRoomId === room.id
+          );
+          if (assetsReturningToRoom.length > 0) {
+            const existingIds = new Set(nextRoom.interiorAssets.map((asset) => asset.id));
+            nextRoom = {
+              ...nextRoom,
+              interiorAssets: [
+                ...nextRoom.interiorAssets,
+                ...assetsReturningToRoom
+                  .filter((moved) => !existingIds.has(moved.asset.id))
+                  .map((moved) => cloneRoomInteriorAsset(moved.asset)),
+              ],
+            };
+          }
+
+          return nextRoom;
+        }),
+      };
+    } else {
+      // Move rooms to target floor and move selected stairs into target room.
+      return {
+        ...document,
+        rooms: document.rooms.map((room) => {
+          const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
+          let nextRoom = movedRoomInfo
+            ? {
+                ...room,
+                floorId: command.targetFloorId,
+              }
+            : room;
+
+          const movedAssetIds = new Set(command.movedAssets.map((moved) => moved.asset.id));
+          if (movedAssetIds.size > 0) {
+            // Remove moved stairs from source rooms.
+            if (command.movedAssets.some((moved) => moved.previousRoomId === room.id)) {
+              nextRoom = {
+                ...nextRoom,
+                interiorAssets: nextRoom.interiorAssets.filter(
+                  (asset) => !movedAssetIds.has(asset.id)
+                ),
+              };
+            }
+
+            // Add moved stairs to target room.
+            if (command.targetRoomId && room.id === command.targetRoomId) {
+              const existingIds = new Set(nextRoom.interiorAssets.map((asset) => asset.id));
+              nextRoom = {
+                ...nextRoom,
+                interiorAssets: [
+                  ...nextRoom.interiorAssets,
+                  ...command.movedAssets
+                    .filter((moved) => !existingIds.has(moved.asset.id))
+                    .map((moved) => cloneRoomInteriorAsset(moved.asset)),
+                ],
+              };
+            }
+          }
+
+          return nextRoom;
+        }),
+      };
+    }
+  }
+
+  if (command.type === "reorder-rooms-in-floor") {
+    // Get rooms for this floor (preserves relative order)
+    const floorRooms = document.rooms.filter((room) => room.floorId === command.floorId);
+
+    // Determine source and target indices based on direction
+    const sourceIndex = direction === "undo" ? command.toIndex : command.fromIndex;
+    const targetIndex = direction === "undo" ? command.fromIndex : command.toIndex;
+
+    // Reorder the floor rooms
+    const reorderedFloorRooms = [...floorRooms];
+    const [movedRoom] = reorderedFloorRooms.splice(sourceIndex, 1);
+    reorderedFloorRooms.splice(targetIndex, 0, movedRoom);
+
+    // Walk the full rooms array, replacing each floor room with the next
+    // reordered room in sequence. Non-floor rooms stay in place.
+    // This avoids duplicates regardless of whether floor rooms are contiguous.
+    let floorRoomIndex = 0;
+    const reorderedRooms = document.rooms.map((room) => {
+      if (room.floorId !== command.floorId) return room;
+      return reorderedFloorRooms[floorRoomIndex++];
+    });
+
+    return {
+      ...document,
+      rooms: reorderedRooms,
     };
   }
 

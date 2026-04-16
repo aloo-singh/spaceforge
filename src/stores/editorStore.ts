@@ -9,6 +9,7 @@ import {
   applyEditorCommand,
   createEmptyEditorDocumentState,
   getNormalizedActiveFloorId,
+  getRoomFloorId,
   getRoomsForActiveFloor,
   type EditorCommand,
   type EditorDocumentState,
@@ -75,6 +76,7 @@ import {
   getRotatedInteriorAssetForRoom,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
+  isInteriorAssetWithinRoom,
 } from "@/lib/editor/interiorAssets";
 import {
   areRoomOpeningsEqual,
@@ -111,6 +113,7 @@ import type {
   RoomOpeningSelection,
   RoomWallSelection,
   ScreenPoint,
+  SharedSelectionItem,
   ViewportSize,
 } from "@/lib/editor/types";
 
@@ -149,6 +152,17 @@ type FloorRenameSessionState = {
   initialName: string;
 } | null;
 
+type ClipboardData =
+  | { type: "room"; source: "copy" | "cut"; rooms: Room[] }
+  | {
+      type: "stair";
+      source: "copy" | "cut";
+      asset: RoomInteriorAsset;
+      sourceRoomId: string;
+      assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
+    }
+  | null;
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
@@ -167,12 +181,15 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  /** Shared selection model: single source of truth for all selections */
+  selection: SharedSelectionItem[];
   isCanvasInteractionActive: boolean;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
   interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
   floorRenameSession: FloorRenameSessionState;
+  clipboard: ClipboardData;
   history: {
     past: EditorCommand[];
     future: EditorCommand[];
@@ -213,6 +230,23 @@ type EditorState = {
   clearSelectedInteriorAsset: () => void;
   clearSelectedWall: () => void;
   clearRoomSelection: () => void;
+  /** Shared selection model actions */
+  selectItems: (items: SharedSelectionItem[]) => void;
+  clearSelection: () => void;
+  addToSelection: (item: SharedSelectionItem) => void;
+  removeFromSelection: (item: SharedSelectionItem) => void;
+  /** Copy selected room(s) or stair(s) to clipboard */
+  copySelection: () => void;
+  /** Paste item(s) from clipboard to current floor */
+  pasteSelection: () => void;
+  /** Cut selected room(s) or stair(s) to clipboard (remove from location) */
+  cutSelection: () => void;
+  /** Duplicate selected room(s) or stair(s) with smart naming and offset placement */
+  duplicateSelection: () => void;
+  /** Move selected room(s) and stair(s) to a different floor */
+  moveSelectionToFloor: (targetFloorId: string) => void;
+  /** Reorder a room within its floor */
+  reorderRoomInFloor: (roomId: string, targetIndex: number) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
@@ -235,6 +269,7 @@ type EditorState = {
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
+  bulkDeleteSelection: () => void;
   updateRoomName: (roomId: string, name: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
@@ -274,6 +309,12 @@ type EditorState = {
     roomId: string,
     assetId: string,
     previousCenter: Point,
+    nextCenter: Point
+  ) => void;
+  commitInteriorAssetMoveToRoom: (
+    fromRoomId: string,
+    toRoomId: string,
+    assetId: string,
     nextCenter: Point
   ) => void;
   previewInteriorAssetResize: (
@@ -369,6 +410,26 @@ function createStairConnectionId(): string {
   }
 
   return `stair-connection-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+/**
+ * Generate a duplicate name with smart incrementing.
+ * E.g., "Living Room" -> "Copy of Living Room" -> "Copy of Living Room 2" -> "Copy of Living Room 3"
+ */
+function generateDuplicateName(baseName: string, existingNames: Set<string>): string {
+  const copyPrefix = "Copy of ";
+  const candidateName = `${copyPrefix}${baseName}`;
+
+  if (!existingNames.has(candidateName)) {
+    return candidateName;
+  }
+
+  let counter = 2;
+  while (existingNames.has(`${copyPrefix}${baseName} ${counter}`)) {
+    counter++;
+  }
+
+  return `${copyPrefix}${baseName} ${counter}`;
 }
 
 function getConnectedFloorAvailability(document: DocumentState, floorId: string) {
@@ -1256,6 +1317,109 @@ function getSelectedInteriorAssetAfterHistoryCommand(
   return getSelectedInteriorAssetIfExists(selectedInteriorAsset, nextDocument);
 }
 
+/**
+ * Returns the floor the user should be viewing immediately after applying a history command,
+ * so the modified item is visible. Returns null if no floor switch is needed.
+ */
+function getTargetFloorForHistoryCommand(
+  command: EditorCommand,
+  documentAfterCommand: DocumentState,
+  direction: "undo" | "redo"
+): string | null {
+  const findFloorForRoom = (roomId: string): string | null => {
+    const room = documentAfterCommand.rooms.find((r) => r.id === roomId);
+    return room ? getRoomFloorId(room, documentAfterCommand) : null;
+  };
+
+  switch (command.type) {
+    case "complete-room":
+      // Room removed by undo — floor was recorded on the room at creation time.
+      return command.room.floorId ?? null;
+
+    case "delete-room":
+      if (direction === "redo") {
+        // Room is removed again on redo, so rely on recorded room floor.
+        return command.room.floorId ?? null;
+      }
+      // Room restored by undo — find it in post-undo document.
+      return findFloorForRoom(command.room.id) ?? command.room.floorId ?? null;
+
+    case "rename-room":
+    case "resize-room":
+    case "move-room":
+      return findFloorForRoom(command.roomId);
+
+    case "add-opening":
+    case "delete-opening":
+    case "move-opening":
+    case "update-opening":
+    case "add-interior-asset":
+    case "delete-interior-asset":
+    case "move-interior-asset":
+    case "update-interior-asset":
+      return findFloorForRoom(command.roomId);
+
+    case "paste-rooms":
+      return command.floorId;
+
+    case "paste-interior-asset":
+      return findFloorForRoom(command.targetRoomId);
+
+    case "paste-interior-assets":
+      return findFloorForRoom(command.targetRoomId);
+
+    case "cut-rooms": {
+      if (command.cutRooms.length === 0) return null;
+      return findFloorForRoom(command.cutRooms[0].id) ?? command.cutRooms[0].floorId ?? null;
+    }
+
+    case "cut-interior-asset":
+      return findFloorForRoom(command.roomId);
+
+    case "move-interior-asset-to-room":
+      return findFloorForRoom(direction === "undo" ? command.fromRoomId : command.toRoomId);
+
+    case "bulk-delete": {
+      for (const sub of command.deleteCommands) {
+        if (sub.type === "delete-room") {
+          return findFloorForRoom(sub.room.id) ?? sub.room.floorId ?? null;
+        }
+      }
+      for (const sub of command.deleteCommands) {
+        if (sub.type !== "delete-room") {
+          const floor = findFloorForRoom(sub.roomId);
+          if (floor) return floor;
+        }
+      }
+      return null;
+    }
+
+    case "bulk-duplicate": {
+      if (command.duplicatedRooms.length > 0) return command.duplicatedRooms[0].floorId ?? null;
+      if (command.duplicatedAssets.length > 0) {
+        return findFloorForRoom(command.duplicatedAssets[0].roomId);
+      }
+      return null;
+    }
+
+    case "move-selection-to-floor":
+      if (command.movedRooms.length > 0) {
+        return direction === "undo" ? command.movedRooms[0].previousFloorId : command.targetFloorId;
+      }
+      if (command.movedAssets.length > 0) {
+        if (direction === "redo") return command.targetFloorId;
+        return findFloorForRoom(command.movedAssets[0].roomId);
+      }
+      return null;
+
+    case "reorder-rooms-in-floor":
+      return command.floorId;
+
+    default:
+      return null;
+  }
+}
+
 function getSelectedWallHostRoom(
   document: DocumentState,
   selectedWall: RoomWallSelection | null
@@ -1292,6 +1456,7 @@ function insertOpeningOnSelectedWall(
     selectedWall: null,
     selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
     selectedInteriorAsset: null,
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, id: opening.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -1322,6 +1487,7 @@ function insertDefaultStairOnSelectedRoom(
     selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
     selectedOpening: null,
     selectedWall: null,
+    selection: [{ type: "stair" as const, roomId: room.id, id: asset.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -1677,12 +1843,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  selection: [],
   isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   interiorAssetRenameSession: null,
   interiorAssetArrowLabelSession: null,
   floorRenameSession: null,
+  clipboard: null,
   history: {
     past: hydratedHistoryState.past,
     future: hydratedHistoryState.future,
@@ -2060,12 +2228,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const previousActiveFloorId = getNormalizedActiveFloorId(state.document);
       if (nextActiveFloorId === previousActiveFloorId) return state;
 
-      const command: EditorCommand = {
-        type: "switch-floor",
-        previousActiveFloorId,
-        nextActiveFloorId,
-      };
-      const nextDocument = applyEditorCommand(state.document, command, "redo");
+      // Floor switches are not undoable — update activeFloorId directly without history entry.
+      const nextDocument = { ...state.document, activeFloorId: nextActiveFloorId };
 
       return {
         document: nextDocument,
@@ -2076,16 +2240,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           state.selectedInteriorAsset,
           nextDocument
         ),
+        selection: [{ type: "floor" as const, id: nextActiveFloorId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
-        history: {
-          past: pushToPast(state.history.past, command),
-          future: [],
-        },
-        canUndo: true,
-        canRedo: false,
       };
     }),
   panCameraByPx: (delta) => {
@@ -2232,6 +2391,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: roomId ? [{ type: "room" as const, id: roomId }] : [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2249,6 +2409,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedWall: null,
           selectedOpening: null,
           selectedInteriorAsset: null,
+          selection: [{ type: "room" as const, id: roomId }],
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
           interiorAssetRenameSession: null,
@@ -2270,6 +2431,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: { roomId, wall },
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [{ type: "wall" as const, roomId, wall }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2295,6 +2457,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: { roomId, openingId },
         selectedInteriorAsset: null,
+        selection: [{ type: "opening" as const, roomId, id: openingId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2320,6 +2483,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: { roomId, assetId },
+        selection: [{ type: "stair" as const, roomId, id: assetId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2331,6 +2495,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedOpening === null) return state;
       return {
         selectedOpening: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       };
     }),
   clearSelectedInteriorAsset: () =>
@@ -2338,6 +2503,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedInteriorAsset === null) return state;
       return {
         selectedInteriorAsset: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
       };
@@ -2347,6 +2513,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedWall === null) return state;
       return {
         selectedWall: null,
+        selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       };
     }),
   clearRoomSelection: () =>
@@ -2356,10 +2523,678 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedWall: null,
       selectedOpening: null,
       selectedInteriorAsset: null,
+      selection: [],
       shouldFocusSelectedRoomNameInput: false,
       renameSession: null,
       interiorAssetRenameSession: null,
       interiorAssetArrowLabelSession: null,
+    }),
+  selectItems: (items) =>
+    set((state) => {
+      if (
+        state.selection.length === items.length &&
+        state.selection.every((existing, index) => {
+          const item = items[index];
+          if (existing.type !== item.type) return false;
+          if (existing.type === "room" && item.type === "room") return existing.id === item.id;
+          if (existing.type === "wall" && item.type === "wall") {
+            return existing.roomId === item.roomId && existing.wall === item.wall;
+          }
+          if (existing.type === "opening" && item.type === "opening") {
+            return existing.roomId === item.roomId && existing.id === item.id;
+          }
+          if (existing.type === "stair" && item.type === "stair") {
+            return existing.roomId === item.roomId && existing.id === item.id;
+          }
+          if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
+          return false;
+        })
+      ) {
+        return state;
+      }
+      return {
+        selection: items,
+      };
+    }),
+  clearSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+      return {
+        selection: [],
+      };
+    }),
+  addToSelection: (item) =>
+    set((state) => {
+      const exists = state.selection.some((existing) => {
+        if (existing.type !== item.type) return false;
+        if (existing.type === "room" && item.type === "room") return existing.id === item.id;
+        if (existing.type === "wall" && item.type === "wall") {
+          return existing.roomId === item.roomId && existing.wall === item.wall;
+        }
+        if (existing.type === "opening" && item.type === "opening") {
+          return existing.roomId === item.roomId && existing.id === item.id;
+        }
+        if (existing.type === "stair" && item.type === "stair") {
+          return existing.roomId === item.roomId && existing.id === item.id;
+        }
+        if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
+        return false;
+      });
+      if (exists) return state;
+      return {
+        selection: [...state.selection, item],
+      };
+    }),
+  removeFromSelection: (item) =>
+    set((state) => {
+      const nextSelection = state.selection.filter((existing) => {
+        if (existing.type !== item.type) return true;
+        if (existing.type === "room" && item.type === "room") return existing.id !== item.id;
+        if (existing.type === "wall" && item.type === "wall") {
+          return !(existing.roomId === item.roomId && existing.wall === item.wall);
+        }
+        if (existing.type === "opening" && item.type === "opening") {
+          return !(existing.roomId === item.roomId && existing.id === item.id);
+        }
+        if (existing.type === "stair" && item.type === "stair") {
+          return !(existing.roomId === item.roomId && existing.id === item.id);
+        }
+        if (existing.type === "floor" && item.type === "floor") return existing.id !== item.id;
+        return true;
+      });
+      if (nextSelection.length === state.selection.length) return state;
+      return {
+        selection: nextSelection,
+      };
+    }),
+  copySelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const item = state.selection[0];
+      if (!item) return state;
+
+      if (item.type === "room") {
+        const selectedRoomItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "room" }> =>
+            selectionItem.type === "room"
+        );
+        const rooms = selectedRoomItems
+          .map((selectionItem) => state.document.rooms.find((r) => r.id === selectionItem.id))
+          .filter((room): room is Room => Boolean(room))
+          .map((room) => cloneRoom(room));
+        if (rooms.length === 0) return state;
+
+        return {
+          clipboard: {
+            type: "room",
+            source: "copy" as const,
+            rooms,
+          },
+        };
+      }
+
+      if (item.type === "stair") {
+        const selectedStairItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
+            selectionItem.type === "stair"
+        );
+        const assets = selectedStairItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
+            if (!room || !asset) return null;
+
+            return {
+              asset: cloneRoomInteriorAsset(asset),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { asset: RoomInteriorAsset; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (assets.length === 0) return state;
+
+        const firstAsset = assets[0];
+        if (!firstAsset) return state;
+
+        return {
+          clipboard: {
+            type: "stair",
+            source: "copy" as const,
+            asset: firstAsset.asset,
+            sourceRoomId: firstAsset.sourceRoomId,
+            assets,
+          },
+        };
+      }
+
+      return state;
+    }),
+  pasteSelection: () =>
+    set((state) => {
+      if (!state.clipboard) return state;
+
+      const activeFloorId = getNormalizedActiveFloorId(state.document);
+      const PASTE_OFFSET_MM = 500; // Offset new items 500mm from originals
+
+      if (state.clipboard.type === "room") {
+        // Paste rooms with offset and smart naming for all inserted rooms
+        const isCopy = state.clipboard.source === "copy";
+        const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
+        const pastedRooms: Room[] = [];
+
+        for (const room of state.clipboard.rooms) {
+          const newId = createRoomId();
+          const pasteName = generateDuplicateName(room.name, existingRoomNames);
+          existingRoomNames.add(pasteName);
+          const points = isCopy
+            ? room.points.map((p) => ({ x: p.x + PASTE_OFFSET_MM, y: p.y + PASTE_OFFSET_MM }))
+            : room.points.map((p) => ({ ...p }));
+
+          const pastedRoom: Room = {
+            ...cloneRoom(room),
+            id: newId,
+            name: pasteName,
+            floorId: activeFloorId,
+            points,
+          };
+
+          for (const asset of pastedRoom.interiorAssets) {
+            if (isInteriorAssetWithinRoom(pastedRoom, asset)) continue;
+
+            const constrained = constrainInteriorAssetCenter(pastedRoom, asset, {
+              x: asset.xMm,
+              y: asset.yMm,
+            });
+
+            if (!constrained) {
+              toast("Stairs don't fit in that room.");
+              return state;
+            }
+
+            asset.xMm = constrained.x;
+            asset.yMm = constrained.y;
+          }
+
+          pastedRooms.push(pastedRoom);
+        }
+
+        const command: EditorCommand = {
+          type: "paste-rooms",
+          pastedRooms,
+          floorId: activeFloorId,
+        };
+
+        return {
+          document: applyEditorCommand(state.document, command, "redo"),
+          selectedRoomId: pastedRooms[0]?.id ?? null,
+          selectedWall: null,
+          selectedOpening: null,
+          selectedInteriorAsset: null,
+          selection: pastedRooms.map((room) => ({ type: "room" as const, id: room.id })),
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      if (state.clipboard.type === "stair") {
+        // Paste stair into the explicitly selected room on the active floor.
+        const targetRoomId = state.selectedRoomId;
+
+        if (!targetRoomId) {
+          toast("Select a room on this floor first to paste here.");
+          return state;
+        }
+
+        const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
+        if (!targetRoom || (targetRoom.floorId ?? activeFloorId) !== activeFloorId) {
+          toast("Select a room on this floor first to paste here.");
+          return state;
+        }
+
+        // Support both single-item and multi-item stair clipboard payloads
+        // without requiring clipboard shape changes.
+        const rawClipboard = state.clipboard as unknown as {
+          asset?: RoomInteriorAsset | RoomInteriorAsset[];
+          sourceRoomId?: string;
+          assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
+        };
+        const clipboardAssets = Array.isArray(rawClipboard.assets)
+          ? rawClipboard.assets
+          : Array.isArray(rawClipboard.asset)
+            ? rawClipboard.asset.map((asset) => ({
+                asset,
+                sourceRoomId: rawClipboard.sourceRoomId ?? targetRoomId,
+              }))
+            : rawClipboard.asset
+              ? [
+                  {
+                    asset: rawClipboard.asset,
+                    sourceRoomId: rawClipboard.sourceRoomId ?? targetRoomId,
+                  },
+                ]
+              : [];
+        if (clipboardAssets.length === 0) return state;
+
+        const existingAssetNames = new Set(targetRoom.interiorAssets.map((a) => a.name));
+        const isCopyStair = state.clipboard.source === "copy";
+        const pastedItems: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }> = [];
+
+        for (const stairClipboardItem of clipboardAssets) {
+          const sourceAsset = stairClipboardItem.asset;
+          const newAssetId = createInteriorAssetId();
+          const pasteName = generateDuplicateName(sourceAsset.name, existingAssetNames);
+          existingAssetNames.add(pasteName);
+
+          let pastedAsset: RoomInteriorAsset = {
+            ...cloneRoomInteriorAsset(sourceAsset),
+            id: newAssetId,
+            name: pasteName,
+            xMm: isCopyStair ? sourceAsset.xMm + PASTE_OFFSET_MM : sourceAsset.xMm,
+            yMm: isCopyStair ? sourceAsset.yMm + PASTE_OFFSET_MM : sourceAsset.yMm,
+          };
+
+          // Bounds check: nudge into room if out of bounds
+          if (!isInteriorAssetWithinRoom(targetRoom, pastedAsset)) {
+            const constrained = constrainInteriorAssetCenter(targetRoom, pastedAsset, {
+              x: pastedAsset.xMm,
+              y: pastedAsset.yMm,
+            });
+            if (constrained) {
+              pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
+            } else {
+              // Room is too small — abort and notify
+              toast("Stairs don't fit in that room.");
+              return state;
+            }
+          }
+
+          pastedItems.push({
+            asset: pastedAsset,
+            sourceRoomId: stairClipboardItem.sourceRoomId,
+          });
+        }
+
+        const newSelection: SharedSelectionItem[] = [];
+        for (const pastedItem of pastedItems) {
+          newSelection.push({
+            type: "stair" as const,
+            roomId: targetRoomId,
+            id: pastedItem.asset.id,
+          });
+        }
+
+        const command: EditorCommand = {
+          type: "paste-interior-assets",
+          pastedAssets: pastedItems.map((item) => ({
+            asset: cloneRoomInteriorAsset(item.asset),
+            sourceRoomId: item.sourceRoomId,
+          })),
+          targetRoomId,
+        };
+
+        const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+        return {
+          document: nextDocument,
+          selectedRoomId: targetRoomId,
+          selectedWall: null,
+          selectedOpening: null,
+          selectedInteriorAsset:
+            pastedItems.length > 0
+              ? { roomId: targetRoomId, assetId: pastedItems[pastedItems.length - 1].asset.id }
+              : null,
+          selection: newSelection,
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      return state;
+    }),
+  cutSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const item = state.selection[0];
+      if (!item) return state;
+
+      if (item.type === "room") {
+        const roomIndex = state.document.rooms.findIndex((r) => r.id === item.id);
+        const room = state.document.rooms[roomIndex];
+        if (!room || roomIndex === -1) return state;
+
+        const command: EditorCommand = {
+          type: "cut-rooms",
+          cutRooms: [cloneRoom(room)],
+          previousIndex: roomIndex,
+        };
+
+        return {
+          clipboard: {
+            type: "room",
+            source: "cut" as const,
+            rooms: [cloneRoom(room)],
+          },
+          document: applyEditorCommand(state.document, command, "redo"),
+          selectedRoomId: null,
+          selectedWall: null,
+          selectedOpening: null,
+          selectedInteriorAsset: null,
+          selection: [],
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      if (item.type === "stair") {
+        const selectedStairItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
+            selectionItem.type === "stair"
+        );
+        const assetsToCut = selectedStairItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
+            if (!room || !asset) return null;
+
+            return {
+              asset: cloneRoomInteriorAsset(asset),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { asset: RoomInteriorAsset; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (assetsToCut.length === 0) return state;
+
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+        for (const stairToCut of assetsToCut) {
+          const command: EditorCommand = {
+            type: "cut-interior-asset",
+            cutAsset: cloneRoomInteriorAsset(stairToCut.asset),
+            roomId: stairToCut.sourceRoomId,
+          };
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+        }
+
+        const firstAsset = assetsToCut[0];
+        if (!firstAsset) return state;
+
+        return {
+          clipboard: {
+            type: "stair",
+            source: "cut" as const,
+            asset: cloneRoomInteriorAsset(firstAsset.asset),
+            sourceRoomId: firstAsset.sourceRoomId,
+            assets: assetsToCut.map((stairToCut) => ({
+              asset: cloneRoomInteriorAsset(stairToCut.asset),
+              sourceRoomId: stairToCut.sourceRoomId,
+            })),
+          },
+          document: nextDocument,
+          selectedRoomId: firstAsset.sourceRoomId,
+          selectedInteriorAsset: null,
+          selection: [{ type: "room" as const, id: firstAsset.sourceRoomId }],
+          history: {
+            past: nextPast,
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      return state;
+    }),
+  duplicateSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const activeFloorId = getNormalizedActiveFloorId(state.document);
+      const DUPLICATE_OFFSET_MM = 500; // Offset duplicates 500mm from originals
+
+      // Collect all existing names for smart naming
+      const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
+      const existingAssetNames = new Map<string, Set<string>>();
+      for (const room of state.document.rooms) {
+        existingAssetNames.set(
+          room.id,
+          new Set(room.interiorAssets.map((a) => a.name))
+        );
+      }
+
+      const duplicatedRooms: Room[] = [];
+      const duplicatedAssets: Array<{ roomId: string; asset: RoomInteriorAsset }> = [];
+      const newSelection: SharedSelectionItem[] = [];
+
+      // Process each item in selection
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.id);
+          if (!sourceRoom) continue;
+
+          // Create duplicate with new ID and smart name
+          const duplicateName = generateDuplicateName(sourceRoom.name, existingRoomNames);
+          existingRoomNames.add(duplicateName);
+
+          const newRoomId = createRoomId();
+          const offsetPoints = sourceRoom.points.map((p) => ({
+            x: p.x + DUPLICATE_OFFSET_MM,
+            y: p.y + DUPLICATE_OFFSET_MM,
+          }));
+
+          const duplicateRoom: Room = {
+            ...cloneRoom(sourceRoom),
+            id: newRoomId,
+            name: duplicateName,
+            floorId: sourceRoom.floorId ?? activeFloorId,
+            points: offsetPoints,
+          };
+
+          duplicatedRooms.push(duplicateRoom);
+          newSelection.push({ type: "room" as const, id: newRoomId });
+        }
+
+        if (item.type === "stair") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.roomId);
+          const sourceAsset = sourceRoom?.interiorAssets.find((a) => a.id === item.id);
+          if (!sourceRoom || !sourceAsset) continue;
+
+          // Create duplicate with new ID and smart name
+          const roomAssetNames = existingAssetNames.get(sourceRoom.id) ?? new Set();
+          const duplicateName = generateDuplicateName(sourceAsset.name, roomAssetNames);
+          roomAssetNames.add(duplicateName);
+          existingAssetNames.set(sourceRoom.id, roomAssetNames);
+
+          const newAssetId = createInteriorAssetId();
+          const duplicateAsset: RoomInteriorAsset = {
+            ...cloneRoomInteriorAsset(sourceAsset),
+            id: newAssetId,
+            name: duplicateName,
+            xMm: sourceAsset.xMm + DUPLICATE_OFFSET_MM,
+            yMm: sourceAsset.yMm + DUPLICATE_OFFSET_MM,
+          };
+
+          duplicatedAssets.push({
+            roomId: sourceRoom.id,
+            asset: duplicateAsset,
+          });
+          newSelection.push({ type: "stair" as const, roomId: sourceRoom.id, id: newAssetId });
+        }
+      }
+
+      // If nothing was duplicated, return unchanged state
+      if (duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "bulk-duplicate",
+        duplicatedRooms,
+        duplicatedAssets,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRoomId: duplicatedRooms[0]?.id ?? state.selectedRoomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset:
+          duplicatedAssets[0] && duplicatedAssets[0].roomId
+            ? {
+                roomId: duplicatedAssets[0].roomId,
+                assetId: duplicatedAssets[0].asset.id,
+              }
+            : null,
+        selection: newSelection.length > 0 ? newSelection : [],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  moveSelectionToFloor: (targetFloorId) =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      const targetFloor = state.document.floors.find((f) => f.id === targetFloorId);
+      if (!targetFloor) return state;
+
+      const hasStairSelection = state.selection.some((item) => item.type === "stair");
+      const selectedTargetRoom = state.selectedRoomId
+        ? state.document.rooms.find((room) => room.id === state.selectedRoomId)
+        : null;
+      if (hasStairSelection) {
+        if (!selectedTargetRoom || selectedTargetRoom.floorId !== targetFloorId) {
+          toast("Select a room on this floor first to paste here.");
+          return state;
+        }
+      }
+
+      const movedRooms: Array<{ room: Room; previousFloorId: string }> = [];
+      const movedAssets: Array<{ roomId: string; asset: RoomInteriorAsset; previousRoomId: string }> = [];
+
+      // Process each item in selection
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const room = state.document.rooms.find((r) => r.id === item.id);
+          if (!room) continue;
+
+          // Only move if the floor is different
+          if (room.floorId === targetFloorId) continue;
+
+          movedRooms.push({
+            room: cloneRoom(room),
+            previousFloorId: room.floorId,
+          });
+        }
+
+        if (item.type === "stair") {
+          const room = state.document.rooms.find((r) => r.id === item.roomId);
+          const asset = room?.interiorAssets.find((a) => a.id === item.id);
+          if (!room || !asset) continue;
+
+          movedAssets.push({
+            roomId: item.roomId,
+            asset: cloneRoomInteriorAsset(asset),
+            previousRoomId: item.roomId,
+          });
+        }
+      }
+
+      // If nothing was moved, return unchanged state
+      if (movedRooms.length === 0 && movedAssets.length === 0) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "move-selection-to-floor",
+        targetFloorId,
+        targetRoomId: selectedTargetRoom?.id ?? null,
+        movedRooms,
+        movedAssets,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+      const nextSelection = state.selection.map((item) => {
+        if (item.type !== "stair") return item;
+        if (!selectedTargetRoom) return item;
+        return {
+          type: "stair" as const,
+          roomId: selectedTargetRoom.id,
+          id: item.id,
+        };
+      });
+
+      return {
+        document: nextDocument,
+        selectedRoomId: movedRooms[0]?.room.id ?? selectedTargetRoom?.id ?? state.selectedRoomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: nextSelection,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  reorderRoomInFloor: (roomId, targetIndex) =>
+    set((state) => {
+      const room = state.document.rooms.find((r) => r.id === roomId);
+      if (!room) return state;
+
+      // Get rooms for this floor
+      const floorRooms = state.document.rooms.filter((r) => r.floorId === room.floorId);
+      
+      // Find current index of room within floor
+      const currentIndex = floorRooms.findIndex((r) => r.id === roomId);
+      if (currentIndex === -1 || targetIndex < 0 || targetIndex >= floorRooms.length) {
+        return state;
+      }
+
+      // If already at target, no-op
+      if (currentIndex === targetIndex) return state;
+
+      const command: EditorCommand = {
+        type: "reorder-rooms-in-floor",
+        floorId: room.floorId,
+        roomId,
+        fromIndex: currentIndex,
+        toIndex: targetIndex,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   setCanvasInteractionActive: (isActive) =>
     set((state) => {
@@ -2887,6 +3722,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedWall: null,
           selectedOpening: null,
           selectedInteriorAsset: null,
+          selection: [],
           shouldFocusSelectedRoomNameInput: false,
           renameSession: null,
         };
@@ -2913,6 +3749,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         history: {
@@ -2933,6 +3770,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room || !opening) {
         return {
           selectedOpening: null,
+          selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         };
       }
 
@@ -2946,6 +3784,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedOpening: null,
+        selection: [{ type: "room" as const, id: room.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -2964,6 +3803,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room || !asset) {
         return {
           selectedInteriorAsset: null,
+          selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         };
       }
 
@@ -2977,6 +3817,121 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: room.id }],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  bulkDeleteSelection: () =>
+    set((state) => {
+      if (state.selection.length === 0) return state;
+
+      // If only one item selected, route to specific delete functions
+      if (state.selection.length === 1) {
+        return state; // Caller should handle single-item delete
+      }
+
+      // Collect all delete commands from selection
+      const deleteCommands: EditorCommand[] = [];
+      const roomsToDelete = new Set<string>();
+      let roomCount = 0;
+      let openingCount = 0;
+      let stairCount = 0;
+
+      for (const item of state.selection) {
+        if (item.type === "room") {
+          const roomIndex = state.document.rooms.findIndex((r) => r.id === item.id);
+          if (roomIndex >= 0) {
+            const room = state.document.rooms[roomIndex];
+            deleteCommands.push({
+              type: "delete-room",
+              room: {
+                id: room.id,
+                floorId: room.floorId,
+                name: room.name,
+                points: room.points.map((p) => ({ ...p })),
+                openings: cloneRoomOpenings(room.openings),
+                interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
+              },
+              previousIndex: roomIndex,
+            } as EditorCommand);
+            roomsToDelete.add(room.id);
+            roomCount++;
+          }
+        } else if (item.type === "opening" && item.roomId && item.id) {
+          // Only delete openings from rooms that aren't being deleted
+          if (!roomsToDelete.has(item.roomId)) {
+            const room = state.document.rooms.find((r) => r.id === item.roomId);
+            const opening = room?.openings.find((o) => o.id === item.id);
+            if (room && opening) {
+              deleteCommands.push({
+                type: "delete-opening",
+                roomId: room.id,
+                opening: cloneRoomOpening(opening),
+              } as EditorCommand);
+              openingCount++;
+            }
+          }
+        } else if (item.type === "stair" && item.roomId && item.id) {
+          // Only delete stairs from rooms that aren't being deleted
+          if (!roomsToDelete.has(item.roomId)) {
+            const room = state.document.rooms.find((r) => r.id === item.roomId);
+            const asset = room?.interiorAssets.find((a) => a.id === item.id);
+            if (room && asset) {
+              deleteCommands.push({
+                type: "delete-interior-asset",
+                roomId: room.id,
+                asset: cloneRoomInteriorAsset(asset),
+              } as EditorCommand);
+              stairCount++;
+            }
+          }
+        }
+      }
+
+      if (deleteCommands.length === 0) return state;
+
+      // Build bulk delete command
+      const command: EditorCommand = {
+        type: "bulk-delete",
+        deleteCommands,
+      } as EditorCommand;
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      // Show confirmation toast with counts
+      const parts = [];
+      if (roomCount > 0) parts.push(`${roomCount} room${roomCount > 1 ? "s" : ""}`);
+      if (openingCount > 0) parts.push(`${openingCount} opening${openingCount > 1 ? "s" : ""}`);
+      if (stairCount > 0) parts.push(`${stairCount} stair${stairCount > 1 ? "s" : ""}`);
+      const confirmationText = parts.join(" and ");
+
+      toast(`Deleted ${confirmationText}`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const currentState = useEditorStore.getState();
+            const latestCommand = currentState.history.past[currentState.history.past.length - 1];
+            if (latestCommand?.type !== "bulk-delete") {
+              return;
+            }
+            currentState.undo();
+          },
+        },
+      });
+
+      return {
+        document: nextDocument,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -3360,6 +4315,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  commitInteriorAssetMoveToRoom: (fromRoomId, toRoomId, assetId, nextCenter) =>
+    set((state) => {
+      const fromRoom = state.document.rooms.find((candidate) => candidate.id === fromRoomId);
+      const toRoom = state.document.rooms.find((candidate) => candidate.id === toRoomId);
+      const asset = fromRoom?.interiorAssets.find((candidate) => candidate.id === assetId);
+      if (!fromRoom || !toRoom || !asset) return state;
+
+      let finalCenter = nextCenter;
+
+      // Bounds check: if the asset center would land outside the target room, nudge it in
+      const candidateAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        xMm: nextCenter.x,
+        yMm: nextCenter.y,
+      };
+      if (!isInteriorAssetWithinRoom(toRoom, candidateAsset)) {
+        const constrained = constrainInteriorAssetCenter(toRoom, candidateAsset, nextCenter);
+        if (constrained) {
+          finalCenter = constrained;
+        } else {
+          toast("Stairs don't fit in that room.", {
+            description: "Try a smaller stair block or a larger room.",
+          });
+          return state;
+        }
+      }
+
+      const movedAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        xMm: finalCenter.x,
+        yMm: finalCenter.y,
+      };
+
+      const command: EditorCommand = {
+        type: "move-interior-asset-to-room",
+        assetId,
+        fromRoomId,
+        toRoomId,
+        asset: movedAsset,
+      };
+
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        selectedRoomId: toRoomId,
+        selectedInteriorAsset: { roomId: toRoomId, assetId },
+        selection: [{ type: "stair" as const, roomId: toRoomId, id: assetId }],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   previewInteriorAssetResize: (roomId, assetId, nextAsset) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -3639,21 +4650,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];
 
+      // If the command happened on a different floor than the one currently viewed,
+      // restore the view to that floor so the user sees the undone change.
+      const targetFloor = getTargetFloorForHistoryCommand(command, nextDocument, "undo");
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
       return {
-        document: nextDocument,
-        camera: syncCameraRotationToDocument(state.camera, nextDocument),
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
-          nextDocument,
+          restoredDocument,
           command,
           "undo"
         ),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
-          nextDocument,
+          restoredDocument,
           command,
           "undo"
         ),
@@ -3676,21 +4696,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
       const nextPast = pushToPast(state.history.past, command);
 
+      const targetFloor = getTargetFloorForHistoryCommand(command, nextDocument, "redo");
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
       return {
-        document: nextDocument,
-        camera: syncCameraRotationToDocument(state.camera, nextDocument),
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
-          nextDocument,
+          restoredDocument,
           command,
           "redo"
         ),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
-          nextDocument,
+          restoredDocument,
           command,
           "redo"
         ),
@@ -3768,10 +4795,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
+        selection: [],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
+        clipboard: null,
         history: {
           past: [],
           future: [],

@@ -15,6 +15,7 @@ export type EditorSettings = {
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
   exportSignatureText: string;
+  multiSelectModeEnabled: boolean;
 };
 
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
@@ -28,6 +29,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   snappingEnabled: true,
   showFloorFootprint: true,
   exportSignatureText: "",
+  multiSelectModeEnabled: false,
 };
 
 export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
@@ -42,6 +44,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
     exportSignatureText: settings.exportSignatureText,
+    multiSelectModeEnabled: settings.multiSelectModeEnabled,
   };
 }
 
@@ -56,7 +59,8 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
-    a.exportSignatureText === b.exportSignatureText
+    a.exportSignatureText === b.exportSignatureText &&
+    a.multiSelectModeEnabled === b.multiSelectModeEnabled
   );
 }
 
@@ -144,6 +148,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "exportSignatureText" in value && typeof value.exportSignatureText === "string"
         ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)
         : DEFAULT_EDITOR_SETTINGS.exportSignatureText,
+    multiSelectModeEnabled:
+      "multiSelectModeEnabled" in value && typeof value.multiSelectModeEnabled === "boolean"
+        ? value.multiSelectModeEnabled
+        : DEFAULT_EDITOR_SETTINGS.multiSelectModeEnabled,
   };
 }
 

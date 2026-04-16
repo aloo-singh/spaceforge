@@ -6,8 +6,13 @@ export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
   | "toggle-guidelines"
   | "toggle-snapping"
+  | "multi-select-toggle"
   | "undo"
   | "redo"
+  | "copy"
+  | "cut"
+  | "paste"
+  | "duplicate-selection"
   | "delete-selection"
   | "hold-pan"
   | "cancel-draft-or-clear-selection"
@@ -77,6 +82,20 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
   },
   {
+    id: "multi-select-toggle",
+    section: "Edit",
+    keyCombination: "Hold Primary (Cmd/Ctrl)",
+    description: "Temporarily enable multi-select while held",
+    macKeys: "Hold Cmd",
+    windowsKeys: "Hold Ctrl",
+    type: "toggle",
+    bindings: [
+      { key: "Meta", metaKey: true, ctrlKey: false, altKey: false },
+      { key: "Control", ctrlKey: true, metaKey: false, altKey: false },
+    ],
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Multi-select enabled" : null),
+  },
+  {
     id: "undo",
     section: "Edit",
     keyCombination: "Primary+Z",
@@ -100,6 +119,50 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "y", code: "KeyY", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false },
     ],
     sonnerMessage: ({ actionLabel }) => `Redo ${actionLabel ?? "action"}`,
+  },
+  {
+    id: "copy",
+    section: "Edit",
+    keyCombination: "Primary+C",
+    description: "Copy the current selection",
+    macKeys: "Cmd+C",
+    windowsKeys: "Ctrl+C",
+    type: "action",
+    bindings: [{ key: "c", code: "KeyC", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Copied to clipboard",
+  },
+  {
+    id: "paste",
+    section: "Edit",
+    keyCombination: "Primary+V",
+    description: "Paste the copied selection",
+    macKeys: "Cmd+V",
+    windowsKeys: "Ctrl+V",
+    type: "action",
+    bindings: [{ key: "v", code: "KeyV", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Pasted from clipboard",
+  },
+  {
+    id: "cut",
+    section: "Edit",
+    keyCombination: "Primary+X",
+    description: "Cut the current selection",
+    macKeys: "Cmd+X",
+    windowsKeys: "Ctrl+X",
+    type: "action",
+    bindings: [{ key: "x", code: "KeyX", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: "Cut to clipboard",
+  },
+  {
+    id: "duplicate-selection",
+    section: "Edit",
+    keyCombination: "Primary+D",
+    description: "Duplicate the current selection",
+    macKeys: "Cmd+D",
+    windowsKeys: "Ctrl+D",
+    type: "action",
+    bindings: [{ key: "d", code: "KeyD", primaryModifier: true, altKey: false, shiftKey: false }],
+    sonnerMessage: ({ actionLabel }) => actionLabel ?? "Selection duplicated",
   },
   {
     id: "delete-selection",
@@ -193,13 +256,13 @@ export function getKeyboardShortcutFeedbackMessage(
     : shortcut.sonnerMessage;
 }
 
-export function showKeyboardShortcutFeedbackToast(message: string) {
-  if (activeKeyboardShortcutFeedbackToastId !== null) {
-    toast.dismiss(activeKeyboardShortcutFeedbackToastId);
-  }
-
+export function showKeyboardShortcutFeedbackToast(
+  message: string,
+  options?: { durationMs?: number }
+) {
   const id = toast(message, {
-    duration: KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
+    id: activeKeyboardShortcutFeedbackToastId ?? undefined,
+    duration: options?.durationMs ?? KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
     onDismiss: () => {
       if (activeKeyboardShortcutFeedbackToastId === id) {
         activeKeyboardShortcutFeedbackToastId = null;
@@ -210,11 +273,19 @@ export function showKeyboardShortcutFeedbackToast(message: string) {
   activeKeyboardShortcutFeedbackToastId = id;
 }
 
+export function dismissKeyboardShortcutFeedbackToast() {
+  if (activeKeyboardShortcutFeedbackToastId === null) return;
+
+  toast.dismiss(activeKeyboardShortcutFeedbackToastId);
+  activeKeyboardShortcutFeedbackToastId = null;
+}
+
 export function showKeyboardShortcutFeedback(
   shortcutId: EditorKeyboardShortcutId,
   options: {
     feedbackEnabled: boolean;
     context?: KeyboardShortcutFeedbackContext;
+    durationMs?: number;
   }
 ) {
   if (!options.feedbackEnabled) return;
@@ -222,7 +293,7 @@ export function showKeyboardShortcutFeedback(
   const message = getKeyboardShortcutFeedbackMessage(shortcutId, options.context);
   if (!message) return;
 
-  showKeyboardShortcutFeedbackToast(message);
+  showKeyboardShortcutFeedbackToast(message, { durationMs: options.durationMs });
 }
 
 export function getHistoryCommandActionLabel(command: EditorCommand | undefined): string {
@@ -286,6 +357,44 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
 
   if (command.type === "move-interior-asset") {
     return "interior asset move";
+  }
+
+  if (command.type === "bulk-duplicate") {
+    const roomCount = command.duplicatedRooms.length;
+    const stairCount = command.duplicatedAssets.length;
+    if (roomCount > 0 && stairCount > 0) return "rooms and stairs duplication";
+    if (roomCount > 1) return "rooms duplication";
+    if (roomCount === 1) return "room duplication";
+    if (stairCount > 1) return "stairs duplication";
+    if (stairCount === 1) return "stair duplication";
+    return "selection duplication";
+  }
+
+  if (command.type === "move-selection-to-floor") {
+    const roomCount = command.movedRooms.length;
+    const stairCount = command.movedAssets.length;
+    if (roomCount > 0 && stairCount > 0) return "rooms and stairs move";
+    if (roomCount > 1) return "rooms move";
+    if (roomCount === 1) return "room move";
+    if (stairCount > 1) return "stairs move";
+    if (stairCount === 1) return "stair move";
+    return "selection move";
+  }
+
+  if (command.type === "reorder-rooms-in-floor") {
+    return "room reorder";
+  }
+
+  if (command.type === "paste-rooms") {
+    return command.pastedRooms.length === 1 ? "room paste" : "rooms paste";
+  }
+
+  if (command.type === "paste-interior-asset") {
+    return getInteriorAssetActionLabel(command.pastedAsset.type, "creation");
+  }
+
+  if (command.type === "paste-interior-assets") {
+    return command.pastedAssets.length === 1 ? "stair paste" : "stairs paste";
   }
 
   if (command.type === "update-interior-asset") {

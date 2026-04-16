@@ -61,6 +61,7 @@ import { attachPanZoomInput } from "@/lib/editor/input/panZoomInput";
 import { attachRoomResizeInput } from "@/lib/editor/input/roomResizeInput";
 import { attachRoomDrawInput } from "@/lib/editor/input/roomDrawInput";
 import { attachDeleteRoomHotkeys } from "@/lib/editor/input/deleteRoomHotkeys";
+import { attachCopyPasteHotkeys } from "@/lib/editor/input/copyPasteHotkeys";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
@@ -868,6 +869,7 @@ export default function EditorCanvas({
   const dimensionOverlayRef = useRef<Container | null>(null);
   const cursorWorldRef = useRef<Point | null>(null);
   const hoveredRoomLabelIdRef = useRef<string | null>(null);
+  const assetDragTargetRoomIdRef = useRef<string | null>(null);
   const hoveredSelectableWallRef = useRef<{
     roomId: string;
     wall: RoomWall;
@@ -1046,7 +1048,8 @@ export default function EditorCanvas({
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag),
       footprintPreviewFloorIdRef.current,
-      footprintPreviewOpacityRef.current
+      footprintPreviewOpacityRef.current,
+      assetDragTargetRoomIdRef.current
     );
 
     if (app) {
@@ -1828,6 +1831,10 @@ export default function EditorCanvas({
   }, []);
 
   useEffect(() => {
+    return attachCopyPasteHotkeys(useEditorStore);
+  }, []);
+
+  useEffect(() => {
     const syncDimensionsOverride = (isActive: boolean) => {
       const state = useEditorStore.getState();
       state.setDimensionsVisibilityOverrideActive(state.roomDraft.points.length > 0 ? false : isActive);
@@ -2466,6 +2473,9 @@ export default function EditorCanvas({
         },
         onDraftConstraintModeChange: (mode) => {
           draftConstraintModeRef.current = mode;
+        },
+        onInteriorAssetDragTargetChange: (roomId) => {
+          assetDragTargetRoomIdRef.current = roomId;
         },
         requestRender: () => {
           drawCurrentScene();
@@ -3218,7 +3228,8 @@ function drawScene(
   theme: EditorCanvasTheme,
   hideCursorHud: boolean,
   footprintFloorId: string | null,
-  footprintOpacity: number
+  footprintOpacity: number,
+  assetDragTargetRoomId: string | null = null
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
@@ -3286,7 +3297,8 @@ function drawScene(
     state.camera,
     state.viewport,
     transformFeedback,
-    theme
+    theme,
+    assetDragTargetRoomId
   );
   drawOpenings(
     openingGraphics,
@@ -3458,7 +3470,8 @@ function drawRooms(
   camera: CameraState,
   viewport: ViewportSize,
   transformFeedback: TransformFeedback | null,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  assetDragTargetRoomId: string | null = null
 ) {
   graphics.clear();
   const transformSettlingProgress =
@@ -3496,6 +3509,7 @@ function drawRooms(
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId;
+    const isAssetDragTarget = room.id === assetDragTargetRoomId;
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
@@ -3525,6 +3539,19 @@ function drawRooms(
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9
     );
+
+    if (isAssetDragTarget) {
+      drawRoomShape(
+        graphics,
+        room.points,
+        camera,
+        viewport,
+        theme.roomSelectionOutline,
+        0.1,
+        2,
+        0.45
+      );
+    }
 
     if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);

@@ -38,6 +38,7 @@ import {
 } from "@/lib/editor/roomTranslation";
 import type { Point, Room } from "@/lib/editor/types";
 import type { RoomWall } from "@/lib/editor/types";
+import type { SharedSelectionItem } from "@/lib/editor/types";
 import {
   getInteriorAssetResizeFromCornerForCursor,
   getInteriorAssetResizeFromWallForCursor,
@@ -50,6 +51,10 @@ import {
   type EditorDocumentState,
 } from "@/lib/editor/history";
 import {
+  dismissKeyboardShortcutFeedbackToast,
+  showKeyboardShortcutFeedback,
+} from "@/lib/editor/keyboardMap";
+import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
   TRANSFORM_SETTLE_TOTAL_MS,
@@ -59,7 +64,8 @@ import {
 type RoomDrawStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
-  settings: { showGuidelines: boolean; snappingEnabled: boolean };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
+  keyboardShortcutFeedbackEnabled: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -77,6 +83,10 @@ type RoomDrawStoreState = {
   selectOpeningById: (roomId: string, openingId: string) => void;
   selectInteriorAssetById: (roomId: string, assetId: string) => void;
   clearRoomSelection: () => void;
+  clearSelection: () => void;
+  selection: SharedSelectionItem[];
+  addToSelection: (item: SharedSelectionItem) => void;
+  removeFromSelection: (item: SharedSelectionItem) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
   commitOpeningMove: (
@@ -96,6 +106,12 @@ type RoomDrawStoreState = {
     roomId: string,
     assetId: string,
     previousCenter: Point,
+    nextCenter: Point
+  ) => void;
+  commitInteriorAssetMoveToRoom: (
+    fromRoomId: string,
+    toRoomId: string,
+    assetId: string,
     nextCenter: Point
   ) => void;
   previewInteriorAssetResize: (
@@ -126,6 +142,7 @@ type RoomDrawInputCallbacks = {
   onSnapGuidesChange?: (guides: SnapGuides | null) => void;
   onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
   onRoomLabelSelected?: (roomId: string) => void;
+  onInteriorAssetDragTargetChange?: (roomId: string | null) => void;
   requestRender: () => void;
 };
 
@@ -162,6 +179,7 @@ type OpeningResizeSession = {
 type InteriorAssetDragSession = {
   pointerId: number;
   roomId: string;
+  targetRoomId: string | null;
   assetId: string;
   startScreenPoint: Point;
   startWorldPoint: Point;
@@ -194,6 +212,73 @@ const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 const DRAFT_GUIDE_TAIL_PX = 44;
 
+function isPrimaryModifierActionKey(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey)) return false;
+  if (event.altKey) return false;
+
+  const key = event.key.toLowerCase();
+  return key === "c" || key === "x" || key === "v" || key === "d" || key === "z" || key === "y";
+}
+
+function isModifierOnlyCombinationKey(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey)) return false;
+  if (event.altKey) return false;
+
+  // Keys that should keep modifier feedback alive and smoothly updated while held.
+  return event.key === "Shift" || event.key === "Meta" || event.key === "Control";
+}
+
+/**
+ * Determines if multi-select should be active based on event and settings.
+ * Returns true if:
+ * - Cmd/Ctrl is held, OR
+ * - Multi-select mode is enabled in settings
+ */
+function isMultiSelectActive(event: PointerEvent, multiSelectModeEnabled: boolean): boolean {
+  const isModifierHeld = event.metaKey || event.ctrlKey;
+  return isModifierHeld || multiSelectModeEnabled;
+}
+
+/**
+ * Determines if item is already in current selection.
+ */
+function isItemSelected(
+  selection: SharedSelectionItem[],
+  type: SharedSelectionItem["type"],
+  roomId?: string,
+  itemId?: string,
+  wall?: RoomWall
+): boolean {
+  return selection.some((existing) => {
+    if (existing.type !== type) return false;
+    
+    switch (type) {
+      case "room":
+        if (itemId && existing.type === "room") return existing.id === itemId;
+        return false;
+      case "wall":
+        if (roomId && wall && existing.type === "wall") {
+          return existing.roomId === roomId && existing.wall === wall;
+        }
+        return false;
+      case "opening":
+        if (roomId && itemId && existing.type === "opening") {
+          return existing.roomId === roomId && existing.id === itemId;
+        }
+        return false;
+      case "stair":
+        if (roomId && itemId && existing.type === "stair") {
+          return existing.roomId === roomId && existing.id === itemId;
+        }
+        return false;
+      case "floor":
+        return false;
+      default:
+        return false;
+    }
+  });
+}
+
 /**
  * Handles room drawing interactions:
  * - left click places points while drafting
@@ -211,6 +296,7 @@ export function attachRoomDrawInput(
 ) {
   let isSpaceHeld = false;
   let isShiftHeld = false;
+  let isMultiSelectModifierHeld = false;
   let shouldSuppressNextContextMenu = false;
   let activePointerCount = 0;
   let latestCursorWorld: Point | null = null;
@@ -583,6 +669,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeInteriorAssetDragSession = null;
+    callbacks.onInteriorAssetDragTargetChange?.(null);
     store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
@@ -830,6 +917,18 @@ export function attachRoomDrawInput(
         return;
       }
 
+      // Detect which room is under the cursor for cross-room drag
+      const hoveredRoom = findRoomLabelAtScreenPoint(
+        getRoomsForActiveFloor(state.document),
+        screenPoint,
+        state.camera,
+        state.viewport
+      );
+      session.targetRoomId = hoveredRoom?.id ?? session.roomId;
+      // Notify when drag target switches to a different room
+      const isDifferentRoom = session.targetRoomId !== session.roomId;
+      callbacks.onInteriorAssetDragTargetChange?.(isDifferentRoom ? session.targetRoomId : null);
+
       session.didDrag = true;
       store.getState().setCanvasInteractionActive(true);
       session.latestCenter = moveTarget.nextCenter;
@@ -1055,7 +1154,20 @@ export function attachRoomDrawInput(
       );
 
       const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
-      state.selectRoomById(labelHitRoom.id);
+      
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        // Multi-select: toggle room in/out of selection
+        const roomItem: SharedSelectionItem = { type: "room", id: labelHitRoom.id };
+        if (isItemSelected(state.selection, "room", undefined, labelHitRoom.id)) {
+          state.removeFromSelection(roomItem);
+        } else {
+          state.addToSelection(roomItem);
+        }
+      } else {
+        // Normal mode: replace selection and clear multi-selection
+        state.clearSelection();
+        state.selectRoomById(labelHitRoom.id);
+      }
       activeLabelDragSession = {
         pointerId: event.pointerId,
         roomId: labelHitRoom.id,
@@ -1082,7 +1194,17 @@ export function attachRoomDrawInput(
     );
     if (openingWidthHandleHit) {
       event.preventDefault();
-      state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, id: openingWidthHandleHit.openingId };
+        if (isItemSelected(state.selection, "opening", openingWidthHandleHit.roomId, openingWidthHandleHit.openingId)) {
+          state.removeFromSelection(openingItem);
+        } else {
+          state.addToSelection(openingItem);
+        }
+      } else {
+        state.clearSelection();
+        state.selectOpeningById(openingWidthHandleHit.roomId, openingWidthHandleHit.openingId);
+      }
       hoveredOpeningWidthHandle = openingWidthHandleHit;
       hoveredOpening = { roomId: openingWidthHandleHit.roomId, openingId: openingWidthHandleHit.openingId };
       setHoveredSelectableWall(null);
@@ -1170,7 +1292,17 @@ export function attachRoomDrawInput(
     );
     if (openingHit) {
       event.preventDefault();
-      state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, id: openingHit.openingId };
+        if (isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId)) {
+          state.removeFromSelection(openingItem);
+        } else {
+          state.addToSelection(openingItem);
+        }
+      } else {
+        state.clearSelection();
+        state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+      }
       hoveredOpening = openingHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(openingHit.roomId);
@@ -1200,7 +1332,17 @@ export function attachRoomDrawInput(
     );
     if (interiorAssetHit) {
       event.preventDefault();
-      state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const stairItem: SharedSelectionItem = { type: "stair", roomId: interiorAssetHit.roomId, id: interiorAssetHit.assetId };
+        if (isItemSelected(state.selection, "stair", interiorAssetHit.roomId, interiorAssetHit.assetId)) {
+          state.removeFromSelection(stairItem);
+        } else {
+          state.addToSelection(stairItem);
+        }
+      } else {
+        state.clearSelection();
+        state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+      }
       hoveredInteriorAsset = interiorAssetHit;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(interiorAssetHit.roomId);
@@ -1211,6 +1353,7 @@ export function attachRoomDrawInput(
         activeInteriorAssetDragSession = {
           pointerId: event.pointerId,
           roomId: interiorAssetHit.roomId,
+          targetRoomId: interiorAssetHit.roomId,
           assetId: interiorAssetHit.assetId,
           startScreenPoint: screenPoint,
           startWorldPoint: cursorWorld,
@@ -1228,7 +1371,17 @@ export function attachRoomDrawInput(
       const didChangeSelectedWall =
         state.selectedWall?.roomId !== wallHit.roomId || state.selectedWall.wall !== wallHit.wall;
 
-      state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const wallItem: SharedSelectionItem = { type: "wall", roomId: wallHit.roomId, wall: wallHit.wall };
+        if (isItemSelected(state.selection, "wall", wallHit.roomId, undefined, wallHit.wall)) {
+          state.removeFromSelection(wallItem);
+        } else {
+          state.addToSelection(wallItem);
+        }
+      } else {
+        state.clearSelection();
+        state.selectWallByRoomId(wallHit.roomId, wallHit.wall);
+      }
       setHoveredSelectableWall(wallHit);
       setHoveredSelectableRoomId(wallHit.roomId);
       if (didChangeSelectedWall) {
@@ -1247,7 +1400,17 @@ export function attachRoomDrawInput(
 
     const bodyHitRoom = findSelectableRoomAtScreenPoint(state, cursorWorld);
     if (bodyHitRoom) {
-      state.selectRoomById(bodyHitRoom.id);
+      if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
+        const roomItem: SharedSelectionItem = { type: "room", id: bodyHitRoom.id };
+        if (isItemSelected(state.selection, "room", undefined, bodyHitRoom.id)) {
+          state.removeFromSelection(roomItem);
+        } else {
+          state.addToSelection(roomItem);
+        }
+      } else {
+        state.clearSelection();
+        state.selectRoomById(bodyHitRoom.id);
+      }
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(bodyHitRoom.id);
       updateCursor();
@@ -1261,6 +1424,7 @@ export function attachRoomDrawInput(
         selectedRoom !== null && isPointInPolygon(cursorWorld, selectedRoom.points);
 
       if (!clickedInsideSelectedRoom) {
+        state.clearSelection();
         state.clearRoomSelection();
         return;
       }
@@ -1357,12 +1521,22 @@ export function attachRoomDrawInput(
       if (session.didDrag) {
         const nextCenter = session.latestCenter ?? session.startCenter;
         if (nextCenter.x !== session.startCenter.x || nextCenter.y !== session.startCenter.y) {
-          commitInteriorAssetMove(
-            session.roomId,
-            session.assetId,
-            session.startCenter,
-            nextCenter
-          );
+          // Check if asset was dragged to a different room
+          if (session.targetRoomId && session.targetRoomId !== session.roomId) {
+            store.getState().commitInteriorAssetMoveToRoom(
+              session.roomId,
+              session.targetRoomId,
+              session.assetId,
+              nextCenter
+            );
+          } else {
+            commitInteriorAssetMove(
+              session.roomId,
+              session.assetId,
+              session.startCenter,
+              nextCenter
+            );
+          }
         }
       }
       stopInteriorAssetDragSession();
@@ -1600,6 +1774,33 @@ export function attachRoomDrawInput(
   const onKeyDown = (event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) return;
 
+    if (isMultiSelectModifierHeld && isPrimaryModifierActionKey(event)) {
+      // Let the action's own feedback toast take over immediately.
+      dismissKeyboardShortcutFeedbackToast();
+      isMultiSelectModifierHeld = false;
+    }
+
+    if ((event.key === "Meta" || event.key === "Control") && !event.repeat) {
+      const state = store.getState();
+      if (!state.settings.multiSelectModeEnabled && !isMultiSelectModifierHeld) {
+        isMultiSelectModifierHeld = true;
+        showKeyboardShortcutFeedback("multi-select-toggle", {
+          feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: true },
+          durationMs: Infinity,
+        });
+      }
+    }
+
+    if (isMultiSelectModifierHeld && isModifierOnlyCombinationKey(event)) {
+      const state = store.getState();
+      showKeyboardShortcutFeedback("multi-select-toggle", {
+        feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+        context: { isEnabled: true },
+        durationMs: Infinity,
+      });
+    }
+
     if (event.code === "Space") {
       isSpaceHeld = true;
       updateCursor();
@@ -1646,6 +1847,14 @@ export function attachRoomDrawInput(
   const onKeyUp = (event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) return;
 
+    if (event.key === "Meta" || event.key === "Control") {
+      const state = store.getState();
+      if (!state.settings.multiSelectModeEnabled && isMultiSelectModifierHeld && !event.metaKey && !event.ctrlKey) {
+        isMultiSelectModifierHeld = false;
+        dismissKeyboardShortcutFeedbackToast();
+      }
+    }
+
     if (event.code === "Space") {
       isSpaceHeld = false;
       updateCursor();
@@ -1660,8 +1869,12 @@ export function attachRoomDrawInput(
   };
 
   const onWindowBlur = () => {
+    if (isMultiSelectModifierHeld) {
+      dismissKeyboardShortcutFeedbackToast();
+    }
     isSpaceHeld = false;
     isShiftHeld = false;
+    isMultiSelectModifierHeld = false;
     latestCursorWorld = null;
     syncDraftConstraintMode();
     if (activeLabelDragSession?.didDrag) {
