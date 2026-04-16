@@ -5,6 +5,7 @@ import type { SharedSelectionItem } from "@/lib/editor/types";
 export type CopyPasteStore = {
   getState: () => {
     document: { rooms: Array<{ id: string; name: string }> };
+    history: { past: unknown[] };
     selection: SharedSelectionItem[];
     clipboard: unknown;
     copySelection: () => void;
@@ -114,7 +115,10 @@ export function attachCopyPasteHotkeys(store: CopyPasteStore) {
       event.preventDefault();
       event.stopPropagation();
 
+      const previousHistoryLength = state.history.past.length;
       state.pasteSelection();
+      const didPasteSucceed = store.getState().history.past.length > previousHistoryLength;
+      if (!didPasteSucceed) return;
 
       showKeyboardShortcutFeedback(shortcut.id, {
         feedbackEnabled: state.keyboardShortcutFeedbackEnabled,

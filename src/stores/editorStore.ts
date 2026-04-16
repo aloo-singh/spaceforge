@@ -2752,17 +2752,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       if (state.clipboard.type === "stair") {
-        // Paste stair into the selected room (or first room on active floor)
-        let targetRoomId = state.selectedRoomId;
+        // Paste stair into the explicitly selected room on the active floor.
+        const targetRoomId = state.selectedRoomId;
+
         if (!targetRoomId) {
-          const roomsOnFloor = getRoomsForActiveFloor(state.document);
-          targetRoomId = roomsOnFloor[0]?.id;
+          toast("Select a room on this floor first to paste here.");
+          return state;
         }
 
-        if (!targetRoomId) return state;
-
         const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
-        if (!targetRoom) return state;
+        if (!targetRoom || (targetRoom.floorId ?? activeFloorId) !== activeFloorId) {
+          toast("Select a room on this floor first to paste here.");
+          return state;
+        }
 
         // Support both single-item and multi-item stair clipboard payloads
         // without requiring clipboard shape changes.
@@ -3093,6 +3095,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const targetFloor = state.document.floors.find((f) => f.id === targetFloorId);
       if (!targetFloor) return state;
+
+      const hasStairSelection = state.selection.some((item) => item.type === "stair");
+      if (hasStairSelection) {
+        const selectedRoom = state.selectedRoomId
+          ? state.document.rooms.find((room) => room.id === state.selectedRoomId)
+          : null;
+        if (!selectedRoom || selectedRoom.floorId !== targetFloorId) {
+          toast("Select a room on this floor first to paste here.");
+          return state;
+        }
+      }
 
       const movedRooms: Array<{ room: Room; previousFloorId: string }> = [];
       const movedAssets: Array<{ roomId: string; asset: RoomInteriorAsset; previousRoomId: string }> = [];
