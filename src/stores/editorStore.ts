@@ -855,6 +855,33 @@ function updateRoomInteriorAssetPositionInDocument(
   };
 }
 
+function moveInteriorAssetToRoomInDocument(
+  document: DocumentState,
+  fromRoomId: string,
+  toRoomId: string,
+  assetId: string,
+  movedAsset: RoomInteriorAsset
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) => {
+      if (room.id === fromRoomId) {
+        return {
+          ...room,
+          interiorAssets: room.interiorAssets.filter((asset) => asset.id !== assetId),
+        };
+      }
+      if (room.id === toRoomId) {
+        return {
+          ...room,
+          interiorAssets: [...room.interiorAssets, cloneRoomInteriorAsset(movedAsset)],
+        };
+      }
+      return room;
+    }),
+  };
+}
+
 function updateRoomInteriorAssetInDocument(
   document: DocumentState,
   roomId: string,
@@ -4321,6 +4348,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const toRoom = state.document.rooms.find((candidate) => candidate.id === toRoomId);
       const asset = fromRoom?.interiorAssets.find((candidate) => candidate.id === assetId);
       if (!fromRoom || !toRoom || !asset) return state;
+      if (fromRoomId === toRoomId) return state;
 
       let finalCenter = nextCenter;
 
@@ -4348,15 +4376,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         yMm: finalCenter.y,
       };
 
+      const nextDocument = moveInteriorAssetToRoomInDocument(
+        state.document,
+        fromRoomId,
+        toRoomId,
+        assetId,
+        movedAsset
+      );
+
       const command: EditorCommand = {
         type: "move-interior-asset-to-room",
         assetId,
         fromRoomId,
         toRoomId,
         asset: movedAsset,
+        previousDocument: cloneDocumentState(state.document),
+        nextDocument: cloneDocumentState(nextDocument),
       };
-
-      const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       return {
         document: nextDocument,

@@ -971,6 +971,7 @@ export default function EditorCanvas({
   const [northDragTooltip, setNorthDragTooltip] = useState<NorthDragTooltipState | null>(null);
   const [canvasRotationTooltip, setCanvasRotationTooltip] =
     useState<CanvasRotationTooltipState | null>(null);
+  const [hasMountedClient, setHasMountedClient] = useState(false);
   const [isNorthIndicatorHovered, setIsNorthIndicatorHovered] = useState(false);
   const [northIndicatorSurfaceState, setNorthIndicatorSurfaceState] =
     useState<NorthIndicatorSurfaceState>("hidden");
@@ -978,6 +979,10 @@ export default function EditorCanvas({
     useState<NorthIndicatorSurfaceState>(
       Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01 ? "visible" : "hidden"
     );
+
+  useEffect(() => {
+    setHasMountedClient(true);
+  }, []);
   const northIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRotationIndicatorFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHintFlowPaused = hintPauseUntilMs > Date.now();
@@ -2878,7 +2883,7 @@ export default function EditorCanvas({
               ) : null}
             </div>
           ) : null}
-          {floors.length > 1 ? (
+          {hasMountedClient && floors.length > 1 ? (
             <div
               className={cn(
                 "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4",
@@ -2894,7 +2899,6 @@ export default function EditorCanvas({
                 <div className="flex flex-col gap-1.5">
                   {displayedFloors.map((floor, floorIndex) => {
                     const isActiveFloor = floor.id === activeFloorId;
-                    const floorLabel = floor.name.replace(/^Floor\s+/u, "");
                     const floorNumber = displayedFloors.length - 1 - floorIndex;
 
                     return (

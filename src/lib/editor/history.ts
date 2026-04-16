@@ -244,6 +244,8 @@ export type EditorCommand =
       fromRoomId: string;
       toRoomId: string;
       asset: RoomInteriorAsset;
+      previousDocument?: EditorDocumentState;
+      nextDocument?: EditorDocumentState;
     }
   | {
       type: "bulk-delete";
@@ -307,6 +309,16 @@ export function applyEditorCommand(
   }
 
   if (command.type === "sync-connected-stairs") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
+  if (
+    command.type === "move-interior-asset-to-room" &&
+    command.previousDocument &&
+    command.nextDocument
+  ) {
     return cloneEditorDocumentState(
       direction === "undo" ? command.previousDocument : command.nextDocument
     );
