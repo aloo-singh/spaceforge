@@ -50,7 +50,10 @@ import {
   getRoomsForActiveFloor,
   type EditorDocumentState,
 } from "@/lib/editor/history";
-import { showKeyboardShortcutFeedback } from "@/lib/editor/keyboardMap";
+import {
+  dismissKeyboardShortcutFeedbackToast,
+  showKeyboardShortcutFeedback,
+} from "@/lib/editor/keyboardMap";
 import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
@@ -208,6 +211,14 @@ type SelectableWallHit = {
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 const DRAFT_GUIDE_TAIL_PX = 44;
+
+function isPrimaryModifierActionKey(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey)) return false;
+  if (event.altKey) return false;
+
+  const key = event.key.toLowerCase();
+  return key === "c" || key === "x" || key === "v" || key === "d" || key === "z" || key === "y";
+}
 
 /**
  * Determines if multi-select should be active based on event and settings.
@@ -1755,6 +1766,11 @@ export function attachRoomDrawInput(
   const onKeyDown = (event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) return;
 
+    if (isMultiSelectModifierHeld && isPrimaryModifierActionKey(event)) {
+      // Let the action's own feedback toast take over while modifiers remain held.
+      isMultiSelectModifierHeld = false;
+    }
+
     if ((event.key === "Meta" || event.key === "Control") && !event.repeat) {
       const state = store.getState();
       if (!state.settings.multiSelectModeEnabled && !isMultiSelectModifierHeld) {
@@ -1762,6 +1778,7 @@ export function attachRoomDrawInput(
         showKeyboardShortcutFeedback("multi-select-toggle", {
           feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
           context: { isEnabled: true },
+          durationMs: Infinity,
         });
       }
     }
@@ -1816,10 +1833,7 @@ export function attachRoomDrawInput(
       const state = store.getState();
       if (!state.settings.multiSelectModeEnabled && isMultiSelectModifierHeld && !event.metaKey && !event.ctrlKey) {
         isMultiSelectModifierHeld = false;
-        showKeyboardShortcutFeedback("multi-select-toggle", {
-          feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
-          context: { isEnabled: false },
-        });
+        dismissKeyboardShortcutFeedbackToast();
       }
     }
 
@@ -1837,6 +1851,9 @@ export function attachRoomDrawInput(
   };
 
   const onWindowBlur = () => {
+    if (isMultiSelectModifierHeld) {
+      dismissKeyboardShortcutFeedbackToast();
+    }
     isSpaceHeld = false;
     isShiftHeld = false;
     isMultiSelectModifierHeld = false;

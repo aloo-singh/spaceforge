@@ -93,8 +93,7 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
       { key: "Meta", metaKey: true, ctrlKey: false, altKey: false },
       { key: "Control", ctrlKey: true, metaKey: false, altKey: false },
     ],
-    sonnerMessage: ({ isEnabled }) =>
-      isEnabled ? "Multi-select mode enabled" : "Multi-select mode disabled",
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Multi-select enabled" : null),
   },
   {
     id: "undo",
@@ -257,13 +256,16 @@ export function getKeyboardShortcutFeedbackMessage(
     : shortcut.sonnerMessage;
 }
 
-export function showKeyboardShortcutFeedbackToast(message: string) {
+export function showKeyboardShortcutFeedbackToast(
+  message: string,
+  options?: { durationMs?: number }
+) {
   if (activeKeyboardShortcutFeedbackToastId !== null) {
     toast.dismiss(activeKeyboardShortcutFeedbackToastId);
   }
 
   const id = toast(message, {
-    duration: KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
+    duration: options?.durationMs ?? KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
     onDismiss: () => {
       if (activeKeyboardShortcutFeedbackToastId === id) {
         activeKeyboardShortcutFeedbackToastId = null;
@@ -274,11 +276,19 @@ export function showKeyboardShortcutFeedbackToast(message: string) {
   activeKeyboardShortcutFeedbackToastId = id;
 }
 
+export function dismissKeyboardShortcutFeedbackToast() {
+  if (activeKeyboardShortcutFeedbackToastId === null) return;
+
+  toast.dismiss(activeKeyboardShortcutFeedbackToastId);
+  activeKeyboardShortcutFeedbackToastId = null;
+}
+
 export function showKeyboardShortcutFeedback(
   shortcutId: EditorKeyboardShortcutId,
   options: {
     feedbackEnabled: boolean;
     context?: KeyboardShortcutFeedbackContext;
+    durationMs?: number;
   }
 ) {
   if (!options.feedbackEnabled) return;
@@ -286,7 +296,7 @@ export function showKeyboardShortcutFeedback(
   const message = getKeyboardShortcutFeedbackMessage(shortcutId, options.context);
   if (!message) return;
 
-  showKeyboardShortcutFeedbackToast(message);
+  showKeyboardShortcutFeedbackToast(message, { durationMs: options.durationMs });
 }
 
 export function getHistoryCommandActionLabel(command: EditorCommand | undefined): string {
