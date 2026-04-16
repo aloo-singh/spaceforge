@@ -40,6 +40,7 @@ export function EditorSettingsDialog({
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const isFloorFootprintVisible = settings.showFloorFootprint;
+  const autoCollapseOtherFloorsOnRoomSelect = settings.autoCollapseOtherFloorsOnRoomSelect;
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
 
@@ -529,6 +530,55 @@ export function EditorSettingsDialog({
               variant={!isFloorFootprintVisible ? "secondary" : "ghost"}
               aria-pressed={!isFloorFootprintVisible}
               onClick={() => updateSettings({ showFloorFootprint: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-auto-collapse-floors-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-auto-collapse-floors-title" className="text-sm font-medium text-foreground">
+                Auto-collapse other floors when selecting a room
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Keep the selected room&apos;s floor expanded and optionally collapse all other floors.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Auto-collapse floors status</dt>
+                <dd>{autoCollapseOtherFloorsOnRoomSelect ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Auto-collapse other floors when selecting a room"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={autoCollapseOtherFloorsOnRoomSelect ? "secondary" : "ghost"}
+              aria-pressed={autoCollapseOtherFloorsOnRoomSelect}
+              onClick={() => updateSettings({ autoCollapseOtherFloorsOnRoomSelect: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!autoCollapseOtherFloorsOnRoomSelect ? "secondary" : "ghost"}
+              aria-pressed={!autoCollapseOtherFloorsOnRoomSelect}
+              onClick={() => updateSettings({ autoCollapseOtherFloorsOnRoomSelect: false })}
               className="min-w-20 flex-1 sm:flex-none"
             >
               Off

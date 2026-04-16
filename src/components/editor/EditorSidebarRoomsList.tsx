@@ -156,6 +156,9 @@ export function EditorSidebarRoomsList() {
   const interiorAssetRenameSession = useEditorStore((state) => state.interiorAssetRenameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
+  const autoCollapseOtherFloorsOnRoomSelect = useEditorStore(
+    (state) => state.settings.autoCollapseOtherFloorsOnRoomSelect
+  );
   const addFloor = useEditorStore((state) => state.addFloor);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
@@ -210,6 +213,20 @@ export function EditorSidebarRoomsList() {
   const [isStructureSectionExpanded, setIsStructureSectionExpanded] = useState(true);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
+  const selectedRoomFloorId = selectedRoomId
+    ? document.rooms.find((room) => room.id === selectedRoomId)?.floorId ?? null
+    : null;
+  const effectiveCollapsedFloorIds = (() => {
+    if (!selectedRoomFloorId) return collapsedFloorIds;
+
+    if (autoCollapseOtherFloorsOnRoomSelect) {
+      return floors
+        .map((floor) => floor.id)
+        .filter((floorId) => floorId !== selectedRoomFloorId);
+    }
+
+    return collapsedFloorIds.filter((floorId) => floorId !== selectedRoomFloorId);
+  })();
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -277,7 +294,7 @@ export function EditorSidebarRoomsList() {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
-                const isFloorExpanded = !collapsedFloorIds.includes(floor.id);
+                const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
 
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">

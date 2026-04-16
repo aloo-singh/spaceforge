@@ -14,6 +14,7 @@ export type EditorSettings = {
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
+  autoCollapseOtherFloorsOnRoomSelect: boolean;
   exportSignatureText: string;
   multiSelectModeEnabled: boolean;
 };
@@ -28,6 +29,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
+  autoCollapseOtherFloorsOnRoomSelect: true,
   exportSignatureText: "",
   multiSelectModeEnabled: false,
 };
@@ -43,6 +45,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
+    autoCollapseOtherFloorsOnRoomSelect: settings.autoCollapseOtherFloorsOnRoomSelect,
     exportSignatureText: settings.exportSignatureText,
     multiSelectModeEnabled: settings.multiSelectModeEnabled,
   };
@@ -59,6 +62,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
+    a.autoCollapseOtherFloorsOnRoomSelect === b.autoCollapseOtherFloorsOnRoomSelect &&
     a.exportSignatureText === b.exportSignatureText &&
     a.multiSelectModeEnabled === b.multiSelectModeEnabled
   );
@@ -144,6 +148,11 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showFloorFootprint" in value && typeof value.showFloorFootprint === "boolean"
         ? value.showFloorFootprint
         : DEFAULT_EDITOR_SETTINGS.showFloorFootprint,
+    autoCollapseOtherFloorsOnRoomSelect:
+      "autoCollapseOtherFloorsOnRoomSelect" in value &&
+      typeof value.autoCollapseOtherFloorsOnRoomSelect === "boolean"
+        ? value.autoCollapseOtherFloorsOnRoomSelect
+        : DEFAULT_EDITOR_SETTINGS.autoCollapseOtherFloorsOnRoomSelect,
     exportSignatureText:
       "exportSignatureText" in value && typeof value.exportSignatureText === "string"
         ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)
