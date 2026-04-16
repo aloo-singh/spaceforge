@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.60.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Sidebar Enhancements</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Unified shared selection model (single source of truth between canvas &amp; sidebar)</li>
+                <li>Multi-select support (Cmd/Ctrl + click or toggle)</li>
+                <li>Copy, Cut, Paste, and Cmd/Ctrl+D Duplicate for rooms and stairs (all atomic)</li>
+                <li>Drag assets between rooms and drag selection to another floor</li>
+                <li>Reorder rooms within a floor via drag</li>
+                <li>Smart naming, bounds-aware paste/drag with silent positional nudges</li>
+                <li>Meaningful undo/redo Sonner messages for all bulk actions</li>
+                <li>Floor view restoration on undo/redo of cross-floor actions</li>
+                <li>Calmer drag highlights and non-spammy modifier Sonner behaviour</li>
+                <li>Parent-child hierarchy documented (floors &rarr; rooms &rarr; walls/assets)</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.59.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-13</span>
           </div>
