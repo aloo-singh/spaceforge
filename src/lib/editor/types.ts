@@ -122,6 +122,10 @@ export type Room = {
  * Shared selection model — single source of truth for all selections.
  * Supports rooms, walls, openings, stairs, and floors.
  * Each selection item has a type and associated identifiers.
+ *
+ * Undo semantics rule:
+ * - Selection is transient UI state and must not be written to undo history.
+ * - Only geometry/structural document changes belong in history.
  */
 export type SharedSelectionItem =
   | { type: "room"; id: string }

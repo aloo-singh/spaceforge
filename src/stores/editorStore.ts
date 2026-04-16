@@ -190,6 +190,11 @@ type EditorState = {
   interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
   floorRenameSession: FloorRenameSessionState;
   clipboard: ClipboardData;
+  /**
+   * Undo history policy:
+   * - Include geometry/structural document changes only.
+   * - Exclude selection, focus/hover/UI state, and floor navigation.
+   */
   history: {
     past: EditorCommand[];
     future: EditorCommand[];
@@ -377,6 +382,8 @@ function preserveHistoryForSelectionUpdate(
   state: EditorState,
   nextState: Partial<EditorState>
 ): Partial<EditorState> {
+  // Selection/focus/navigation updates are transient UI state and must never
+  // create undo entries or alter canUndo/canRedo.
   return {
     ...nextState,
     history: state.history,
