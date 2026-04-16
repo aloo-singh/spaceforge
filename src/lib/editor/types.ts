@@ -104,6 +104,11 @@ export type Floor = {
   name: string;
 };
 
+/**
+ * Parent-child hierarchy:
+ * - Floors contain rooms.
+ * - Rooms contain wall segments (derived from points), openings, and interior assets (e.g. stairs).
+ */
 export type Room = {
   id: string;
   floorId: string;

@@ -370,6 +370,21 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "selection duplication";
   }
 
+  if (command.type === "move-selection-to-floor") {
+    const roomCount = command.movedRooms.length;
+    const stairCount = command.movedAssets.length;
+    if (roomCount > 0 && stairCount > 0) return "rooms and stairs move";
+    if (roomCount > 1) return "rooms move";
+    if (roomCount === 1) return "room move";
+    if (stairCount > 1) return "stairs move";
+    if (stairCount === 1) return "stair move";
+    return "selection move";
+  }
+
+  if (command.type === "reorder-rooms-in-floor") {
+    return "room reorder";
+  }
+
   if (command.type === "paste-rooms") {
     return command.pastedRooms.length === 1 ? "room paste" : "rooms paste";
   }

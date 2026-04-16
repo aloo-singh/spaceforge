@@ -3079,11 +3079,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!targetFloor) return state;
 
       const hasStairSelection = state.selection.some((item) => item.type === "stair");
+      const selectedTargetRoom = state.selectedRoomId
+        ? state.document.rooms.find((room) => room.id === state.selectedRoomId)
+        : null;
       if (hasStairSelection) {
-        const selectedRoom = state.selectedRoomId
-          ? state.document.rooms.find((room) => room.id === state.selectedRoomId)
-          : null;
-        if (!selectedRoom || selectedRoom.floorId !== targetFloorId) {
+        if (!selectedTargetRoom || selectedTargetRoom.floorId !== targetFloorId) {
           toast("Select a room on this floor first to paste here.");
           return state;
         }
@@ -3128,19 +3128,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "move-selection-to-floor",
         targetFloorId,
+        targetRoomId: selectedTargetRoom?.id ?? null,
         movedRooms,
         movedAssets,
       };
 
       const nextDocument = applyEditorCommand(state.document, command, "redo");
+      const nextSelection = state.selection.map((item) => {
+        if (item.type !== "stair") return item;
+        if (!selectedTargetRoom) return item;
+        return {
+          type: "stair" as const,
+          roomId: selectedTargetRoom.id,
+          id: item.id,
+        };
+      });
 
       return {
         document: nextDocument,
-        selectedRoomId: movedRooms[0]?.room.id ?? state.selectedRoomId,
+        selectedRoomId: movedRooms[0]?.room.id ?? selectedTargetRoom?.id ?? state.selectedRoomId,
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,
-        selection: state.selection,
+        selection: nextSelection,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

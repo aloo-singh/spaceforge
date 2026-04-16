@@ -276,6 +276,7 @@ export type EditorCommand =
   | {
       type: "move-selection-to-floor";
       targetFloorId: string;
+      targetRoomId: string | null;
       movedRooms: Array<{
         room: Room;
         previousFloorId: string;
@@ -938,31 +939,90 @@ export function applyEditorCommand(
 
   if (command.type === "move-selection-to-floor") {
     if (direction === "undo") {
-      // Restore rooms to their previous floors
+      // Restore rooms to previous floors and move stairs back to previous rooms.
       return {
         ...document,
         rooms: document.rooms.map((room) => {
           const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
-          if (!movedRoomInfo) return room;
+          let nextRoom = movedRoomInfo
+            ? {
+                ...room,
+                floorId: movedRoomInfo.previousFloorId,
+              }
+            : room;
 
-          return {
-            ...room,
-            floorId: movedRoomInfo.previousFloorId,
-          };
+          // Remove moved stairs from target room.
+          if (command.targetRoomId && room.id === command.targetRoomId) {
+            const movedAssetIds = new Set(command.movedAssets.map((moved) => moved.asset.id));
+            nextRoom = {
+              ...nextRoom,
+              interiorAssets: nextRoom.interiorAssets.filter(
+                (asset) => !movedAssetIds.has(asset.id)
+              ),
+            };
+          }
+
+          // Restore moved stairs to their previous rooms.
+          const assetsReturningToRoom = command.movedAssets.filter(
+            (moved) => moved.previousRoomId === room.id
+          );
+          if (assetsReturningToRoom.length > 0) {
+            const existingIds = new Set(nextRoom.interiorAssets.map((asset) => asset.id));
+            nextRoom = {
+              ...nextRoom,
+              interiorAssets: [
+                ...nextRoom.interiorAssets,
+                ...assetsReturningToRoom
+                  .filter((moved) => !existingIds.has(moved.asset.id))
+                  .map((moved) => cloneRoomInteriorAsset(moved.asset)),
+              ],
+            };
+          }
+
+          return nextRoom;
         }),
       };
     } else {
-      // Move rooms to target floor
+      // Move rooms to target floor and move selected stairs into target room.
       return {
         ...document,
         rooms: document.rooms.map((room) => {
           const movedRoomInfo = command.movedRooms.find((mr) => mr.room.id === room.id);
-          if (!movedRoomInfo) return room;
+          let nextRoom = movedRoomInfo
+            ? {
+                ...room,
+                floorId: command.targetFloorId,
+              }
+            : room;
 
-          return {
-            ...room,
-            floorId: command.targetFloorId,
-          };
+          const movedAssetIds = new Set(command.movedAssets.map((moved) => moved.asset.id));
+          if (movedAssetIds.size > 0) {
+            // Remove moved stairs from source rooms.
+            if (command.movedAssets.some((moved) => moved.previousRoomId === room.id)) {
+              nextRoom = {
+                ...nextRoom,
+                interiorAssets: nextRoom.interiorAssets.filter(
+                  (asset) => !movedAssetIds.has(asset.id)
+                ),
+              };
+            }
+
+            // Add moved stairs to target room.
+            if (command.targetRoomId && room.id === command.targetRoomId) {
+              const existingIds = new Set(nextRoom.interiorAssets.map((asset) => asset.id));
+              nextRoom = {
+                ...nextRoom,
+                interiorAssets: [
+                  ...nextRoom.interiorAssets,
+                  ...command.movedAssets
+                    .filter((moved) => !existingIds.has(moved.asset.id))
+                    .map((moved) => cloneRoomInteriorAsset(moved.asset)),
+                ],
+              };
+            }
+          }
+
+          return nextRoom;
         }),
       };
     }
