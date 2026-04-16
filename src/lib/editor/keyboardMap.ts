@@ -260,11 +260,8 @@ export function showKeyboardShortcutFeedbackToast(
   message: string,
   options?: { durationMs?: number }
 ) {
-  if (activeKeyboardShortcutFeedbackToastId !== null) {
-    toast.dismiss(activeKeyboardShortcutFeedbackToastId);
-  }
-
   const id = toast(message, {
+    id: activeKeyboardShortcutFeedbackToastId ?? undefined,
     duration: options?.durationMs ?? KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
     onDismiss: () => {
       if (activeKeyboardShortcutFeedbackToastId === id) {

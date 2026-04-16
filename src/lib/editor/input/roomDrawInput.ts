@@ -220,6 +220,14 @@ function isPrimaryModifierActionKey(event: KeyboardEvent): boolean {
   return key === "c" || key === "x" || key === "v" || key === "d" || key === "z" || key === "y";
 }
 
+function isModifierOnlyCombinationKey(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey)) return false;
+  if (event.altKey) return false;
+
+  // Keys that should keep modifier feedback alive and smoothly updated while held.
+  return event.key === "Shift" || event.key === "Meta" || event.key === "Control";
+}
+
 /**
  * Determines if multi-select should be active based on event and settings.
  * Returns true if:
@@ -1767,7 +1775,8 @@ export function attachRoomDrawInput(
     if (isTypingTarget(event.target)) return;
 
     if (isMultiSelectModifierHeld && isPrimaryModifierActionKey(event)) {
-      // Let the action's own feedback toast take over while modifiers remain held.
+      // Let the action's own feedback toast take over immediately.
+      dismissKeyboardShortcutFeedbackToast();
       isMultiSelectModifierHeld = false;
     }
 
@@ -1781,6 +1790,15 @@ export function attachRoomDrawInput(
           durationMs: Infinity,
         });
       }
+    }
+
+    if (isMultiSelectModifierHeld && isModifierOnlyCombinationKey(event)) {
+      const state = store.getState();
+      showKeyboardShortcutFeedback("multi-select-toggle", {
+        feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+        context: { isEnabled: true },
+        durationMs: Infinity,
+      });
     }
 
     if (event.code === "Space") {
