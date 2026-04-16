@@ -2682,7 +2682,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // Paste rooms with offset and smart naming for all inserted rooms
         const isCopy = state.clipboard.source === "copy";
         const existingRoomNames = new Set(state.document.rooms.map((r) => r.name));
-        let stairsWereAdjusted = false;
         const pastedRooms: Room[] = [];
 
         for (const room of state.clipboard.rooms) {
@@ -2716,17 +2715,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
             asset.xMm = constrained.x;
             asset.yMm = constrained.y;
-            stairsWereAdjusted = true;
           }
 
           pastedRooms.push(pastedRoom);
-        }
-
-        if (stairsWereAdjusted) {
-          toast("Stairs adjusted to fit room.", {
-            duration: 5000,
-            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
-          });
         }
 
         const command: EditorCommand = {
@@ -2793,7 +2784,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const existingAssetNames = new Set(targetRoom.interiorAssets.map((a) => a.name));
         const isCopyStair = state.clipboard.source === "copy";
         const pastedItems: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }> = [];
-        let wasAdjusted = false;
 
         for (const stairClipboardItem of clipboardAssets) {
           const sourceAsset = stairClipboardItem.asset;
@@ -2817,7 +2807,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             });
             if (constrained) {
               pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
-              wasAdjusted = true;
             } else {
               // Room is too small — abort and notify
               toast("Stairs don't fit in that room.");
@@ -2828,13 +2817,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           pastedItems.push({
             asset: pastedAsset,
             sourceRoomId: stairClipboardItem.sourceRoomId,
-          });
-        }
-
-        if (wasAdjusted) {
-          toast("Stairs adjusted to fit room.", {
-            duration: 5000,
-            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
           });
         }
 
@@ -4342,9 +4324,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const constrained = constrainInteriorAssetCenter(toRoom, candidateAsset, nextCenter);
         if (constrained) {
           finalCenter = constrained;
-          toast("Stairs adjusted to fit room.", {
-            action: { label: "Undo", onClick: () => useEditorStore.getState().undo() },
-          });
         } else {
           toast("Stairs don't fit in that room.", {
             description: "Try a smaller stair block or a larger room.",
