@@ -2,6 +2,7 @@ export type EditorMeasurementDisplayMode = "interactive";
 export type EditorDimensionsVisibility = "visible" | "hidden";
 export type EditorMeasurementFontSize = "normal" | "large";
 export type EditorWallMeasurementPosition = "inside" | "outside";
+export type EditorSidebarDensity = "comfortable" | "compact";
 export const EDITOR_EXPORT_SIGNATURE_MAX_LENGTH = 40;
 
 export type EditorSettings = {
@@ -14,6 +15,7 @@ export type EditorSettings = {
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
+  sidebarDensity: EditorSidebarDensity;
   autoCollapseOtherFloorsOnRoomSelect: boolean;
   exportSignatureText: string;
   multiSelectModeEnabled: boolean;
@@ -29,6 +31,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
+  sidebarDensity: "comfortable",
   autoCollapseOtherFloorsOnRoomSelect: true,
   exportSignatureText: "",
   multiSelectModeEnabled: false,
@@ -45,6 +48,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
+    sidebarDensity: settings.sidebarDensity,
     autoCollapseOtherFloorsOnRoomSelect: settings.autoCollapseOtherFloorsOnRoomSelect,
     exportSignatureText: settings.exportSignatureText,
     multiSelectModeEnabled: settings.multiSelectModeEnabled,
@@ -62,6 +66,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
+    a.sidebarDensity === b.sidebarDensity &&
     a.autoCollapseOtherFloorsOnRoomSelect === b.autoCollapseOtherFloorsOnRoomSelect &&
     a.exportSignatureText === b.exportSignatureText &&
     a.multiSelectModeEnabled === b.multiSelectModeEnabled
@@ -84,6 +89,10 @@ export function isEditorWallMeasurementPosition(
   value: unknown
 ): value is EditorWallMeasurementPosition {
   return value === "inside" || value === "outside";
+}
+
+export function isEditorSidebarDensity(value: unknown): value is EditorSidebarDensity {
+  return value === "comfortable" || value === "compact";
 }
 
 export function shouldShowDimensions(
@@ -148,6 +157,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showFloorFootprint" in value && typeof value.showFloorFootprint === "boolean"
         ? value.showFloorFootprint
         : DEFAULT_EDITOR_SETTINGS.showFloorFootprint,
+    sidebarDensity:
+      "sidebarDensity" in value && isEditorSidebarDensity(value.sidebarDensity)
+        ? value.sidebarDensity
+        : DEFAULT_EDITOR_SETTINGS.sidebarDensity,
     autoCollapseOtherFloorsOnRoomSelect:
       "autoCollapseOtherFloorsOnRoomSelect" in value &&
       typeof value.autoCollapseOtherFloorsOnRoomSelect === "boolean"

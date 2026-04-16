@@ -40,6 +40,7 @@ export function EditorSettingsDialog({
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const isFloorFootprintVisible = settings.showFloorFootprint;
+  const isCompactSidebarDensity = settings.sidebarDensity === "compact";
   const autoCollapseOtherFloorsOnRoomSelect = settings.autoCollapseOtherFloorsOnRoomSelect;
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
@@ -582,6 +583,55 @@ export function EditorSettingsDialog({
               className="min-w-20 flex-1 sm:flex-none"
             >
               Off
+            </Button>
+          </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-sidebar-density-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-sidebar-density-title" className="text-sm font-medium text-foreground">
+                Sidebar density
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Choose between a spacious tree and a compact, higher-density layout.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Sidebar density</dt>
+                <dd>{isCompactSidebarDensity ? "Compact" : "Comfortable"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Sidebar density"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={!isCompactSidebarDensity ? "secondary" : "ghost"}
+              aria-pressed={!isCompactSidebarDensity}
+              onClick={() => updateSettings({ sidebarDensity: "comfortable" })}
+              className="min-w-28 flex-1 sm:flex-none"
+            >
+              Comfortable
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={isCompactSidebarDensity ? "secondary" : "ghost"}
+              aria-pressed={isCompactSidebarDensity}
+              onClick={() => updateSettings({ sidebarDensity: "compact" })}
+              className="min-w-24 flex-1 sm:flex-none"
+            >
+              Compact
             </Button>
           </div>
         </div>
