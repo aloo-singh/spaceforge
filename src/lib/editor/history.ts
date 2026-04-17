@@ -89,6 +89,7 @@ export type EditorCommand =
       type: "add-floor";
       floor: Floor;
       previousActiveFloorId: string | null;
+      insertIndex?: number;
     }
   | {
       type: "switch-floor";
@@ -360,9 +361,27 @@ export function applyEditorCommand(
       };
     }
 
+    const nextFloor = {
+      id: command.floor.id,
+      name: command.floor.name,
+    };
+
+    const floorsWithoutAdded = document.floors.filter((floor) => floor.id !== command.floor.id);
+    if (typeof command.insertIndex === "number") {
+      const nextFloors = [...floorsWithoutAdded];
+      const clampedInsertIndex = Math.max(0, Math.min(command.insertIndex, nextFloors.length));
+      nextFloors.splice(clampedInsertIndex, 0, nextFloor);
+
+      return {
+        ...document,
+        floors: nextFloors,
+        activeFloorId: command.floor.id,
+      };
+    }
+
     return {
       ...document,
-      floors: [...document.floors.filter((floor) => floor.id !== command.floor.id), command.floor],
+      floors: [...floorsWithoutAdded, nextFloor],
       activeFloorId: command.floor.id,
     };
   }
