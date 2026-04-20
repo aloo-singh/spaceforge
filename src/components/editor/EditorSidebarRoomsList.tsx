@@ -3,8 +3,20 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { ChevronRight, Plus, Trash2 } from "@/components/ui/icons";
+import {
+  ChevronRight,
+  IconCaretDownFilled,
+  IconCaretUpFilled,
+  Plus,
+  Trash2,
+} from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -148,6 +160,7 @@ export function EditorSidebarRoomsList() {
   const document = useEditorStore((state) => state.document);
   const maxFloors = useEditorStore((state) => state.maxFloors);
   const floors = document.floors;
+  const canAddFloor = floors.length < maxFloors;
   const displayedFloors = [...floors].reverse();
   const activeFloorId = document.activeFloorId;
   const rooms = document.rooms;
@@ -365,86 +378,106 @@ export function EditorSidebarRoomsList() {
                         />
                       </div>
                     ) : (
-                      <div
-                        className={cn(
-                          floorRowClass,
-                          dragOverFloorId === floor.id
-                            ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
-                            : activeFloorId === floor.id
-                            ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
-                            : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
-                        )}
-                        onDragOver={(e) => {
-                          if (selection.length > 0 && floor.id !== activeFloorId) {
-                            e.preventDefault();
-                            e.dataTransfer!.dropEffect = "move";
-                            setDragOverFloorId(floor.id);
-                          }
-                        }}
-                        onDragLeave={() => {
-                          setDragOverFloorId(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragOverFloorId(null);
-                          if (selection.length > 0 && floor.id !== activeFloorId) {
-                            moveSelectionToFloor(floor.id);
-                          }
-                        }}
-                      >
-                        <SidebarIconTooltip
-                          content={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
-                        >
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCollapsedFloorIds((current) =>
-                                current.includes(floor.id)
-                                  ? current.filter((id) => id !== floor.id)
-                                  : [...current, floor.id]
-                              );
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <div
+                            className={cn(
+                              floorRowClass,
+                              dragOverFloorId === floor.id
+                                ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
+                                : activeFloorId === floor.id
+                                ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
+                                : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
+                            )}
+                            onDragOver={(e) => {
+                              if (selection.length > 0 && floor.id !== activeFloorId) {
+                                e.preventDefault();
+                                e.dataTransfer!.dropEffect = "move";
+                                setDragOverFloorId(floor.id);
+                              }
                             }}
-                            className={SIDEBAR_CHEVRON_BUTTON_CLASS}
-                            aria-label={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
-                          >
-                            <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
-                          </button>
-                        </SidebarIconTooltip>
-                        <button
-                          type="button"
-                          onClick={() => selectFloorById(floor.id)}
-                          onDoubleClick={(event) => {
-                            event.stopPropagation();
-                            setSidebarRenameFloorId(floor.id);
-                            shouldAutoFocusFloorRenameInputRef.current = true;
-                            selectFloorById(floor.id);
-                            startFloorRename(floor.id);
-                          }}
-                          className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
-                        >
-                          <span className={floorBadgeClass}>
-                            {floorNumber}
-                          </span>
-                          <span className="truncate">{floor.name}</span>
-                          <span className={SECTION_COUNT_CLASS}>{floorRooms.length}</span>
-                          {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
-                        </button>
-                        <SidebarIconTooltip content="Delete floor">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFloorToDelete(floor.id);
-                              setIsFloorDeleteDialogOpen(true);
+                            onDragLeave={() => {
+                              setDragOverFloorId(null);
                             }}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
-                            aria-label={`Delete ${floor.name}`}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragOverFloorId(null);
+                              if (selection.length > 0 && floor.id !== activeFloorId) {
+                                moveSelectionToFloor(floor.id);
+                              }
+                            }}
                           >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </SidebarIconTooltip>
-                      </div>
+                            <SidebarIconTooltip
+                              content={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setCollapsedFloorIds((current) =>
+                                    current.includes(floor.id)
+                                      ? current.filter((id) => id !== floor.id)
+                                      : [...current, floor.id]
+                                  );
+                                }}
+                                className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                                aria-label={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                              >
+                                <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
+                              </button>
+                            </SidebarIconTooltip>
+                            <button
+                              type="button"
+                              onClick={() => selectFloorById(floor.id)}
+                              onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setSidebarRenameFloorId(floor.id);
+                                shouldAutoFocusFloorRenameInputRef.current = true;
+                                selectFloorById(floor.id);
+                                startFloorRename(floor.id);
+                              }}
+                              className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
+                            >
+                              <span className={floorBadgeClass}>
+                                {floorNumber}
+                              </span>
+                              <span className="truncate">{floor.name}</span>
+                              <span className={SECTION_COUNT_CLASS}>{floorRooms.length}</span>
+                              {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
+                            </button>
+                            <SidebarIconTooltip content="Delete floor">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setFloorToDelete(floor.id);
+                                  setIsFloorDeleteDialogOpen(true);
+                                }}
+                                className="flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                aria-label={`Delete ${floor.name}`}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </SidebarIconTooltip>
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-48">
+                          <ContextMenuItem
+                            disabled={!canAddFloor}
+                            onSelect={() => addFloor({ targetFloorId: floor.id, position: "below" })}
+                          >
+                            <IconCaretUpFilled className="size-4" />
+                            Add floor above
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            disabled={!canAddFloor}
+                            onSelect={() => addFloor({ targetFloorId: floor.id, position: "above" })}
+                          >
+                            <IconCaretDownFilled className="size-4" />
+                            Add floor below
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     )}
 
                     {isFloorExpanded ? (
@@ -898,7 +931,7 @@ export function EditorSidebarRoomsList() {
               })}
               <button
                 type="button"
-                onClick={addFloor}
+                onClick={() => addFloor()}
                 className={cn(
                   "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
                   isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
