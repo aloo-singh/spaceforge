@@ -106,17 +106,21 @@ function SidebarSection({
   count,
   isExpanded,
   onToggle,
+  headerClassName,
+  countClassName,
   children,
 }: {
   title: string;
   count: number;
   isExpanded: boolean;
   onToggle: () => void;
+  headerClassName?: string;
+  countClassName?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className={SECTION_HEADER_CLASS}>
+      <div className={headerClassName ?? SECTION_HEADER_CLASS}>
         <SidebarIconTooltip content={isExpanded ? `Collapse ${title}` : `Expand ${title}`}>
           <button
             type="button"
@@ -128,7 +132,7 @@ function SidebarSection({
           </button>
         </SidebarIconTooltip>
         <span>{title}</span>
-        <span className={SECTION_COUNT_CLASS}>{count}</span>
+        <span className={countClassName ?? SECTION_COUNT_CLASS}>{count}</span>
       </div>
       {isExpanded ? children : null}
     </div>
@@ -156,6 +160,7 @@ export function EditorSidebarRoomsList() {
   const interiorAssetRenameSession = useEditorStore((state) => state.interiorAssetRenameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
+  const isCompactDensity = useEditorStore((state) => state.settings.sidebarDensity === "compact");
   const addFloor = useEditorStore((state) => state.addFloor);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
@@ -210,6 +215,47 @@ export function EditorSidebarRoomsList() {
   const [isStructureSectionExpanded, setIsStructureSectionExpanded] = useState(true);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
+  const sectionHeaderClass = cn(
+    "flex items-center gap-2 rounded-lg font-medium text-zinc-800 transition-colors hover:bg-zinc-200/70 dark:text-zinc-100 dark:hover:bg-zinc-800/60",
+    isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+  );
+  const sectionCountClass = cn("ml-auto font-normal text-inherit/70", isCompactDensity ? "text-[10px]" : "text-[11px]");
+  const floorRowClass = cn(
+    "flex w-full items-center rounded-lg transition-colors group",
+    isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+  );
+  const floorBadgeClass = cn(
+    "inline-flex shrink-0 items-center justify-center rounded-full bg-zinc-300/50 font-semibold text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300",
+    isCompactDensity ? "h-4 w-4 text-[9px]" : "w-5 h-5 text-[10px]"
+  );
+  const roomCardClass = cn("rounded-lg border transition-colors", isCompactDensity ? "text-xs" : "text-sm");
+  const roomHeaderClass = cn(
+    "flex items-center gap-2",
+    isCompactDensity ? "min-h-8 px-2.5 py-1.5" : "min-h-10 px-3 py-2"
+  );
+  const roomNameClass = cn("min-w-0 flex-1 truncate font-medium text-inherit", isCompactDensity ? "text-xs" : "text-sm");
+  const areaLabelClass = cn(
+    "shrink-0 text-right leading-none text-zinc-500 dark:text-zinc-400",
+    isCompactDensity ? "w-12 text-[10px]" : "w-14 text-xs"
+  );
+  const roomDetailsContainerClass = cn(isCompactDensity ? "px-2.5 pb-1.5" : "px-3 pb-2");
+  const nestedRoomListClass = cn("flex flex-col", isCompactDensity ? "ml-5 mt-1 gap-0.5" : "ml-6 mt-1 gap-1");
+  const wallRowClass = cn(
+    "ml-2 flex items-center gap-2 rounded-md pr-2 transition-colors",
+    isCompactDensity ? "min-h-8 py-1 text-xs" : "min-h-9 py-1.5 text-sm"
+  );
+  const openingRowClass = cn(
+    "flex w-full items-center rounded-md text-left transition-colors",
+    isCompactDensity ? "min-h-8 px-2 py-1 text-xs" : "min-h-9 px-2 py-1.5 text-sm"
+  );
+  const assetHeaderRowClass = cn(
+    "ml-2 flex items-center gap-2 rounded-md pr-2 transition-colors",
+    isCompactDensity ? "min-h-8 py-1 text-xs" : "min-h-9 py-1.5 text-sm"
+  );
+  const assetRowClass = cn(
+    "flex w-full items-center rounded-md text-left transition-colors",
+    isCompactDensity ? "min-h-8 px-2 py-1 text-xs" : "min-h-9 px-2 py-1.5 text-sm"
+  );
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -262,15 +308,20 @@ export function EditorSidebarRoomsList() {
 
   return (
     <ImmediateTooltipProvider>
-      <div className="flex flex-col gap-3">
+      <div className={cn("flex flex-col", isCompactDensity ? "gap-2" : "gap-3")}>
         <SidebarSection
           title="Structure"
           count={rooms.length}
           isExpanded={isStructureSectionExpanded}
           onToggle={() => setIsStructureSectionExpanded((current) => !current)}
+          headerClassName={sectionHeaderClass}
+          countClassName={sectionCountClass}
         >
           {floors.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
+            <div className={cn(
+              "rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground",
+              isCompactDensity ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+            )}>
               No floors yet.
             </div>
           ) : (
@@ -283,7 +334,7 @@ export function EditorSidebarRoomsList() {
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
                     {isRenaming ? (
-                      <div className="flex min-h-10 items-center gap-2 px-3 py-2">
+                      <div className={roomHeaderClass}>
                         <EditorSidebarRenameInput
                           ref={floorRenameInputRef}
                           value={floor.name}
@@ -316,7 +367,7 @@ export function EditorSidebarRoomsList() {
                     ) : (
                       <div
                         className={cn(
-                          "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm transition-colors group",
+                          floorRowClass,
                           dragOverFloorId === floor.id
                             ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
                             : activeFloorId === floor.id
@@ -372,7 +423,7 @@ export function EditorSidebarRoomsList() {
                           }}
                           className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
                         >
-                          <span className="inline-flex shrink-0 items-center justify-center rounded-full w-5 h-5 bg-zinc-300/50 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300">
+                          <span className={floorBadgeClass}>
                             {floorNumber}
                           </span>
                           <span className="truncate">{floor.name}</span>
@@ -397,9 +448,12 @@ export function EditorSidebarRoomsList() {
                     )}
 
                     {isFloorExpanded ? (
-                      <div className="ml-6 mt-1 flex flex-col gap-1">
+                      <div className={nestedRoomListClass}>
                         {floorRooms.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 p-3 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
+                          <div className={cn(
+                            "rounded-md border border-dashed border-zinc-300/70 bg-zinc-50/50 text-zinc-500 dark:border-border/60 dark:bg-transparent dark:text-muted-foreground",
+                            isCompactDensity ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"
+                          )}>
                             Rooms will appear here as you draw them.
                           </div>
                         ) : (
@@ -452,7 +506,7 @@ export function EditorSidebarRoomsList() {
                       setDraggedRoomId(null);
                     }}
                     className={cn(
-                      "rounded-lg border transition-colors",
+                      roomCardClass,
                       isDraggingThisRoom
                         ? "border-zinc-300 bg-zinc-100 text-zinc-600 opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
                         : isDragOverThisRoom
@@ -465,7 +519,7 @@ export function EditorSidebarRoomsList() {
                     )}
                   >
                     {isRenaming ? (
-                      <div className="flex min-h-10 items-center gap-2 px-3 py-2">
+                      <div className={roomHeaderClass}>
                         <EditorSidebarRenameInput
                           ref={inputRef}
                           value={room.name}
@@ -506,7 +560,7 @@ export function EditorSidebarRoomsList() {
                       </div>
                     ) : (
                       <div
-                        className="flex min-h-10 items-center gap-2 px-3 py-2"
+                        className={roomHeaderClass}
                         onClick={(e) => {
                           if ((e.ctrlKey || e.metaKey) && e.button === 0) {
                             const roomItem: SharedSelectionItem = { type: "room", id: room.id };
@@ -555,18 +609,18 @@ export function EditorSidebarRoomsList() {
                               selectRoomById(room.id);
                               startRoomRenameSession(room.id);
                             }}
-                            className="min-w-0 flex-1 truncate text-sm font-medium text-inherit"
+                            className={roomNameClass}
                           >
                             {room.name}
                           </span>
-                          <span className="w-14 shrink-0 text-right text-xs leading-none text-zinc-500 dark:text-zinc-400">
+                          <span className={areaLabelClass}>
                             {areaLabel}
                           </span>
                         </div>
                       </div>
                     )}
                     {isRoomExpanded ? (
-                      <div className="px-3 pb-2">
+                      <div className={roomDetailsContainerClass}>
                         <div className="mt-1 flex flex-col gap-1">
                           {roomWalls.map(({ wall, segmentIndex }) => {
                             const wallKey = `${room.id}:${wall}`;
@@ -582,7 +636,7 @@ export function EditorSidebarRoomsList() {
                               <div key={wallKey} className="flex flex-col gap-1">
                                 <div
                                   className={cn(
-                                    "ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm transition-colors",
+                                    wallRowClass,
                                     isWallSelected
                                       ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                       : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -666,7 +720,7 @@ export function EditorSidebarRoomsList() {
                                                 }
                                               }}
                                               className={cn(
-                                                "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                                openingRowClass,
                                                 isOpeningSelected
                                                   ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                                   : isInMultiSelection
@@ -687,7 +741,10 @@ export function EditorSidebarRoomsList() {
                           })}
                           {hasInteriorAssets ? (
                             <div className="flex flex-col gap-1">
-                              <div className="ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
+                              <div className={cn(
+                                assetHeaderRowClass,
+                                "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                              )}>
                                 <SidebarIconTooltip
                                   content={
                                     isAssetSectionExpanded
@@ -798,7 +855,7 @@ export function EditorSidebarRoomsList() {
                                               }
                                             }}
                                             className={cn(
-                                              "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                              assetRowClass,
                                               isAssetSelected
                                                 ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                                 : isInMultiSelection
@@ -842,7 +899,10 @@ export function EditorSidebarRoomsList() {
               <button
                 type="button"
                 onClick={addFloor}
-                className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70"
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
+                  isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+                )}
                 disabled={isRenameBlocked || floors.length >= maxFloors}
                 title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
               >
