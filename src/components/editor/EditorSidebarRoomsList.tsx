@@ -509,7 +509,6 @@ export function EditorSidebarRoomsList() {
                         className="flex min-h-10 items-center gap-2 px-3 py-2"
                         onClick={(e) => {
                           if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                            // Ctrl/Cmd + Click for multi-select
                             const roomItem: SharedSelectionItem = { type: "room", id: room.id };
                             if (isItemInSelection(roomItem, selection)) {
                               removeFromSelection(roomItem);
@@ -517,7 +516,6 @@ export function EditorSidebarRoomsList() {
                               addToSelection(roomItem);
                             }
                           } else {
-                            // Regular click for single selection
                             selectRoomById(room.id);
                           }
                         }}
@@ -653,14 +651,12 @@ export function EditorSidebarRoomsList() {
                                               type="button"
                                               onClick={(e) => {
                                                 if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                  // Ctrl/Cmd + Click for multi-select
                                                   if (isItemInSelection(openingItem, selection)) {
                                                     removeFromSelection(openingItem);
                                                   } else {
                                                     addToSelection(openingItem);
                                                   }
                                                 } else {
-                                                  // Regular click for single selection
                                                   selectOpeningById(room.id, opening.id);
                                                 }
                                               }}
@@ -787,14 +783,12 @@ export function EditorSidebarRoomsList() {
                                             type="button"
                                             onClick={(e) => {
                                               if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                // Ctrl/Cmd + Click for multi-select
                                                 if (isItemInSelection(assetItem, selection)) {
                                                   removeFromSelection(assetItem);
                                                 } else {
                                                   addToSelection(assetItem);
                                                 }
                                               } else {
-                                                // Regular click for single selection
                                                 selectInteriorAssetById(room.id, asset.id);
                                               }
                                             }}
