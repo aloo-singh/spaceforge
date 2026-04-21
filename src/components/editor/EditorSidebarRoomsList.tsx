@@ -228,13 +228,23 @@ export function EditorSidebarRoomsList() {
   const [isStructureSectionExpanded, setIsStructureSectionExpanded] = useState(true);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
+  const selectedRoomFromMultiSelection = selection.find(
+    (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
+  );
+  const selectedRoomForStructureId = selectedRoomId ?? selectedRoomFromMultiSelection?.id ?? null;
+  const selectedRoomFloorId = selectedRoomForStructureId
+    ? rooms.find((room) => room.id === selectedRoomForStructureId)?.floorId ?? null
+    : null;
+  const effectiveCollapsedFloorIds = selectedRoomFloorId
+    ? collapsedFloorIds.filter((floorId) => floorId !== selectedRoomFloorId)
+    : collapsedFloorIds;
   const sectionHeaderClass = cn(
     "flex items-center gap-2 rounded-lg font-medium text-zinc-800 transition-colors hover:bg-zinc-200/70 dark:text-zinc-100 dark:hover:bg-zinc-800/60",
     isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
   );
   const sectionCountClass = cn("ml-auto font-normal text-inherit/70", isCompactDensity ? "text-[10px]" : "text-[11px]");
   const floorRowClass = cn(
-    "flex w-full items-center rounded-lg transition-colors group",
+    "group flex w-full items-center rounded-lg border font-semibold tracking-[0.02em] transition-colors",
     isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
   );
   const floorBadgeClass = cn(
@@ -268,6 +278,10 @@ export function EditorSidebarRoomsList() {
   const assetRowClass = cn(
     "flex w-full items-center rounded-md text-left transition-colors",
     isCompactDensity ? "min-h-8 px-2 py-1 text-xs" : "min-h-9 px-2 py-1.5 text-sm"
+  );
+  const floorLabelClass = cn(
+    "truncate font-semibold text-inherit",
+    isCompactDensity ? "text-[11px]" : "text-sm"
   );
 
   useEffect(() => {
@@ -343,7 +357,7 @@ export function EditorSidebarRoomsList() {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
-                const isFloorExpanded = !collapsedFloorIds.includes(floor.id);
+                const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
                     {isRenaming ? (
@@ -386,8 +400,8 @@ export function EditorSidebarRoomsList() {
                               dragOverFloorId === floor.id
                                 ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
                                 : activeFloorId === floor.id
-                                ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
-                                : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
+                                ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                                : "border-zinc-300/70 bg-zinc-100/60 text-zinc-700 hover:bg-zinc-200/75 dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
                             )}
                             onDragOver={(e) => {
                               if (selection.length > 0 && floor.id !== activeFloorId) {
@@ -441,7 +455,7 @@ export function EditorSidebarRoomsList() {
                               <span className={floorBadgeClass}>
                                 {floorNumber}
                               </span>
-                              <span className="truncate">{floor.name}</span>
+                              <span className={floorLabelClass}>{floor.name}</span>
                               <span className={SECTION_COUNT_CLASS}>{floorRooms.length}</span>
                               {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
                             </button>
