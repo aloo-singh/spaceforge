@@ -20,7 +20,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
+import {
+  formatMetricRoomArea,
+  formatMetricRoomAreaForRoom,
+  getRoomAreaSquareMillimetres,
+} from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
 import { getRoomsForFloor } from "@/lib/editor/history";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
@@ -254,6 +258,7 @@ export function EditorSidebarRoomsList() {
     "shrink-0 text-right leading-none text-zinc-500 dark:text-zinc-400",
     isCompactDensity ? "w-12 text-[10px]" : "w-14 text-xs"
   );
+  const floorAreaLabelClass = cn("ml-auto", areaLabelClass);
   const roomDetailsContainerClass = cn(isCompactDensity ? "px-2.5 pb-1.5" : "px-3 pb-2");
   const nestedRoomListClass = cn("flex flex-col", isCompactDensity ? "ml-5 mt-1 gap-0.5" : "ml-6 mt-1 gap-1");
   const wallRowClass = cn(
@@ -354,6 +359,11 @@ export function EditorSidebarRoomsList() {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
+                const floorAreaSquareMillimetres = floorRooms.reduce(
+                  (totalArea, room) => totalArea + getRoomAreaSquareMillimetres(room),
+                  0
+                );
+                const floorAreaLabel = formatMetricRoomArea(floorAreaSquareMillimetres);
                 const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
@@ -440,7 +450,7 @@ export function EditorSidebarRoomsList() {
                                   )}
                                   disabled={isRenameBlocked}
                                 />
-                                <span className={sectionCountClass}>{floorRooms.length}</span>
+                                <span className={floorAreaLabelClass}>{floorAreaLabel}</span>
                               </div>
                             ) : (
                               <button
@@ -459,7 +469,7 @@ export function EditorSidebarRoomsList() {
                                   {floorNumber}
                                 </span>
                                 <span className={floorLabelClass}>{floor.name}</span>
-                                <span className={sectionCountClass}>{floorRooms.length}</span>
+                                <span className={floorAreaLabelClass}>{floorAreaLabel}</span>
                               </button>
                             )}
                           </div>
