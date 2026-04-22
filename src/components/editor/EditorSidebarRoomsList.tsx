@@ -40,9 +40,6 @@ type SidebarWallEntry = {
 const RECTANGULAR_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
 const SIDEBAR_CHEVRON_BUTTON_CLASS =
   "flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5";
-const SECTION_HEADER_CLASS =
-  "flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200/70 dark:text-zinc-100 dark:hover:bg-zinc-800/60";
-const SECTION_COUNT_CLASS = "ml-auto text-[11px] font-normal text-inherit/70";
 
 function getWallLabel(segmentIndex: number): string {
   return `Wall ${segmentIndex + 1}`;
@@ -111,44 +108,6 @@ function SidebarIconTooltip({
         {content}
       </TooltipContent>
     </Tooltip>
-  );
-}
-
-function SidebarSection({
-  title,
-  count,
-  isExpanded,
-  onToggle,
-  headerClassName,
-  countClassName,
-  children,
-}: {
-  title: string;
-  count: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-  headerClassName?: string;
-  countClassName?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className={headerClassName ?? SECTION_HEADER_CLASS}>
-        <SidebarIconTooltip content={isExpanded ? `Collapse ${title}` : `Expand ${title}`}>
-          <button
-            type="button"
-            onClick={onToggle}
-            className={SIDEBAR_CHEVRON_BUTTON_CLASS}
-            aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
-          >
-            <ChevronRight className={cn("size-3.5 transition-transform", isExpanded && "rotate-90")} />
-          </button>
-        </SidebarIconTooltip>
-        <span>{title}</span>
-        <span className={countClassName ?? SECTION_COUNT_CLASS}>{count}</span>
-      </div>
-      {isExpanded ? children : null}
-    </div>
   );
 }
 
@@ -222,7 +181,6 @@ export function EditorSidebarRoomsList() {
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
   const [collapsedFloorIds, setCollapsedFloorIds] = useState<string[]>([]);
-  const [isStructureSectionExpanded, setIsStructureSectionExpanded] = useState(true);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
   const selectedRoomFromMultiSelection = selection.find(
@@ -235,11 +193,6 @@ export function EditorSidebarRoomsList() {
   const effectiveCollapsedFloorIds = selectedRoomFloorId
     ? collapsedFloorIds.filter((floorId) => floorId !== selectedRoomFloorId)
     : collapsedFloorIds;
-  const sectionHeaderClass = cn(
-    "flex items-center gap-2 rounded-lg font-medium text-zinc-800 transition-colors hover:bg-zinc-200/70 dark:text-zinc-100 dark:hover:bg-zinc-800/60",
-    isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
-  );
-  const sectionCountClass = cn("ml-auto font-normal text-inherit/70", isCompactDensity ? "text-[10px]" : "text-[11px]");
   const floorRowClass = cn(
     "group flex w-full items-center rounded-lg border font-semibold tracking-[0.02em] transition-colors",
     isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
@@ -338,24 +291,16 @@ export function EditorSidebarRoomsList() {
   return (
     <ImmediateTooltipProvider>
       <div className={cn("flex flex-col", isCompactDensity ? "gap-2" : "gap-3")}>
-        <SidebarSection
-          title="Structure"
-          count={rooms.length}
-          isExpanded={isStructureSectionExpanded}
-          onToggle={() => setIsStructureSectionExpanded((current) => !current)}
-          headerClassName={sectionHeaderClass}
-          countClassName={sectionCountClass}
-        >
-          {floors.length === 0 ? (
-            <div className={cn(
-              "rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground",
-              isCompactDensity ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
-            )}>
-              No floors yet.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {displayedFloors.map((floor, floorIndex) => {
+        {floors.length === 0 ? (
+          <div className={cn(
+            "rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground",
+            isCompactDensity ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          )}>
+            No floors yet.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {displayedFloors.map((floor, floorIndex) => {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
@@ -943,25 +888,24 @@ export function EditorSidebarRoomsList() {
                         )}
                       </div>
                     ) : null}
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => addFloor()}
-                className={cn(
-                  "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
-                  isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
-                )}
-                disabled={isRenameBlocked || floors.length >= maxFloors}
-                title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
-              >
-                <Plus className="size-4" />
-                <span>Add Floor</span>
-              </button>
-            </div>
-          )}
-        </SidebarSection>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => addFloor()}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
+                isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+              )}
+              disabled={isRenameBlocked || floors.length >= maxFloors}
+              title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
+            >
+              <Plus className="size-4" />
+              <span>Add Floor</span>
+            </button>
+          </div>
+        )}
 
         {selection.length > 0 && (
           <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 px-3 py-2 dark:border-blue-700/50 dark:bg-blue-900/20">
