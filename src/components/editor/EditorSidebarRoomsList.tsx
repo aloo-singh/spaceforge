@@ -461,7 +461,6 @@ export function EditorSidebarRoomsList() {
                               </span>
                               <span className={floorLabelClass}>{floor.name}</span>
                               <span className={sectionCountClass}>{floorRooms.length}</span>
-                              {activeFloorId === floor.id ? <span className={sectionCountClass}>Active</span> : null}
                             </button>
                             <SidebarIconTooltip content="Delete floor">
                               <button
