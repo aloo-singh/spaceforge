@@ -130,7 +130,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           leftSidebarContent={
             <div className="flex h-full min-h-0 w-full flex-col">
               <div>
-                <div className="px-3 py-3 sm:px-4">
+                <div className="px-3 py-2 pr-12 sm:px-4 sm:pr-13">
                   <EditorProjectChrome
                     projectId={activeProject?.id ?? null}
                     projectName={activeProject?.name ?? null}

@@ -2791,7 +2791,7 @@ export default function EditorCanvas({
                       aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                       onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
                       className={cn(
-                        "absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5",
+                        "absolute top-[18px] right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-[14px] [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5",
                         useCompactMobileControls && "size-9 rounded-xl"
                       )}
                     >
@@ -2809,7 +2809,7 @@ export default function EditorCanvas({
               </ImmediateTooltipProvider>
               <div
                 className={cn(
-                  "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
+                  "min-h-0 flex-1 overflow-hidden px-2 pt-2 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-1.5",
                   isLeftSidebarCollapsed
                     ? "pointer-events-none -translate-x-2 opacity-0"
                     : "translate-x-0 opacity-100"
