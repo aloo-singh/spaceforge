@@ -364,39 +364,7 @@ export function EditorSidebarRoomsList() {
                 const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
-                    {isRenaming ? (
-                      <div className={roomHeaderClass}>
-                        <EditorSidebarRenameInput
-                          ref={floorRenameInputRef}
-                          value={floor.name}
-                          onChange={(event) => updateFloorRenameDraft(floor.id, event.target.value)}
-                          onBlur={() => {
-                            commitFloorRenameSession();
-                            setSidebarRenameFloorId(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.nativeEvent.isComposing) return;
-
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              commitFloorRenameSession();
-                              setSidebarRenameFloorId(null);
-                              return;
-                            }
-
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              cancelFloorRename();
-                              setSidebarRenameFloorId(null);
-                            }
-                          }}
-                          aria-label={`Rename ${floor.name}`}
-                          className="flex-1"
-                          disabled={isRenameBlocked}
-                        />
-                      </div>
-                    ) : (
-                      <ContextMenu>
+                    <ContextMenu>
                         <ContextMenuTrigger asChild>
                           <div
                             className={cn(
@@ -444,24 +412,63 @@ export function EditorSidebarRoomsList() {
                                 <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
                               </button>
                             </SidebarIconTooltip>
-                            <button
-                              type="button"
-                              onClick={() => selectFloorById(floor.id)}
-                              onDoubleClick={(event) => {
-                                event.stopPropagation();
-                                setSidebarRenameFloorId(floor.id);
-                                shouldAutoFocusFloorRenameInputRef.current = true;
-                                selectFloorById(floor.id);
-                                startFloorRename(floor.id);
-                              }}
-                              className={floorContentClass}
-                            >
-                              <span className={floorBadgeClass}>
-                                {floorNumber}
-                              </span>
-                              <span className={floorLabelClass}>{floor.name}</span>
-                              <span className={sectionCountClass}>{floorRooms.length}</span>
-                            </button>
+                            {isRenaming ? (
+                              <div className={floorContentClass}>
+                                <span className={floorBadgeClass}>{floorNumber}</span>
+                                <EditorSidebarRenameInput
+                                  ref={floorRenameInputRef}
+                                  value={floor.name}
+                                  onChange={(event) => updateFloorRenameDraft(floor.id, event.target.value)}
+                                  onBlur={() => {
+                                    commitFloorRenameSession();
+                                    setSidebarRenameFloorId(null);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.nativeEvent.isComposing) return;
+
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      commitFloorRenameSession();
+                                      setSidebarRenameFloorId(null);
+                                      return;
+                                    }
+
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      cancelFloorRename();
+                                      setSidebarRenameFloorId(null);
+                                    }
+                                  }}
+                                  aria-label={`Rename ${floor.name}`}
+                                  className={cn(
+                                    "flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0",
+                                    isCompactDensity && "pt-px",
+                                    floorLabelClass
+                                  )}
+                                  disabled={isRenameBlocked}
+                                />
+                                <span className={sectionCountClass}>{floorRooms.length}</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => selectFloorById(floor.id)}
+                                onDoubleClick={(event) => {
+                                  event.stopPropagation();
+                                  setSidebarRenameFloorId(floor.id);
+                                  shouldAutoFocusFloorRenameInputRef.current = true;
+                                  selectFloorById(floor.id);
+                                  startFloorRename(floor.id);
+                                }}
+                                className={floorContentClass}
+                              >
+                                <span className={floorBadgeClass}>
+                                  {floorNumber}
+                                </span>
+                                <span className={floorLabelClass}>{floor.name}</span>
+                                <span className={sectionCountClass}>{floorRooms.length}</span>
+                              </button>
+                            )}
                             <SidebarIconTooltip content="Delete floor">
                               <button
                                 type="button"
@@ -495,7 +502,6 @@ export function EditorSidebarRoomsList() {
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
-                    )}
 
                     {isFloorExpanded ? (
                       <div className={nestedRoomListClass}>
@@ -568,67 +574,34 @@ export function EditorSidebarRoomsList() {
                         : "border-transparent text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
                     )}
                   >
-                    {isRenaming ? (
-                      <div className={roomHeaderClass}>
-                        <EditorSidebarRenameInput
-                          ref={inputRef}
-                          value={room.name}
-                          onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
-                          onBlur={() => {
-                            commitRoomRenameSession({ deselectIfUnchanged: false });
-                            setSidebarRenameRoomId(null);
-                            selectRoomById(room.id);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.nativeEvent.isComposing) return;
-
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              commitRoomRenameSession({ deselectIfUnchanged: false });
-                              setSidebarRenameRoomId(null);
-                              selectRoomById(room.id);
-                              return;
+                    <div
+                      className={roomHeaderClass}
+                      onClick={
+                        isRenaming
+                          ? undefined
+                          : (e) => {
+                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                const roomItem: SharedSelectionItem = { type: "room", id: room.id };
+                                if (isItemInSelection(roomItem, selection)) {
+                                  removeFromSelection(roomItem);
+                                } else {
+                                  addToSelection(roomItem);
+                                }
+                              } else {
+                                selectRoomById(room.id);
+                              }
                             }
-
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              cancelRoomRenameSession();
-                              setSidebarRenameRoomId(null);
-                              selectRoomById(room.id);
+                      }
+                      onMouseDown={
+                        isRenaming
+                          ? undefined
+                          : (e) => {
+                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                e.preventDefault();
+                              }
                             }
-                          }}
-                          aria-label={`Rename ${room.name}`}
-                          className="flex-1"
-                          disabled={isRenameBlocked}
-                        />
-                        <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                          -
-                        </span>
-                        <span className="shrink-0 text-xs leading-none text-zinc-500 dark:text-zinc-400">
-                          {areaLabel}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className={roomHeaderClass}
-                        onClick={(e) => {
-                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                            const roomItem: SharedSelectionItem = { type: "room", id: room.id };
-                            if (isItemInSelection(roomItem, selection)) {
-                              removeFromSelection(roomItem);
-                            } else {
-                              addToSelection(roomItem);
-                            }
-                          } else {
-                            selectRoomById(room.id);
-                          }
-                        }}
-                        onMouseDown={(e) => {
-                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                            e.preventDefault();
-                          }
-                        }}
-                      >
+                      }
+                    >
                         <SidebarIconTooltip
                           content={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                         >
@@ -651,24 +624,61 @@ export function EditorSidebarRoomsList() {
                           </button>
                         </SidebarIconTooltip>
                         <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                          <span
-                            onDoubleClick={(event) => {
-                              event.stopPropagation();
-                              setSidebarRenameRoomId(room.id);
-                              shouldAutoFocusRenameInputRef.current = true;
-                              selectRoomById(room.id);
-                              startRoomRenameSession(room.id);
-                            }}
-                            className={roomNameClass}
-                          >
-                            {room.name}
-                          </span>
+                          {isRenaming ? (
+                            <EditorSidebarRenameInput
+                              ref={inputRef}
+                              value={room.name}
+                              onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
+                              onBlur={() => {
+                                commitRoomRenameSession({ deselectIfUnchanged: false });
+                                setSidebarRenameRoomId(null);
+                                selectRoomById(room.id);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.nativeEvent.isComposing) return;
+
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  commitRoomRenameSession({ deselectIfUnchanged: false });
+                                  setSidebarRenameRoomId(null);
+                                  selectRoomById(room.id);
+                                  return;
+                                }
+
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  cancelRoomRenameSession();
+                                  setSidebarRenameRoomId(null);
+                                  selectRoomById(room.id);
+                                }
+                              }}
+                              aria-label={`Rename ${room.name}`}
+                              className={cn(
+                                "flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0",
+                                isCompactDensity && "pt-px",
+                                roomNameClass
+                              )}
+                              disabled={isRenameBlocked}
+                            />
+                          ) : (
+                            <span
+                              onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setSidebarRenameRoomId(room.id);
+                                shouldAutoFocusRenameInputRef.current = true;
+                                selectRoomById(room.id);
+                                startRoomRenameSession(room.id);
+                              }}
+                              className={roomNameClass}
+                            >
+                              {room.name}
+                            </span>
+                          )}
                           <span className={areaLabelClass}>
                             {areaLabel}
                           </span>
                         </div>
                       </div>
-                    )}
                     {isRoomExpanded ? (
                       <div className={roomDetailsContainerClass}>
                         <div className="mt-1 flex flex-col gap-1">
@@ -882,6 +892,7 @@ export function EditorSidebarRoomsList() {
                                                 }
                                               }}
                                               aria-label={`Rename ${asset.name}`}
+                                              className={isCompactDensity ? "!h-8" : "!h-10"}
                                               disabled={isRenameBlocked}
                                             />
                                           </div>
