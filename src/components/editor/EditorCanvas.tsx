@@ -407,7 +407,12 @@ type EditorCanvasProps = {
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
   onThumbnailGeneratorChange?: (generateThumbnailDataUrl: (() => Promise<string | null>) | null) => void;
   topBarLeadingContent?: ReactNode;
-  leftSidebarContent?: ReactNode;
+  leftSidebarContent?:
+    | ReactNode
+    | ((options: {
+        sidebarCollapseControl: ReactNode;
+        isLeftSidebarCollapsed: boolean;
+      }) => ReactNode);
 };
 
 function CanvasHudCard({ children, className }: { children: ReactNode; className?: string }) {
@@ -2614,6 +2619,29 @@ export default function EditorCanvas({
       ? `${DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX}px`
       : expandedLeftSidebarWidth
     : null;
+  const sidebarCollapseControl = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
+      className="size-8 rounded-lg text-foreground/72 hover:bg-muted/80 hover:text-foreground"
+    >
+      {isLeftSidebarCollapsed ? (
+        <PanelLeftExpand className="size-4" />
+      ) : (
+        <PanelLeftCollapse className="size-4" />
+      )}
+    </Button>
+  );
+  const resolvedLeftSidebarContent =
+    typeof leftSidebarContent === "function"
+      ? leftSidebarContent({
+          sidebarCollapseControl,
+          isLeftSidebarCollapsed,
+        })
+      : leftSidebarContent;
   const rightInspectorWidth = usesPortraitBottomInspector
     ? null
     : isDesktopInspectorCollapsed
@@ -2781,32 +2809,20 @@ export default function EditorCanvas({
             }}
           >
             <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-              <ImmediateTooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                      onClick={() => setIsLeftSidebarCollapsed((current) => !current)}
-                      className={cn(
-                        "absolute top-[18px] right-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-[14px] [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5",
-                        useCompactMobileControls && "size-9 rounded-xl"
-                      )}
-                    >
-                      {isLeftSidebarCollapsed ? (
-                        <PanelLeftExpand className="size-4" />
-                      ) : (
-                        <PanelLeftCollapse className="size-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" align="start">
-                    {isLeftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                  </TooltipContent>
-                </Tooltip>
-              </ImmediateTooltipProvider>
+              {isLeftSidebarCollapsed ? (
+                <ImmediateTooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="absolute top-2 right-2 z-10 [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:right-1.5">
+                        {sidebarCollapseControl}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" align="start">
+                      Expand sidebar
+                    </TooltipContent>
+                  </Tooltip>
+                </ImmediateTooltipProvider>
+              ) : null}
               <div
                 className={cn(
                   "min-h-0 flex-1 overflow-hidden px-2 pt-2 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-1.5",
@@ -2816,7 +2832,7 @@ export default function EditorCanvas({
                 )}
                 aria-hidden={isLeftSidebarCollapsed}
               >
-                {leftSidebarContent}
+                {resolvedLeftSidebarContent}
               </div>
             </div>
           </aside>
