@@ -14,6 +14,7 @@ type DeleteRoomStoreState = {
   deleteSelectedOpening: () => void;
   deleteSelectedInteriorAsset: () => void;
   deleteSelectedRoom: () => void;
+  deleteFloor: (floorId: string) => void;
   bulkDeleteSelection: () => void;
 };
 
@@ -40,8 +41,12 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
       event.preventDefault();
       return;
     }
+
+    const selectedFloor = state.selection?.find(
+      (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
+    );
     
-    if (!state.selectedOpening && !state.selectedInteriorAsset && !state.selectedRoomId) return;
+    if (!state.selectedOpening && !state.selectedInteriorAsset && !state.selectedRoomId && !selectedFloor) return;
 
     event.stopImmediatePropagation();
     event.stopPropagation();
@@ -50,8 +55,10 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
       state.deleteSelectedOpening();
     } else if (state.selectedInteriorAsset) {
       state.deleteSelectedInteriorAsset();
-    } else {
+    } else if (state.selectedRoomId) {
       state.deleteSelectedRoom();
+    } else if (selectedFloor) {
+      state.deleteFloor(selectedFloor.id);
     }
 
     showKeyboardShortcutFeedback(shortcut.id, {
