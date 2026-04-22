@@ -927,7 +927,10 @@ export default function EditorCanvas({
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
     );
-    return floorSelection?.id ?? null;
+    if (floorSelection) return floorSelection.id;
+    return state.document.floors.some((floor) => floor.id === state.document.activeFloorId)
+      ? state.document.activeFloorId
+      : null;
   });
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
   const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
