@@ -154,6 +154,7 @@ import type {
   Room,
   RoomInteriorAssetSelection,
   RoomOpeningSelection,
+  SharedSelectionItem,
   RoomWall,
   RoomWallSelection,
   ScreenPoint,
@@ -162,6 +163,7 @@ import type {
 import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
+import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
@@ -916,6 +918,12 @@ export default function EditorCanvas({
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const selectedFloorId = useEditorStore((state) => {
+    const floorSelection = state.selection.find(
+      (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
+    );
+    return floorSelection?.id ?? null;
+  });
   const selectNorthIndicator = useEditorStore((state) => state.selectNorthIndicator);
   const updateCanvasRotationDegrees = useEditorStore((state) => state.updateCanvasRotationDegrees);
   const resetCanvasRotation = useEditorStore((state) => state.resetCanvasRotation);
@@ -2575,6 +2583,8 @@ export default function EditorCanvas({
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
     <SelectedRoomNamePanel className="h-full" />
+  ) : selectedFloorId ? (
+    <SelectedFloorInspector className="h-full" />
   ) : (
     <EditorInspectorEmptyState className="h-full" />
   );
@@ -2582,6 +2592,8 @@ export default function EditorCanvas({
     <SelectedNorthInspector />
   ) : selectedRoomId ? (
     <SelectedRoomNamePanel />
+  ) : selectedFloorId ? (
+    <SelectedFloorInspector />
   ) : (
     <EditorInspectorEmptyState />
   );
