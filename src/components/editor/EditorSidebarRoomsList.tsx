@@ -6,6 +6,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -13,6 +14,7 @@ import {
   IconCaretDownFilled,
   IconCaretUpFilled,
   Plus,
+  Trash2,
 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
@@ -162,6 +164,7 @@ export function EditorSidebarRoomsList() {
   const updateFloorRenameDraft = useEditorStore((state) => state.updateFloorRenameDraft);
   const commitFloorRenameSession = useEditorStore((state) => state.commitFloorRenameSession);
   const cancelFloorRename = useEditorStore((state) => state.cancelFloorRename);
+  const deleteFloor = useEditorStore((state) => state.deleteFloor);
   const moveSelectionToFloor = useEditorStore((state) => state.moveSelectionToFloor);
   const reorderRoomInFloor = useEditorStore((state) => state.reorderRoomInFloor);
   const floorRenameSession = useEditorStore((state) => state.floorRenameSession);
@@ -433,6 +436,14 @@ export function EditorSidebarRoomsList() {
                           >
                             <IconCaretDownFilled className="size-4" />
                             Add floor below
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            variant="destructive"
+                            onSelect={() => deleteFloor(floor.id)}
+                          >
+                            <Trash2 className="size-4" />
+                            Delete floor
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
