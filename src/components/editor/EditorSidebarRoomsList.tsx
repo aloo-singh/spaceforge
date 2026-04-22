@@ -283,6 +283,10 @@ export function EditorSidebarRoomsList() {
     "truncate font-semibold text-inherit",
     isCompactDensity ? "text-[11px]" : "text-sm"
   );
+  const floorContentClass = cn(
+    "flex flex-1 min-w-0 items-center gap-2 text-left",
+    isCompactDensity ? "-my-1 py-1" : "-my-2 py-2"
+  );
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -450,14 +454,14 @@ export function EditorSidebarRoomsList() {
                                 selectFloorById(floor.id);
                                 startFloorRename(floor.id);
                               }}
-                              className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
+                              className={floorContentClass}
                             >
                               <span className={floorBadgeClass}>
                                 {floorNumber}
                               </span>
                               <span className={floorLabelClass}>{floor.name}</span>
-                              <span className={SECTION_COUNT_CLASS}>{floorRooms.length}</span>
-                              {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
+                              <span className={sectionCountClass}>{floorRooms.length}</span>
+                              {activeFloorId === floor.id ? <span className={sectionCountClass}>Active</span> : null}
                             </button>
                             <SidebarIconTooltip content="Delete floor">
                               <button
