@@ -163,6 +163,11 @@ type ClipboardData =
     }
   | null;
 
+type AddFloorOptions = {
+  targetFloorId?: string;
+  position?: "above" | "below";
+};
+
 type EditorState = {
   document: DocumentState;
   camera: CameraState;
@@ -216,7 +221,7 @@ type EditorState = {
   previewNorthBearingDegrees: (degrees: number) => void;
   commitNorthBearingDegrees: (previousDegrees: number, nextDegrees: number) => void;
   updateNorthBearingDegrees: (degrees: number) => void;
-  addFloor: () => void;
+  addFloor: (options?: AddFloorOptions) => void;
   selectFloorById: (floorId: string) => void;
   panCameraByPx: (delta: ScreenPoint) => void;
   zoomAtScreenPoint: (screenPoint: ScreenPoint, scaleFactor: number) => void;
@@ -2237,12 +2242,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
-  addFloor: () =>
+  addFloor: (options) =>
     set((state) => {
       if (state.document.floors.length >= state.maxFloors) {
         console.warn(`Cannot add floor: project is already at the maximum of ${state.maxFloors} floors.`);
         return state;
       }
+
+      const targetFloorIndex = options?.targetFloorId
+        ? state.document.floors.findIndex((floor) => floor.id === options.targetFloorId)
+        : -1;
+      const insertIndex =
+        targetFloorIndex === -1
+          ? state.document.floors.length
+          : options?.position === "above"
+          ? targetFloorIndex
+          : targetFloorIndex + 1;
 
       const nextFloorNumber = state.document.floors.length + 1;
       const floor: Floor = {
@@ -2253,6 +2268,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "add-floor",
         floor,
         previousActiveFloorId: state.document.activeFloorId,
+        insertIndex,
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 

@@ -20,6 +20,7 @@ type EditorProjectChromeProps = {
   projectName: string | null;
   isLoading: boolean;
   variant?: "toolbar" | "sidebar";
+  sidebarTrailingContent?: React.ReactNode;
   isNameHighlighted?: boolean;
   onProjectRenameStart?: () => void;
   onProjectRenameCommitted?: () => void;
@@ -31,6 +32,7 @@ export function EditorProjectChrome({
   projectName,
   isLoading,
   variant = "toolbar",
+  sidebarTrailingContent,
   isNameHighlighted = false,
   onProjectRenameStart,
   onProjectRenameCommitted,
@@ -83,8 +85,8 @@ export function EditorProjectChrome({
   const isSidebar = variant === "sidebar";
 
   return (
-    <div className={cn("min-w-0", isSidebar ? "flex items-center gap-2" : "flex items-center gap-1.5")}>
-      <ImmediateTooltipProvider>
+    <ImmediateTooltipProvider>
+      <div className={cn("min-w-0", isSidebar ? "flex items-center gap-2" : "flex items-center gap-1.5")}>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="inline-flex">
@@ -109,9 +111,9 @@ export function EditorProjectChrome({
             Back to projects
           </TooltipContent>
         </Tooltip>
-      </ImmediateTooltipProvider>
+      
 
-      <div data-editor-project-name-anchor className={cn("min-w-0", isSidebar && "flex-1")}>
+        <div data-editor-project-name-anchor className={cn("min-w-0", isSidebar && "flex-1")}>
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading project...</div>
         ) : isEditingName ? (
@@ -140,24 +142,35 @@ export function EditorProjectChrome({
             )}
           />
         ) : projectName ? (
-          <button
-            type="button"
-            onClick={() => {
-              onProjectRenameStart?.();
-              setIsEditingName(true);
-            }}
-            className={cn(
-              isSidebar
-                ? "h-9 w-full min-w-0 cursor-text rounded-lg border border-transparent px-3 text-left text-base font-medium tracking-tight text-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                : "min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              isNameHighlighted && "bg-blue-500/10 text-white ring-1 ring-blue-500/40"
-            )}
-            aria-label={`Rename project ${projectName}`}
-          >
-            <span className="block leading-none">{projectName}</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  onProjectRenameStart?.();
+                  setIsEditingName(true);
+                }}
+                className={cn(
+                  isSidebar
+                    ? "h-9 w-full min-w-0 cursor-text rounded-lg border border-transparent px-3 text-left text-base font-medium tracking-tight text-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    : "min-w-0 cursor-text rounded-md px-2 py-1 text-left text-sm font-medium tracking-tight text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  isNameHighlighted && "bg-blue-500/10 text-white ring-1 ring-blue-500/40"
+                )}
+                aria-label={`Rename project ${projectName}`}
+              >
+                <span className="block truncate leading-none">{projectName}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="start">
+              {projectName}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+        </div>
+        {isSidebar && sidebarTrailingContent ? (
+          <div className="shrink-0">{sidebarTrailingContent}</div>
         ) : null}
       </div>
-    </div>
+    </ImmediateTooltipProvider>
   );
 }

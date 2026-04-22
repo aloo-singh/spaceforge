@@ -127,15 +127,16 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           onDisplayedHintChange={setActiveHintId}
           onThumbnailGeneratorChange={handleThumbnailGeneratorChange}
           projectRenameCompletionCount={projectRenameCompletionCount}
-          leftSidebarContent={
+          leftSidebarContent={({ sidebarCollapseControl, isLeftSidebarCollapsed }) => (
             <div className="flex h-full min-h-0 w-full flex-col">
               <div>
-                <div className="px-3 py-3 sm:px-4">
+                <div className="px-3 py-2 sm:px-4">
                   <EditorProjectChrome
                     projectId={activeProject?.id ?? null}
                     projectName={activeProject?.name ?? null}
                     isLoading={bootstrapState.status === "loading"}
                     variant="sidebar"
+                    sidebarTrailingContent={isLeftSidebarCollapsed ? null : sidebarCollapseControl}
                     isNameHighlighted={activeHintId === "project-name"}
                     onProjectRenameCommitted={() => {
                       setProjectRenameCompletionCount((currentCount) => currentCount + 1);
@@ -158,7 +159,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
                 <EditorSidebarRoomsList />
               </div>
             </div>
-          }
+          )}
         />
       ) : null}
       <FeedbackWidget

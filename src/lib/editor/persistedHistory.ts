@@ -264,6 +264,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         name: addedFloor.name,
       },
       previousActiveFloorId,
+      insertIndex: nextFloors.length - 1,
     };
   }
 

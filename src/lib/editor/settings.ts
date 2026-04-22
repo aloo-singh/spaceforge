@@ -2,6 +2,7 @@ export type EditorMeasurementDisplayMode = "interactive";
 export type EditorDimensionsVisibility = "visible" | "hidden";
 export type EditorMeasurementFontSize = "normal" | "large";
 export type EditorWallMeasurementPosition = "inside" | "outside";
+export type EditorSidebarDensity = "comfortable" | "compact";
 export const EDITOR_EXPORT_SIGNATURE_MAX_LENGTH = 40;
 
 export type EditorSettings = {
@@ -14,6 +15,7 @@ export type EditorSettings = {
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
+  sidebarDensity: EditorSidebarDensity;
   exportSignatureText: string;
   multiSelectModeEnabled: boolean;
 };
@@ -28,6 +30,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
+  sidebarDensity: "comfortable",
   exportSignatureText: "",
   multiSelectModeEnabled: false,
 };
@@ -43,6 +46,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
+    sidebarDensity: settings.sidebarDensity,
     exportSignatureText: settings.exportSignatureText,
     multiSelectModeEnabled: settings.multiSelectModeEnabled,
   };
@@ -59,6 +63,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
+    a.sidebarDensity === b.sidebarDensity &&
     a.exportSignatureText === b.exportSignatureText &&
     a.multiSelectModeEnabled === b.multiSelectModeEnabled
   );
@@ -80,6 +85,10 @@ export function isEditorWallMeasurementPosition(
   value: unknown
 ): value is EditorWallMeasurementPosition {
   return value === "inside" || value === "outside";
+}
+
+export function isEditorSidebarDensity(value: unknown): value is EditorSidebarDensity {
+  return value === "comfortable" || value === "compact";
 }
 
 export function shouldShowDimensions(
@@ -144,6 +153,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showFloorFootprint" in value && typeof value.showFloorFootprint === "boolean"
         ? value.showFloorFootprint
         : DEFAULT_EDITOR_SETTINGS.showFloorFootprint,
+    sidebarDensity:
+      "sidebarDensity" in value && isEditorSidebarDensity(value.sidebarDensity)
+        ? value.sidebarDensity
+        : DEFAULT_EDITOR_SETTINGS.sidebarDensity,
     exportSignatureText:
       "exportSignatureText" in value && typeof value.exportSignatureText === "string"
         ? value.exportSignatureText.slice(0, EDITOR_EXPORT_SIGNATURE_MAX_LENGTH)

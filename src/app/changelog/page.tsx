@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.62.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-22</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Sidebar Floor Hierarchy</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Restructured sidebar into true hierarchical tree: Project &rarr; Floors &rarr; Rooms &rarr; Walls/Assets</li>
+                <li>Selection now drives floor expansion (selected room&rsquo;s floor opens automatically)</li>
+                <li>Added Comfortable vs Compact density toggle with reduced visual weight in Compact mode</li>
+                <li>Added right-click actions on floors: &ldquo;Add floor above&rdquo; and &ldquo;Add floor below&rdquo;</li>
+                <li>Improved visual distinction between floor and room nodes</li>
+                <li>Relaxed accordion behaviour based on testing (manual expansion of non-selected floors allowed)</li>
+                <li>All existing actions (multi-select, drag, reorder, delete, duplicate, move) continue to work seamlessly</li>
+                <li>Final polish and verification sweep completed</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.61.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-16</span>
           </div>

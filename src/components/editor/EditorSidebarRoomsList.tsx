@@ -2,18 +2,33 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
-import { Button } from "@/components/ui/button";
-import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { ChevronRight, Plus, Trash2 } from "@/components/ui/icons";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  ChevronRight,
+  IconCaretDownFilled,
+  IconCaretUpFilled,
+  Plus,
+  Trash2,
+} from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatMetricRoomAreaForRoom } from "@/lib/editor/measurements";
+import {
+  formatMetricRoomArea,
+  formatMetricRoomAreaForRoom,
+  getRoomAreaSquareMillimetres,
+} from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
-import { getRoomsForActiveFloor } from "@/lib/editor/history";
+import { getRoomsForFloor } from "@/lib/editor/history";
 import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/editor/types";
 import type { SharedSelectionItem } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
@@ -27,9 +42,6 @@ type SidebarWallEntry = {
 const RECTANGULAR_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
 const SIDEBAR_CHEVRON_BUTTON_CLASS =
   "flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5";
-const SECTION_HEADER_CLASS =
-  "flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200/70 dark:text-zinc-100 dark:hover:bg-zinc-800/60";
-const SECTION_COUNT_CLASS = "ml-auto text-[11px] font-normal text-inherit/70";
 
 function getWallLabel(segmentIndex: number): string {
   return `Wall ${segmentIndex + 1}`;
@@ -101,40 +113,6 @@ function SidebarIconTooltip({
   );
 }
 
-function SidebarSection({
-  title,
-  count,
-  isExpanded,
-  onToggle,
-  children,
-}: {
-  title: string;
-  count: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className={SECTION_HEADER_CLASS}>
-        <SidebarIconTooltip content={isExpanded ? `Collapse ${title}` : `Expand ${title}`}>
-          <button
-            type="button"
-            onClick={onToggle}
-            className={SIDEBAR_CHEVRON_BUTTON_CLASS}
-            aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
-          >
-            <ChevronRight className={cn("size-3.5 transition-transform", isExpanded && "rotate-90")} />
-          </button>
-        </SidebarIconTooltip>
-        <span>{title}</span>
-        <span className={SECTION_COUNT_CLASS}>{count}</span>
-      </div>
-      {isExpanded ? children : null}
-    </div>
-  );
-}
-
 export function EditorSidebarRoomsList() {
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -144,9 +122,10 @@ export function EditorSidebarRoomsList() {
   const document = useEditorStore((state) => state.document);
   const maxFloors = useEditorStore((state) => state.maxFloors);
   const floors = document.floors;
+  const canAddFloor = floors.length < maxFloors;
   const displayedFloors = [...floors].reverse();
   const activeFloorId = document.activeFloorId;
-  const rooms = getRoomsForActiveFloor(document);
+  const rooms = document.rooms;
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
@@ -156,6 +135,7 @@ export function EditorSidebarRoomsList() {
   const interiorAssetRenameSession = useEditorStore((state) => state.interiorAssetRenameSession);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
+  const isCompactDensity = useEditorStore((state) => state.settings.sidebarDensity === "compact");
   const addFloor = useEditorStore((state) => state.addFloor);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
@@ -197,19 +177,70 @@ export function EditorSidebarRoomsList() {
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
-  const [isFloorDeleteDialogOpen, setIsFloorDeleteDialogOpen] = useState(false);
-  const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
-  const [isDeletingFloor, setIsDeletingFloor] = useState(false);
   const [dragOverFloorId, setDragOverFloorId] = useState<string | null>(null);
   const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
   const [expandedRoomIds, setExpandedRoomIds] = useState<string[]>([]);
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
-  const [isFloorsSectionExpanded, setIsFloorsSectionExpanded] = useState(true);
-  const [isRoomsSectionExpanded, setIsRoomsSectionExpanded] = useState(true);
+  const [collapsedFloorIds, setCollapsedFloorIds] = useState<string[]>([]);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
+  const selectedRoomFromMultiSelection = selection.find(
+    (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
+  );
+  const selectedRoomForStructureId = selectedRoomId ?? selectedRoomFromMultiSelection?.id ?? null;
+  const selectedRoomFloorId = selectedRoomForStructureId
+    ? rooms.find((room) => room.id === selectedRoomForStructureId)?.floorId ?? null
+    : null;
+  const effectiveCollapsedFloorIds = selectedRoomFloorId
+    ? collapsedFloorIds.filter((floorId) => floorId !== selectedRoomFloorId)
+    : collapsedFloorIds;
+  const floorRowClass = cn(
+    "group flex w-full items-center rounded-lg border font-semibold tracking-[0.02em] transition-colors",
+    isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+  );
+  const floorBadgeClass = cn(
+    "inline-flex shrink-0 items-center justify-center rounded-full bg-zinc-300/50 font-semibold text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300",
+    isCompactDensity ? "h-4 w-4 text-[9px]" : "w-5 h-5 text-[10px]"
+  );
+  const roomCardClass = cn("rounded-lg border transition-colors", isCompactDensity ? "text-xs" : "text-sm");
+  const roomHeaderClass = cn(
+    "flex items-center gap-2",
+    isCompactDensity ? "min-h-8 px-2.5 py-1.5" : "min-h-10 px-3 py-2"
+  );
+  const roomNameClass = cn("min-w-0 flex-1 truncate font-medium text-inherit", isCompactDensity ? "text-xs" : "text-sm");
+  const areaLabelClass = cn(
+    "shrink-0 text-right leading-none text-zinc-500 dark:text-zinc-400",
+    isCompactDensity ? "w-12 text-[10px]" : "w-14 text-xs"
+  );
+  const floorAreaLabelClass = cn("ml-auto", areaLabelClass);
+  const roomDetailsContainerClass = cn(isCompactDensity ? "px-2.5 pb-1.5" : "px-3 pb-2");
+  const nestedRoomListClass = cn("flex flex-col", isCompactDensity ? "ml-5 mt-1 gap-0.5" : "ml-6 mt-1 gap-1");
+  const wallRowClass = cn(
+    "ml-2 flex items-center gap-2 rounded-md pr-2 transition-colors",
+    isCompactDensity ? "min-h-8 py-1 text-xs" : "min-h-9 py-1.5 text-sm"
+  );
+  const openingRowClass = cn(
+    "flex w-full items-center rounded-md text-left transition-colors",
+    isCompactDensity ? "min-h-8 px-2 py-1 text-xs" : "min-h-9 px-2 py-1.5 text-sm"
+  );
+  const assetHeaderRowClass = cn(
+    "ml-2 flex items-center gap-2 rounded-md pr-2 transition-colors",
+    isCompactDensity ? "min-h-8 py-1 text-xs" : "min-h-9 py-1.5 text-sm"
+  );
+  const assetRowClass = cn(
+    "flex w-full items-center rounded-md text-left transition-colors",
+    isCompactDensity ? "min-h-8 px-2 py-1 text-xs" : "min-h-9 px-2 py-1.5 text-sm"
+  );
+  const floorLabelClass = cn(
+    "truncate font-semibold text-inherit",
+    isCompactDensity ? "text-[11px]" : "text-sm"
+  );
+  const floorContentClass = cn(
+    "flex flex-1 min-w-0 items-center gap-2 text-left",
+    isCompactDensity ? "-my-1 py-1" : "-my-2 py-2"
+  );
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -262,148 +293,172 @@ export function EditorSidebarRoomsList() {
 
   return (
     <ImmediateTooltipProvider>
-      <div className="flex flex-col gap-3">
-        <SidebarSection
-          title="Floors"
-          count={floors.length}
-          isExpanded={isFloorsSectionExpanded}
-          onToggle={() => setIsFloorsSectionExpanded((current) => !current)}
-        >
+      <div className={cn("flex flex-col", isCompactDensity ? "gap-2" : "gap-3")}>
+        {floors.length === 0 ? (
+          <div className={cn(
+            "rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground",
+            isCompactDensity ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          )}>
+            No floors yet.
+          </div>
+        ) : (
           <div className="flex flex-col gap-1">
-            {floors.length > 0 ? (
-              displayedFloors.map((floor, floorIndex) => {
+            {displayedFloors.map((floor, floorIndex) => {
                 const floorNumber = displayedFloors.length - 1 - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
+                const floorRooms = getRoomsForFloor(document, floor.id);
+                const floorAreaSquareMillimetres = floorRooms.reduce(
+                  (totalArea, room) => totalArea + getRoomAreaSquareMillimetres(room),
+                  0
+                );
+                const floorAreaLabel = formatMetricRoomArea(floorAreaSquareMillimetres);
+                const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
                 return (
-                  <div key={floor.id}>
-                    {isRenaming ? (
-                      <div className="flex min-h-10 items-center gap-2 px-3 py-2">
-                        <EditorSidebarRenameInput
-                          ref={floorRenameInputRef}
-                          value={floor.name}
-                          onChange={(event) => updateFloorRenameDraft(floor.id, event.target.value)}
-                          onBlur={() => {
-                            commitFloorRenameSession();
-                            setSidebarRenameFloorId(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.nativeEvent.isComposing) return;
-
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              commitFloorRenameSession();
-                              setSidebarRenameFloorId(null);
-                              return;
-                            }
-
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              cancelFloorRename();
-                              setSidebarRenameFloorId(null);
-                            }
-                          }}
-                          aria-label={`Rename ${floor.name}`}
-                          className="flex-1"
-                          disabled={isRenameBlocked}
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={cn(
-                          "flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm transition-colors group",
-                          dragOverFloorId === floor.id
-                            ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
-                            : activeFloorId === floor.id
-                            ? "bg-zinc-200/95 text-zinc-950 dark:bg-zinc-800/80 dark:text-zinc-50"
-                            : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
-                        )}
-                        onDragOver={(e) => {
-                          // Only allow drop if selection is not empty
-                          if (selection.length > 0 && floor.id !== activeFloorId) {
-                            e.preventDefault();
-                            e.dataTransfer!.dropEffect = "move";
-                            setDragOverFloorId(floor.id);
-                          }
-                        }}
-                        onDragLeave={() => {
-                          setDragOverFloorId(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragOverFloorId(null);
-                          if (selection.length > 0 && floor.id !== activeFloorId) {
-                            moveSelectionToFloor(floor.id);
-                          }
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => selectFloorById(floor.id)}
-                          onDoubleClick={(event) => {
-                            event.stopPropagation();
-                            setSidebarRenameFloorId(floor.id);
-                            shouldAutoFocusFloorRenameInputRef.current = true;
-                            selectFloorById(floor.id);
-                            startFloorRename(floor.id);
-                          }}
-                          className="flex flex-1 min-w-0 items-center gap-2 text-left -my-2 py-2"
-                        >
-                          <span className="inline-flex shrink-0 items-center justify-center rounded-full w-5 h-5 bg-zinc-300/50 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300">
-                            {floorNumber}
-                          </span>
-                          <span className="truncate">{floor.name}</span>
-                          {activeFloorId === floor.id ? <span className={SECTION_COUNT_CLASS}>Active</span> : null}
-                        </button>
-                        <SidebarIconTooltip content="Delete floor">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFloorToDelete(floor.id);
-                              setIsFloorDeleteDialogOpen(true);
+                  <div key={floor.id} className="rounded-lg border border-transparent">
+                    <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <div
+                            className={cn(
+                              floorRowClass,
+                              dragOverFloorId === floor.id
+                                ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
+                                : activeFloorId === floor.id
+                                ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                                : "border-zinc-300/70 bg-zinc-100/60 text-zinc-700 hover:bg-zinc-200/75 dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                            )}
+                            onDragOver={(e) => {
+                              if (selection.length > 0 && floor.id !== activeFloorId) {
+                                e.preventDefault();
+                                e.dataTransfer!.dropEffect = "move";
+                                setDragOverFloorId(floor.id);
+                              }
                             }}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-inherit/70 transition-colors hover:bg-black/5 hover:text-inherit dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
-                            aria-label={`Delete ${floor.name}`}
+                            onDragLeave={() => {
+                              setDragOverFloorId(null);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragOverFloorId(null);
+                              if (selection.length > 0 && floor.id !== activeFloorId) {
+                                moveSelectionToFloor(floor.id);
+                              }
+                            }}
+                          >
+                            <SidebarIconTooltip
+                              content={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setCollapsedFloorIds((current) =>
+                                    current.includes(floor.id)
+                                      ? current.filter((id) => id !== floor.id)
+                                      : [...current, floor.id]
+                                  );
+                                }}
+                                className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                                aria-label={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
+                              >
+                                <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
+                              </button>
+                            </SidebarIconTooltip>
+                            {isRenaming ? (
+                              <div className={floorContentClass}>
+                                <span className={floorBadgeClass}>{floorNumber}</span>
+                                <EditorSidebarRenameInput
+                                  ref={floorRenameInputRef}
+                                  value={floor.name}
+                                  onChange={(event) => updateFloorRenameDraft(floor.id, event.target.value)}
+                                  onBlur={() => {
+                                    commitFloorRenameSession();
+                                    setSidebarRenameFloorId(null);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.nativeEvent.isComposing) return;
+
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      commitFloorRenameSession();
+                                      setSidebarRenameFloorId(null);
+                                      return;
+                                    }
+
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      cancelFloorRename();
+                                      setSidebarRenameFloorId(null);
+                                    }
+                                  }}
+                                  aria-label={`Rename ${floor.name}`}
+                                  className={cn(
+                                    "flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0",
+                                    isCompactDensity && "pt-px",
+                                    floorLabelClass
+                                  )}
+                                  disabled={isRenameBlocked}
+                                />
+                                <span className={floorAreaLabelClass}>{floorAreaLabel}</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => selectFloorById(floor.id)}
+                                onDoubleClick={(event) => {
+                                  event.stopPropagation();
+                                  setSidebarRenameFloorId(floor.id);
+                                  shouldAutoFocusFloorRenameInputRef.current = true;
+                                  selectFloorById(floor.id);
+                                  startFloorRename(floor.id);
+                                }}
+                                className={floorContentClass}
+                              >
+                                <span className={floorBadgeClass}>
+                                  {floorNumber}
+                                </span>
+                                <span className={floorLabelClass}>{floor.name}</span>
+                                <span className={floorAreaLabelClass}>{floorAreaLabel}</span>
+                              </button>
+                            )}
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-48">
+                          <ContextMenuItem
+                            disabled={!canAddFloor}
+                            onSelect={() => addFloor({ targetFloorId: floor.id, position: "below" })}
+                          >
+                            <IconCaretUpFilled className="size-4" />
+                            Add floor above
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            disabled={!canAddFloor}
+                            onSelect={() => addFloor({ targetFloorId: floor.id, position: "above" })}
+                          >
+                            <IconCaretDownFilled className="size-4" />
+                            Add floor below
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            variant="destructive"
+                            onSelect={() => deleteFloor(floor.id)}
                           >
                             <Trash2 className="size-4" />
-                          </button>
-                        </SidebarIconTooltip>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
-                No floors yet.
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={addFloor}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70"
-              disabled={isRenameBlocked || floors.length >= maxFloors}
-              title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
-            >
-              <Plus className="size-4" />
-              <span>Add Floor</span>
-            </button>
-          </div>
-        </SidebarSection>
+                            Delete floor
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
 
-        <SidebarSection
-          title="Rooms"
-          count={rooms.length}
-          isExpanded={isRoomsSectionExpanded}
-          onToggle={() => setIsRoomsSectionExpanded((current) => !current)}
-        >
-          {rooms.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-300/80 bg-zinc-50/60 p-3 text-sm text-zinc-600 dark:border-border/70 dark:bg-transparent dark:text-muted-foreground">
-              Rooms will appear here as you draw them.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {rooms.map((room) => {
+                    {isFloorExpanded ? (
+                      <div className={nestedRoomListClass}>
+                        {floorRooms.length === 0 ? (
+                          <div className={cn(
+                            "rounded-md border border-dashed border-zinc-300/70 bg-zinc-50/50 text-zinc-500 dark:border-border/60 dark:bg-transparent dark:text-muted-foreground",
+                            isCompactDensity ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"
+                          )}>
+                            Rooms will appear here as you draw them.
+                          </div>
+                        ) : (
+                          floorRooms.map((room) => {
                 const selectedOpeningHostWall =
                   selectedOpening?.roomId === room.id
                     ? getSelectedOpeningHostWall(room, selectedOpening.openingId)
@@ -443,16 +498,16 @@ export function EditorSidebarRoomsList() {
                       e.preventDefault();
                       setDragOverRoomId(null);
                       if (draggedRoomId && draggedRoomId !== room.id) {
-                        // Find the target index within the floor
-                        const targetIndex = rooms.findIndex((r) => r.id === room.id);
-                        if (targetIndex !== -1) {
+                        const draggedRoom = document.rooms.find((r) => r.id === draggedRoomId);
+                        const targetIndex = floorRooms.findIndex((r) => r.id === room.id);
+                        if (draggedRoom && draggedRoom.floorId === room.floorId && targetIndex !== -1) {
                           reorderRoomInFloor(draggedRoomId, targetIndex);
                         }
                       }
                       setDraggedRoomId(null);
                     }}
                     className={cn(
-                      "rounded-lg border transition-colors",
+                      roomCardClass,
                       isDraggingThisRoom
                         ? "border-zinc-300 bg-zinc-100 text-zinc-600 opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
                         : isDragOverThisRoom
@@ -464,69 +519,34 @@ export function EditorSidebarRoomsList() {
                         : "border-transparent text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
                     )}
                   >
-                    {isRenaming ? (
-                      <div className="flex min-h-10 items-center gap-2 px-3 py-2">
-                        <EditorSidebarRenameInput
-                          ref={inputRef}
-                          value={room.name}
-                          onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
-                          onBlur={() => {
-                            commitRoomRenameSession({ deselectIfUnchanged: false });
-                            setSidebarRenameRoomId(null);
-                            selectRoomById(room.id);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.nativeEvent.isComposing) return;
-
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              commitRoomRenameSession({ deselectIfUnchanged: false });
-                              setSidebarRenameRoomId(null);
-                              selectRoomById(room.id);
-                              return;
+                    <div
+                      className={roomHeaderClass}
+                      onClick={
+                        isRenaming
+                          ? undefined
+                          : (e) => {
+                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                const roomItem: SharedSelectionItem = { type: "room", id: room.id };
+                                if (isItemInSelection(roomItem, selection)) {
+                                  removeFromSelection(roomItem);
+                                } else {
+                                  addToSelection(roomItem);
+                                }
+                              } else {
+                                selectRoomById(room.id);
+                              }
                             }
-
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              cancelRoomRenameSession();
-                              setSidebarRenameRoomId(null);
-                              selectRoomById(room.id);
+                      }
+                      onMouseDown={
+                        isRenaming
+                          ? undefined
+                          : (e) => {
+                              if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                e.preventDefault();
+                              }
                             }
-                          }}
-                          aria-label={`Rename ${room.name}`}
-                          className="flex-1"
-                          disabled={isRenameBlocked}
-                        />
-                        <span aria-hidden="true" className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                          -
-                        </span>
-                        <span className="shrink-0 text-xs leading-none text-zinc-500 dark:text-zinc-400">
-                          {areaLabel}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex min-h-10 items-center gap-2 px-3 py-2"
-                        onClick={(e) => {
-                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                            // Ctrl/Cmd + Click for multi-select
-                            const roomItem: SharedSelectionItem = { type: "room", id: room.id };
-                            if (isItemInSelection(roomItem, selection)) {
-                              removeFromSelection(roomItem);
-                            } else {
-                              addToSelection(roomItem);
-                            }
-                          } else {
-                            // Regular click for single selection
-                            selectRoomById(room.id);
-                          }
-                        }}
-                        onMouseDown={(e) => {
-                          if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                            e.preventDefault();
-                          }
-                        }}
-                      >
+                      }
+                    >
                         <SidebarIconTooltip
                           content={isRoomExpanded ? `Collapse ${room.name}` : `Expand ${room.name}`}
                         >
@@ -549,26 +569,63 @@ export function EditorSidebarRoomsList() {
                           </button>
                         </SidebarIconTooltip>
                         <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                          <span
-                            onDoubleClick={(event) => {
-                              event.stopPropagation();
-                              setSidebarRenameRoomId(room.id);
-                              shouldAutoFocusRenameInputRef.current = true;
-                              selectRoomById(room.id);
-                              startRoomRenameSession(room.id);
-                            }}
-                            className="min-w-0 flex-1 truncate text-sm font-medium text-inherit"
-                          >
-                            {room.name}
-                          </span>
-                          <span className="w-14 shrink-0 text-right text-xs leading-none text-zinc-500 dark:text-zinc-400">
+                          {isRenaming ? (
+                            <EditorSidebarRenameInput
+                              ref={inputRef}
+                              value={room.name}
+                              onChange={(event) => updateRoomRenameDraft(room.id, event.target.value)}
+                              onBlur={() => {
+                                commitRoomRenameSession({ deselectIfUnchanged: false });
+                                setSidebarRenameRoomId(null);
+                                selectRoomById(room.id);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.nativeEvent.isComposing) return;
+
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  commitRoomRenameSession({ deselectIfUnchanged: false });
+                                  setSidebarRenameRoomId(null);
+                                  selectRoomById(room.id);
+                                  return;
+                                }
+
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  cancelRoomRenameSession();
+                                  setSidebarRenameRoomId(null);
+                                  selectRoomById(room.id);
+                                }
+                              }}
+                              aria-label={`Rename ${room.name}`}
+                              className={cn(
+                                "flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0",
+                                isCompactDensity && "pt-px",
+                                roomNameClass
+                              )}
+                              disabled={isRenameBlocked}
+                            />
+                          ) : (
+                            <span
+                              onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setSidebarRenameRoomId(room.id);
+                                shouldAutoFocusRenameInputRef.current = true;
+                                selectRoomById(room.id);
+                                startRoomRenameSession(room.id);
+                              }}
+                              className={roomNameClass}
+                            >
+                              {room.name}
+                            </span>
+                          )}
+                          <span className={areaLabelClass}>
                             {areaLabel}
                           </span>
                         </div>
                       </div>
-                    )}
                     {isRoomExpanded ? (
-                      <div className="px-3 pb-2">
+                      <div className={roomDetailsContainerClass}>
                         <div className="mt-1 flex flex-col gap-1">
                           {roomWalls.map(({ wall, segmentIndex }) => {
                             const wallKey = `${room.id}:${wall}`;
@@ -584,7 +641,7 @@ export function EditorSidebarRoomsList() {
                               <div key={wallKey} className="flex flex-col gap-1">
                                 <div
                                   className={cn(
-                                    "ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm transition-colors",
+                                    wallRowClass,
                                     isWallSelected
                                       ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                       : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
@@ -653,14 +710,12 @@ export function EditorSidebarRoomsList() {
                                               type="button"
                                               onClick={(e) => {
                                                 if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                  // Ctrl/Cmd + Click for multi-select
                                                   if (isItemInSelection(openingItem, selection)) {
                                                     removeFromSelection(openingItem);
                                                   } else {
                                                     addToSelection(openingItem);
                                                   }
                                                 } else {
-                                                  // Regular click for single selection
                                                   selectOpeningById(room.id, opening.id);
                                                 }
                                               }}
@@ -670,7 +725,7 @@ export function EditorSidebarRoomsList() {
                                                 }
                                               }}
                                               className={cn(
-                                                "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                                openingRowClass,
                                                 isOpeningSelected
                                                   ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                                   : isInMultiSelection
@@ -691,7 +746,10 @@ export function EditorSidebarRoomsList() {
                           })}
                           {hasInteriorAssets ? (
                             <div className="flex flex-col gap-1">
-                              <div className="ml-2 flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100">
+                              <div className={cn(
+                                assetHeaderRowClass,
+                                "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                              )}>
                                 <SidebarIconTooltip
                                   content={
                                     isAssetSectionExpanded
@@ -779,6 +837,7 @@ export function EditorSidebarRoomsList() {
                                                 }
                                               }}
                                               aria-label={`Rename ${asset.name}`}
+                                              className={isCompactDensity ? "!h-8" : "!h-10"}
                                               disabled={isRenameBlocked}
                                             />
                                           </div>
@@ -787,14 +846,12 @@ export function EditorSidebarRoomsList() {
                                             type="button"
                                             onClick={(e) => {
                                               if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                // Ctrl/Cmd + Click for multi-select
                                                 if (isItemInSelection(assetItem, selection)) {
                                                   removeFromSelection(assetItem);
                                                 } else {
                                                   addToSelection(assetItem);
                                                 }
                                               } else {
-                                                // Regular click for single selection
                                                 selectInteriorAssetById(room.id, asset.id);
                                               }
                                             }}
@@ -804,7 +861,7 @@ export function EditorSidebarRoomsList() {
                                               }
                                             }}
                                             className={cn(
-                                              "flex min-h-9 w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                              assetRowClass,
                                               isAssetSelected
                                                 ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                                 : isInMultiSelection
@@ -838,10 +895,28 @@ export function EditorSidebarRoomsList() {
                     ) : null}
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </SidebarSection>
+                          })
+                        )}
+                      </div>
+                    ) : null}
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => addFloor()}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
+                isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
+              )}
+              disabled={isRenameBlocked || floors.length >= maxFloors}
+              title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
+            >
+              <Plus className="size-4" />
+              <span>Add Floor</span>
+            </button>
+          </div>
+        )}
 
         {selection.length > 0 && (
           <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 px-3 py-2 dark:border-blue-700/50 dark:bg-blue-900/20">
@@ -850,53 +925,6 @@ export function EditorSidebarRoomsList() {
               <span className="text-blue-800 dark:text-blue-200">{selection.length} item{selection.length !== 1 ? "s" : ""}</span>
             </div>
           </div>
-        )}
-
-        {floorToDelete && (
-          <ResponsiveAlertDialog
-            open={isFloorDeleteDialogOpen}
-            onOpenChange={(open) => {
-              setIsFloorDeleteDialogOpen(open);
-              if (!open) {
-                setFloorToDelete(null);
-              }
-            }}
-            title="Delete floor?"
-            description={
-              document.floors.find((f) => f.id === floorToDelete)
-                ? `Delete "${document.floors.find((f) => f.id === floorToDelete)?.name}" and all its rooms. You can undo this if needed.`
-                : "Delete this floor and all its rooms. You can undo this if needed."
-            }
-            footer={
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsFloorDeleteDialogOpen(false)}
-                  disabled={isDeletingFloor}
-                  className="w-full sm:w-auto"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={async () => {
-                    setIsDeletingFloor(true);
-                    await deleteFloor(floorToDelete);
-                    setIsDeletingFloor(false);
-                    setIsFloorDeleteDialogOpen(false);
-                    setFloorToDelete(null);
-                  }}
-                  disabled={isDeletingFloor}
-                  className="w-full sm:w-auto"
-                >
-                  <Trash2 className="size-4" />
-                  {isDeletingFloor ? "Deleting..." : "Delete floor"}
-                </Button>
-              </>
-            }
-          />
         )}
       </div>
     </ImmediateTooltipProvider>
