@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AlertCircle, ArrowRight, Plus, RefreshCcw, LoaderCircle } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
   createUnsavedProject,
+  finalizeUnsavedProject,
   deleteProject,
   fetchProjects,
   updateProject,
@@ -34,6 +36,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 export function ProjectsPageClient() {
   const router = useRouter();
   const interactionSectionRef = useRef<HTMLElement | null>(null);
+  const deletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -168,6 +171,45 @@ export function ProjectsPageClient() {
         currentProject?.id === deletedProject.id ? null : currentProject
       );
       setErrorMessage(null);
+
+      // Show undo toast for 5 seconds
+      if (deletionTimeoutRef.current) {
+        clearTimeout(deletionTimeoutRef.current);
+      }
+
+      toast.error(`Deleted project "${deletedProject.name}"`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            // Restore project to UI immediately
+            setProjects((currentProjects) =>
+              mergeProjectIntoList(currentProjects, deletedProject)
+            );
+
+            // Restore project to API
+            try {
+              await finalizeUnsavedProject(clientToken, deletedProject.id, {
+                name: deletedProject.name,
+                document: deletedProject.document,
+              });
+            } catch (error) {
+              console.error("Failed to restore deleted project.", error);
+              setErrorMessage("Failed to restore project. Removing it again.");
+              // Remove from UI if restoration failed
+              setProjects((currentProjects) =>
+                removeProjectFromList(currentProjects, deletedProject.id)
+              );
+            }
+
+            // Clear the timeout since undo was performed
+            if (deletionTimeoutRef.current) {
+              clearTimeout(deletionTimeoutRef.current);
+              deletionTimeoutRef.current = null;
+            }
+          },
+        },
+        duration: 5000,
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
       throw error;
@@ -175,6 +217,15 @@ export function ProjectsPageClient() {
       setDeletingProjectId(null);
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (deletionTimeoutRef.current) {
+        clearTimeout(deletionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background text-foreground">
