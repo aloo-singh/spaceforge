@@ -3035,10 +3035,7 @@ export default function EditorCanvas({
           {hasMountedClient && floors.length > 1 ? (
             <div
               className={cn(
-                "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4",
-                hydratedShowCanvasHud
-                  ? "translate-x-0 opacity-100"
-                  : "-translate-x-1 opacity-85"
+                "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4 translate-x-0 opacity-100"
               )}
             >
               <div
