@@ -214,7 +214,9 @@ const EDITOR_KEYBOARD_SHORTCUTS_BY_ID = new Map(
   EDITOR_KEYBOARD_SHORTCUTS.map((shortcut) => [shortcut.id, shortcut])
 );
 
-let activeKeyboardShortcutFeedbackToastId: string | number | null = null;
+// Separate tracking for modifier (temporary) and action (persistent) feedback toasts
+let activeModifierFeedbackToastId: string | number | null = null;
+let activeActionFeedbackToastId: string | number | null = null;
 
 export function getEditorKeyboardShortcut(
   shortcutId: EditorKeyboardShortcutId
@@ -258,26 +260,46 @@ export function getKeyboardShortcutFeedbackMessage(
 
 export function showKeyboardShortcutFeedbackToast(
   message: string,
-  options?: { durationMs?: number }
+  options?: { durationMs?: number; isModifier?: boolean }
 ) {
+  const isModifier = options?.isModifier ?? false;
+  const currentActiveId = isModifier ? activeModifierFeedbackToastId : activeActionFeedbackToastId;
+  
   const id = toast(message, {
-    id: activeKeyboardShortcutFeedbackToastId ?? undefined,
+    id: currentActiveId ?? undefined,
     duration: options?.durationMs ?? KEYBOARD_SHORTCUT_FEEDBACK_DURATION_MS,
     onDismiss: () => {
-      if (activeKeyboardShortcutFeedbackToastId === id) {
-        activeKeyboardShortcutFeedbackToastId = null;
+      if (isModifier) {
+        if (activeModifierFeedbackToastId === id) {
+          activeModifierFeedbackToastId = null;
+        }
+      } else {
+        if (activeActionFeedbackToastId === id) {
+          activeActionFeedbackToastId = null;
+        }
       }
     },
   });
 
-  activeKeyboardShortcutFeedbackToastId = id;
+  if (isModifier) {
+    activeModifierFeedbackToastId = id;
+  } else {
+    activeActionFeedbackToastId = id;
+  }
+}
+
+export function dismissModifierFeedbackToast() {
+  if (activeModifierFeedbackToastId === null) return;
+
+  toast.dismiss(activeModifierFeedbackToastId);
+  activeModifierFeedbackToastId = null;
 }
 
 export function dismissKeyboardShortcutFeedbackToast() {
-  if (activeKeyboardShortcutFeedbackToastId === null) return;
+  if (activeActionFeedbackToastId === null) return;
 
-  toast.dismiss(activeKeyboardShortcutFeedbackToastId);
-  activeKeyboardShortcutFeedbackToastId = null;
+  toast.dismiss(activeActionFeedbackToastId);
+  activeActionFeedbackToastId = null;
 }
 
 export function showKeyboardShortcutFeedback(
@@ -293,7 +315,9 @@ export function showKeyboardShortcutFeedback(
   const message = getKeyboardShortcutFeedbackMessage(shortcutId, options.context);
   if (!message) return;
 
-  showKeyboardShortcutFeedbackToast(message, { durationMs: options.durationMs });
+  const shortcut = getEditorKeyboardShortcut(shortcutId);
+  const isModifier = shortcut.type === "toggle" && shortcutId === "multi-select-toggle";
+  showKeyboardShortcutFeedbackToast(message, { durationMs: options.durationMs, isModifier });
 }
 
 export function getHistoryCommandActionLabel(command: EditorCommand | undefined): string {
