@@ -24,6 +24,7 @@ import {
   NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
 import type { ProjectRecord } from "@/lib/projects/types";
+import { saveProjectDocument } from "@/lib/projects/projectDocumentPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
@@ -99,6 +100,7 @@ export function EditorProjectBootstrap({
   const clientTokenRef = useRef<string | null>(null);
   const lastSyncedSignatureRef = useRef<string | null>(null);
   const lastSyncedThumbnailSignatureRef = useRef<string | null>(null);
+  const projectNameRef = useRef<string>("");
   const isBootstrappingRef = useRef(true);
   const generateThumbnailDataUrlRef = useRef(generateThumbnailDataUrl);
   const onProjectResolvedRef = useRef(onProjectResolved);
@@ -168,6 +170,7 @@ export function EditorProjectBootstrap({
             useEditorStore.getState().setMaxFloors(fallbackProject.maxFloors);
 
             saveActiveProjectId(fallbackProject.id);
+            projectNameRef.current = fallbackProject.name;
             onProjectResolvedRef.current?.({
               id: fallbackProject.id,
               name: fallbackProject.name,
@@ -195,6 +198,7 @@ export function EditorProjectBootstrap({
           }
 
           saveActiveProjectId(project.id);
+          projectNameRef.current = project.name;
           onProjectResolvedRef.current?.({
             id: project.id,
             name: project.name,
@@ -233,6 +237,7 @@ export function EditorProjectBootstrap({
         useEditorStore.getState().setMaxFloors(selectedProject.maxFloors);
 
         saveActiveProjectId(selectedProject.id);
+        projectNameRef.current = selectedProject.name;
         onProjectResolvedRef.current?.({
           id: selectedProject.id,
           name: selectedProject.name,
@@ -301,8 +306,9 @@ export function EditorProjectBootstrap({
     }
 
     const timeoutId = window.setTimeout(() => {
+      const nextDoc = cloneDocumentState(nextDocument);
       void updateProject(clientToken, activeProjectId, {
-        document: nextDocument,
+        document: nextDoc,
       })
         .then((project) => {
           lastSyncedSignatureRef.current = getDocumentSignature(project.document);
@@ -310,6 +316,12 @@ export function EditorProjectBootstrap({
         .catch((error) => {
           console.error("Failed to sync active project.", error);
         });
+      // Also save to dual-layer persistence (IndexedDB + localStorage)
+      void saveProjectDocument(activeProjectId, projectNameRef.current, nextDoc).catch(
+        (error) => {
+          console.error("Failed to save project to dual-layer persistence.", error);
+        }
+      );
     }, PROJECT_AUTOSAVE_DEBOUNCE_MS);
 
     return () => {
@@ -363,6 +375,13 @@ export function EditorProjectBootstrap({
             .catch((error) => {
               console.error("Failed to sync project thumbnail.", error);
             });
+
+          // Also update thumbnail in dual-layer persistence
+          void saveProjectDocument(activeProjectId, projectNameRef.current, nextDocument, thumbnailDataUrl).catch(
+            (error) => {
+              console.error("Failed to save project thumbnail to dual-layer persistence.", error);
+            }
+          );
         })();
       });
     }, PROJECT_THUMBNAIL_DEBOUNCE_MS);
