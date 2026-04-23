@@ -82,7 +82,6 @@ function parseCatalogPayload(raw: string): CatalogStoragePayload | null {
 
 async function openCatalogDatabase(): Promise<IDBDatabase | null> {
   if (typeof window === "undefined" || !window.indexedDB) {
-    warnCatalog("IndexedDB not available, falling back to localStorage.");
     return null;
   }
 
@@ -208,7 +207,7 @@ export async function saveProjectCatalog(entries: ProjectCatalogEntry[]): Promis
 
 export async function addOrUpdateCatalogEntry(entry: ProjectCatalogEntry): Promise<void> {
   const entries = await loadProjectCatalog();
-  const existingIndex = entries.findIndex(e => e.id === entry.id);
+  const existingIndex = entries.findIndex((e) => e.id === entry.id);
 
   if (existingIndex >= 0) {
     entries[existingIndex] = entry;
