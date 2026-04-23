@@ -8,11 +8,14 @@ const PROJECT_DOCUMENTS_DB_NAME = "spaceforge.projects.v1";
 const PROJECT_DOCUMENTS_STORE_NAME = "documents";
 const PROJECT_DOCUMENTS_VERSION = 1;
 const PROJECT_DOCUMENTS_LOCAL_STORAGE_KEY = "spaceforge.projects.documents.v1";
+const PROJECT_HISTORY_STATE_LIMIT = 100;
 
 export type PersistedProjectDocument = {
   id: string;
   document: EditorDocumentState;
   lastModified: string;
+  historyStack: EditorDocumentState[];
+  historyIndex: number;
 };
 
 type ProjectDocumentsStoragePayload = {
@@ -139,14 +142,22 @@ export async function saveProjectDocument(
   projectId: string,
   projectName: string,
   document: EditorDocumentState,
-  thumbnailDataUrl: string | null = null
+  thumbnailDataUrl: string | null = null,
+  historyStack: EditorDocumentState[] = [],
+  historyIndex: number = 0
 ): Promise<boolean> {
   const now = new Date().toISOString();
+
+  // Cap history to reasonable size
+  const cappedHistoryStack = historyStack.slice(-PROJECT_HISTORY_STATE_LIMIT);
+  const cappedHistoryIndex = Math.min(historyIndex, cappedHistoryStack.length - 1);
 
   const projectDoc: PersistedProjectDocument = {
     id: projectId,
     document,
     lastModified: now,
+    historyStack: cappedHistoryStack,
+    historyIndex: cappedHistoryIndex,
   };
 
   // Primary: IndexedDB

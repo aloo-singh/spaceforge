@@ -77,7 +77,12 @@ function scheduleIdleTask(callback: () => void) {
 async function attemptProjectRecovery(
   projectId: string,
   serverLastModified: string
-): Promise<{ didRecover: boolean; recoveredDocument?: ReturnType<typeof cloneDocumentState> }> {
+): Promise<{
+  didRecover: boolean;
+  recoveredDocument?: ReturnType<typeof cloneDocumentState>;
+  historyStack?: ReturnType<typeof cloneDocumentState>[];
+  historyIndex?: number;
+}> {
   try {
     const recovery = await checkForCachedProjectRecovery(projectId, serverLastModified);
     if (recovery.shouldRecover && recovery.cachedDoc) {
@@ -85,7 +90,12 @@ async function attemptProjectRecovery(
       toast("Project recovered from last known good state", {
         duration: 4000,
       });
-      return { didRecover: true, recoveredDocument };
+      return {
+        didRecover: true,
+        recoveredDocument,
+        historyStack: recovery.cachedDoc.historyStack,
+        historyIndex: recovery.cachedDoc.historyIndex,
+      };
     }
   } catch (error) {
     console.error("Error checking for project recovery.", error);
@@ -360,12 +370,17 @@ export function EditorProjectBootstrap({
         .catch((error) => {
           console.error("Failed to sync active project.", error);
         });
-      // Also save to dual-layer persistence (IndexedDB + localStorage)
-      void saveProjectDocument(activeProjectId, projectNameRef.current, nextDoc).catch(
-        (error) => {
-          console.error("Failed to save project to dual-layer persistence.", error);
-        }
-      );
+      // Also save to dual-layer persistence (IndexedDB + localStorage) with history
+      void saveProjectDocument(
+        activeProjectId,
+        projectNameRef.current,
+        nextDoc,
+        undefined,
+        [], // TODO: restore full undo stack in Step 6
+        0
+      ).catch((error) => {
+        console.error("Failed to save project to dual-layer persistence.", error);
+      });
     }, PROJECT_AUTOSAVE_DEBOUNCE_MS);
 
     return () => {
@@ -420,12 +435,17 @@ export function EditorProjectBootstrap({
               console.error("Failed to sync project thumbnail.", error);
             });
 
-          // Also update thumbnail in dual-layer persistence
-          void saveProjectDocument(activeProjectId, projectNameRef.current, nextDocument, thumbnailDataUrl).catch(
-            (error) => {
-              console.error("Failed to save project thumbnail to dual-layer persistence.", error);
-            }
-          );
+          // Also update thumbnail in dual-layer persistence with current history
+          void saveProjectDocument(
+            activeProjectId,
+            projectNameRef.current,
+            nextDocument,
+            thumbnailDataUrl,
+            [], // TODO: restore full undo stack in Step 6
+            0
+          ).catch((error) => {
+            console.error("Failed to save project thumbnail to dual-layer persistence.", error);
+          });
         })();
       });
     }, PROJECT_THUMBNAIL_DEBOUNCE_MS);
