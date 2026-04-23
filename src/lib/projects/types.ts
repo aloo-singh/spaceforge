@@ -33,6 +33,15 @@ export type ProjectRecord = {
 
 export type ProjectListItem = Omit<ProjectRecord, "document">;
 
+export type ProjectCatalogEntry = {
+  id: string;
+  name: string;
+  lastModified: string;
+  thumbnailDataUrl: string | null;
+  documentVersion: number;
+  recoveryBlobId: string | null;
+};
+
 export const MAX_PROJECT_THUMBNAIL_DATA_URL_LENGTH = 400_000;
 
 function isObject(value: unknown): value is Record<string, unknown> {

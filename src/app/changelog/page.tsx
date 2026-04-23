@@ -10,6 +10,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.63.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-23</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Project Persistence &amp; Recovery</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Robust local-first persistence: IndexedDB primary + localStorage mirror</li>
+                <li>Project Catalog for reliable discovery and recovery</li>
+                <li>Dual-layer autosave (document + undo/redo history)</li>
+                <li>Recovery flow with calm &ldquo;Project recovered from local cache&rdquo; toast</li>
+                <li>Undo/redo history now survives refresh/session loss</li>
+                <li>Clear separation of persistent data vs transient editor state</li>
+                <li>Foundation for future cloud sync and accounts</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.62.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-22</span>
           </div>
