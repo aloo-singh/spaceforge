@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "@/components/ui/icons";
+import { AlertCircle, ArrowRight, Plus, RefreshCcw, LoaderCircle } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
@@ -206,7 +206,7 @@ export function ProjectsPageClient() {
             className="h-11 rounded-full bg-blue-500 px-5 text-white hover:bg-blue-500/90"
           >
             <Plus className="size-4" />
-            {isCreatingProject ? "Creating project..." : "New project"}
+            New project
           </Button>
         </div>
 
@@ -274,7 +274,7 @@ export function ProjectsPageClient() {
                 className="bg-blue-500 text-white hover:bg-blue-500/90"
               >
                 <Plus className="size-4" />
-                {isCreatingProject ? "Creating project..." : "New project"}
+                New project
               </Button>
               {errorMessage ? (
                 <Button
