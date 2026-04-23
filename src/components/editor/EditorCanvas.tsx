@@ -225,7 +225,7 @@ const ANCHORED_HINT_MAX_WIDTH_PX = 352;
 const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
-const FLOOR_FOOTPRINT_MAX_ALPHA = 0.26;
+const FLOOR_FOOTPRINT_MAX_ALPHA = 0.50;
 const FLOOR_FOOTPRINT_STROKE_WIDTH_PX = 2.25;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
@@ -3510,6 +3510,8 @@ function drawScene(
     }
   }
   
+  // Always clear floor footprint graphics, then conditionally draw
+  floorFootprintGraphics.clear();
   if (state.settings.showFloorFootprint) {
     drawFloorFootprint(
       floorFootprintGraphics,
@@ -3517,7 +3519,7 @@ function drawScene(
       state.camera,
       state.viewport,
       theme,
-      footprintOpacity
+      state.settings.floorFootprintOpacity
     );
   }
   drawRooms(
