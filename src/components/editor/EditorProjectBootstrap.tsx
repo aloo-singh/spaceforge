@@ -35,7 +35,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { areDocumentsEqual, cloneDocumentState } from "@/lib/editor/persistedHistory";
+import { areDocumentsEqual, cloneDocumentState, buildPersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 import {
   createOrFetchAnonymousUser,
   isProjectsApiUnavailableError,
@@ -63,6 +63,7 @@ import { useEditorStore } from "@/stores/editorStore";
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
 const PROJECT_THUMBNAIL_DEBOUNCE_MS = 1400;
 const PROJECT_THUMBNAIL_IDLE_TIMEOUT_MS = 1200;
+const PROJECT_HISTORY_STATE_LIMIT = 100;
 const NEW_PROJECT_OPEN_CAMERA_OPTIONS = {
   emptyLayoutPixelsPerMm: NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } as const;
@@ -123,8 +124,10 @@ async function attemptProjectRecovery(
     const recovery = await checkForCachedProjectRecovery(projectId, serverLastModified);
     if (recovery.shouldRecover && recovery.cachedDoc) {
       const recoveredDocument = cloneDocumentState(recovery.cachedDoc.document);
-      toast("Project recovered from last known good state", {
-        duration: 4000,
+      // Show calm recovery confirmation to user — non-alarming, just reassuring
+      toast.success("Project recovered from local cache", {
+        description: "Your latest changes have been restored.",
+        duration: 3500,
       });
       return {
         didRecover: true,
@@ -159,6 +162,7 @@ export function EditorProjectBootstrap({
 }: EditorProjectBootstrapProps) {
   const router = useRouter();
   const document = useEditorStore((state) => state.document);
+  const history = useEditorStore((state) => state.history);
   const fitCameraOnProjectOpen = useEditorStore((state) => state.fitCameraOnProjectOpen);
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
@@ -408,13 +412,14 @@ export function EditorProjectBootstrap({
         });
       // PERSISTENCE: Save ONLY the persistent document + undo history (no camera, selection, or UI state).
       // Transient state (camera position, selected items, draft, etc.) is intentionally NOT saved and will reset on recovery.
+      const historySnapshot = buildPersistedHistorySnapshot(nextDoc, history, PROJECT_HISTORY_STATE_LIMIT);
       void saveProjectDocument(
         activeProjectId,
         projectNameRef.current,
         nextDoc,
         undefined,
-        [], // TODO: restore full undo stack in Step 6
-        0
+        historySnapshot?.historyStack ?? [],
+        historySnapshot?.historyIndex ?? 0
       ).catch((error) => {
         console.error("Failed to save project to dual-layer persistence.", error);
       });
@@ -423,7 +428,7 @@ export function EditorProjectBootstrap({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [activeProjectId, document, generateThumbnailDataUrl]);
+  }, [activeProjectId, document, history, generateThumbnailDataUrl]);
 
   useEffect(() => {
     const clientToken = clientTokenRef.current;
