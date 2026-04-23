@@ -1,5 +1,37 @@
 "use client";
 
+/**
+ * EditorProjectBootstrap — Project Loading & Persistence Orchestration
+ *
+ * PERSISTENCE STRATEGY:
+ * ====================
+ * This component manages the loading and recovery of projects, with careful separation
+ * between PERSISTENT and TRANSIENT data:
+ *
+ * PERSISTENT DATA (saved to IndexedDB + localStorage):
+ * - Project document (rooms, floors, geometry, export config, etc.)
+ * - Undo/redo history stack (up to 100 snapshots per project)
+ * - Project metadata (id, name, lastModified, thumbnail)
+ *
+ * TRANSIENT STATE (NOT saved, reset on load via loadProjectDocument()):
+ * - Camera viewport state (position, zoom, rotation)
+ * - Selected items (room, wall, opening, interior asset)
+ * - Multi-selection array
+ * - Draft state (rooms being drawn)
+ * - Modal/rename sessions
+ * - Clipboard state
+ * - Pending camera fit operations
+ *
+ * RECOVERY BEHAVIOR:
+ * When a project is loaded or recovered:
+ * 1. Document + undo/redo history are restored from persistence
+ * 2. loadProjectDocument() automatically resets all transient state to safe defaults
+ * 3. Camera is positioned to fit the project layout
+ * 4. User is left with a clean, predictable editor state
+ *
+ * This ensures data is never silently lost while keeping the editor in a valid state.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -74,6 +106,10 @@ function scheduleIdleTask(callback: () => void) {
   };
 }
 
+// Attempt to recover a project from local persistence if it's fresher than the server version.
+// RECOVERY SEMANTICS: Only persistent data (document + undo history) is restored.
+// All transient state (camera, selections, drafts, sessions) is reset by loadProjectDocument() to safe defaults.
+// This ensures recovery is predictable and never leaves the editor in an invalid state.
 async function attemptProjectRecovery(
   projectId: string,
   serverLastModified: string
@@ -370,7 +406,8 @@ export function EditorProjectBootstrap({
         .catch((error) => {
           console.error("Failed to sync active project.", error);
         });
-      // Also save to dual-layer persistence (IndexedDB + localStorage) with history
+      // PERSISTENCE: Save ONLY the persistent document + undo history (no camera, selection, or UI state).
+      // Transient state (camera position, selected items, draft, etc.) is intentionally NOT saved and will reset on recovery.
       void saveProjectDocument(
         activeProjectId,
         projectNameRef.current,
@@ -435,7 +472,7 @@ export function EditorProjectBootstrap({
               console.error("Failed to sync project thumbnail.", error);
             });
 
-          // Also update thumbnail in dual-layer persistence with current history
+          // PERSISTENCE: Save thumbnail metadata with document (persistent data only, no transient UI state).
           void saveProjectDocument(
             activeProjectId,
             projectNameRef.current,

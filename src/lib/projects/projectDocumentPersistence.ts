@@ -4,18 +4,50 @@ import type { EditorDocumentState } from "@/lib/editor/history";
 import type { ProjectCatalogEntry } from "@/lib/projects/types";
 import { addOrUpdateCatalogEntry } from "@/lib/projects/catalog";
 
+/**
+ * Project Document Persistence Layer
+ *
+ * SEPARATION OF CONCERNS:
+ * ======================
+ * PERSISTENT DATA (saved):
+ * - document: EditorDocumentState (rooms, floors, openings, interior assets, export config, north bearing, canvas rotation)
+ * - historyStack: Array of document snapshots for undo/redo
+ * - historyIndex: Current position in the undo/redo stack
+ * - lastModified: Timestamp for recovery decision-making
+ * - id: Project identifier
+ *
+ * TRANSIENT STATE (NOT saved, reset on recovery):
+ * - camera: { xMm, yMm, pixelsPerMm, rotationDegrees } — viewport position/zoom, resets on load
+ * - selectedRoomId, selectedWall, selectedOpening, selectedInteriorAsset — UI selection, clears on load
+ * - selection array — multi-select state, clears on load
+ * - roomDraft — work-in-progress room being drawn, cleared on load
+ * - renameSession, interiorAssetRenameSession — modal/input sessions, cleared on load
+ * - clipboard, pendingProjectOpenCameraFit — temporary UI state, cleared on load
+ * - editor settings — preserved separately via editorPersistence.ts (not project-specific)
+ *
+ * This separation ensures:
+ * 1. Users never lose their spatial design (document)
+ * 2. Undo/redo history is preserved across sessions
+ * 3. UI state resets to sensible defaults on recovery (safe, no orphaned selections)
+ * 4. Recovery is predictable and doesn't leave the editor in an invalid state
+ */
+
 const PROJECT_DOCUMENTS_DB_NAME = "spaceforge.projects.v1";
 const PROJECT_DOCUMENTS_STORE_NAME = "documents";
 const PROJECT_DOCUMENTS_VERSION = 1;
 const PROJECT_DOCUMENTS_LOCAL_STORAGE_KEY = "spaceforge.projects.documents.v1";
 const PROJECT_HISTORY_STATE_LIMIT = 100;
 
+/**
+ * Persistent project document — only includes structural/spatial data + history.
+ * Camera, selection, and other transient UI state are explicitly NOT included.
+ */
 export type PersistedProjectDocument = {
   id: string;
-  document: EditorDocumentState;
-  lastModified: string;
-  historyStack: EditorDocumentState[];
-  historyIndex: number;
+  document: EditorDocumentState; // Room geometry, floors, openings, etc. — the actual design
+  lastModified: string; // For recovery timestamp comparison
+  historyStack: EditorDocumentState[]; // Previous document snapshots for undo/redo
+  historyIndex: number; // Current position in history stack
 };
 
 type ProjectDocumentsStoragePayload = {

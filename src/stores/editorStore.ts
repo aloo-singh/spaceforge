@@ -4850,6 +4850,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       };
     }),
+  // Load a project document and reset all transient UI state to safe defaults.
+  // IMPORTANT: This resets camera, selections, drafts, sessions, clipboard, and undo/redo history.
+  // Only the document geometry is preserved. This is intentional—transient state should not persist across sessions.
+  // Recovery automatically positions the camera to fit the project layout.
   loadProjectDocument: (document, options) =>
     set((state) => {
       const nextDocument = cloneDocumentState(document);
