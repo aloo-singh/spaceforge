@@ -10,6 +10,7 @@ type CreateProjectRequestBody = {
   clientToken?: unknown;
   name?: unknown;
   document?: unknown;
+  projectId?: unknown;
 };
 
 function getClientTokenFromSearchParams(request: NextRequest) {
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateProjectRequestBody;
     const clientToken = typeof body.clientToken === "string" ? body.clientToken.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim() : "";
+    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : "";
     if (!clientToken) {
       return NextResponse.json({ error: "clientToken is required." }, { status: 400 });
     }
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
     const project = await createProjectForClientToken(clientToken, {
       name,
       document: body.document,
+      projectId: projectId || undefined,
     });
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {

@@ -305,3 +305,55 @@ export function isProjectsApiUnavailableError(error: unknown) {
 export function isSpecificProjectNotFoundError(error: unknown) {
   return error instanceof ProjectApiError && error.status === 404 && error.message === "Project not found.";
 }
+
+export async function createUnsavedProject(
+  clientToken: string,
+  input: {
+    name: string;
+    document: EditorDocumentState;
+  }
+) {
+  const normalizedDocument = cloneProjectDocument(input.document);
+  const localFallbackProject = createLocalFallbackProject(clientToken, {
+    name: input.name,
+    document: normalizedDocument,
+  });
+
+  // Store in cache but don't call API — project exists only locally until first room is created
+  return upsertCachedProject(clientToken, localFallbackProject);
+}
+
+export async function finalizeUnsavedProject(
+  clientToken: string,
+  projectId: string,
+  input: {
+    name: string;
+    document: EditorDocumentState;
+  }
+) {
+  const normalizedDocument = cloneProjectDocument(input.document);
+
+  try {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clientToken,
+        projectId,
+        name: input.name,
+        document: normalizedDocument,
+      }),
+    });
+    const payload = await readJson<{ project: ProjectRecord }>(response);
+    return upsertCachedProject(clientToken, payload.project);
+  } catch (error) {
+    warnProjectRecovery(
+      "Project finalization failed remotely. Keeping project as local-only until synced.",
+      error
+    );
+    // Keep the local copy - we'll retry finalization on next edit
+    return loadCachedProject(projectId);
+  }
+}

@@ -44,6 +44,7 @@ import {
   updateProject,
   fetchProjectSafely,
   fetchProjects,
+  finalizeUnsavedProject,
 } from "@/lib/projects/clientApi";
 import {
   clearActiveProjectId,
@@ -172,6 +173,8 @@ export function EditorProjectBootstrap({
   const lastSyncedThumbnailSignatureRef = useRef<string | null>(null);
   const projectNameRef = useRef<string>("");
   const isBootstrappingRef = useRef(true);
+  const hasProjectBeenFinalizedRef = useRef(false);
+  const previousRoomCountRef = useRef(0);
   const generateThumbnailDataUrlRef = useRef(generateThumbnailDataUrl);
   const onProjectResolvedRef = useRef(onProjectResolved);
   const onBootstrapStateChangeRef = useRef(onBootstrapStateChange);
@@ -498,6 +501,36 @@ export function EditorProjectBootstrap({
       cancelIdleTask?.();
     };
   }, [activeProjectId, document]);
+
+  // Finalize unsaved projects when the first room is created
+  useEffect(() => {
+    const clientToken = clientTokenRef.current;
+    if (
+      !clientToken ||
+      !activeProjectId ||
+      isBootstrappingRef.current ||
+      hasProjectBeenFinalizedRef.current
+    ) {
+      return;
+    }
+
+    const currentRoomCount = document.rooms.length;
+    const previousRoomCount = previousRoomCountRef.current;
+
+    // Detect when first room is created (transition from 0 to 1+ rooms)
+    if (previousRoomCount === 0 && currentRoomCount > 0) {
+      hasProjectBeenFinalizedRef.current = true;
+
+      void finalizeUnsavedProject(clientToken, activeProjectId, {
+        name: projectNameRef.current,
+        document: cloneDocumentState(document),
+      }).catch((error) => {
+        console.error("Failed to finalize unsaved project.", error);
+      });
+    }
+
+    previousRoomCountRef.current = currentRoomCount;
+  }, [document]);
 
   return null;
 }

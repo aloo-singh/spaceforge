@@ -7,7 +7,7 @@ import { AlertCircle, ArrowRight, Plus, RefreshCcw, LoaderCircle } from "@/compo
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
-  createProject,
+  createUnsavedProject,
   deleteProject,
   fetchProjects,
   updateProject,
@@ -118,7 +118,7 @@ export function ProjectsPageClient() {
           const project =
             projects.length === 0
               ? await ensureFirstProject(clientToken, createEmptyProjectDocument())
-              : await createProject(clientToken, {
+              : await createUnsavedProject(clientToken, {
                   name: getDefaultProjectName({ existingProjectCount: projects.length }),
                   document: createEmptyProjectDocument(),
                 });
