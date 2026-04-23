@@ -2610,8 +2610,8 @@ export default function EditorCanvas({
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
   const useCompactHud = isMobile || isLandscapeViewport;
   const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
-  const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
-  const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
+  const shouldShowTouchZoomControls = isMobile || isCompactLandscapeViewport;
+  const shouldShowTouchCancelButton = (isMobile || isCompactLandscapeViewport) && roomDraftPointCount > 0;
   const expandedLeftSidebarWidth = isMobile
     ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
     : isCompactLandscapeViewport
