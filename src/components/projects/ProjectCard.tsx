@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
@@ -27,11 +27,17 @@ export function ProjectCard({
   isDeleting,
   isInteractionDisabled = false,
 }: ProjectCardProps) {
+  const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(project.name);
   const [hasThumbnailLoadError, setHasThumbnailLoadError] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isSubmittingRenameRef = useRef(false);
+
+  const handleCardClick = () => {
+    if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
+    router.push(`/editor/${project.id}`);
+  };
 
   useEffect(() => {
     if (isEditingName) return;
@@ -86,7 +92,17 @@ export function ProjectCard({
   };
 
   return (
-    <Card className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card/95">
+    <Card 
+      onClick={handleCardClick}
+      className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card/95 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !isInteractionDisabled && !isEditingName && !isRenaming && !isDeleting) {
+          handleCardClick();
+        }
+      }}
+    >
       <CardContent className="flex h-full flex-col gap-4 p-4">
         <div className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/35">
           <div className="aspect-[8/5] w-full">
@@ -195,7 +211,8 @@ export function ProjectCard({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (isInteractionDisabled) return;
                     setDraftName(project.name);
                     setIsEditingName(true);
@@ -211,7 +228,8 @@ export function ProjectCard({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (isInteractionDisabled) return;
                     setDraftName(project.name);
                     setIsEditingName(false);
@@ -228,15 +246,17 @@ export function ProjectCard({
             )}
           </div>
           <Button
-            asChild
+            type="button"
             size="sm"
-            className="bg-blue-500 text-white hover:bg-blue-500/90"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCardClick();
+            }}
             disabled={isEditingName || isRenaming || isInteractionDisabled}
+            className="bg-blue-500 text-white hover:bg-blue-500/90"
           >
-            <Link href={`/editor/${project.id}`}>
-              Open project
-              <ArrowUpRight className="size-4" />
-            </Link>
+            Open project
+            <ArrowUpRight className="size-4" />
           </Button>
         </div>
       </CardContent>
