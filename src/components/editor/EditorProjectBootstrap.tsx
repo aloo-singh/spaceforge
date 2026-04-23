@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { areDocumentsEqual, cloneDocumentState } from "@/lib/editor/persistedHistory";
 import {
   createOrFetchAnonymousUser,
@@ -24,7 +25,7 @@ import {
   NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
 import type { ProjectRecord } from "@/lib/projects/types";
-import { saveProjectDocument } from "@/lib/projects/projectDocumentPersistence";
+import { saveProjectDocument, checkForCachedProjectRecovery } from "@/lib/projects/projectDocumentPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
@@ -71,6 +72,25 @@ function scheduleIdleTask(callback: () => void) {
   return () => {
     globalThis.clearTimeout(timeoutId);
   };
+}
+
+async function attemptProjectRecovery(
+  projectId: string,
+  serverLastModified: string
+): Promise<{ didRecover: boolean; recoveredDocument?: ReturnType<typeof cloneDocumentState> }> {
+  try {
+    const recovery = await checkForCachedProjectRecovery(projectId, serverLastModified);
+    if (recovery.shouldRecover && recovery.cachedDoc) {
+      const recoveredDocument = cloneDocumentState(recovery.cachedDoc.document);
+      toast("Project recovered from last known good state", {
+        duration: 4000,
+      });
+      return { didRecover: true, recoveredDocument };
+    }
+  } catch (error) {
+    console.error("Error checking for project recovery.", error);
+  }
+  return { didRecover: false };
 }
 
 type EditorProjectBootstrapProps = {
@@ -154,7 +174,19 @@ export function EditorProjectBootstrap({
             }
             if (isCancelled) return;
 
-            const fallbackDocument = cloneDocumentState(fallbackProject.document);
+            let fallbackDocument = cloneDocumentState(fallbackProject.document);
+
+            // Check for recovery from local persistence
+            const fallbackRecovery = await attemptProjectRecovery(
+              fallbackProject.id,
+              fallbackProject.updatedAt
+            );
+            if (fallbackRecovery.didRecover && fallbackRecovery.recoveredDocument) {
+              fallbackDocument = fallbackRecovery.recoveredDocument;
+            }
+
+            if (isCancelled) return;
+
             const currentState = useEditorStore.getState();
             const currentDocument = currentState.document;
             const projectOpenCameraOptions =
@@ -221,7 +253,19 @@ export function EditorProjectBootstrap({
           router.replace(`/editor/${selectedProject.id}`);
         }
 
-        const nextDocument = cloneDocumentState(selectedProject.document);
+        let nextDocument = cloneDocumentState(selectedProject.document);
+
+        // Check for recovery from local persistence
+        const selectedRecovery = await attemptProjectRecovery(
+          selectedProject.id,
+          selectedProject.updatedAt
+        );
+        if (selectedRecovery.didRecover && selectedRecovery.recoveredDocument) {
+          nextDocument = selectedRecovery.recoveredDocument;
+        }
+
+        if (isCancelled) return;
+
         const currentState = useEditorStore.getState();
         const currentDocument = currentState.document;
         const projectOpenCameraOptions =

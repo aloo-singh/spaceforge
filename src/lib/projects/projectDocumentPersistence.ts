@@ -229,3 +229,25 @@ export async function loadProjectDocument(projectId: string): Promise<PersistedP
 
   return payload.projects.find((p) => p.id === projectId) ?? null;
 }
+
+export async function checkForCachedProjectRecovery(
+  projectId: string,
+  serverLastModified: string
+): Promise<{ shouldRecover: boolean; cachedDoc: PersistedProjectDocument | null }> {
+  const cachedDoc = await loadProjectDocument(projectId);
+
+  if (!cachedDoc) {
+    return { shouldRecover: false, cachedDoc: null };
+  }
+
+  // Check if cached version is fresher than server version
+  const cachedTime = new Date(cachedDoc.lastModified).getTime();
+  const serverTime = new Date(serverLastModified).getTime();
+
+  // Recover if cached is significantly fresher (more than 100ms) or server time is invalid
+  if (!Number.isFinite(serverTime) || cachedTime > serverTime + 100) {
+    return { shouldRecover: true, cachedDoc };
+  }
+
+  return { shouldRecover: false, cachedDoc };
+}
