@@ -50,7 +50,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AppToaster />
           <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-black/10 bg-background/95 px-4 backdrop-blur sm:px-6">
-            <Link href="/" aria-label="SpaceForge home" className="flex items-center gap-2">
+            <Link href="/?skipRedirect=true" aria-label="SpaceForge home" className="flex items-center gap-2">
               <BrandWordmark />
               <Badge
                 variant="outline"
