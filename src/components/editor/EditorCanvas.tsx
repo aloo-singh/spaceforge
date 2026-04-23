@@ -3484,6 +3484,32 @@ function drawScene(
   );
   const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
+  
+  // Get the peer room for linked staircases
+  let linkedStaircasePeerRoom: Room | null = null;
+  if (state.selectedInteriorAsset) {
+    const selectedRoom = state.document.rooms.find(
+      (room) => room.id === state.selectedInteriorAsset!.roomId
+    );
+    const selectedAsset = selectedRoom?.interiorAssets.find(
+      (asset) => asset.id === state.selectedInteriorAsset!.assetId
+    );
+    if (selectedAsset?.connectionId) {
+      for (const room of state.document.rooms) {
+        for (const asset of room.interiorAssets) {
+          if (
+            asset.id !== selectedAsset.id &&
+            asset.connectionId === selectedAsset.connectionId
+          ) {
+            linkedStaircasePeerRoom = room;
+            break;
+          }
+        }
+        if (linkedStaircasePeerRoom) break;
+      }
+    }
+  }
+  
   if (state.settings.showFloorFootprint) {
     drawFloorFootprint(
       floorFootprintGraphics,
@@ -3506,6 +3532,19 @@ function drawScene(
     theme,
     assetDragTargetRoomId
   );
+  
+  // Draw linked staircase peer room as overlay (visible even when on different floor)
+  if (linkedStaircasePeerRoom && linkedStaircasePeerRoom.points.length >= 3) {
+    drawDashedRoomOutline(
+      roomGraphics,
+      linkedStaircasePeerRoom.points,
+      state.camera,
+      state.viewport,
+      theme.wallSelectionAccent,
+      2.5,
+      0.5
+    );
+  }
   drawOpenings(
     openingGraphics,
     renderedRooms,
@@ -6272,6 +6311,47 @@ function drawDashedGuideLine(
     graphics.moveTo(start.x + stepX * dashStart, start.y + stepY * dashStart);
     graphics.lineTo(start.x + stepX * dashEnd, start.y + stepY * dashEnd);
   }
+  graphics.stroke();
+}
+
+function drawDashedRoomOutline(
+  graphics: Graphics,
+  points: Point[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  color: number,
+  strokeWidth: number,
+  strokeAlpha: number
+) {
+  const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
+  if (screenPoints.length < 2) return;
+
+  const dashLength = 10;
+  const gapLength = 8;
+
+  graphics.setStrokeStyle({ width: strokeWidth, color, alpha: strokeAlpha });
+
+  // Draw dashed lines for each wall of the room
+  for (let i = 0; i < screenPoints.length; i += 1) {
+    const start = screenPoints[i];
+    const end = screenPoints[(i + 1) % screenPoints.length];
+
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) continue;
+
+    const stepX = dx / length;
+    const stepY = dy / length;
+
+    for (let distance = 0; distance < length; distance += dashLength + gapLength) {
+      const dashStart = distance;
+      const dashEnd = Math.min(distance + dashLength, length);
+      graphics.moveTo(start.x + stepX * dashStart, start.y + stepY * dashStart);
+      graphics.lineTo(start.x + stepX * dashEnd, start.y + stepY * dashEnd);
+    }
+  }
+
   graphics.stroke();
 }
 
