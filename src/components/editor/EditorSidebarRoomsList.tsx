@@ -324,7 +324,7 @@ export function EditorSidebarRoomsList() {
                               dragOverFloorId === floor.id
                                 ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
                                 : activeFloorId === floor.id
-                                ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                                ? "border-zinc-300/70 bg-zinc-100/80 text-zinc-950 dark:border-zinc-600/70 dark:bg-zinc-800/60 dark:text-zinc-50"
                                 : "border-zinc-300/70 bg-zinc-100/60 text-zinc-700 hover:bg-zinc-200/75 dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
                             )}
                             onMouseDown={(event) => {
@@ -523,7 +523,7 @@ export function EditorSidebarRoomsList() {
                         : isDragOverThisRoom
                         ? "border-brand/60 bg-brand/10 dark:border-brand/50 dark:bg-brand/15"
                         : isSelected
-                        ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
+                        ? "border-zinc-400/70 bg-zinc-200/85 text-zinc-950 dark:border-zinc-700/70 dark:bg-zinc-800/75 dark:text-zinc-50"
                         : isInMultiSelection
                         ? "border-zinc-400/50 bg-zinc-200/60 text-zinc-900 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-100"
                         : "border-transparent text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
@@ -653,7 +653,7 @@ export function EditorSidebarRoomsList() {
                                   className={cn(
                                     wallRowClass,
                                     isWallSelected
-                                      ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                      ? "bg-zinc-300/85 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
                                       : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                                   )}
                                   onClick={() => selectWallByRoomId(room.id, wall)}
