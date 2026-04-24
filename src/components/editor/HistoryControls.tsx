@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import {
+  ChevronDown,
   Construction,
   DoorOpen,
   Download,
@@ -340,6 +341,23 @@ export function HistoryControls({
                 </EditorChromeTooltip>
                 <EditorChromeTooltip
                   groupItem
+                  content="Undo history"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={isUndoDisabled}
+                    aria-label="Undo history dropdown"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <ChevronDown className="size-4" />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
                   content={
                     isRedoDisabled ? (
                       "Nothing to redo"
@@ -361,6 +379,21 @@ export function HistoryControls({
                     className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                   >
                     <Redo2 />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content="Redo history"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={isRedoDisabled}
+                    aria-label="Redo history dropdown"
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <ChevronDown className="size-4" />
                   </Button>
                 </EditorChromeTooltip>
               </ButtonGroup>
