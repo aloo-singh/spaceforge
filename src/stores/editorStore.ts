@@ -2441,9 +2441,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectRoomById: (roomId) =>
     set((state) => {
-      if (roomId && !getRoomsForActiveFloor(state.document).some((room) => room.id === roomId)) {
+      const room = state.document.rooms.find((r) => r.id === roomId);
+      
+      // If room doesn't exist, do nothing
+      if (roomId && !room) {
         return state;
       }
+      
+      // If already in the correct state, return early
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
@@ -2453,7 +2458,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      // If the room is on a different floor, switch to that floor first
+      const nextDocument = room && room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2468,10 +2479,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!getRoomWallSegment(room, wall)) {
+        // If wall doesn't exist, just select the room instead
+        const nextDocument = room.floorId !== state.document.activeFloorId
+          ? { ...state.document, activeFloorId: room.floorId }
+          : state.document;
         return preserveHistoryForSelectionUpdate(state, {
+          document: nextDocument,
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -2493,7 +2509,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -2508,7 +2529,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectOpeningById: (roomId, openingId) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.openings.some((opening) => opening.id === openingId)) return state;
       if (
@@ -2519,7 +2540,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2534,7 +2560,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectInteriorAssetById: (roomId, assetId) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.interiorAssets.some((asset) => asset.id === assetId)) return state;
       if (
@@ -2545,7 +2571,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
