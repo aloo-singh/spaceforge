@@ -1938,11 +1938,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       stopResetCameraAnimation();
 
+      // Use the same device-aware padding logic as the manual "fit view" button
+      const isLandscape = nextViewport.width > nextViewport.height;
+      const isMobile = nextViewport.height < 600;
+      const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
       return {
         viewport: nextViewport,
-        camera: getProjectOpenCamera(state.document, nextViewport, {
-          emptyLayoutPixelsPerMm: state.pendingProjectOpenEmptyLayoutPixelsPerMm ?? undefined,
-        }),
+        camera: getCameraFitTarget({
+          rooms: getRoomsForActiveFloor(state.document),
+          viewport: nextViewport,
+          emptyLayoutCamera: {
+            ...DEFAULT_CAMERA_STATE,
+            pixelsPerMm: state.pendingProjectOpenEmptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+            rotationDegrees: normalizeCanvasRotationDegrees(state.document.canvasRotationDegrees),
+          },
+          paddingPx,
+        }).camera,
         pendingProjectOpenCameraFit: false,
         pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       };
@@ -4873,9 +4885,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      const targetCamera = getProjectOpenCamera(state.document, state.viewport, {
-        emptyLayoutPixelsPerMm,
-      });
+      // Use the same device-aware padding logic as the manual "fit view" button
+      // to ensure consistent camera fitting across project open and manual resets
+      const isLandscape = state.viewport.width > state.viewport.height;
+      const isMobile = state.viewport.height < 600;
+      const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
+      const targetCamera = getCameraFitTarget({
+        rooms: getRoomsForActiveFloor(state.document),
+        viewport: state.viewport,
+        emptyLayoutCamera: {
+          ...DEFAULT_CAMERA_STATE,
+          pixelsPerMm: emptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+          rotationDegrees: normalizeCanvasRotationDegrees(state.document.canvasRotationDegrees),
+        },
+        paddingPx,
+      }).camera;
+
       if (!state.pendingProjectOpenCameraFit && areCamerasEqual(state.camera, targetCamera)) {
         return state;
       }
@@ -4901,13 +4927,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
       const emptyLayoutPixelsPerMm = options?.emptyLayoutPixelsPerMm;
 
+      let nextCamera = syncCameraRotationToDocument(state.camera, nextDocument);
+
+      if (!shouldDeferCameraFit) {
+        // Use the same device-aware padding logic as the manual "fit view" button
+        const isLandscape = state.viewport.width > state.viewport.height;
+        const isMobile = state.viewport.height < 600;
+        const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
+        nextCamera = getCameraFitTarget({
+          rooms: getRoomsForActiveFloor(nextDocument),
+          viewport: state.viewport,
+          emptyLayoutCamera: {
+            ...DEFAULT_CAMERA_STATE,
+            pixelsPerMm: emptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+            rotationDegrees: normalizeCanvasRotationDegrees(nextDocument.canvasRotationDegrees),
+          },
+          paddingPx,
+        }).camera;
+      }
+
       return {
         document: nextDocument,
-        camera: shouldDeferCameraFit
-          ? syncCameraRotationToDocument(state.camera, nextDocument)
-          : getProjectOpenCamera(nextDocument, state.viewport, {
-              emptyLayoutPixelsPerMm,
-            }),
+        camera: nextCamera,
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
         pendingProjectOpenEmptyLayoutPixelsPerMm: shouldDeferCameraFit
           ? emptyLayoutPixelsPerMm ?? null
