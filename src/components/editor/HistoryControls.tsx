@@ -32,7 +32,7 @@ import {
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
-import { getHistoryCommandActionLabel } from "@/lib/editor/keyboardMap";
+import { getHistoryCommandActionLabel, generateBatchHistoryFeedbackMessage, showKeyboardShortcutFeedbackToast } from "@/lib/editor/keyboardMap";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
 import { detectMacPlatform } from "@/lib/platform";
@@ -131,6 +131,7 @@ export function HistoryControls({
   const redo = useEditorStore((state) => state.redo);
   const undoBatch = useEditorStore((state) => state.undoBatch);
   const redoBatch = useEditorStore((state) => state.redoBatch);
+  const keyboardShortcutFeedbackEnabled = useEditorStore((state) => state.keyboardShortcutFeedbackEnabled);
   const resetCamera = useEditorStore((state) => state.resetCamera);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const insertDefaultDoorOnSelectedWall = useEditorStore(
@@ -444,8 +445,18 @@ export function HistoryControls({
                             role="option"
                             aria-selected="false"
                             onClick={() => {
-                              undoBatch(index + 1);
+                              const stepsToUndo = index + 1;
+                              undoBatch(stepsToUndo);
                               closeDropdowns();
+                              
+                              // Show feedback for batch undo
+                              if (keyboardShortcutFeedbackEnabled) {
+                                const commandsToUndo = undoHistory.slice(-stepsToUndo);
+                                const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
+                                if (message) {
+                                  showKeyboardShortcutFeedbackToast(message);
+                                }
+                              }
                             }}
                           >
                             {getHistoryCommandActionLabel(command)}
@@ -524,8 +535,18 @@ export function HistoryControls({
                             role="option"
                             aria-selected="false"
                             onClick={() => {
-                              redoBatch(index + 1);
+                              const stepsToRedo = index + 1;
+                              redoBatch(stepsToRedo);
                               closeDropdowns();
+                              
+                              // Show feedback for batch redo
+                              if (keyboardShortcutFeedbackEnabled) {
+                                const commandsToRedo = redoHistory.slice(0, stepsToRedo);
+                                const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
+                                if (message) {
+                                  showKeyboardShortcutFeedbackToast(message);
+                                }
+                              }
                             }}
                           >
                             {getHistoryCommandActionLabel(command)}

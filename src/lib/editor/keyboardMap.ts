@@ -451,6 +451,31 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   return "action";
 }
 
+export function generateBatchHistoryFeedbackMessage(
+  commands: EditorCommand[],
+  direction: "undo" | "redo"
+): string | null {
+  if (commands.length === 0) return null;
+
+  const count = commands.length;
+  const verb = direction === "undo" ? "Undid" : "Redid";
+  
+  // Check if all commands are the same type
+  const firstCommand = commands[0];
+  const allSameType = commands.every(cmd => cmd.type === firstCommand.type);
+  const actionLabel = getHistoryCommandActionLabel(firstCommand);
+
+  if (allSameType) {
+    // "Undid 3 room moves" or "Undid room move"
+    return count === 1 
+      ? `${verb} ${actionLabel}` 
+      : `${verb} ${count} ${actionLabel}s`;
+  } else {
+    // "Undid 3 actions"
+    return `${verb} ${count} action${count === 1 ? "" : "s"}`;
+  }
+}
+
 function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: KeyboardEvent) {
   const eventKey = event.key.toLowerCase();
   const bindingKey = binding.key?.toLowerCase();
