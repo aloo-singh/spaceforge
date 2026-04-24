@@ -95,8 +95,12 @@ export function HistoryControls({
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isUndoDropdownOpen, setIsUndoDropdownOpen] = useState(false);
   const [isRedoDropdownOpen, setIsRedoDropdownOpen] = useState(false);
-  const [undoDropdownPos, setUndoDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [undoDropdownPos, setUndoDropdownPos] = useState<{ top: number; right: number } | null>(null);
   const [redoDropdownPos, setRedoDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [hoveredUndoIndex, setHoveredUndoIndex] = useState<number | null>(null);
+  const [hoveredRedoIndex, setHoveredRedoIndex] = useState<number | null>(null);
+  const [selectedUndoIndex, setSelectedUndoIndex] = useState<number | null>(null);
+  const [selectedRedoIndex, setSelectedRedoIndex] = useState<number | null>(null);
   const undoDropdownRef = useRef<HTMLDivElement>(null);
   const redoDropdownRef = useRef<HTMLDivElement>(null);
   const undoButtonRef = useRef<HTMLButtonElement>(null);
@@ -206,6 +210,42 @@ export function HistoryControls({
     }
   }, [isUndoDropdownOpen, isRedoDropdownOpen]);
 
+  // Focus dropdown when opened for keyboard navigation
+  useEffect(() => {
+    if (isUndoDropdownOpen && undoDropdownRef.current) {
+      undoDropdownRef.current.focus();
+    }
+  }, [isUndoDropdownOpen]);
+
+  useEffect(() => {
+    if (isRedoDropdownOpen && redoDropdownRef.current) {
+      redoDropdownRef.current.focus();
+    }
+  }, [isRedoDropdownOpen]);
+
+  // Scroll selected item into view for keyboard navigation
+  useEffect(() => {
+    if (isUndoDropdownOpen && selectedUndoIndex !== null && undoDropdownRef.current) {
+      const selectedElement = undoDropdownRef.current.querySelector(
+        `[role="option"]:nth-child(${selectedUndoIndex + 1})`
+      );
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [isUndoDropdownOpen, selectedUndoIndex]);
+
+  useEffect(() => {
+    if (isRedoDropdownOpen && selectedRedoIndex !== null && redoDropdownRef.current) {
+      const selectedElement = redoDropdownRef.current.querySelector(
+        `[role="option"]:nth-child(${selectedRedoIndex + 1})`
+      );
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [isRedoDropdownOpen, selectedRedoIndex]);
+
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
     resetCanvas();
@@ -221,7 +261,7 @@ export function HistoryControls({
   const toggleUndoDropdown = () => {
     if (!isUndoDropdownOpen && undoButtonRef.current) {
       const rect = undoButtonRef.current.getBoundingClientRect();
-      setUndoDropdownPos({ top: rect.bottom + 4, left: rect.left });
+      setUndoDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
     }
     setIsUndoDropdownOpen(!isUndoDropdownOpen);
     setIsRedoDropdownOpen(false);
@@ -240,6 +280,82 @@ export function HistoryControls({
   const closeDropdowns = () => {
     setIsUndoDropdownOpen(false);
     setIsRedoDropdownOpen(false);
+    setHoveredUndoIndex(null);
+    setHoveredRedoIndex(null);
+    setSelectedUndoIndex(null);
+    setSelectedRedoIndex(null);
+  };
+
+  const handleUndoDropdownKeyDown = (event: React.KeyboardEvent) => {
+    const itemCount = undoHistory.slice(-50).length;
+    
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedUndoIndex((prev) => {
+        const next = prev === null ? 0 : Math.min(prev + 1, itemCount - 1);
+        return next;
+      });
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedUndoIndex((prev) => {
+        const next = prev === null ? itemCount - 1 : Math.max(prev - 1, 0);
+        return next;
+      });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (selectedUndoIndex !== null) {
+        const stepsToUndo = selectedUndoIndex + 1;
+        undoBatch(stepsToUndo);
+        closeDropdowns();
+        
+        if (keyboardShortcutFeedbackEnabled) {
+          const commandsToUndo = undoHistory.slice(-stepsToUndo);
+          const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
+        }
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeDropdowns();
+    }
+  };
+
+  const handleRedoDropdownKeyDown = (event: React.KeyboardEvent) => {
+    const itemCount = redoHistory.slice(0, 50).length;
+    
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedRedoIndex((prev) => {
+        const next = prev === null ? 0 : Math.min(prev + 1, itemCount - 1);
+        return next;
+      });
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedRedoIndex((prev) => {
+        const next = prev === null ? itemCount - 1 : Math.max(prev - 1, 0);
+        return next;
+      });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (selectedRedoIndex !== null) {
+        const stepsToRedo = selectedRedoIndex + 1;
+        redoBatch(stepsToRedo);
+        closeDropdowns();
+        
+        if (keyboardShortcutFeedbackEnabled) {
+          const commandsToRedo = redoHistory.slice(0, stepsToRedo);
+          const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
+        }
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeDropdowns();
+    }
   };
 
   return (
@@ -429,39 +545,58 @@ export function HistoryControls({
                 {isUndoDropdownOpen && undoDropdownPos !== null && hasHydrated && createPortal(
                   <div
                     ref={undoDropdownRef}
-                    style={{ top: undoDropdownPos.top, left: undoDropdownPos.left }}
-                    className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
-                    role="listbox"
-                    aria-label="Undo history"
+                    style={{ top: undoDropdownPos.top, right: undoDropdownPos.right }}
+                    className="fixed z-[999999] w-80 max-h-96 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg outline-none"
+                    tabIndex={0}
+                    onKeyDown={handleUndoDropdownKeyDown}
                   >
                     {undoHistory.length > 0 ? (
                       undoHistory
                         .slice(-50)
                         .reverse()
-                        .map((command, index) => (
-                          <div
-                            key={index}
-                            className="cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
-                            role="option"
-                            aria-selected="false"
-                            onClick={() => {
-                              const stepsToUndo = index + 1;
-                              undoBatch(stepsToUndo);
-                              closeDropdowns();
-                              
-                              // Show feedback for batch undo
-                              if (keyboardShortcutFeedbackEnabled) {
-                                const commandsToUndo = undoHistory.slice(-stepsToUndo);
-                                const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
-                                if (message) {
-                                  showKeyboardShortcutFeedbackToast(message);
+                        .map((command, index) => {
+                          const isHovered = hoveredUndoIndex === index;
+                          const isSelected = selectedUndoIndex === index;
+                          const batchUpperIndex = hoveredUndoIndex ?? selectedUndoIndex ?? -1;
+                          const isInBatch = batchUpperIndex >= 0 && index <= batchUpperIndex;
+                          const bgColorClass = isSelected
+                            ? "bg-accent text-accent-foreground ring-1 ring-inset ring-accent-foreground/30"
+                            : isHovered
+                            ? "bg-accent text-accent-foreground"
+                            : isInBatch
+                            ? "bg-accent/50 text-accent-foreground"
+                            : "hover:bg-accent/30";
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={cn(
+                                "cursor-pointer select-none px-3 py-2.5 text-sm transition-colors",
+                                bgColorClass
+                              )}
+                              role="option"
+                              aria-selected={isSelected}
+                              onMouseEnter={() => setHoveredUndoIndex(index)}
+                              onMouseLeave={() => setHoveredUndoIndex(null)}
+                              onClick={() => {
+                                const stepsToUndo = index + 1;
+                                undoBatch(stepsToUndo);
+                                closeDropdowns();
+                                
+                                // Show feedback for batch undo
+                                if (keyboardShortcutFeedbackEnabled) {
+                                  const commandsToUndo = undoHistory.slice(-stepsToUndo);
+                                  const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
+                                  if (message) {
+                                    showKeyboardShortcutFeedbackToast(message);
+                                  }
                                 }
-                              }
-                            }}
-                          >
-                            {getHistoryCommandActionLabel(command)}
-                          </div>
-                        ))
+                              }}
+                            >
+                              {getHistoryCommandActionLabel(command)}
+                            </div>
+                          );
+                        })
                     ) : (
                       <div className="px-3 py-2 text-sm text-muted-foreground">
                         No undo history
@@ -521,37 +656,56 @@ export function HistoryControls({
                   <div
                     ref={redoDropdownRef}
                     style={{ top: redoDropdownPos.top, right: redoDropdownPos.right }}
-                    className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
-                    role="listbox"
-                    aria-label="Redo history"
+                    className="fixed z-[999999] w-80 max-h-96 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg outline-none"
+                    tabIndex={0}
+                    onKeyDown={handleRedoDropdownKeyDown}
                   >
                     {redoHistory.length > 0 ? (
                       redoHistory
                         .slice(0, 50)
-                        .map((command, index) => (
-                          <div
-                            key={index}
-                            className="cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
-                            role="option"
-                            aria-selected="false"
-                            onClick={() => {
-                              const stepsToRedo = index + 1;
-                              redoBatch(stepsToRedo);
-                              closeDropdowns();
-                              
-                              // Show feedback for batch redo
-                              if (keyboardShortcutFeedbackEnabled) {
-                                const commandsToRedo = redoHistory.slice(0, stepsToRedo);
-                                const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
-                                if (message) {
-                                  showKeyboardShortcutFeedbackToast(message);
+                        .map((command, index) => {
+                          const isHovered = hoveredRedoIndex === index;
+                          const isSelected = selectedRedoIndex === index;
+                          const batchUpperIndex = hoveredRedoIndex ?? selectedRedoIndex ?? -1;
+                          const isInBatch = batchUpperIndex >= 0 && index <= batchUpperIndex;
+                          const bgColorClass = isSelected
+                            ? "bg-accent text-accent-foreground ring-1 ring-inset ring-accent-foreground/30"
+                            : isHovered
+                            ? "bg-accent text-accent-foreground"
+                            : isInBatch
+                            ? "bg-accent/50 text-accent-foreground"
+                            : "hover:bg-accent/30";
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={cn(
+                                "cursor-pointer select-none px-3 py-2.5 text-sm transition-colors",
+                                bgColorClass
+                              )}
+                              role="option"
+                              aria-selected={isSelected}
+                              onMouseEnter={() => setHoveredRedoIndex(index)}
+                              onMouseLeave={() => setHoveredRedoIndex(null)}
+                              onClick={() => {
+                                const stepsToRedo = index + 1;
+                                redoBatch(stepsToRedo);
+                                closeDropdowns();
+                                
+                                // Show feedback for batch redo
+                                if (keyboardShortcutFeedbackEnabled) {
+                                  const commandsToRedo = redoHistory.slice(0, stepsToRedo);
+                                  const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
+                                  if (message) {
+                                    showKeyboardShortcutFeedbackToast(message);
+                                  }
                                 }
-                              }
-                            }}
-                          >
-                            {getHistoryCommandActionLabel(command)}
-                          </div>
-                        ))
+                              }}
+                            >
+                              {getHistoryCommandActionLabel(command)}
+                            </div>
+                          );
+                        })
                     ) : (
                       <div className="px-3 py-2 text-sm text-muted-foreground">
                         No redo history
