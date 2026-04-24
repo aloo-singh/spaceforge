@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import {
+  ChevronDown,
   Construction,
   DoorOpen,
   Download,
@@ -30,6 +32,7 @@ import {
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { getHistoryCommandActionLabel, generateBatchHistoryFeedbackMessage, showKeyboardShortcutFeedbackToast } from "@/lib/editor/keyboardMap";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
 import { detectMacPlatform } from "@/lib/platform";
@@ -90,6 +93,18 @@ export function HistoryControls({
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isUndoDropdownOpen, setIsUndoDropdownOpen] = useState(false);
+  const [isRedoDropdownOpen, setIsRedoDropdownOpen] = useState(false);
+  const [undoDropdownPos, setUndoDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [redoDropdownPos, setRedoDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [hoveredUndoIndex, setHoveredUndoIndex] = useState<number | null>(null);
+  const [hoveredRedoIndex, setHoveredRedoIndex] = useState<number | null>(null);
+  const [selectedUndoIndex, setSelectedUndoIndex] = useState<number | null>(null);
+  const [selectedRedoIndex, setSelectedRedoIndex] = useState<number | null>(null);
+  const undoDropdownRef = useRef<HTMLDivElement>(null);
+  const redoDropdownRef = useRef<HTMLDivElement>(null);
+  const undoButtonRef = useRef<HTMLButtonElement>(null);
+  const redoButtonRef = useRef<HTMLButtonElement>(null);
   const { resolvedTheme } = useTheme();
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -103,6 +118,8 @@ export function HistoryControls({
   );
   const canUndo = useEditorStore((state) => state.canUndo);
   const canRedo = useEditorStore((state) => state.canRedo);
+  const undoHistory = useEditorStore((state) => state.history.past);
+  const redoHistory = useEditorStore((state) => state.history.future);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedRoom = useEditorStore((state) =>
@@ -116,6 +133,9 @@ export function HistoryControls({
   );
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
+  const undoBatch = useEditorStore((state) => state.undoBatch);
+  const redoBatch = useEditorStore((state) => state.redoBatch);
+  const keyboardShortcutFeedbackEnabled = useEditorStore((state) => state.keyboardShortcutFeedbackEnabled);
   const resetCamera = useEditorStore((state) => state.resetCamera);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const insertDefaultDoorOnSelectedWall = useEditorStore(
@@ -162,6 +182,70 @@ export function HistoryControls({
   const undoShortcut = isMacPlatform ? ["⌘", "Z"] : ["Ctrl", "Z"];
   const redoShortcut = isMacPlatform ? ["⇧", "⌘", "Z"] : ["Ctrl", "Y"];
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        undoDropdownRef.current &&
+        !undoDropdownRef.current.contains(target) &&
+        !((event.target as HTMLElement).closest('[aria-label="Undo history dropdown"]'))
+      ) {
+        setIsUndoDropdownOpen(false);
+      }
+      if (
+        redoDropdownRef.current &&
+        !redoDropdownRef.current.contains(target) &&
+        !((event.target as HTMLElement).closest('[aria-label="Redo history dropdown"]'))
+      ) {
+        setIsRedoDropdownOpen(false);
+      }
+    };
+
+    if (isUndoDropdownOpen || isRedoDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [isUndoDropdownOpen, isRedoDropdownOpen]);
+
+  // Focus dropdown when opened for keyboard navigation
+  useEffect(() => {
+    if (isUndoDropdownOpen && undoDropdownRef.current) {
+      undoDropdownRef.current.focus();
+    }
+  }, [isUndoDropdownOpen]);
+
+  useEffect(() => {
+    if (isRedoDropdownOpen && redoDropdownRef.current) {
+      redoDropdownRef.current.focus();
+    }
+  }, [isRedoDropdownOpen]);
+
+  // Scroll selected item into view for keyboard navigation
+  useEffect(() => {
+    if (isUndoDropdownOpen && selectedUndoIndex !== null && undoDropdownRef.current) {
+      const selectedElement = undoDropdownRef.current.querySelector(
+        `[role="option"]:nth-child(${selectedUndoIndex + 1})`
+      );
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [isUndoDropdownOpen, selectedUndoIndex]);
+
+  useEffect(() => {
+    if (isRedoDropdownOpen && selectedRedoIndex !== null && redoDropdownRef.current) {
+      const selectedElement = redoDropdownRef.current.querySelector(
+        `[role="option"]:nth-child(${selectedRedoIndex + 1})`
+      );
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [isRedoDropdownOpen, selectedRedoIndex]);
+
   const confirmResetCanvas = () => {
     clearEditorSnapshot();
     resetCanvas();
@@ -172,6 +256,106 @@ export function HistoryControls({
     if (isSettingsDialogOpen) return;
     track(ANALYTICS_EVENTS.settingsOpened);
     setIsSettingsDialogOpen(true);
+  };
+
+  const toggleUndoDropdown = () => {
+    if (!isUndoDropdownOpen && undoButtonRef.current) {
+      const rect = undoButtonRef.current.getBoundingClientRect();
+      setUndoDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setIsUndoDropdownOpen(!isUndoDropdownOpen);
+    setIsRedoDropdownOpen(false);
+  };
+
+  const toggleRedoDropdown = () => {
+    if (!isRedoDropdownOpen && redoButtonRef.current) {
+      const rect = redoButtonRef.current.getBoundingClientRect();
+      setRedoDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setIsRedoDropdownOpen(!isRedoDropdownOpen);
+    setIsUndoDropdownOpen(false);
+  };
+
+  // Close dropdowns when clicking outside (Step 2: clicking entry does nothing yet)
+  const closeDropdowns = () => {
+    setIsUndoDropdownOpen(false);
+    setIsRedoDropdownOpen(false);
+    setHoveredUndoIndex(null);
+    setHoveredRedoIndex(null);
+    setSelectedUndoIndex(null);
+    setSelectedRedoIndex(null);
+  };
+
+  const handleUndoDropdownKeyDown = (event: React.KeyboardEvent) => {
+    const itemCount = undoHistory.slice(-50).length;
+    
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedUndoIndex((prev) => {
+        const next = prev === null ? 0 : Math.min(prev + 1, itemCount - 1);
+        return next;
+      });
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedUndoIndex((prev) => {
+        const next = prev === null ? itemCount - 1 : Math.max(prev - 1, 0);
+        return next;
+      });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (selectedUndoIndex !== null) {
+        const stepsToUndo = selectedUndoIndex + 1;
+        undoBatch(stepsToUndo);
+        closeDropdowns();
+        
+        if (keyboardShortcutFeedbackEnabled) {
+          const commandsToUndo = undoHistory.slice(-stepsToUndo);
+          const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
+        }
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeDropdowns();
+    }
+  };
+
+  const handleRedoDropdownKeyDown = (event: React.KeyboardEvent) => {
+    const itemCount = redoHistory.slice(0, 50).length;
+    
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedRedoIndex((prev) => {
+        const next = prev === null ? 0 : Math.min(prev + 1, itemCount - 1);
+        return next;
+      });
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedRedoIndex((prev) => {
+        const next = prev === null ? itemCount - 1 : Math.max(prev - 1, 0);
+        return next;
+      });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (selectedRedoIndex !== null) {
+        const stepsToRedo = selectedRedoIndex + 1;
+        redoBatch(stepsToRedo);
+        closeDropdowns();
+        
+        if (keyboardShortcutFeedbackEnabled) {
+          const commandsToRedo = redoHistory.slice(0, stepsToRedo);
+          const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
+          if (message) {
+            showKeyboardShortcutFeedbackToast(message);
+          }
+        }
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeDropdowns();
+    }
   };
 
   return (
@@ -311,59 +495,226 @@ export function HistoryControls({
         <div className="flex items-center gap-2 sm:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5">
           <EarlyExplorerBadge />
           <ImmediateTooltipProvider>
-            <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-              <ButtonGroup>
-                <EditorChromeTooltip
-                  groupItem
-                  content={
-                    isUndoDisabled ? (
-                      "Nothing to undo"
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
-                        <span>Undo</span>
-                        <KeycapCombo keys={undoShortcut} />
-                      </span>
-                    )
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={undo}
-                    disabled={isUndoDisabled}
-                    aria-label="Undo last edit, shortcut Command or Control plus Z"
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+            <div className="relative flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
+              <div className="relative">
+                <ButtonGroup>
+                  <EditorChromeTooltip
+                    groupItem
+                    content={
+                      isUndoDisabled ? (
+                        "Nothing to undo"
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <span>Undo</span>
+                          <KeycapCombo keys={undoShortcut} />
+                        </span>
+                      )
+                    }
                   >
-                    <Undo2 />
-                  </Button>
-                </EditorChromeTooltip>
-                <EditorChromeTooltip
-                  groupItem
-                  content={
-                    isRedoDisabled ? (
-                      "Nothing to redo"
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
-                        <span>Redo</span>
-                        <KeycapCombo keys={redoShortcut} />
-                      </span>
-                    )
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={redo}
-                    disabled={isRedoDisabled}
-                    aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={undo}
+                      disabled={isUndoDisabled}
+                      aria-label="Undo last edit, shortcut Command or Control plus Z"
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <Undo2 />
+                    </Button>
+                  </EditorChromeTooltip>
+                  <EditorChromeTooltip
+                    groupItem
+                    content="Undo history"
                   >
-                    <Redo2 />
-                  </Button>
-                </EditorChromeTooltip>
-              </ButtonGroup>
+                    <Button
+                      ref={undoButtonRef}
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleUndoDropdown}
+                      disabled={isUndoDisabled}
+                      aria-label="Undo history dropdown"
+                      aria-expanded={isUndoDropdownOpen}
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </EditorChromeTooltip>
+                </ButtonGroup>
+                {isUndoDropdownOpen && undoDropdownPos !== null && hasHydrated && createPortal(
+                  <div
+                    ref={undoDropdownRef}
+                    style={{ top: undoDropdownPos.top, right: undoDropdownPos.right }}
+                    className="fixed z-[999999] w-80 max-h-96 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg outline-none"
+                    tabIndex={0}
+                    onKeyDown={handleUndoDropdownKeyDown}
+                  >
+                    {undoHistory.length > 0 ? (
+                      undoHistory
+                        .slice(-50)
+                        .reverse()
+                        .map((command, index) => {
+                          const isHovered = hoveredUndoIndex === index;
+                          const isSelected = selectedUndoIndex === index;
+                          const batchUpperIndex = hoveredUndoIndex ?? selectedUndoIndex ?? -1;
+                          const isInBatch = batchUpperIndex >= 0 && index <= batchUpperIndex;
+                          const bgColorClass = isSelected
+                            ? "bg-accent text-accent-foreground ring-1 ring-inset ring-accent-foreground/30"
+                            : isHovered
+                            ? "bg-accent text-accent-foreground"
+                            : isInBatch
+                            ? "bg-accent/50 text-accent-foreground"
+                            : "hover:bg-accent/30";
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={cn(
+                                "cursor-pointer select-none px-3 py-2.5 text-sm transition-colors",
+                                bgColorClass
+                              )}
+                              role="option"
+                              aria-selected={isSelected}
+                              onMouseEnter={() => setHoveredUndoIndex(index)}
+                              onMouseLeave={() => setHoveredUndoIndex(null)}
+                              onClick={() => {
+                                const stepsToUndo = index + 1;
+                                undoBatch(stepsToUndo);
+                                closeDropdowns();
+                                
+                                // Show feedback for batch undo
+                                if (keyboardShortcutFeedbackEnabled) {
+                                  const commandsToUndo = undoHistory.slice(-stepsToUndo);
+                                  const message = generateBatchHistoryFeedbackMessage(commandsToUndo, "undo");
+                                  if (message) {
+                                    showKeyboardShortcutFeedbackToast(message);
+                                  }
+                                }
+                              }}
+                            >
+                              {getHistoryCommandActionLabel(command)}
+                            </div>
+                          );
+                        })
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No undo history
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                )}
+              </div>
+              <div className="relative">
+                <ButtonGroup>
+                  <EditorChromeTooltip
+                    groupItem
+                    content={
+                      isRedoDisabled ? (
+                        "Nothing to redo"
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <span>Redo</span>
+                          <KeycapCombo keys={redoShortcut} />
+                        </span>
+                      )
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={redo}
+                      disabled={isRedoDisabled}
+                      aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <Redo2 />
+                    </Button>
+                  </EditorChromeTooltip>
+                  <EditorChromeTooltip
+                    groupItem
+                    content="Redo history"
+                  >
+                    <Button
+                      ref={redoButtonRef}
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleRedoDropdown}
+                      disabled={isRedoDisabled}
+                      aria-label="Redo history dropdown"
+                      aria-expanded={isRedoDropdownOpen}
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </EditorChromeTooltip>
+                </ButtonGroup>
+                {isRedoDropdownOpen && redoDropdownPos !== null && hasHydrated && createPortal(
+                  <div
+                    ref={redoDropdownRef}
+                    style={{ top: redoDropdownPos.top, right: redoDropdownPos.right }}
+                    className="fixed z-[999999] w-80 max-h-96 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg outline-none"
+                    tabIndex={0}
+                    onKeyDown={handleRedoDropdownKeyDown}
+                  >
+                    {redoHistory.length > 0 ? (
+                      redoHistory
+                        .slice(0, 50)
+                        .map((command, index) => {
+                          const isHovered = hoveredRedoIndex === index;
+                          const isSelected = selectedRedoIndex === index;
+                          const batchUpperIndex = hoveredRedoIndex ?? selectedRedoIndex ?? -1;
+                          const isInBatch = batchUpperIndex >= 0 && index <= batchUpperIndex;
+                          const bgColorClass = isSelected
+                            ? "bg-accent text-accent-foreground ring-1 ring-inset ring-accent-foreground/30"
+                            : isHovered
+                            ? "bg-accent text-accent-foreground"
+                            : isInBatch
+                            ? "bg-accent/50 text-accent-foreground"
+                            : "hover:bg-accent/30";
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={cn(
+                                "cursor-pointer select-none px-3 py-2.5 text-sm transition-colors",
+                                bgColorClass
+                              )}
+                              role="option"
+                              aria-selected={isSelected}
+                              onMouseEnter={() => setHoveredRedoIndex(index)}
+                              onMouseLeave={() => setHoveredRedoIndex(null)}
+                              onClick={() => {
+                                const stepsToRedo = index + 1;
+                                redoBatch(stepsToRedo);
+                                closeDropdowns();
+                                
+                                // Show feedback for batch redo
+                                if (keyboardShortcutFeedbackEnabled) {
+                                  const commandsToRedo = redoHistory.slice(0, stepsToRedo);
+                                  const message = generateBatchHistoryFeedbackMessage(commandsToRedo, "redo");
+                                  if (message) {
+                                    showKeyboardShortcutFeedbackToast(message);
+                                  }
+                                }
+                              }}
+                            >
+                              {getHistoryCommandActionLabel(command)}
+                            </div>
+                          );
+                        })
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No redo history
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                )}
+              </div>
             </div>
           </ImmediateTooltipProvider>
         </div>
