@@ -320,12 +320,16 @@ export function EditorSidebarRoomsList() {
                           <div
                             className={cn(
                               floorRowClass,
+                              "pointer-events-auto",
                               dragOverFloorId === floor.id
                                 ? "bg-brand/10 text-foreground ring-1 ring-brand/50 dark:bg-brand/15 dark:ring-brand/40"
                                 : activeFloorId === floor.id
                                 ? "border-zinc-400/80 bg-zinc-200/95 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-50"
                                 : "border-zinc-300/70 bg-zinc-100/60 text-zinc-700 hover:bg-zinc-200/75 dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
                             )}
+                            onMouseDown={(event) => {
+                              event.stopPropagation();
+                            }}
                             onDragOver={(e) => {
                               if (selection.length > 0 && floor.id !== activeFloorId) {
                                 e.preventDefault();
@@ -350,6 +354,7 @@ export function EditorSidebarRoomsList() {
                               <button
                                 type="button"
                                 onClick={(event) => {
+                                  event.preventDefault();
                                   event.stopPropagation();
                                   setCollapsedFloorIds((current) =>
                                     current.includes(floor.id)
@@ -357,7 +362,7 @@ export function EditorSidebarRoomsList() {
                                       : [...current, floor.id]
                                   );
                                 }}
-                                className={SIDEBAR_CHEVRON_BUTTON_CLASS}
+                                className={cn(SIDEBAR_CHEVRON_BUTTON_CLASS, "pointer-events-auto")}
                                 aria-label={isFloorExpanded ? `Collapse ${floor.name}` : `Expand ${floor.name}`}
                               >
                                 <ChevronRight className={cn("size-3.5 transition-transform", isFloorExpanded && "rotate-90")} />
@@ -403,15 +408,20 @@ export function EditorSidebarRoomsList() {
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => selectFloorById(floor.id)}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  selectFloorById(floor.id);
+                                }}
                                 onDoubleClick={(event) => {
+                                  event.preventDefault();
                                   event.stopPropagation();
                                   setSidebarRenameFloorId(floor.id);
                                   shouldAutoFocusFloorRenameInputRef.current = true;
                                   selectFloorById(floor.id);
                                   startFloorRename(floor.id);
                                 }}
-                                className={floorContentClass}
+                                className={cn(floorContentClass, "pointer-events-auto")}
                               >
                                 <span className={floorBadgeClass}>
                                   {floorNumber}

@@ -2289,20 +2289,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeFloorId: floorId,
       });
       const previousActiveFloorId = getNormalizedActiveFloorId(state.document);
-      if (nextActiveFloorId === previousActiveFloorId) return state;
+      
+      // Check if we're just clearing selection on the same floor
+      const isJustClearingSelection = 
+        nextActiveFloorId === previousActiveFloorId && 
+        (state.selectedRoomId !== null || state.selectedWall !== null || state.selectedOpening !== null || state.selectedInteriorAsset !== null);
+      
+      if (nextActiveFloorId === previousActiveFloorId && !isJustClearingSelection) return state;
 
       // Floor switches are not undoable — update activeFloorId directly without history entry.
-      const nextDocument = { ...state.document, activeFloorId: nextActiveFloorId };
+      const nextDocument = nextActiveFloorId !== previousActiveFloorId 
+        ? { ...state.document, activeFloorId: nextActiveFloorId }
+        : state.document;
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
-        selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
-        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
-          state.selectedInteriorAsset,
-          nextDocument
-        ),
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
         selection: [{ type: "floor" as const, id: nextActiveFloorId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
