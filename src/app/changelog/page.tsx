@@ -24,7 +24,7 @@ export default function ChangelogPage() {
                 <li>Deleting projects is now reversible—Sonner confirmation with undo option shown for 5 seconds</li>
                 <li>Mobile zoom and cancel controls no longer appear on desktop HUD</li>
                 <li>Floor switcher on HUD now animates with grow-shrink style when switching floors</li>
-                <li>New projects from homepage now intelligently load the last open project if one exists</li>
+                <li>New projects from homepage now work consistently with "New project" button from /projects</li>
                 <li>Projects can now be opened by clicking the thumbnail (not just the button)</li>
                 <li>Toggling HUD visibility no longer shifts the floor selector position</li>
                 <li>Sonner confirmations for keyboard shortcuts with Ctrl/Cmd modifier now persist correctly</li>
