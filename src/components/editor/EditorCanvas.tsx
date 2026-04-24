@@ -3091,7 +3091,7 @@ export default function EditorCanvas({
                   )}
                   {displayedFloors.map((floor, floorIndex) => {
                     const isActiveFloor = floor.id === activeFloorId && !isFloorAnimating;
-                    const floorNumber = displayedFloors.length - 1 - floorIndex;
+                    const floorNumber = displayedFloors.length - floorIndex;
                     
                     // Determine if this floor is in the animation path (but not the starting floor)
                     let isInAnimationPath = false;
