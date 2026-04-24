@@ -312,7 +312,7 @@ export function EditorSidebarRoomsList() {
                   0
                 );
                 const floorAreaLabel = formatMetricRoomArea(floorAreaSquareMillimetres);
-                const isFloorExpanded = !effectiveCollapsedFloorIds.includes(floor.id);
+                const isFloorExpanded = !collapsedFloorIds.includes(floor.id);
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
                     <ContextMenu>
@@ -479,7 +479,7 @@ export function EditorSidebarRoomsList() {
                 const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
                 const areaLabel = formatMetricRoomAreaForRoom(room);
                 const roomWalls = getRoomWalls(room);
-                const isRoomExpanded = isSelected || expandedRoomIds.includes(room.id);
+                const isRoomExpanded = expandedRoomIds.includes(room.id);
                 const hasInteriorAssets = room.interiorAssets.length > 0;
                 const isAssetSectionExpanded = expandedAssetRoomIds.includes(room.id);
                 const isDraggingThisRoom = draggedRoomId === room.id;
