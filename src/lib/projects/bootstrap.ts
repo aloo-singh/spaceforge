@@ -1,5 +1,5 @@
 import { cloneProjectDocument, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
-import { createProject, fetchProjectSafely, fetchProjects } from "@/lib/projects/clientApi";
+import { createUnsavedProject, fetchProjectSafely, fetchProjects } from "@/lib/projects/clientApi";
 import {
   clearActiveProjectId,
   loadActiveProjectId,
@@ -209,7 +209,7 @@ export async function ensureFirstProject(
       }
 
       try {
-        const createdProject = await createProject(clientToken, {
+        const createdProject = await createUnsavedProject(clientToken, {
           name: getDefaultProjectName({ existingProjectCount: 0 }),
           document: cloneProjectDocument(initialDocument),
         });

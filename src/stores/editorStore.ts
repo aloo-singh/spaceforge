@@ -1938,11 +1938,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       stopResetCameraAnimation();
 
+      // Use the same device-aware padding logic as the manual "fit view" button
+      const isLandscape = nextViewport.width > nextViewport.height;
+      const isMobile = nextViewport.height < 600;
+      const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
       return {
         viewport: nextViewport,
-        camera: getProjectOpenCamera(state.document, nextViewport, {
-          emptyLayoutPixelsPerMm: state.pendingProjectOpenEmptyLayoutPixelsPerMm ?? undefined,
-        }),
+        camera: getCameraFitTarget({
+          rooms: getRoomsForActiveFloor(state.document),
+          viewport: nextViewport,
+          emptyLayoutCamera: {
+            ...DEFAULT_CAMERA_STATE,
+            pixelsPerMm: state.pendingProjectOpenEmptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+            rotationDegrees: normalizeCanvasRotationDegrees(state.document.canvasRotationDegrees),
+          },
+          paddingPx,
+        }).camera,
         pendingProjectOpenCameraFit: false,
         pendingProjectOpenEmptyLayoutPixelsPerMm: null,
       };
@@ -2289,20 +2301,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeFloorId: floorId,
       });
       const previousActiveFloorId = getNormalizedActiveFloorId(state.document);
-      if (nextActiveFloorId === previousActiveFloorId) return state;
+      
+      // Check if we're just clearing selection on the same floor
+      const isJustClearingSelection = 
+        nextActiveFloorId === previousActiveFloorId && 
+        (state.selectedRoomId !== null || state.selectedWall !== null || state.selectedOpening !== null || state.selectedInteriorAsset !== null);
+      
+      if (nextActiveFloorId === previousActiveFloorId && !isJustClearingSelection) return state;
 
       // Floor switches are not undoable — update activeFloorId directly without history entry.
-      const nextDocument = { ...state.document, activeFloorId: nextActiveFloorId };
+      const nextDocument = nextActiveFloorId !== previousActiveFloorId 
+        ? { ...state.document, activeFloorId: nextActiveFloorId }
+        : state.document;
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
-        selectedRoomId: getSelectionIfRoomExists(state.selectedRoomId, nextDocument),
-        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, nextDocument),
-        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, nextDocument),
-        selectedInteriorAsset: getSelectedInteriorAssetIfExists(
-          state.selectedInteriorAsset,
-          nextDocument
-        ),
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
         selection: [{ type: "floor" as const, id: nextActiveFloorId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
@@ -2436,9 +2453,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectRoomById: (roomId) =>
     set((state) => {
-      if (roomId && !getRoomsForActiveFloor(state.document).some((room) => room.id === roomId)) {
+      const room = state.document.rooms.find((r) => r.id === roomId);
+      
+      // If room doesn't exist, do nothing
+      if (roomId && !room) {
         return state;
       }
+      
+      // If already in the correct state, return early
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
@@ -2448,7 +2470,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      // If the room is on a different floor, switch to that floor first
+      const nextDocument = room && room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2463,10 +2491,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectWallByRoomId: (roomId, wall) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!getRoomWallSegment(room, wall)) {
+        // If wall doesn't exist, just select the room instead
+        const nextDocument = room.floorId !== state.document.activeFloorId
+          ? { ...state.document, activeFloorId: room.floorId }
+          : state.document;
         return preserveHistoryForSelectionUpdate(state, {
+          document: nextDocument,
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -2488,7 +2521,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -2503,7 +2541,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectOpeningById: (roomId, openingId) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.openings.some((opening) => opening.id === openingId)) return state;
       if (
@@ -2514,7 +2552,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2529,7 +2572,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   selectInteriorAssetById: (roomId, assetId) =>
     set((state) => {
-      const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === roomId);
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (!room.interiorAssets.some((asset) => asset.id === assetId)) return state;
       if (
@@ -2540,7 +2583,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const nextDocument = room.floorId !== state.document.activeFloorId
+        ? { ...state.document, activeFloorId: room.floorId }
+        : state.document;
+
       return preserveHistoryForSelectionUpdate(state, {
+        document: nextDocument,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -4837,9 +4885,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      const targetCamera = getProjectOpenCamera(state.document, state.viewport, {
-        emptyLayoutPixelsPerMm,
-      });
+      // Use the same device-aware padding logic as the manual "fit view" button
+      // to ensure consistent camera fitting across project open and manual resets
+      const isLandscape = state.viewport.width > state.viewport.height;
+      const isMobile = state.viewport.height < 600;
+      const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
+      const targetCamera = getCameraFitTarget({
+        rooms: getRoomsForActiveFloor(state.document),
+        viewport: state.viewport,
+        emptyLayoutCamera: {
+          ...DEFAULT_CAMERA_STATE,
+          pixelsPerMm: emptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+          rotationDegrees: normalizeCanvasRotationDegrees(state.document.canvasRotationDegrees),
+        },
+        paddingPx,
+      }).camera;
+
       if (!state.pendingProjectOpenCameraFit && areCamerasEqual(state.camera, targetCamera)) {
         return state;
       }
@@ -4865,13 +4927,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const shouldDeferCameraFit = !isViewportReadyForProjectOpenCameraFit(state.viewport);
       const emptyLayoutPixelsPerMm = options?.emptyLayoutPixelsPerMm;
 
+      let nextCamera = syncCameraRotationToDocument(state.camera, nextDocument);
+
+      if (!shouldDeferCameraFit) {
+        // Use the same device-aware padding logic as the manual "fit view" button
+        const isLandscape = state.viewport.width > state.viewport.height;
+        const isMobile = state.viewport.height < 600;
+        const paddingPx = isLandscape && !isMobile ? 48 : 96;
+
+        nextCamera = getCameraFitTarget({
+          rooms: getRoomsForActiveFloor(nextDocument),
+          viewport: state.viewport,
+          emptyLayoutCamera: {
+            ...DEFAULT_CAMERA_STATE,
+            pixelsPerMm: emptyLayoutPixelsPerMm ?? DEFAULT_CAMERA_STATE.pixelsPerMm,
+            rotationDegrees: normalizeCanvasRotationDegrees(nextDocument.canvasRotationDegrees),
+          },
+          paddingPx,
+        }).camera;
+      }
+
       return {
         document: nextDocument,
-        camera: shouldDeferCameraFit
-          ? syncCameraRotationToDocument(state.camera, nextDocument)
-          : getProjectOpenCamera(nextDocument, state.viewport, {
-              emptyLayoutPixelsPerMm,
-            }),
+        camera: nextCamera,
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
         pendingProjectOpenEmptyLayoutPixelsPerMm: shouldDeferCameraFit
           ? emptyLayoutPixelsPerMm ?? null

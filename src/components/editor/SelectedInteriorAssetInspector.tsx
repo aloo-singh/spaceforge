@@ -11,7 +11,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
-import { getRotatedInteriorAssetForRoom } from "@/lib/editor/interiorAssets";
+import { 
+  getRotatedInteriorAssetForRoom,
+  getStairRunLengthMm,
+  DEFAULT_STAIR_TREAD_SPACING_MM,
+} from "@/lib/editor/interiorAssets";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import type { RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
@@ -178,8 +182,13 @@ export function SelectedInteriorAssetInspector({
 
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Dimensions</p>
-          <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-            {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+          <div className="space-y-2">
+            <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+              {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+            </div>
+            <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+              {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM)} {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM) === 1 ? "stair" : "stairs"}
+            </div>
           </div>
         </div>
 

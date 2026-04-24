@@ -166,6 +166,7 @@ export async function createProjectForClientToken(
   input: {
     name: string;
     document: EditorDocumentState;
+    projectId?: string;
   }
 ): Promise<ProjectRecord> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
@@ -175,6 +176,7 @@ export async function createProjectForClientToken(
       Prefer: "return=representation",
     },
     body: JSON.stringify({
+      id: input.projectId,
       user_id: user.id,
       name: input.name,
       document: cloneProjectDocument(input.document),

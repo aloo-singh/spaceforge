@@ -15,6 +15,7 @@ export type EditorSettings = {
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
+  floorFootprintOpacity: number;
   sidebarDensity: EditorSidebarDensity;
   exportSignatureText: string;
   multiSelectModeEnabled: boolean;
@@ -30,6 +31,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
+  floorFootprintOpacity: 0.5,
   sidebarDensity: "comfortable",
   exportSignatureText: "",
   multiSelectModeEnabled: false,
@@ -46,6 +48,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
+    floorFootprintOpacity: settings.floorFootprintOpacity,
     sidebarDensity: settings.sidebarDensity,
     exportSignatureText: settings.exportSignatureText,
     multiSelectModeEnabled: settings.multiSelectModeEnabled,
@@ -63,6 +66,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
+    a.floorFootprintOpacity === b.floorFootprintOpacity &&
     a.sidebarDensity === b.sidebarDensity &&
     a.exportSignatureText === b.exportSignatureText &&
     a.multiSelectModeEnabled === b.multiSelectModeEnabled
@@ -153,6 +157,11 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showFloorFootprint" in value && typeof value.showFloorFootprint === "boolean"
         ? value.showFloorFootprint
         : DEFAULT_EDITOR_SETTINGS.showFloorFootprint,
+    floorFootprintOpacity:
+      "floorFootprintOpacity" in value && typeof value.floorFootprintOpacity === "number" &&
+      value.floorFootprintOpacity >= 0 && value.floorFootprintOpacity <= 1
+        ? value.floorFootprintOpacity
+        : DEFAULT_EDITOR_SETTINGS.floorFootprintOpacity,
     sidebarDensity:
       "sidebarDensity" in value && isEditorSidebarDensity(value.sidebarDensity)
         ? value.sidebarDensity

@@ -59,6 +59,8 @@ export function attachDeleteRoomHotkeys(store: DeleteRoomStore) {
       state.deleteSelectedRoom();
     } else if (selectedFloor) {
       state.deleteFloor(selectedFloor.id);
+      // Floor deletion has its own specific toast notification, so skip generic feedback
+      return;
     }
 
     showKeyboardShortcutFeedback(shortcut.id, {

@@ -141,6 +141,7 @@ import {
   getRoomsForActiveFloor,
   getRoomsForFloor,
 } from "@/lib/editor/history";
+import { usePersistentPanelState } from "@/lib/editor/usePersistentPanelState";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -225,7 +226,7 @@ const ANCHORED_HINT_MAX_WIDTH_PX = 352;
 const ANCHORED_HINT_OFFSET_PX = 10;
 const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
-const FLOOR_FOOTPRINT_MAX_ALPHA = 0.26;
+const FLOOR_FOOTPRINT_MAX_ALPHA = 0.50;
 const FLOOR_FOOTPRINT_STROKE_WIDTH_PX = 2.25;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
@@ -402,6 +403,7 @@ function normalizeExportMultilineText(value: string): string {
 }
 
 type EditorCanvasProps = {
+  projectId?: string | null;
   hasResolvedProject?: boolean;
   projectRenameCompletionCount?: number;
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
@@ -856,6 +858,7 @@ function NorthIndicatorControl({
   );
 }
 export default function EditorCanvas({
+  projectId,
   hasResolvedProject = false,
   projectRenameCompletionCount = 0,
   onDisplayedHintChange,
@@ -948,6 +951,10 @@ export default function EditorCanvas({
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
   const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
+  const [previousActiveFloorId, setPreviousActiveFloorId] = useState<string | null>(null);
+  const [isFloorAnimating, setIsFloorAnimating] = useState(false);
+  const floorButtonsContainerRef = useRef<HTMLDivElement | null>(null);
+  const floorButtonRefsMap = useRef<Map<string, HTMLElement | null>>(new Map());
   const footprintFloorId = useMemo(() => {
     if (hoveredFloorPreviewId) {
       return hoveredFloorPreviewId;
@@ -1197,6 +1204,23 @@ export default function EditorCanvas({
     startFootprintFadeAnimation();
     drawCurrentScene();
   }, [drawCurrentScene, footprintFloorId, startFootprintFadeAnimation]);
+
+  useEffect(() => {
+    if (activeFloorId !== null && previousActiveFloorId !== null && activeFloorId !== previousActiveFloorId) {
+      // Start animation on the indicator morphing to new position
+      setIsFloorAnimating(true);
+      
+      // Clear animation state after duration (200ms total for grow + shrink)
+      const animationTimeoutId = setTimeout(() => {
+        setIsFloorAnimating(false);
+        setPreviousActiveFloorId(activeFloorId);
+      }, 200);
+      
+      return () => clearTimeout(animationTimeoutId);
+    }
+    
+    setPreviousActiveFloorId(activeFloorId);
+  }, [activeFloorId, previousActiveFloorId]);
 
   useEffect(() => {
     return () => {
@@ -2584,9 +2608,16 @@ export default function EditorCanvas({
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const [isLandscapeViewport, setIsLandscapeViewport] = useState(false);
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
-  const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
-  const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
+  const {
+    isLeftSidebarCollapsed,
+    setIsLeftSidebarCollapsed,
+    isDesktopInspectorCollapsed,
+    setIsDesktopInspectorCollapsed,
+    isPortraitInspectorCollapsed,
+    setIsPortraitInspectorCollapsed,
+  } = usePersistentPanelState(projectId);
+  const hasInitializedMobileSidebarRef = useRef(false);
+  
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2610,8 +2641,8 @@ export default function EditorCanvas({
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
   const useCompactHud = isMobile || isLandscapeViewport;
   const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
-  const shouldShowTouchZoomControls = isMobile || isLandscapeViewport;
-  const shouldShowTouchCancelButton = (isMobile || isLandscapeViewport) && roomDraftPointCount > 0;
+  const shouldShowTouchZoomControls = isMobile || isCompactLandscapeViewport;
+  const shouldShowTouchCancelButton = (isMobile || isCompactLandscapeViewport) && roomDraftPointCount > 0;
   const expandedLeftSidebarWidth = isMobile
     ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
     : isCompactLandscapeViewport
@@ -2688,11 +2719,16 @@ export default function EditorCanvas({
     }
 
     setIsDesktopInspectorCollapsed(true);
-  }, [isCompactLandscapeInspector]);
+  }, [isCompactLandscapeInspector, setIsDesktopInspectorCollapsed]);
 
   useEffect(() => {
-    setIsLeftSidebarCollapsed(isMobile);
-  }, [isMobile]);
+    // Only set sidebar to collapsed on mobile on first mount
+    // Don't overwrite the persisted mobile state on every render
+    if (isMobile && !hasInitializedMobileSidebarRef.current) {
+      hasInitializedMobileSidebarRef.current = true;
+      setIsLeftSidebarCollapsed(true);
+    }
+  }, [isMobile, setIsLeftSidebarCollapsed]);
 
   useEffect(() => {
     if (!usesPortraitBottomInspector) {
@@ -2700,7 +2736,7 @@ export default function EditorCanvas({
     }
 
     setIsPortraitInspectorCollapsed(true);
-  }, [usesPortraitBottomInspector]);
+  }, [usesPortraitBottomInspector, setIsPortraitInspectorCollapsed]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {
@@ -2779,6 +2815,103 @@ export default function EditorCanvas({
           : "grid-rows-[auto_minmax(0,1fr)]"
       )}
     >
+      <style>{`
+        @keyframes floorIndicatorMorphDown {
+          0% {
+            height: 32px;
+            top: var(--old-floor-top);
+          }
+          50% {
+            height: var(--full-height);
+            top: var(--old-floor-top);
+          }
+          100% {
+            height: 32px;
+            top: var(--new-floor-top);
+          }
+        }
+
+        @keyframes floorIndicatorMorphUp {
+          0% {
+            height: 32px;
+            top: var(--old-floor-top);
+          }
+          50% {
+            height: var(--full-height);
+            top: var(--new-floor-top);
+          }
+          100% {
+            height: 32px;
+            top: var(--new-floor-top);
+          }
+        }
+
+        @keyframes floorTextMaskDown {
+          0% {
+            background-position: 0 0%;
+          }
+          100% {
+            background-position: 0 100%;
+          }
+        }
+
+        @keyframes floorTextMaskUp {
+          0% {
+            background-position: 0 100%;
+          }
+          100% {
+            background-position: 0 0%;
+          }
+        }
+
+        [data-floor-text-animating-down],
+        [data-floor-text-animating-up] {
+          background: linear-gradient(180deg, rgb(113, 113, 122) 0%, rgb(113, 113, 122) 48%, rgb(250, 250, 250) 52%, rgb(250, 250, 250) 100%);
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-size: 100% 200%;
+        }
+
+        [data-floor-text-animating-down] {
+          animation: floorTextMaskDown 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+        }
+
+        [data-floor-text-animating-up] {
+          animation: floorTextMaskUp 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+        }
+
+        [data-floor-indicator-animating="true"][data-floor-direction="down"] {
+          animation: floorIndicatorMorphDown 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+          will-change: height, top;
+        }
+
+        [data-floor-indicator-animating="true"][data-floor-direction="up"] {
+          animation: floorIndicatorMorphUp 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+          will-change: height, top;
+        }
+
+        [data-floor-text-animating-down],
+        [data-floor-text-animating-up] {
+          background: linear-gradient(180deg, 
+            var(--text-normal-color, currentColor) 0%, 
+            var(--text-normal-color, currentColor) 48%, 
+            var(--text-contrast-color, currentColor) 52%, 
+            var(--text-contrast-color, currentColor) 100%);
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: none;
+        }
+
+        [data-floor-text-animating-down] {
+          animation: floorTextMaskDown 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+        }
+
+        [data-floor-text-animating-up] {
+          animation: floorTextMaskUp 200ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+        }
+      `}</style>
       <p id={instructionsId} className="sr-only">
         Editor controls: left click places room corners while drafting. Click a room name label or
         room body to select that room. When a room is selected, click near one of that room&apos;s
@@ -2917,25 +3050,71 @@ export default function EditorCanvas({
           {hasMountedClient && floors.length > 1 ? (
             <div
               className={cn(
-                "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4",
-                hydratedShowCanvasHud
-                  ? "translate-x-0 opacity-100"
-                  : "-translate-x-1 opacity-85"
+                "pointer-events-none absolute left-3 top-3 z-20 transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-4 sm:top-4 translate-x-0 opacity-100"
               )}
             >
               <div
                 className="pointer-events-auto rounded-full border border-border/70 bg-background/90 p-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:bg-zinc-950/78 dark:shadow-[0_10px_28px_rgba(0,0,0,0.3)]"
                 onPointerLeave={() => setHoveredFloorPreviewId(null)}
               >
-                <div className="flex flex-col gap-1.5">
+                <div className="relative flex flex-col gap-1.5" ref={floorButtonsContainerRef}>
+                  {isFloorAnimating && previousActiveFloorId && activeFloorId && (
+                    (() => {
+                      const oldFloorIdx = displayedFloors.findIndex((f) => f.id === previousActiveFloorId);
+                      const newFloorIdx = displayedFloors.findIndex((f) => f.id === activeFloorId);
+                      const oldButton = floorButtonRefsMap.current.get(previousActiveFloorId);
+                      const newButton = floorButtonRefsMap.current.get(activeFloorId);
+                      
+                      if (oldButton && newButton && oldFloorIdx >= 0 && newFloorIdx >= 0) {
+                        const oldTop = oldButton.offsetTop;
+                        const newTop = newButton.offsetTop;
+                        const isMovingDown = newTop > oldTop;
+                        const minTop = Math.min(oldTop, newTop);
+                        const maxTop = Math.max(oldTop, newTop);
+                        const fullHeight = maxTop - minTop + 32;
+                        
+                        return (
+                          <div
+                            data-floor-indicator-animating="true"
+                            data-floor-direction={isMovingDown ? "down" : "up"}
+                            className="absolute left-0 right-0 z-20 rounded-full bg-zinc-900 dark:bg-zinc-100 transition-none pointer-events-none"
+                            style={{
+                              "--old-floor-top": `${oldTop}px`,
+                              "--new-floor-top": `${newTop}px`,
+                              "--full-height": `${fullHeight}px`,
+                            } as React.CSSProperties}
+                          />
+                        );
+                      }
+                      return null;
+                    })()
+                  )}
                   {displayedFloors.map((floor, floorIndex) => {
-                    const isActiveFloor = floor.id === activeFloorId;
-                    const floorNumber = displayedFloors.length - 1 - floorIndex;
+                    const isActiveFloor = floor.id === activeFloorId && !isFloorAnimating;
+                    const floorNumber = displayedFloors.length - floorIndex;
+                    
+                    // Determine if this floor is in the animation path (but not the starting floor)
+                    let isInAnimationPath = false;
+                    let animationDirection: "down" | "up" | null = null;
+                    if (isFloorAnimating && previousActiveFloorId && activeFloorId) {
+                      const oldFloorIdx = displayedFloors.findIndex((f) => f.id === previousActiveFloorId);
+                      const newFloorIdx = displayedFloors.findIndex((f) => f.id === activeFloorId);
+                      const minIdx = Math.min(oldFloorIdx, newFloorIdx);
+                      const maxIdx = Math.max(oldFloorIdx, newFloorIdx);
+                      // Exclude the source floor from contrasting color during animation
+                      isInAnimationPath = floorIndex >= minIdx && floorIndex <= maxIdx && floor.id !== previousActiveFloorId;
+                      animationDirection = newFloorIdx > oldFloorIdx ? "down" : "up";
+                    }
 
                     return (
                       <button
                         key={floor.id}
                         type="button"
+                        ref={(el) => {
+                          if (el) {
+                            floorButtonRefsMap.current.set(floor.id, el);
+                          }
+                        }}
                         onClick={() => selectFloorById(floor.id)}
                         onPointerEnter={() => setHoveredFloorPreviewId(floor.id)}
                         onPointerMove={() => setHoveredFloorPreviewId(floor.id)}
@@ -2945,14 +3124,21 @@ export default function EditorCanvas({
                         onBlur={() => setHoveredFloorPreviewId(null)}
                         aria-pressed={isActiveFloor}
                         aria-label={`Switch to ${floor.name}`}
+                        data-floor-text-animating-down={animationDirection === "down" && isInAnimationPath ? "" : undefined}
+                        data-floor-text-animating-up={animationDirection === "up" && isInAnimationPath ? "" : undefined}
                         className={cn(
-                          "flex items-center justify-center rounded-full w-8 h-8 text-sm font-medium transition-colors",
+                          "relative z-10 flex items-center justify-center rounded-full w-8 h-8 text-sm font-medium",
+                          !isFloorAnimating && "transition-colors",
                           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                          isActiveFloor
+                          !isInAnimationPath && (isActiveFloor
                             ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-950"
-                            : "text-zinc-600 hover:bg-zinc-200/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50"
+                            : "text-zinc-600 hover:bg-zinc-200/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50")
                         )}
-                        style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
+                        style={{ 
+                          fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+                          "--text-normal-color": "rgb(113, 113, 122)",
+                          "--text-contrast-color": "rgb(250, 250, 250)",
+                        } as React.CSSProperties}
                       >
                         <span>{floorNumber}</span>
                       </button>
@@ -3313,6 +3499,34 @@ function drawScene(
   );
   const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
   const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
+  
+  // Get the peer room for linked staircases
+  let linkedStaircasePeerRoom: Room | null = null;
+  if (state.selectedInteriorAsset) {
+    const selectedRoom = state.document.rooms.find(
+      (room) => room.id === state.selectedInteriorAsset!.roomId
+    );
+    const selectedAsset = selectedRoom?.interiorAssets.find(
+      (asset) => asset.id === state.selectedInteriorAsset!.assetId
+    );
+    if (selectedAsset?.connectionId) {
+      for (const room of state.document.rooms) {
+        for (const asset of room.interiorAssets) {
+          if (
+            asset.id !== selectedAsset.id &&
+            asset.connectionId === selectedAsset.connectionId
+          ) {
+            linkedStaircasePeerRoom = room;
+            break;
+          }
+        }
+        if (linkedStaircasePeerRoom) break;
+      }
+    }
+  }
+  
+  // Always clear floor footprint graphics, then conditionally draw
+  floorFootprintGraphics.clear();
   if (state.settings.showFloorFootprint) {
     drawFloorFootprint(
       floorFootprintGraphics,
@@ -3320,7 +3534,7 @@ function drawScene(
       state.camera,
       state.viewport,
       theme,
-      footprintOpacity
+      state.settings.floorFootprintOpacity
     );
   }
   drawRooms(
@@ -3335,6 +3549,19 @@ function drawScene(
     theme,
     assetDragTargetRoomId
   );
+  
+  // Draw linked staircase peer room as overlay (visible even when on different floor)
+  if (linkedStaircasePeerRoom && linkedStaircasePeerRoom.points.length >= 3) {
+    drawDashedRoomOutline(
+      roomGraphics,
+      linkedStaircasePeerRoom.points,
+      state.camera,
+      state.viewport,
+      theme.wallSelectionAccent,
+      2.5,
+      0.5
+    );
+  }
   drawOpenings(
     openingGraphics,
     renderedRooms,
@@ -6101,6 +6328,47 @@ function drawDashedGuideLine(
     graphics.moveTo(start.x + stepX * dashStart, start.y + stepY * dashStart);
     graphics.lineTo(start.x + stepX * dashEnd, start.y + stepY * dashEnd);
   }
+  graphics.stroke();
+}
+
+function drawDashedRoomOutline(
+  graphics: Graphics,
+  points: Point[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  color: number,
+  strokeWidth: number,
+  strokeAlpha: number
+) {
+  const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
+  if (screenPoints.length < 2) return;
+
+  const dashLength = 10;
+  const gapLength = 8;
+
+  graphics.setStrokeStyle({ width: strokeWidth, color, alpha: strokeAlpha });
+
+  // Draw dashed lines for each wall of the room
+  for (let i = 0; i < screenPoints.length; i += 1) {
+    const start = screenPoints[i];
+    const end = screenPoints[(i + 1) % screenPoints.length];
+
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) continue;
+
+    const stepX = dx / length;
+    const stepY = dy / length;
+
+    for (let distance = 0; distance < length; distance += dashLength + gapLength) {
+      const dashStart = distance;
+      const dashEnd = Math.min(distance + dashLength, length);
+      graphics.moveTo(start.x + stepX * dashStart, start.y + stepY * dashStart);
+      graphics.lineTo(start.x + stepX * dashEnd, start.y + stepY * dashEnd);
+    }
+  }
+
   graphics.stroke();
 }
 

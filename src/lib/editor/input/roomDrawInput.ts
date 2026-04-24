@@ -52,6 +52,7 @@ import {
 } from "@/lib/editor/history";
 import {
   dismissKeyboardShortcutFeedbackToast,
+  dismissModifierFeedbackToast,
   showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
 import {
@@ -1778,7 +1779,7 @@ export function attachRoomDrawInput(
 
     if (isMultiSelectModifierHeld && isPrimaryModifierActionKey(event)) {
       // Let the action's own feedback toast take over immediately.
-      dismissKeyboardShortcutFeedbackToast();
+      dismissModifierFeedbackToast();
       isMultiSelectModifierHeld = false;
     }
 
@@ -1853,7 +1854,7 @@ export function attachRoomDrawInput(
       const state = store.getState();
       if (!state.settings.multiSelectModeEnabled && isMultiSelectModifierHeld && !event.metaKey && !event.ctrlKey) {
         isMultiSelectModifierHeld = false;
-        dismissKeyboardShortcutFeedbackToast();
+        dismissModifierFeedbackToast();
       }
     }
 
@@ -1872,7 +1873,7 @@ export function attachRoomDrawInput(
 
   const onWindowBlur = () => {
     if (isMultiSelectModifierHeld) {
-      dismissKeyboardShortcutFeedbackToast();
+      dismissModifierFeedbackToast();
     }
     isSpaceHeld = false;
     isShiftHeld = false;

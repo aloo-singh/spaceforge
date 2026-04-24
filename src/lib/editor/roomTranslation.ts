@@ -25,7 +25,25 @@ export function translateRoomPointsOnGrid(
     }));
   }
 
-  return translateRoomPointsWithOptionalGrid(points, delta, gridSizeMm);
+  // Room is not aligned to grid: snap only the reference point (first vertex)
+  // to preserve room shape and dimensions during move operations
+  const firstPoint = points[0];
+  const snappedFirstPoint = {
+    x: snapToGrid(firstPoint.x + delta.x, gridSizeMm),
+    y: snapToGrid(firstPoint.y + delta.y, gridSizeMm),
+  };
+
+  // Calculate the actual delta applied to the reference point
+  const actualDelta = {
+    x: snappedFirstPoint.x - firstPoint.x,
+    y: snappedFirstPoint.y - firstPoint.y,
+  };
+
+  // Apply the same delta to all points to preserve room geometry
+  return points.map((point) => ({
+    x: point.x + actualDelta.x,
+    y: point.y + actualDelta.y,
+  }));
 }
 
 function translateRoomPointsWithOptionalGrid(

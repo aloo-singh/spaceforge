@@ -7,6 +7,12 @@ import { getAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { GridPattern } from "@/components/ui/grid-pattern";
 import { HomeHeroContent } from "@/components/home/home-hero-content";
 
+function getSkipRedirectFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get("skipRedirect") === "true";
+}
+
 export function HomePageGate() {
   const router = useRouter();
   const [shouldShowHomepage, setShouldShowHomepage] = useState(false);
@@ -15,6 +21,15 @@ export function HomePageGate() {
     let isCancelled = false;
 
     const routeVisitor = async () => {
+      // Allow bypassing redirect with skipRedirect query parameter (e.g., when clicking the logo)
+      const skipRedirect = getSkipRedirectFromUrl();
+      if (skipRedirect) {
+        if (!isCancelled) {
+          setShouldShowHomepage(true);
+        }
+        return;
+      }
+
       const clientToken = getAnonymousClientToken();
       if (!clientToken) {
         if (!isCancelled) {
@@ -46,6 +61,14 @@ export function HomePageGate() {
       isCancelled = true;
     };
   }, [router]);
+
+  // Remove skipRedirect param from URL after showing homepage to keep URL clean
+  useEffect(() => {
+    if (shouldShowHomepage && getSkipRedirectFromUrl()) {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [shouldShowHomepage]);
 
   return (
     <main className="relative min-h-[calc(100vh-3.5rem)] overflow-hidden bg-background text-foreground">

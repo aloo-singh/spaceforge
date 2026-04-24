@@ -1,10 +1,20 @@
 "use client";
 
-import Link from "next/link";
-import { CSSProperties, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CSSProperties, useEffect, useState, useTransition } from "react";
 import { ArrowRight } from "@/components/ui/icons";
 import { Safari } from "@/components/ui/safari";
 import { Button } from "@/components/ui/button";
+import {
+  createOrFetchAnonymousUser,
+  createUnsavedProject,
+} from "@/lib/projects/clientApi";
+import { ensureFirstProject } from "@/lib/projects/bootstrap";
+import {
+  getOrCreateAnonymousClientToken,
+  saveActiveProjectId,
+} from "@/lib/projects/clientIdentity";
+import { createEmptyProjectDocument, getDefaultProjectName } from "@/lib/projects/defaults";
 
 function revealClass(isVisible: boolean) {
   return [
@@ -20,7 +30,9 @@ function revealStyle(delayMs: number): CSSProperties {
 }
 
 export function HomeHeroContent() {
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
+  const [isCreatingProject, startCreateProjectTransition] = useTransition();
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -31,6 +43,49 @@ export function HomeHeroContent() {
       window.clearTimeout(timeoutId);
     };
   }, []);
+
+  const handleStartDesigning = () => {
+    startCreateProjectTransition(() => {
+      void (async () => {
+        try {
+          const clientToken = getOrCreateAnonymousClientToken();
+          await createOrFetchAnonymousUser(clientToken);
+
+          // Check if there are existing projects
+          try {
+            // Try to get existing projects to determine if this is the first
+            const response = await fetch("/api/projects", {
+              headers: {
+                "X-Client-Token": clientToken,
+              },
+            });
+            const projects = response.ok ? await response.json() : [];
+            
+            const project =
+              projects.length === 0
+                ? await ensureFirstProject(clientToken, createEmptyProjectDocument())
+                : await createUnsavedProject(clientToken, {
+                    name: getDefaultProjectName({ existingProjectCount: projects.length }),
+                    document: createEmptyProjectDocument(),
+                  });
+
+            saveActiveProjectId(project.id);
+            router.push(`/editor/${project.id}`);
+          } catch (error) {
+            // If we can't fetch projects, just create one
+            const project = await createUnsavedProject(clientToken, {
+              name: getDefaultProjectName({ existingProjectCount: 0 }),
+              document: createEmptyProjectDocument(),
+            });
+            saveActiveProjectId(project.id);
+            router.push(`/editor/${project.id}`);
+          }
+        } catch (error) {
+          console.error("Failed to create project.", error);
+        }
+      })();
+    });
+  };
 
   return (
     <section className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-7xl flex-col justify-center gap-10 px-6 py-16 sm:px-10 lg:gap-14 lg:py-18">
@@ -50,14 +105,13 @@ export function HomeHeroContent() {
 
           <div className="mt-8 flex flex-col items-start gap-2.5">
             <Button
-              asChild
+              onClick={handleStartDesigning}
+              disabled={isCreatingProject}
               size="lg"
-              className="h-12 rounded-full bg-blue-500 px-7 text-sm text-white shadow-[0_10px_24px_rgba(59,130,246,0.18)] hover:bg-blue-500/90"
+              className="h-12 rounded-full bg-blue-500 px-7 text-sm text-white shadow-[0_10px_24px_rgba(59,130,246,0.18)] hover:bg-blue-500/90 disabled:opacity-60"
             >
-              <Link href="/editor">
-                Start designing
-                <ArrowRight className="size-4" />
-              </Link>
+              Start designing
+              <ArrowRight className="size-4" />
             </Button>
             <p className="text-sm text-foreground/52">Takes seconds. No signup required.</p>
             <p className="text-sm text-foreground/42">For quick layout ideas, not perfect plans.</p>

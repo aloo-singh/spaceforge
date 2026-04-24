@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Keycap } from "@/components/ui/keycap";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { Slider } from "@/components/ui/slider";
 import {
   EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
   normalizeEditorExportSignature,
@@ -40,6 +41,7 @@ export function EditorSettingsDialog({
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const isFloorFootprintVisible = settings.showFloorFootprint;
+  const floorFootprintOpacity = settings.floorFootprintOpacity;
   const isCompactSidebarDensity = settings.sidebarDensity === "compact";
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
@@ -535,6 +537,24 @@ export function EditorSettingsDialog({
               Off
             </Button>
           </div>
+
+          {isFloorFootprintVisible && (
+            <div className="mt-4 space-y-2">
+              <label htmlFor="floor-footprint-opacity" className="flex items-center justify-between text-xs font-medium text-foreground">
+                <span>Opacity</span>
+                <span className="text-muted-foreground">{Math.round(floorFootprintOpacity * 100)}%</span>
+              </label>
+              <Slider
+                id="floor-footprint-opacity"
+                min={0}
+                max={1}
+                step={0.05}
+                value={[floorFootprintOpacity]}
+                onValueChange={(value) => updateSettings({ floorFootprintOpacity: value[0] })}
+                className="w-full"
+              />
+            </div>
+          )}
         </div>
 
         <div
