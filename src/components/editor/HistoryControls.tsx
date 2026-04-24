@@ -129,6 +129,8 @@ export function HistoryControls({
   );
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
+  const undoBatch = useEditorStore((state) => state.undoBatch);
+  const redoBatch = useEditorStore((state) => state.redoBatch);
   const resetCamera = useEditorStore((state) => state.resetCamera);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const insertDefaultDoorOnSelectedWall = useEditorStore(
@@ -430,7 +432,6 @@ export function HistoryControls({
                     className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
                     role="listbox"
                     aria-label="Undo history"
-                    onClick={closeDropdowns}
                   >
                     {undoHistory.length > 0 ? (
                       undoHistory
@@ -439,9 +440,13 @@ export function HistoryControls({
                         .map((command, index) => (
                           <div
                             key={index}
-                            className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
+                            className="cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
                             role="option"
                             aria-selected="false"
+                            onClick={() => {
+                              undoBatch(index + 1);
+                              closeDropdowns();
+                            }}
                           >
                             {getHistoryCommandActionLabel(command)}
                           </div>
@@ -508,7 +513,6 @@ export function HistoryControls({
                     className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
                     role="listbox"
                     aria-label="Redo history"
-                    onClick={closeDropdowns}
                   >
                     {redoHistory.length > 0 ? (
                       redoHistory
@@ -516,9 +520,13 @@ export function HistoryControls({
                         .map((command, index) => (
                           <div
                             key={index}
-                            className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
+                            className="cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
                             role="option"
                             aria-selected="false"
+                            onClick={() => {
+                              redoBatch(index + 1);
+                              closeDropdowns();
+                            }}
                           >
                             {getHistoryCommandActionLabel(command)}
                           </div>

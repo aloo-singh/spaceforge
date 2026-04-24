@@ -348,6 +348,8 @@ type EditorState = {
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
+  undoBatch: (steps: number) => void;
+  redoBatch: (steps: number) => void;
   fitCameraOnProjectOpen: (options?: { emptyLayoutPixelsPerMm?: number }) => void;
   loadProjectDocument: (document: DocumentState, options?: { emptyLayoutPixelsPerMm?: number }) => void;
 };
@@ -4862,6 +4864,123 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
         canUndo: true,
         canRedo: remainingFuture.length > 0,
+      };
+    }),
+  undoBatch: (steps: number) =>
+    set((state) => {
+      if (steps <= 0 || state.history.past.length === 0) return state;
+      const actualSteps = Math.min(steps, state.history.past.length);
+      const commandsToUndo = state.history.past.slice(-actualSteps);
+      const nextPast = state.history.past.slice(0, -actualSteps);
+      
+      // Apply all commands in reverse order (undo applies them backwards)
+      let nextDocument = state.document;
+      let lastCommand = null;
+      for (const command of commandsToUndo.reverse()) {
+        lastCommand = command;
+        nextDocument = applyEditorCommand(nextDocument, command, "undo");
+      }
+
+      const nextFuture = [...commandsToUndo.reverse(), ...state.history.future];
+
+      if (!lastCommand) return state;
+
+      dismissStairsAdjustedToastForCommand(lastCommand);
+      dismissFloorRenameToastForCommand(lastCommand);
+      dismissDeleteFloorToastForCommand(lastCommand);
+
+      const targetFloor = getTargetFloorForHistoryCommand(lastCommand, nextDocument, "undo");
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
+      return {
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
+        selectedNorthIndicator: state.selectedNorthIndicator,
+        selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
+          state.selectedRoomId,
+          restoredDocument,
+          lastCommand,
+          "undo"
+        ),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
+        selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
+          state.selectedInteriorAsset,
+          restoredDocument,
+          lastCommand,
+          "undo"
+        ),
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+        history: {
+          past: nextPast,
+          future: nextFuture,
+        },
+        canUndo: nextPast.length > 0,
+        canRedo: true,
+      };
+    }),
+  redoBatch: (steps: number) =>
+    set((state) => {
+      if (steps <= 0 || state.history.future.length === 0) return state;
+      const actualSteps = Math.min(steps, state.history.future.length);
+      const commandsToRedo = state.history.future.slice(0, actualSteps);
+      
+      // Apply all commands in forward order
+      let nextDocument = state.document;
+      let lastCommand = null;
+      const nextPast = [...state.history.past];
+      for (const command of commandsToRedo) {
+        lastCommand = command;
+        nextDocument = applyEditorCommand(nextDocument, command, "redo");
+        nextPast.push(command);
+      }
+
+      const nextFuture = state.history.future.slice(actualSteps);
+
+      if (!lastCommand) return state;
+
+      const targetFloor = getTargetFloorForHistoryCommand(lastCommand, nextDocument, "redo");
+      const currentFloor = getNormalizedActiveFloorId(state.document);
+      const restoredDocument =
+        targetFloor !== null && targetFloor !== currentFloor
+          ? { ...nextDocument, activeFloorId: targetFloor }
+          : nextDocument;
+
+      return {
+        document: restoredDocument,
+        camera: syncCameraRotationToDocument(state.camera, restoredDocument),
+        selectedNorthIndicator: state.selectedNorthIndicator,
+        selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
+          state.selectedRoomId,
+          restoredDocument,
+          lastCommand,
+          "redo"
+        ),
+        selectedWall: getSelectedWallIfRoomExists(state.selectedWall, restoredDocument),
+        selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
+        selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
+          state.selectedInteriorAsset,
+          restoredDocument,
+          lastCommand,
+          "redo"
+        ),
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+        history: {
+          past: nextPast,
+          future: nextFuture,
+        },
+        canUndo: true,
+        canRedo: nextFuture.length > 0,
       };
     }),
   fitCameraOnProjectOpen: (options) =>
