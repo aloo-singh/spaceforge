@@ -141,6 +141,7 @@ import {
   getRoomsForActiveFloor,
   getRoomsForFloor,
 } from "@/lib/editor/history";
+import { usePersistentPanelState } from "@/lib/editor/usePersistentPanelState";
 import {
   easeOutCubic,
   TRANSFORM_SETTLE_PREVIEW_FADE_MS,
@@ -402,6 +403,7 @@ function normalizeExportMultilineText(value: string): string {
 }
 
 type EditorCanvasProps = {
+  projectId?: string | null;
   hasResolvedProject?: boolean;
   projectRenameCompletionCount?: number;
   onDisplayedHintChange?: (hintId: EditorOnboardingHintId | null) => void;
@@ -856,6 +858,7 @@ function NorthIndicatorControl({
   );
 }
 export default function EditorCanvas({
+  projectId,
   hasResolvedProject = false,
   projectRenameCompletionCount = 0,
   onDisplayedHintChange,
@@ -2605,9 +2608,16 @@ export default function EditorCanvas({
   const [isPortraitViewport, setIsPortraitViewport] = useState(false);
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const [isLandscapeViewport, setIsLandscapeViewport] = useState(false);
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
-  const [isDesktopInspectorCollapsed, setIsDesktopInspectorCollapsed] = useState(false);
-  const [isPortraitInspectorCollapsed, setIsPortraitInspectorCollapsed] = useState(true);
+  const {
+    isLeftSidebarCollapsed,
+    setIsLeftSidebarCollapsed,
+    isDesktopInspectorCollapsed,
+    setIsDesktopInspectorCollapsed,
+    isPortraitInspectorCollapsed,
+    setIsPortraitInspectorCollapsed,
+  } = usePersistentPanelState(projectId);
+  const hasInitializedMobileSidebarRef = useRef(false);
+  
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
   ) : selectedRoomId ? (
@@ -2709,11 +2719,16 @@ export default function EditorCanvas({
     }
 
     setIsDesktopInspectorCollapsed(true);
-  }, [isCompactLandscapeInspector]);
+  }, [isCompactLandscapeInspector, setIsDesktopInspectorCollapsed]);
 
   useEffect(() => {
-    setIsLeftSidebarCollapsed(isMobile);
-  }, [isMobile]);
+    // Only set sidebar to collapsed on mobile on first mount
+    // Don't overwrite the persisted mobile state on every render
+    if (isMobile && !hasInitializedMobileSidebarRef.current) {
+      hasInitializedMobileSidebarRef.current = true;
+      setIsLeftSidebarCollapsed(true);
+    }
+  }, [isMobile, setIsLeftSidebarCollapsed]);
 
   useEffect(() => {
     if (!usesPortraitBottomInspector) {
@@ -2721,7 +2736,7 @@ export default function EditorCanvas({
     }
 
     setIsPortraitInspectorCollapsed(true);
-  }, [usesPortraitBottomInspector]);
+  }, [usesPortraitBottomInspector, setIsPortraitInspectorCollapsed]);
 
   useEffect(() => {
     if (canvasHudHideTimeoutRef.current) {

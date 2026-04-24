@@ -123,6 +123,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
       ) : null}
       {!shouldHideCanvasDuringBootstrap ? (
         <EditorCanvas
+          projectId={activeProject?.id ?? null}
           hasResolvedProject={activeProject !== null}
           onDisplayedHintChange={setActiveHintId}
           onThumbnailGeneratorChange={handleThumbnailGeneratorChange}

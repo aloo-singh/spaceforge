@@ -125,7 +125,6 @@ export function EditorSidebarRoomsList() {
   const canAddFloor = floors.length < maxFloors;
   const displayedFloors = [...floors].reverse();
   const activeFloorId = document.activeFloorId;
-  const rooms = document.rooms;
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
@@ -186,16 +185,6 @@ export function EditorSidebarRoomsList() {
   const [collapsedFloorIds, setCollapsedFloorIds] = useState<string[]>([]);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
-  const selectedRoomFromMultiSelection = selection.find(
-    (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
-  );
-  const selectedRoomForStructureId = selectedRoomId ?? selectedRoomFromMultiSelection?.id ?? null;
-  const selectedRoomFloorId = selectedRoomForStructureId
-    ? rooms.find((room) => room.id === selectedRoomForStructureId)?.floorId ?? null
-    : null;
-  const effectiveCollapsedFloorIds = selectedRoomFloorId
-    ? collapsedFloorIds.filter((floorId) => floorId !== selectedRoomFloorId)
-    : collapsedFloorIds;
   const floorRowClass = cn(
     "group flex w-full items-center rounded-lg border font-semibold tracking-[0.02em] transition-colors",
     isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
