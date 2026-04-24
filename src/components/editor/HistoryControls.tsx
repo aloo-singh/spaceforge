@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import {
   ChevronDown,
@@ -94,8 +95,12 @@ export function HistoryControls({
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isUndoDropdownOpen, setIsUndoDropdownOpen] = useState(false);
   const [isRedoDropdownOpen, setIsRedoDropdownOpen] = useState(false);
+  const [undoDropdownPos, setUndoDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [redoDropdownPos, setRedoDropdownPos] = useState<{ top: number; right: number } | null>(null);
   const undoDropdownRef = useRef<HTMLDivElement>(null);
   const redoDropdownRef = useRef<HTMLDivElement>(null);
+  const undoButtonRef = useRef<HTMLButtonElement>(null);
+  const redoButtonRef = useRef<HTMLButtonElement>(null);
   const { resolvedTheme } = useTheme();
   const hasHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -211,11 +216,19 @@ export function HistoryControls({
   };
 
   const toggleUndoDropdown = () => {
+    if (!isUndoDropdownOpen && undoButtonRef.current) {
+      const rect = undoButtonRef.current.getBoundingClientRect();
+      setUndoDropdownPos({ top: rect.bottom + 4, left: rect.left });
+    }
     setIsUndoDropdownOpen(!isUndoDropdownOpen);
     setIsRedoDropdownOpen(false);
   };
 
   const toggleRedoDropdown = () => {
+    if (!isRedoDropdownOpen && redoButtonRef.current) {
+      const rect = redoButtonRef.current.getBoundingClientRect();
+      setRedoDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
     setIsRedoDropdownOpen(!isRedoDropdownOpen);
     setIsUndoDropdownOpen(false);
   };
@@ -364,151 +377,161 @@ export function HistoryControls({
           <EarlyExplorerBadge />
           <ImmediateTooltipProvider>
             <div className="relative flex items-center gap-1.5 rounded-md border border-border/60 bg-background/80 p-1 sm:border-0 sm:bg-transparent sm:p-0 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1 [@media(max-height:540px)_and_(orientation:landscape)]:p-0.5">
-              <ButtonGroup>
-                <EditorChromeTooltip
-                  groupItem
-                  content={
-                    isUndoDisabled ? (
-                      "Nothing to undo"
+              <div className="relative">
+                <ButtonGroup>
+                  <EditorChromeTooltip
+                    groupItem
+                    content={
+                      isUndoDisabled ? (
+                        "Nothing to undo"
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <span>Undo</span>
+                          <KeycapCombo keys={undoShortcut} />
+                        </span>
+                      )
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={undo}
+                      disabled={isUndoDisabled}
+                      aria-label="Undo last edit, shortcut Command or Control plus Z"
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <Undo2 />
+                    </Button>
+                  </EditorChromeTooltip>
+                  <EditorChromeTooltip
+                    groupItem
+                    content="Undo history"
+                  >
+                    <Button
+                      ref={undoButtonRef}
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleUndoDropdown}
+                      disabled={isUndoDisabled}
+                      aria-label="Undo history dropdown"
+                      aria-expanded={isUndoDropdownOpen}
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </EditorChromeTooltip>
+                </ButtonGroup>
+                {isUndoDropdownOpen && undoDropdownPos !== null && hasHydrated && createPortal(
+                  <div
+                    ref={undoDropdownRef}
+                    style={{ top: undoDropdownPos.top, left: undoDropdownPos.left }}
+                    className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+                    role="listbox"
+                    aria-label="Undo history"
+                    onClick={closeDropdowns}
+                  >
+                    {undoHistory.length > 0 ? (
+                      undoHistory
+                        .slice(-50)
+                        .reverse()
+                        .map((command, index) => (
+                          <div
+                            key={index}
+                            className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
+                            role="option"
+                            aria-selected="false"
+                          >
+                            {getHistoryCommandActionLabel(command)}
+                          </div>
+                        ))
                     ) : (
-                      <span className="inline-flex items-center gap-2">
-                        <span>Undo</span>
-                        <KeycapCombo keys={undoShortcut} />
-                      </span>
-                    )
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={undo}
-                    disabled={isUndoDisabled}
-                    aria-label="Undo last edit, shortcut Command or Control plus Z"
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No undo history
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                )}
+              </div>
+              <div className="relative">
+                <ButtonGroup>
+                  <EditorChromeTooltip
+                    groupItem
+                    content={
+                      isRedoDisabled ? (
+                        "Nothing to redo"
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <span>Redo</span>
+                          <KeycapCombo keys={redoShortcut} />
+                        </span>
+                      )
+                    }
                   >
-                    <Undo2 />
-                  </Button>
-                </EditorChromeTooltip>
-                <EditorChromeTooltip
-                  groupItem
-                  content="Undo history"
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleUndoDropdown}
-                    disabled={isUndoDisabled}
-                    aria-label="Undo history dropdown"
-                    aria-expanded={isUndoDropdownOpen}
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={redo}
+                      disabled={isRedoDisabled}
+                      aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <Redo2 />
+                    </Button>
+                  </EditorChromeTooltip>
+                  <EditorChromeTooltip
+                    groupItem
+                    content="Redo history"
                   >
-                    <ChevronDown className="size-4" />
-                  </Button>
-                </EditorChromeTooltip>
-              </ButtonGroup>
-              {isUndoDropdownOpen && (
-                <div
-                  ref={undoDropdownRef}
-                  className="absolute top-full left-0 z-[9999] mt-1 max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
-                  role="listbox"
-                  aria-label="Undo history"
-                  onClick={closeDropdowns}
-                >
-                  {undoHistory.length > 0 ? (
-                    undoHistory
-                      .slice(-50) // Limit to 50
-                      .reverse() // Most recent first
-                      .map((command, index) => (
-                        <div
-                          key={index}
-                          className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                          role="option"
-                          aria-selected="false"
-                        >
-                          {getHistoryCommandActionLabel(command)}
-                        </div>
-                      ))
-                  ) : (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No undo history
-                    </div>
-                  )}
-                </div>
-              )}
-              <ButtonGroup>
-                <EditorChromeTooltip
-                  groupItem
-                  content={
-                    isRedoDisabled ? (
-                      "Nothing to redo"
+                    <Button
+                      ref={redoButtonRef}
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleRedoDropdown}
+                      disabled={isRedoDisabled}
+                      aria-label="Redo history dropdown"
+                      aria-expanded={isRedoDropdownOpen}
+                      className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </EditorChromeTooltip>
+                </ButtonGroup>
+                {isRedoDropdownOpen && redoDropdownPos !== null && hasHydrated && createPortal(
+                  <div
+                    ref={redoDropdownRef}
+                    style={{ top: redoDropdownPos.top, right: redoDropdownPos.right }}
+                    className="fixed z-[999999] max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+                    role="listbox"
+                    aria-label="Redo history"
+                    onClick={closeDropdowns}
+                  >
+                    {redoHistory.length > 0 ? (
+                      redoHistory
+                        .slice(0, 50)
+                        .map((command, index) => (
+                          <div
+                            key={index}
+                            className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden"
+                            role="option"
+                            aria-selected="false"
+                          >
+                            {getHistoryCommandActionLabel(command)}
+                          </div>
+                        ))
                     ) : (
-                      <span className="inline-flex items-center gap-2">
-                        <span>Redo</span>
-                        <KeycapCombo keys={redoShortcut} />
-                      </span>
-                    )
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={redo}
-                    disabled={isRedoDisabled}
-                    aria-label="Redo last undone edit, shortcut Shift+Command+Z, Control+Shift+Z, or Control+Y"
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
-                  >
-                    <Redo2 />
-                  </Button>
-                </EditorChromeTooltip>
-                <EditorChromeTooltip
-                  groupItem
-                  content="Redo history"
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleRedoDropdown}
-                    disabled={isRedoDisabled}
-                    aria-label="Redo history dropdown"
-                    aria-expanded={isRedoDropdownOpen}
-                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
-                  >
-                    <ChevronDown className="size-4" />
-                  </Button>
-                </EditorChromeTooltip>
-              </ButtonGroup>
-              {isRedoDropdownOpen && (
-                <div
-                  ref={redoDropdownRef}
-                  className="absolute top-full right-0 z-[9999] mt-1 max-h-48 min-w-48 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
-                  role="listbox"
-                  aria-label="Redo history"
-                  onClick={closeDropdowns}
-                >
-                  {redoHistory.length > 0 ? (
-                    redoHistory
-                      .slice(0, 50) // Limit to 50
-                      .map((command, index) => (
-                        <div
-                          key={index}
-                          className="cursor-default select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-hidden data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                          role="option"
-                          aria-selected="false"
-                        >
-                          {getHistoryCommandActionLabel(command)}
-                        </div>
-                      ))
-                  ) : (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No redo history
-                    </div>
-                  )}
-                </div>
-              )}
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No redo history
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                )}
+              </div>
             </div>
           </ImmediateTooltipProvider>
         </div>
