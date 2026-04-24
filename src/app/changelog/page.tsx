@@ -10,6 +10,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.64.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-24</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Converted undo/redo buttons into dropdown menu buttons with chevrons</li>
+                <li>Added tall, scannable dropdown with plain-English history entries (most recent first)</li>
+                <li>Hovering an entry highlights the full batch range from the top</li>
+                <li>Clicking an entry performs a single atomic undo/redo of the entire batch</li>
+                <li>Smart single Sonner for batch actions (e.g. &ldquo;Undid 3 room moves&rdquo;)</li>
+                <li>Full keyboard navigation in dropdown (arrow keys + Enter to confirm)</li>
+                <li>Improved spacing, polish, and overall feel</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.63.1</h2>
             <span className="text-sm text-muted-foreground">2026-04-24</span>
           </div>
