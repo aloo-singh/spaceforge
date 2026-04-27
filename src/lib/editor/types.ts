@@ -88,16 +88,17 @@ export type StairDirection = "forward" | "reverse";
  *
  * Phases:
  * - Phase 1: stairs (existing) ✓
- * - Phase 2: wardrobe ✓, bed, sofa, dining-table
- * - Future: sink, toilet, range, island, shelving, etc.
+ * - Phase 2: wardrobe ✓
+ * - Phase 3: bed, sofa, dining-table ✓
+ * - Future: sink, toilet, range, island, shelving, armchair, etc.
  */
-export type InteriorAssetType = "stairs" | "wardrobe";
+export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table";
 
 /**
  * Interior asset: a piece of furniture or fixture placed inside a room.
  *
  * This is a heterogeneous type that represents all interior assets.
- * The `type` field discriminates between stairs, wardrobe, and future assets.
+ * The `type` field discriminates between stairs, wardrobe, bed, sofa, and dining table.
  *
  * Common properties (all assets):
  * - id, name: identity and display
@@ -110,10 +111,14 @@ export type InteriorAssetType = "stairs" | "wardrobe";
  * Type-specific properties:
  * - Stairs: connectionId, arrowEnabled, arrowDirection, arrowLabel
  * - Wardrobe: doorType, doorConstraint
+ * - Bed: no specific properties (extensible for future use)
+ * - Sofa: no specific properties (extensible for future use)
+ * - Dining Table: shape ("rectangular" | "round")
  *
  * Backward compatibility:
- * - Existing stairs projects load unchanged (arrowEnabled, etc. already present)
- * - New wardrobe assets add doorType and doorConstraint
+ * - Existing stairs projects load unchanged
+ * - Wardrobe assets from Step 2 load unchanged (doorType, doorConstraint optional)
+ * - New bed, sofa, dining table assets follow same pattern as wardrobe
  * - Optional fields default to sensible values at runtime
  *
  * Behaviours (common across all assets):
@@ -138,14 +143,16 @@ export type RoomInteriorAsset = {
   widthMm: number;
   depthMm: number;
   rotationDegrees: number;
-  // Stairs-specific properties (optional for wardrobe)
+  // Stairs-specific properties (optional for other assets)
   arrowEnabled?: boolean;
   arrowDirection?: StairDirection;
   arrowLabel?: string;
-  // Wardrobe-specific properties (optional for stairs)
+  // Wardrobe-specific properties (optional for other assets)
   doorType?: "swing" | "sliding";
   doorConstraint?: number;
-  // Optional regionalisation
+  // Dining Table-specific properties (optional for other assets)
+  shape?: "rectangular" | "round";
+  // Optional regionalisation (all assets)
   unitSystem?: "metric" | "imperial";
   sizePreset?: string;
 };

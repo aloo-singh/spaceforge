@@ -207,15 +207,98 @@ export interface InteriorAssetWardrobe extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Bed: sleeping furniture (single, double, king, etc.).
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate (respects size preset)
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - Currently no specific properties; all data captured in common properties
+ * - Future: could add properties like mattressType, headboardStyle, etc.
+ *
+ * Examples:
+ * - Single: 900mm × 1900mm
+ * - Double: 1350mm × 1900mm
+ * - King: 1800mm × 2000mm
+ */
+export interface InteriorAssetBed extends InteriorAssetCommonProperties {
+  type: "bed";
+}
+
+/**
+ * Sofa: seating furniture (loveseat, sectional, etc.).
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate (respects size preset)
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - Currently no specific properties; all data captured in common properties
+ * - Future: could add properties like seatCount, armStyle, upholsteryType, etc.
+ *
+ * Examples:
+ * - 2-seater: 1400mm × 900mm
+ * - 3-seater: 2000mm × 900mm
+ * - Sectional: variable dimensions
+ */
+export interface InteriorAssetSofa extends InteriorAssetCommonProperties {
+  type: "sofa";
+}
+
+/**
+ * Dining Table: gathering furniture with shape variants.
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth, or diameter for round)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate (respects shape and size preset)
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions and shape
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - shape: "rectangular" | "round" — determines visual and interaction model
+ *
+ * Examples:
+ * - Rectangular 6-seat: 1600mm × 900mm, shape: "rectangular"
+ * - Round 4-seat: 1000mm diameter (stored as 1000mm × 1000mm, shape: "round")
+ */
+export interface InteriorAssetDiningTable extends InteriorAssetCommonProperties {
+  type: "dining-table";
+
+  /**
+   * Table shape affects both visual rendering and interaction.
+   * "rectangular" = standard four-legged or pedestal table
+   * "round" = circular top, typically pedestal-based
+   *
+   * For round tables, widthMm and depthMm are equal (diameter).
+   * UI may constraint resize to maintain circular shape.
+   */
+  shape: "rectangular" | "round";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
  * - Stairs (Phase 1) ✓
  * - Wardrobe (Phase 2) ✓
- * - Bed (Phase 2)
- * - Sofa (Phase 2)
- * - Dining Table (Phase 2)
- * - [Future: Sink, Toilet, Range, Island, Shelving, etc.]
+ * - Bed (Phase 3) ✓
+ * - Sofa (Phase 3) ✓
+ * - Dining Table (Phase 3) ✓
+ * - [Future: Sink, Toilet, Range, Island, Shelving, Armchair, etc.]
  *
  * Usage:
  * ```typescript
@@ -226,11 +309,14 @@ export interface InteriorAssetWardrobe extends InteriorAssetCommonProperties {
  *   } else if (asset.type === "wardrobe") {
  *     // wardrobe-specific logic
  *     console.log(asset.doorType);
+ *   } else if (asset.type === "dining-table") {
+ *     // dining table-specific logic
+ *     console.log(asset.shape);
  *   }
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
@@ -258,6 +344,48 @@ export function isStairs(asset: InteriorAsset): asset is InteriorAssetStairs {
  */
 export function isWardrobe(asset: InteriorAsset): asset is InteriorAssetWardrobe {
   return asset.type === "wardrobe";
+}
+
+/**
+ * Type guard to safely extract bed from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isBed(asset)) {
+ *   // asset-specific logic
+ * }
+ * ```
+ */
+export function isBed(asset: InteriorAsset): asset is InteriorAssetBed {
+  return asset.type === "bed";
+}
+
+/**
+ * Type guard to safely extract sofa from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isSofa(asset)) {
+ *   // asset-specific logic
+ * }
+ * ```
+ */
+export function isSofa(asset: InteriorAsset): asset is InteriorAssetSofa {
+  return asset.type === "sofa";
+}
+
+/**
+ * Type guard to safely extract dining table from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isDiningTable(asset)) {
+ *   console.log(asset.shape); // type-safe
+ * }
+ * ```
+ */
+export function isDiningTable(asset: InteriorAsset): asset is InteriorAssetDiningTable {
+  return asset.type === "dining-table";
 }
 
 /**
@@ -443,4 +571,46 @@ export function getAssetDisplayDimensions(asset: InteriorAsset): string {
 
     return `${formatFeetInches(widthInches)} × ${formatFeetInches(depthInches)}`;
   }
+}
+
+/**
+ * Get a friendly display name for an interior asset.
+ *
+ * Returns a human-readable name based on asset type and optional preset.
+ * Used in UI, exports, and user-facing contexts.
+ *
+ * @param asset - The interior asset to name
+ * @returns Friendly display name
+ *
+ * Examples:
+ * - Stairs: "Stairs" or custom name "Main Stairs"
+ * - Bed: "Bed" or custom name "Double Bed 1"
+ * - Sofa: "Sofa" or custom name "3-Seater"
+ * - Dining Table (rectangular): "Dining Table" or custom name "Round Dining Table 1.8m"
+ * - Dining Table (round): "Round Dining Table" or custom name
+ *
+ * Implementation strategy:
+ * - For most assets: use the asset's name field (user-editable)
+ * - Optionally append size preset if available (from sizePreset field)
+ * - Handle special cases like dining table shape for better defaults
+ *
+ * Future enhancement:
+ * - Localise preset names based on locale
+ * - Extract material/style from sizePreset key
+ * - Add seat count inference for sofa/bed variations
+ */
+export function getAssetDisplayName(asset: InteriorAsset): string {
+  // For dining tables, consider the shape in the default name generation
+  if (isDiningTable(asset)) {
+    const shapePrefix = asset.shape === "round" ? "Round " : "";
+    // If custom name, use it; otherwise suggest based on shape
+    if (asset.name !== "Dining Table") {
+      return asset.name;
+    }
+    return `${shapePrefix}Dining Table`;
+  }
+
+  // For all other assets, use the name field
+  // This is user-editable and takes precedence
+  return asset.name;
 }
