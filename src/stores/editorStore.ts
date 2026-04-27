@@ -378,6 +378,45 @@ let activeFloorRenameToastId: string | number | null = null;
 let activeDeleteFloorToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
+const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
+
+/**
+ * Load dev subscription tier from localStorage.
+ * Only loads if dev mode is enabled via env var.
+ * Returns "Free" if not found or invalid.
+ */
+function loadDevSubscriptionTierFromStorage(): "Free" | "Pro" | "Studio" | "Education" {
+  if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
+    return "Free";
+  }
+
+  try {
+    const stored = window.localStorage.getItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY);
+    if (stored && ["Free", "Pro", "Studio", "Education"].includes(stored)) {
+      return stored as "Free" | "Pro" | "Studio" | "Education";
+    }
+  } catch {
+    // localStorage may be unavailable in some environments
+  }
+
+  return "Free";
+}
+
+/**
+ * Save dev subscription tier to localStorage.
+ * Only saves if dev mode is enabled via env var.
+ */
+function saveDevSubscriptionTierToStorage(tier: "Free" | "Pro" | "Studio" | "Education"): void {
+  if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY, tier);
+  } catch {
+    // localStorage may be unavailable in some environments
+  }
+}
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
@@ -1905,11 +1944,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   // Dev subscription mode flag: enabled only when NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE="true"
   isDevSubscriptionModeEnabled: process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
-  // Dev subscription tier: session-only, defaults to Free
-  devSubscriptionTier: "Free" as const,
+  // Dev subscription tier: persisted to localStorage, defaults to Free
+  devSubscriptionTier: loadDevSubscriptionTierFromStorage(),
   setDevSubscriptionTier: (tier) =>
     set((state) => {
       if (state.devSubscriptionTier === tier) return state;
+      saveDevSubscriptionTierToStorage(tier);
       return {
         devSubscriptionTier: tier,
       };
