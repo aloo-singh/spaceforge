@@ -76,9 +76,51 @@ export type RoomOpeningSelection = {
   openingId: string;
 };
 
-export type InteriorAssetType = "stairs";
+/**
+ * Direction of a stair's directional arrow.
+ * Used to indicate flow direction (e.g., "UP" or "DOWN").
+ */
 export type StairDirection = "forward" | "reverse";
 
+/**
+ * Interior asset type discriminant.
+ * Extensible enum for all furniture and fixtures.
+ *
+ * Phases:
+ * - Phase 1: stairs (existing)
+ * - Phase 2: bed, wardrobe, sofa, dining-table
+ * - Future: sink, toilet, range, island, shelving, etc.
+ */
+export type InteriorAssetType = "stairs";
+
+/**
+ * Interior asset: a piece of furniture or fixture placed inside a room.
+ *
+ * This is a discriminated union (keyed by `type`) that allows type-safe
+ * access to asset-specific properties while sharing common behaviours.
+ *
+ * Common properties (all assets):
+ * - id, name: identity and display
+ * - xMm, yMm: position in room coordinates
+ * - widthMm, depthMm: dimensions
+ * - rotationDegrees: orientation
+ *
+ * Type-specific properties:
+ * - stairs: connectionId, arrowEnabled, arrowDirection, arrowLabel
+ * - (future assets will add their own properties)
+ *
+ * Behaviours (common across all assets):
+ * - Move: translate to new position (constrained inside room)
+ * - Resize: change dimensions (asset-specific constraints apply)
+ * - Rotate: change orientation (may auto-constrain if out of bounds)
+ * - Copy/Paste: duplicate asset (new ID, unique name)
+ * - Cut/Paste: move asset between rooms
+ * - Select: highlight and show inspector
+ * - Delete: remove from room (undo-tracked)
+ *
+ * See src/lib/editor/interiorAssetTypes.ts for detailed type definitions
+ * and behaviour documentation.
+ */
 export type RoomInteriorAsset = {
   id: string;
   type: InteriorAssetType;
@@ -120,12 +162,18 @@ export type Room = {
 
 /**
  * Shared selection model — single source of truth for all selections.
- * Supports rooms, walls, openings, stairs, and floors.
+ * Supports rooms, walls, openings, interior assets (currently stairs), and floors.
+ *
  * Each selection item has a type and associated identifiers.
  *
  * Undo semantics rule:
  * - Selection is transient UI state and must not be written to undo history.
  * - Only geometry/structural document changes belong in history.
+ *
+ * Note on "stair" type:
+ * - Currently the only interior asset type
+ * - Will be renamed to "interior-asset" once other furniture types are added
+ * - For now, "stair" remains for backward compatibility
  */
 export type SharedSelectionItem =
   | { type: "room"; id: string }
