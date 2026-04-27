@@ -33,6 +33,8 @@ import type { Room, RoomInteriorAsset, RoomOpening, RoomWall } from "@/lib/edito
 import type { SharedSelectionItem } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
+import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 type SidebarWallEntry = {
   wall: RoomWall;
@@ -135,6 +137,7 @@ export function EditorSidebarRoomsList() {
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
   const isDraftActive = useEditorStore((state) => state.roomDraft.points.length > 0);
   const isCompactDensity = useEditorStore((state) => state.settings.sidebarDensity === "compact");
+  const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const addFloor = useEditorStore((state) => state.addFloor);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
@@ -183,6 +186,7 @@ export function EditorSidebarRoomsList() {
   const [expandedWallKeys, setExpandedWallKeys] = useState<string[]>([]);
   const [expandedAssetRoomIds, setExpandedAssetRoomIds] = useState<string[]>([]);
   const [collapsedFloorIds, setCollapsedFloorIds] = useState<string[]>([]);
+  const [showTierLimitDialog, setShowTierLimitDialog] = useState(false);
   const activeRenameRoomId = renameSession?.roomId ?? null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
   const floorRowClass = cn(
@@ -903,13 +907,18 @@ export function EditorSidebarRoomsList() {
             })}
             <button
               type="button"
-              onClick={() => addFloor()}
+              onClick={() => {
+                if (floors.length >= maxFloors) {
+                  setShowTierLimitDialog(true);
+                } else {
+                  addFloor();
+                }
+              }}
               className={cn(
                 "flex items-center justify-center gap-2 rounded-lg border border-zinc-300/80 bg-zinc-50/80 font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border/70 dark:bg-zinc-900/40 dark:text-zinc-100 dark:hover:bg-zinc-900/70",
                 isCompactDensity ? "min-h-8 px-2.5 py-1.5 text-xs" : "min-h-10 px-3 py-2 text-sm"
               )}
-              disabled={isRenameBlocked || floors.length >= maxFloors}
-              title={floors.length >= maxFloors ? `Maximum ${maxFloors} floors reached` : undefined}
+              disabled={isRenameBlocked}
             >
               <Plus className="size-4" />
               <span>Add Floor</span>
@@ -925,6 +934,13 @@ export function EditorSidebarRoomsList() {
             </div>
           </div>
         )}
+
+        <TierLimitUpsellDialog
+          open={showTierLimitDialog}
+          onOpenChange={setShowTierLimitDialog}
+          featureKey="floors"
+          currentTier={devSubscriptionTier as SubscriptionTier}
+        />
       </div>
     </ImmediateTooltipProvider>
   );

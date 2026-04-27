@@ -98,6 +98,7 @@ import {
   type DrawConstraintMode,
 } from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
 import type {
   CameraState,
@@ -180,6 +181,18 @@ type EditorState = {
   viewport: ViewportSize;
   maxFloors: number;
   setMaxFloors: (maxFloors: number) => void;
+  /**
+   * Dev subscription mode: allows testing different subscription tiers locally.
+   * Controlled by NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE env var.
+   * ⚠️ CRITICAL: This flag must NEVER be enabled in production builds.
+   */
+  isDevSubscriptionModeEnabled: boolean;
+  /**
+   * Currently selected subscription tier in dev mode (session-only, not persisted).
+   * Only used when isDevSubscriptionModeEnabled is true. Defaults to "Free".
+   */
+  devSubscriptionTier: SubscriptionTier;
+  setDevSubscriptionTier: (tier: SubscriptionTier) => void;
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
@@ -366,6 +379,72 @@ let activeFloorRenameToastId: string | number | null = null;
 let activeDeleteFloorToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
+const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
+
+/**
+ * Load dev subscription tier from localStorage.
+ * Only loads if dev mode is enabled via env var.
+ * Returns "Free" if not found or invalid.
+ */
+function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
+  if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
+    return "Free";
+  }
+
+  try {
+    const stored = window.localStorage.getItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY);
+    if (stored && AVAILABLE_TIERS.includes(stored as SubscriptionTier)) {
+      return stored as SubscriptionTier;
+    }
+  } catch {
+    // localStorage may be unavailable in some environments
+  }
+
+  return "Free";
+}
+
+/**
+ * Save dev subscription tier to localStorage.
+ * Only saves if dev mode is enabled via env var.
+ */
+function saveDevSubscriptionTierToStorage(tier: SubscriptionTier): void {
+  if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY, tier);
+  } catch {
+    // localStorage may be unavailable in some environments
+  }
+}
+
+/**
+ * Get the effective subscription tier for gating logic.
+ * If dev mode is enabled, uses the selected dev tier.
+ * Otherwise defaults to Free (non-paying user baseline).
+ */
+function getEffectiveSubscriptionTier(
+  isDevMode: boolean,
+  devTier: SubscriptionTier
+): SubscriptionTier {
+  return isDevMode ? devTier : "Free";
+}
+
+/**
+ * Get the effective max floors for the current user/tier.
+ * Respects dev tier selection when dev mode is enabled.
+ * Uses central tier configuration from @/lib/subscription/tiers.
+ */
+function getEffectiveMaxFloors(
+  isDevMode: boolean,
+  devTier: SubscriptionTier
+): number {
+  const effectiveTier = getEffectiveSubscriptionTier(isDevMode, devTier);
+  const tierConfig = getTierConfig(effectiveTier);
+  return tierConfig.maxFloors;
+}
+
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
@@ -1883,12 +1962,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
-  maxFloors: 10,
+  // Initial maxFloors respects subscription tier limits
+  maxFloors: getEffectiveMaxFloors(
+    process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
+    loadDevSubscriptionTierFromStorage()
+  ),
   setMaxFloors: (maxFloors) =>
     set((state) => {
-      if (state.maxFloors === maxFloors) return state;
+      // Apply subscription tier limits: effective maxFloors is the minimum of
+      // the project's maxFloors and the user's subscription tier limit
+      const effectiveLimit = getEffectiveMaxFloors(
+        state.isDevSubscriptionModeEnabled,
+        state.devSubscriptionTier
+      );
+      const constrainedMaxFloors = Math.min(maxFloors, effectiveLimit);
+      
+      if (state.maxFloors === constrainedMaxFloors) return state;
       return {
-        maxFloors,
+        maxFloors: constrainedMaxFloors,
+      };
+    }),
+  // Dev subscription mode flag: enabled only when NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE="true"
+  isDevSubscriptionModeEnabled: process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
+  // Dev subscription tier: persisted to localStorage, defaults to Free
+  devSubscriptionTier: loadDevSubscriptionTierFromStorage(),
+  setDevSubscriptionTier: (tier) =>
+    set((state) => {
+      if (state.devSubscriptionTier === tier) return state;
+      saveDevSubscriptionTierToStorage(tier);
+      
+      // When tier changes, always update maxFloors to match the new tier's limit
+      const newMaxFloors = getEffectiveMaxFloors(state.isDevSubscriptionModeEnabled, tier);
+      
+      return {
+        devSubscriptionTier: tier,
+        maxFloors: newMaxFloors,
       };
     }),
   roomDraft: EMPTY_ROOM_DRAFT,

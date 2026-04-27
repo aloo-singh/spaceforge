@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
+import { DevSubscriptionTierSelector } from "@/components/editor/DevSubscriptionTierSelector";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { getHistoryCommandActionLabel, generateBatchHistoryFeedbackMessage, showKeyboardShortcutFeedbackToast } from "@/lib/editor/keyboardMap";
@@ -491,6 +492,8 @@ export function HistoryControls({
             </div>
           </ImmediateTooltipProvider>
         </div>
+
+        <DevSubscriptionTierSelector />
 
         <div className="flex items-center gap-2 sm:gap-2.5 [@media(max-height:540px)_and_(orientation:landscape)]:gap-1.5">
           <EarlyExplorerBadge />
