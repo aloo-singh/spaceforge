@@ -4454,12 +4454,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const room = state.document.rooms.find((r) => r.id === selectedInteriorAsset.roomId);
       const asset = room?.interiorAssets.find((a) => a.id === selectedInteriorAsset.assetId);
       if (!room || !asset) return state;
-      if (asset.widthMm === widthMm && asset.depthMm === depthMm) return state;
+
+      // Account for rotation when applying preset size
+      // When bed is rotated 90° or 270°, width and depth are swapped relative to original orientation
+      const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+      const isSideways = rotation === 90 || rotation === -90;
+      const [appliedWidth, appliedDepth] = isSideways ? [depthMm, widthMm] : [widthMm, depthMm];
+
+      if (asset.widthMm === appliedWidth && asset.depthMm === appliedDepth) return state;
 
       let nextAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
-        widthMm,
-        depthMm,
+        widthMm: appliedWidth,
+        depthMm: appliedDepth,
         sizePreset: presetName,
       };
 

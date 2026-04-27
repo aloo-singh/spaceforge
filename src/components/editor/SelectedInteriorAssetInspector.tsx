@@ -16,6 +16,7 @@ import {
   getStairRunLengthMm,
   DEFAULT_STAIR_TREAD_SPACING_MM,
 } from "@/lib/editor/interiorAssets";
+import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import type { InteriorAssetType, RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
@@ -152,19 +153,27 @@ function FurnitureInspector({
                   { label: "Queen", widthMm: 1500, depthMm: 2000 },
                   { label: "King", widthMm: 1800, depthMm: 2000 },
                 ] as const
-              ).map(({ label, widthMm, depthMm }) => (
-                <Button
-                  key={label}
-                  type="button"
-                  variant={asset.widthMm === widthMm && asset.depthMm === depthMm ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedBedSizePreset(widthMm, depthMm, label)}
-                  aria-label={`${label} bed`}
-                  aria-pressed={asset.widthMm === widthMm && asset.depthMm === depthMm}
-                >
-                  {label}
-                </Button>
-              ))}
+              ).map(({ label, widthMm, depthMm }) => {
+                // Account for rotation when comparing preset sizes
+                const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+                const isSideways = rotation === 90 || rotation === -90;
+                const [comparedWidth, comparedDepth] = isSideways ? [depthMm, widthMm] : [widthMm, depthMm];
+                const isActive = asset.widthMm === comparedWidth && asset.depthMm === comparedDepth;
+
+                return (
+                  <Button
+                    key={label}
+                    type="button"
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedBedSizePreset(widthMm, depthMm, label)}
+                    aria-label={`${label} bed`}
+                    aria-pressed={isActive}
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         ) : null}

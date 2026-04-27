@@ -377,13 +377,27 @@ function getDisplayedInteriorAssetForAnimation(
 
   const progress = clampValue((renderedAtMs - animation.startedAtMs) / STAIR_ROTATION_ANIMATION_MS, 0, 1);
   const easedProgress = easeOutCubic(progress);
-  const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
-  const longSideMm = Math.max(asset.widthMm, asset.depthMm);
 
+  // Stairs swap width/depth during 90° rotations, but furniture should maintain proportions
+  if (asset.type === "stairs") {
+    const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
+    const longSideMm = Math.max(asset.widthMm, asset.depthMm);
+
+    return {
+      ...asset,
+      widthMm: shortSideMm,
+      depthMm: longSideMm,
+      rotationDegrees: getInterpolatedRotationDegrees(
+        animation.startRotationDegrees,
+        animation.endRotationDegrees,
+        easedProgress
+      ),
+    };
+  }
+
+  // For furniture (bed, sofa, wardrobe, dining-table), just animate rotation without dimension swaps
   return {
     ...asset,
-    widthMm: shortSideMm,
-    depthMm: longSideMm,
     rotationDegrees: getInterpolatedRotationDegrees(
       animation.startRotationDegrees,
       animation.endRotationDegrees,
@@ -1551,6 +1565,7 @@ export default function EditorCanvas({
         showDimensions,
         null,
         exportTheme,
+        null,
         { includeStairDirectionLabels: false }
       );
       drawDraft(
@@ -3599,6 +3614,7 @@ function drawScene(
     showDimensions,
     transformFeedback,
     theme,
+    state.selectedInteriorAsset,
     { includeStairDirectionLabels: true, stairRotationAnimations }
   );
   clearContainerChildren(dimensionOverlayContainer);
@@ -4396,37 +4412,47 @@ function drawRoomInteriorAssets(
       const fgColor = isSelected ? theme.wallSelectionAccent : theme.roomOutline;
       const fgFillAlpha = isSelected ? 0.30 : 0.20;
 
+      // Determine front edge based on rotation (normalizeCanvasRotationDegrees returns -180 to 180)
+      // 0°=top, 90°=right, ±180°=bottom, -90°=left
+      const rot = normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+      // Which pair of corners form the "front" edge
+      const [frontC1, frontC2, backC1, backC2] =
+        rot === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
+        : rot === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
+        : rot === 180 || rot === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
+        : [topLeft, bottomLeft, topRight, bottomRight]; // -90
+
       if (displayedAsset.type === "bed") {
-        // Headboard: filled strip at top ~14% of depth
+        // Headboard: filled strip at front ~14% depth
         const hFrac = 0.14;
-        const hBL = { x: topLeft.x + (bottomLeft.x - topLeft.x) * hFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * hFrac };
-        const hBR = { x: topRight.x + (bottomRight.x - topRight.x) * hFrac, y: topRight.y + (bottomRight.y - topRight.y) * hFrac };
+        const hC1 = { x: frontC1.x + (backC1.x - frontC1.x) * hFrac, y: frontC1.y + (backC1.y - frontC1.y) * hFrac };
+        const hC2 = { x: frontC2.x + (backC2.x - frontC2.x) * hFrac, y: frontC2.y + (backC2.y - frontC2.y) * hFrac };
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha });
-        graphics.moveTo(topLeft.x, topLeft.y);
-        graphics.lineTo(topRight.x, topRight.y);
-        graphics.lineTo(hBR.x, hBR.y);
-        graphics.lineTo(hBL.x, hBL.y);
+        graphics.moveTo(frontC1.x, frontC1.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(hC2.x, hC2.y);
+        graphics.lineTo(hC1.x, hC1.y);
         graphics.closePath();
         graphics.fill();
       }
 
       if (displayedAsset.type === "sofa") {
-        // Back rest: filled strip at top ~30%
+        // Back rest: filled strip at front ~30%
         const bFrac = 0.30;
-        const bBL = { x: topLeft.x + (bottomLeft.x - topLeft.x) * bFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * bFrac };
-        const bBR = { x: topRight.x + (bottomRight.x - topRight.x) * bFrac, y: topRight.y + (bottomRight.y - topRight.y) * bFrac };
+        const bC1 = { x: frontC1.x + (backC1.x - frontC1.x) * bFrac, y: frontC1.y + (backC1.y - frontC1.y) * bFrac };
+        const bC2 = { x: frontC2.x + (backC2.x - frontC2.x) * bFrac, y: frontC2.y + (backC2.y - frontC2.y) * bFrac };
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha - 0.04 });
-        graphics.moveTo(topLeft.x, topLeft.y);
-        graphics.lineTo(topRight.x, topRight.y);
-        graphics.lineTo(bBR.x, bBR.y);
-        graphics.lineTo(bBL.x, bBL.y);
+        graphics.moveTo(frontC1.x, frontC1.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(bC2.x, bC2.y);
+        graphics.lineTo(bC1.x, bC1.y);
         graphics.closePath();
         graphics.fill();
-        // 2 cushion dividers
+        // 2 cushion dividers perpendicular to front edge
         graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
         for (const t of [1 / 3, 2 / 3]) {
-          const divStart = { x: bBL.x + (bBR.x - bBL.x) * t, y: bBL.y + (bBR.y - bBL.y) * t };
-          const divEnd = { x: bottomLeft.x + (bottomRight.x - bottomLeft.x) * t, y: bottomLeft.y + (bottomRight.y - bottomLeft.y) * t };
+          const divStart = { x: bC1.x + (bC2.x - bC1.x) * t, y: bC1.y + (bC2.y - bC1.y) * t };
+          const divEnd = { x: backC1.x + (backC2.x - backC1.x) * t, y: backC1.y + (backC2.y - backC1.y) * t };
           graphics.moveTo(divStart.x, divStart.y);
           graphics.lineTo(divEnd.x, divEnd.y);
           graphics.stroke();
@@ -4436,24 +4462,32 @@ function drawRoomInteriorAssets(
       if (displayedAsset.type === "wardrobe") {
         graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
         if (displayedAsset.doorType === "sliding") {
-          // Two parallel sliding door track lines
+          // Two parallel sliding door lines on the front edge
           for (const t of [1 / 3, 2 / 3]) {
-            const left = { x: topLeft.x + (bottomLeft.x - topLeft.x) * t, y: topLeft.y + (bottomLeft.y - topLeft.y) * t };
-            const right = { x: topRight.x + (bottomRight.x - topRight.x) * t, y: topRight.y + (bottomRight.y - topRight.y) * t };
-            graphics.moveTo(left.x, left.y);
-            graphics.lineTo(right.x, right.y);
+            const p1 = { x: frontC1.x + (frontC2.x - frontC1.x) * t, y: frontC1.y + (frontC2.y - frontC1.y) * t };
+            const p2 = { x: backC1.x + (backC2.x - backC1.x) * t, y: backC1.y + (backC2.y - backC1.y) * t };
+            graphics.moveTo(p1.x, p1.y);
+            graphics.lineTo(p2.x, p2.y);
             graphics.stroke();
           }
         } else {
-          // Swing door diagonal indicators from front (bottom) corners
-          const widthPx = Math.abs(bottomRight.x - bottomLeft.x);
-          const depthPx = Math.abs(bottomLeft.y - topLeft.y);
-          const leafLen = Math.min(widthPx * 0.5, depthPx) * 0.88;
-          graphics.moveTo(bottomLeft.x, bottomLeft.y);
-          graphics.lineTo(bottomLeft.x + leafLen, bottomLeft.y - leafLen);
+          // Swing door: diagonals opening outward from front corners
+          const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };
+          const depthLen = Math.sqrt(depthVec.x * depthVec.x + depthVec.y * depthVec.y);
+          const depthUnit = depthLen > 0 ? { x: depthVec.x / depthLen, y: depthVec.y / depthLen } : { x: 0, y: 0 };
+          
+          const widthVec = { x: frontC2.x - frontC1.x, y: frontC2.y - frontC1.y };
+          const widthLen = Math.sqrt(widthVec.x * widthVec.x + widthVec.y * widthVec.y);
+          const leafLen = Math.min(widthLen * 0.4, depthLen * 0.6);
+          
+          // Left door swings outward (away from center, towards -y in 0° config)
+          graphics.moveTo(frontC1.x, frontC1.y);
+          graphics.lineTo(frontC1.x - depthUnit.x * leafLen, frontC1.y - depthUnit.y * leafLen);
           graphics.stroke();
-          graphics.moveTo(bottomRight.x, bottomRight.y);
-          graphics.lineTo(bottomRight.x - leafLen, bottomRight.y - leafLen);
+          
+          // Right door swings outward
+          graphics.moveTo(frontC2.x, frontC2.y);
+          graphics.lineTo(frontC2.x - depthUnit.x * leafLen, frontC2.y - depthUnit.y * leafLen);
           graphics.stroke();
         }
       }
@@ -4776,7 +4810,8 @@ function drawFurnitureLabels(
   rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  selectedInteriorAsset: RoomInteriorAssetSelection | null
 ) {
   const fontSizePx = clampValue(
     camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
@@ -4790,7 +4825,9 @@ function drawFurnitureLabels(
       if (asset.type === "stairs") continue;
       const screenWidthPx = (asset.widthMm) * camera.pixelsPerMm;
       const screenHeightPx = (asset.depthMm) * camera.pixelsPerMm;
-      if (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5) continue;
+      const isSelected = selectedInteriorAsset?.roomId === room.id && selectedInteriorAsset?.assetId === asset.id;
+      // Show label if asset is large enough OR if it's selected
+      if (!isSelected && (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5)) continue;
 
       const center = worldToScreen({ x: asset.xMm, y: asset.yMm }, camera, viewport);
       const labelText = asset.name || getInteriorAssetDisplayName(asset.type);
@@ -4814,7 +4851,7 @@ function drawFurnitureLabels(
       text.roundPixels = true;
       text.anchor.set(0.5);
       text.position.set(snapToPixel(center.x, textResolution), snapToPixel(center.y, textResolution));
-      text.alpha = 0.72;
+      text.alpha = isSelected ? 0.98 : 0.72;
       labelContainer.addChild(text);
     }
   }
@@ -5034,6 +5071,7 @@ function drawRoomLabels(
   showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
+  selectedInteriorAsset: RoomInteriorAssetSelection | null,
   options?: {
     includeStairDirectionLabels?: boolean;
     stairRotationAnimations?: Map<string, StairRotationAnimation>;
@@ -5156,7 +5194,7 @@ function drawRoomLabels(
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selectedInteriorAsset);
 }
 
 type ResizeDimensionLabelSpec = {
