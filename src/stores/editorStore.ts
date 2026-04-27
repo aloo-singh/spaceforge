@@ -180,6 +180,12 @@ type EditorState = {
   viewport: ViewportSize;
   maxFloors: number;
   setMaxFloors: (maxFloors: number) => void;
+  /**
+   * Dev subscription mode: allows testing different subscription tiers locally.
+   * Controlled by NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE env var.
+   * ⚠️ CRITICAL: This flag must NEVER be enabled in production builds.
+   */
+  isDevSubscriptionModeEnabled: boolean;
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
@@ -1891,6 +1897,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         maxFloors,
       };
     }),
+  // Dev subscription mode flag: enabled only when NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE="true"
+  isDevSubscriptionModeEnabled: process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
   roomDraft: EMPTY_ROOM_DRAFT,
   selectedNorthIndicator: false,
   selectedRoomId: null,
