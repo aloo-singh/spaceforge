@@ -385,23 +385,27 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
 
   if (command.type === "bulk-duplicate") {
     const roomCount = command.duplicatedRooms.length;
-    const stairCount = command.duplicatedAssets.length;
-    if (roomCount > 0 && stairCount > 0) return "rooms and stairs duplication";
+    const assetCount = command.duplicatedAssets.length;
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets duplication";
     if (roomCount > 1) return "rooms duplication";
     if (roomCount === 1) return "room duplication";
-    if (stairCount > 1) return "stairs duplication";
-    if (stairCount === 1) return "stair duplication";
+    const firstDupAsset = command.duplicatedAssets[0]?.asset;
+    const dupTypeName = firstDupAsset ? getInteriorAssetTypeName(firstDupAsset.type) : "asset";
+    if (assetCount > 1) return `${dupTypeName} duplication`;
+    if (assetCount === 1) return `${dupTypeName} duplication`;
     return "selection duplication";
   }
 
   if (command.type === "move-selection-to-floor") {
     const roomCount = command.movedRooms.length;
-    const stairCount = command.movedAssets.length;
-    if (roomCount > 0 && stairCount > 0) return "rooms and stairs move";
+    const assetCount = command.movedAssets.length;
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets move";
     if (roomCount > 1) return "rooms move";
     if (roomCount === 1) return "room move";
-    if (stairCount > 1) return "stairs move";
-    if (stairCount === 1) return "stair move";
+    const firstMovedAsset = command.movedAssets[0]?.asset;
+    const movedTypeName = firstMovedAsset ? getInteriorAssetTypeName(firstMovedAsset.type) : "asset";
+    if (assetCount > 1) return `${movedTypeName} move`;
+    if (assetCount === 1) return `${movedTypeName} move`;
     return "selection move";
   }
 
@@ -418,7 +422,9 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "paste-interior-assets") {
-    return command.pastedAssets.length === 1 ? "stair paste" : "stairs paste";
+    const firstPastedAsset = command.pastedAssets[0]?.asset;
+    const pasteTypeName = firstPastedAsset ? getInteriorAssetTypeName(firstPastedAsset.type) : "asset";
+    return command.pastedAssets.length === 1 ? `${pasteTypeName} paste` : `${pasteTypeName} paste`;
   }
 
   if (command.type === "update-interior-asset") {
@@ -496,6 +502,15 @@ function getInteriorAssetActionLabel(
   type: RoomInteriorAsset["type"],
   action: "creation" | "deletion" | "rotation" | "resize" | "edit"
 ) {
-  const assetLabel = type === "stairs" ? "stair" : "interior asset";
-  return `${assetLabel} ${action}`;
+  return `${getInteriorAssetTypeName(type)} ${action}`;
+}
+
+function getInteriorAssetTypeName(type: RoomInteriorAsset["type"]): string {
+  switch (type) {
+    case "stairs": return "stair";
+    case "bed": return "bed";
+    case "sofa": return "sofa";
+    case "wardrobe": return "wardrobe";
+    case "dining-table": return "dining table";
+  }
 }

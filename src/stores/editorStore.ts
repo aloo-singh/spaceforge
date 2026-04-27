@@ -3041,7 +3041,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               pastedAsset = { ...pastedAsset, xMm: constrained.x, yMm: constrained.y };
             } else {
               // Room is too small — abort and notify
-              toast("Stairs don't fit in that room.");
+              toast("Asset doesn't fit in that room.");
               return state;
             }
           }
@@ -4448,16 +4448,51 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   setSelectedBedSizePreset: (widthMm, depthMm, presetName) =>
     set((state) => {
-      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
-        if (asset.widthMm === widthMm && asset.depthMm === depthMm) return null;
-        return {
-          ...cloneRoomInteriorAsset(asset),
-          widthMm,
-          depthMm,
-          sizePreset: presetName,
-        };
-      });
-      return nextState ?? state;
+      const { selectedInteriorAsset } = state;
+      if (!selectedInteriorAsset) return state;
+
+      const room = state.document.rooms.find((r) => r.id === selectedInteriorAsset.roomId);
+      const asset = room?.interiorAssets.find((a) => a.id === selectedInteriorAsset.assetId);
+      if (!room || !asset) return state;
+      if (asset.widthMm === widthMm && asset.depthMm === depthMm) return state;
+
+      let nextAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        widthMm,
+        depthMm,
+        sizePreset: presetName,
+      };
+
+      if (!isInteriorAssetWithinRoom(room, nextAsset)) {
+        const constrained = constrainInteriorAssetCenter(room, nextAsset, {
+          x: nextAsset.xMm,
+          y: nextAsset.yMm,
+        });
+        if (constrained) {
+          nextAsset = { ...nextAsset, xMm: constrained.x, yMm: constrained.y };
+          toast(`${presetName} bed moved to fit.`, { duration: 2500 });
+        } else {
+          toast(`${presetName} bed doesn't fit in this room.`, { duration: 3000 });
+          return state;
+        }
+      }
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId: room.id,
+        previousAsset: cloneRoomInteriorAsset(asset),
+        nextAsset: cloneRoomInteriorAsset(nextAsset),
+      };
+
+      return {
+        document: updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   updateSelectedOpeningWidth: (widthMm) =>
     set((state) => {

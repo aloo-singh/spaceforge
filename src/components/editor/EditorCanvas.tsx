@@ -32,6 +32,7 @@ import {
   getStairRunLengthMm,
   getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
+  getInteriorAssetDisplayName,
 } from "@/lib/editor/interiorAssets";
 import {
   getFortyFiveVertexHandleLayouts,
@@ -288,6 +289,9 @@ const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
 const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
 const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
 const STAIR_ROTATION_ANIMATION_MS = 180;
+const FURNITURE_LABEL_FONT_SIZE_WORLD_MM = 55;
+const FURNITURE_LABEL_MIN_FONT_SIZE_PX = 9;
+const FURNITURE_LABEL_MAX_FONT_SIZE_PX = 14;
 const CANVAS_ROTATION_ENABLED = false;
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
@@ -4385,6 +4389,87 @@ function drawRoomInteriorAssets(
     graphics.closePath();
     graphics.stroke();
 
+    // Furniture-specific type visuals
+    if (displayedAsset.type !== "stairs") {
+      const fgAlpha = isSelected ? 0.78 : 0.56;
+      const fgLineWidth = Math.max(camera.pixelsPerMm * 10, 1.1);
+      const fgColor = isSelected ? theme.wallSelectionAccent : theme.roomOutline;
+      const fgFillAlpha = isSelected ? 0.30 : 0.20;
+
+      if (displayedAsset.type === "bed") {
+        // Headboard: filled strip at top ~14% of depth
+        const hFrac = 0.14;
+        const hBL = { x: topLeft.x + (bottomLeft.x - topLeft.x) * hFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * hFrac };
+        const hBR = { x: topRight.x + (bottomRight.x - topRight.x) * hFrac, y: topRight.y + (bottomRight.y - topRight.y) * hFrac };
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha });
+        graphics.moveTo(topLeft.x, topLeft.y);
+        graphics.lineTo(topRight.x, topRight.y);
+        graphics.lineTo(hBR.x, hBR.y);
+        graphics.lineTo(hBL.x, hBL.y);
+        graphics.closePath();
+        graphics.fill();
+      }
+
+      if (displayedAsset.type === "sofa") {
+        // Back rest: filled strip at top ~30%
+        const bFrac = 0.30;
+        const bBL = { x: topLeft.x + (bottomLeft.x - topLeft.x) * bFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * bFrac };
+        const bBR = { x: topRight.x + (bottomRight.x - topRight.x) * bFrac, y: topRight.y + (bottomRight.y - topRight.y) * bFrac };
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha - 0.04 });
+        graphics.moveTo(topLeft.x, topLeft.y);
+        graphics.lineTo(topRight.x, topRight.y);
+        graphics.lineTo(bBR.x, bBR.y);
+        graphics.lineTo(bBL.x, bBL.y);
+        graphics.closePath();
+        graphics.fill();
+        // 2 cushion dividers
+        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
+        for (const t of [1 / 3, 2 / 3]) {
+          const divStart = { x: bBL.x + (bBR.x - bBL.x) * t, y: bBL.y + (bBR.y - bBL.y) * t };
+          const divEnd = { x: bottomLeft.x + (bottomRight.x - bottomLeft.x) * t, y: bottomLeft.y + (bottomRight.y - bottomLeft.y) * t };
+          graphics.moveTo(divStart.x, divStart.y);
+          graphics.lineTo(divEnd.x, divEnd.y);
+          graphics.stroke();
+        }
+      }
+
+      if (displayedAsset.type === "wardrobe") {
+        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
+        if (displayedAsset.doorType === "sliding") {
+          // Two parallel sliding door track lines
+          for (const t of [1 / 3, 2 / 3]) {
+            const left = { x: topLeft.x + (bottomLeft.x - topLeft.x) * t, y: topLeft.y + (bottomLeft.y - topLeft.y) * t };
+            const right = { x: topRight.x + (bottomRight.x - topRight.x) * t, y: topRight.y + (bottomRight.y - topRight.y) * t };
+            graphics.moveTo(left.x, left.y);
+            graphics.lineTo(right.x, right.y);
+            graphics.stroke();
+          }
+        } else {
+          // Swing door diagonal indicators from front (bottom) corners
+          const widthPx = Math.abs(bottomRight.x - bottomLeft.x);
+          const depthPx = Math.abs(bottomLeft.y - topLeft.y);
+          const leafLen = Math.min(widthPx * 0.5, depthPx) * 0.88;
+          graphics.moveTo(bottomLeft.x, bottomLeft.y);
+          graphics.lineTo(bottomLeft.x + leafLen, bottomLeft.y - leafLen);
+          graphics.stroke();
+          graphics.moveTo(bottomRight.x, bottomRight.y);
+          graphics.lineTo(bottomRight.x - leafLen, bottomRight.y - leafLen);
+          graphics.stroke();
+        }
+      }
+
+      if (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") {
+        // Inscribed ellipse
+        const cx = (topLeft.x + bottomRight.x) / 2;
+        const cy = (topLeft.y + bottomRight.y) / 2;
+        const rX = Math.abs(bottomRight.x - topLeft.x) / 2 * 0.84;
+        const rY = Math.abs(bottomRight.y - topLeft.y) / 2 * 0.84;
+        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha });
+        graphics.ellipse(cx, cy, rX, rY);
+        graphics.stroke();
+      }
+    }
+
     // Stairs-specific visuals (tread lines and direction arrow)
     if (asset.type === "stairs") {
       const isQuarterTurnSideways =
@@ -4681,6 +4766,55 @@ function drawStairDirectionLabels(
       );
       text.angle = 0;
       text.alpha = 0.82;
+      labelContainer.addChild(text);
+    }
+  }
+}
+
+function drawFurnitureLabels(
+  labelContainer: Container,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const fontSizePx = clampValue(
+    camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
+    FURNITURE_LABEL_MIN_FONT_SIZE_PX,
+    FURNITURE_LABEL_MAX_FONT_SIZE_PX
+  );
+  const textResolution = getTextResolution();
+
+  for (const room of rooms) {
+    for (const asset of room.interiorAssets) {
+      if (asset.type === "stairs") continue;
+      const screenWidthPx = (asset.widthMm) * camera.pixelsPerMm;
+      const screenHeightPx = (asset.depthMm) * camera.pixelsPerMm;
+      if (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5) continue;
+
+      const center = worldToScreen({ x: asset.xMm, y: asset.yMm }, camera, viewport);
+      const labelText = asset.name || getInteriorAssetDisplayName(asset.type);
+
+      const text = new Text({
+        text: labelText,
+        resolution: textResolution,
+        style: {
+          fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
+          fontSize: fontSizePx,
+          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+          fill: theme.roomLabelFill,
+          stroke: {
+            color: theme.roomLabelStroke,
+            width: Math.max(1.1, fontSizePx * 0.12),
+            join: "round",
+          },
+          letterSpacing: 0.15,
+        },
+      });
+      text.roundPixels = true;
+      text.anchor.set(0.5);
+      text.position.set(snapToPixel(center.x, textResolution), snapToPixel(center.y, textResolution));
+      text.alpha = 0.72;
       labelContainer.addChild(text);
     }
   }
@@ -5021,6 +5155,8 @@ function drawRoomLabels(
       options?.stairRotationAnimations
     );
   }
+
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme);
 }
 
 type ResizeDimensionLabelSpec = {

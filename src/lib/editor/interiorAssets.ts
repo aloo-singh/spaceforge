@@ -807,3 +807,13 @@ function snapStairRunMm(runMm: number) {
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
+
+export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): string {
+  switch (type) {
+    case "stairs": return "Stairs";
+    case "bed": return "Bed";
+    case "sofa": return "Sofa";
+    case "wardrobe": return "Wardrobe";
+    case "dining-table": return "Dining Table";
+  }
+}
