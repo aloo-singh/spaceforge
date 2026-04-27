@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -8,20 +7,23 @@ import { cn } from "@/lib/utils";
 type SubscriptionTier = "Free" | "Pro" | "Studio" | "Education";
 
 type DevSubscriptionTierSelectorProps = {
-  onTierChange?: (tier: SubscriptionTier) => void;
   className?: string;
 };
 
 const TIERS: SubscriptionTier[] = ["Free", "Pro", "Studio", "Education"];
 
 export function DevSubscriptionTierSelector({
-  onTierChange,
   className,
 }: DevSubscriptionTierSelectorProps) {
   const isDevSubscriptionModeEnabled = useEditorStore(
     (state) => state.isDevSubscriptionModeEnabled
   );
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("Free");
+  const devSubscriptionTier = useEditorStore(
+    (state) => state.devSubscriptionTier
+  );
+  const setDevSubscriptionTier = useEditorStore(
+    (state) => state.setDevSubscriptionTier
+  );
 
   // Don't render if dev mode is not enabled
   if (!isDevSubscriptionModeEnabled) {
@@ -30,12 +32,11 @@ export function DevSubscriptionTierSelector({
 
   const handleTierChange = (value: string) => {
     const tier = value as SubscriptionTier;
-    setSelectedTier(tier);
-    onTierChange?.(tier);
+    setDevSubscriptionTier(tier);
   };
 
   return (
-    <Tabs value={selectedTier} onValueChange={handleTierChange} className={cn("flex-1 flex justify-center", className)}>
+    <Tabs value={devSubscriptionTier} onValueChange={handleTierChange} className={cn("flex-1 flex justify-center", className)}>
       <TabsList className="h-auto gap-1 bg-background/50 p-0.5">
         {TIERS.map((tier) => (
           <TabsTrigger

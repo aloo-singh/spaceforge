@@ -186,6 +186,12 @@ type EditorState = {
    * ⚠️ CRITICAL: This flag must NEVER be enabled in production builds.
    */
   isDevSubscriptionModeEnabled: boolean;
+  /**
+   * Currently selected subscription tier in dev mode (session-only, not persisted).
+   * Only used when isDevSubscriptionModeEnabled is true. Defaults to "Free".
+   */
+  devSubscriptionTier: "Free" | "Pro" | "Studio" | "Education";
+  setDevSubscriptionTier: (tier: "Free" | "Pro" | "Studio" | "Education") => void;
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
@@ -1899,6 +1905,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   // Dev subscription mode flag: enabled only when NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE="true"
   isDevSubscriptionModeEnabled: process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
+  // Dev subscription tier: session-only, defaults to Free
+  devSubscriptionTier: "Free" as const,
+  setDevSubscriptionTier: (tier) =>
+    set((state) => {
+      if (state.devSubscriptionTier === tier) return state;
+      return {
+        devSubscriptionTier: tier,
+      };
+    }),
   roomDraft: EMPTY_ROOM_DRAFT,
   selectedNorthIndicator: false,
   selectedRoomId: null,
