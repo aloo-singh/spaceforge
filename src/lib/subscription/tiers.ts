@@ -2,6 +2,10 @@
  * Subscription Tier Definitions
  *
  * Single source of truth for all subscription features, limits, and gating.
+ *
+ * Pricing principle:
+ * Free = build and explore
+ * Paid = present and scale
  */
 
 export type SubscriptionTier = "Free" | "Pro" | "Studio" | "Education";
@@ -20,6 +24,11 @@ export interface TierConfig {
 
   /** Measurement & precision */
   hasAdvancedMeasurements: boolean;
+  hasRegionalSettings: boolean;
+
+  /** 2D / 2.5D visualisation */
+  has2DPlanView: boolean;
+  has2_5DVisualisation: boolean;
 
   /** Floor plan output */
   exportPNG: boolean;
@@ -33,14 +42,30 @@ export interface TierConfig {
   hasAdvanced3DRendering: boolean;
   export3DImages: boolean;
 
-  /** Branding / agency */
+  /**
+   * Branding / agency
+   *
+   * Custom branding = personal/project-level design identity.
+   * Useful for Education users to personalise and share their work.
+   *
+   * White labelling, brand templates, and client brand profiles are Studio-only
+   * because they are B2B/commercial agency features.
+   */
   hasCustomBranding: boolean;
+  hasWhiteLabelExports: boolean;
   hasBrandTemplates: boolean;
+  hasClientBrandProfiles: boolean;
 
-  /** Saving & collaboration */
+  /** Saving, sharing & collaboration */
   hasCloudSync: boolean;
   hasShareLinks: boolean;
+  hasPrivateShareLinks: boolean;
   hasVersionHistory: boolean;
+  hasCollaboration: boolean;
+
+  /** Gallery / community */
+  canPublishToGallery: boolean;
+  canDuplicateGalleryProjects: boolean;
 
   /** Pro workflows */
   exportCAD: boolean;
@@ -62,6 +87,11 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
     // Measurements
     hasAdvancedMeasurements: false,
+    hasRegionalSettings: true,
+
+    // 2D / 2.5D
+    has2DPlanView: true,
+    has2_5DVisualisation: true,
 
     // Output
     exportPNG: true,
@@ -75,14 +105,22 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     hasAdvanced3DRendering: false,
     export3DImages: false,
 
-    // Branding
+    // Branding / agency
     hasCustomBranding: false,
+    hasWhiteLabelExports: false,
     hasBrandTemplates: false,
+    hasClientBrandProfiles: false,
 
-    // Saving
+    // Saving / sharing
     hasCloudSync: false,
-    hasShareLinks: false,
+    hasShareLinks: true,
+    hasPrivateShareLinks: false,
     hasVersionHistory: false,
+    hasCollaboration: false,
+
+    // Gallery
+    canPublishToGallery: true,
+    canDuplicateGalleryProjects: true,
 
     // Pro workflows
     exportCAD: false,
@@ -92,7 +130,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Pro: {
     // Layout
-    maxFloors: 5,
+    maxFloors: 4,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,
@@ -100,6 +138,11 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
     // Measurements
     hasAdvancedMeasurements: true,
+    hasRegionalSettings: true,
+
+    // 2D / 2.5D
+    has2DPlanView: true,
+    has2_5DVisualisation: true,
 
     // Output
     exportPNG: true,
@@ -113,14 +156,22 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     hasAdvanced3DRendering: true,
     export3DImages: false,
 
-    // Branding
+    // Branding / agency
     hasCustomBranding: false,
+    hasWhiteLabelExports: false,
     hasBrandTemplates: false,
+    hasClientBrandProfiles: false,
 
-    // Saving
+    // Saving / sharing
     hasCloudSync: true,
     hasShareLinks: true,
+    hasPrivateShareLinks: true,
     hasVersionHistory: false,
+    hasCollaboration: false,
+
+    // Gallery
+    canPublishToGallery: true,
+    canDuplicateGalleryProjects: true,
 
     // Pro workflows
     exportCAD: false,
@@ -130,7 +181,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Studio: {
     // Layout
-    maxFloors: 10,
+    maxFloors: 9,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,
@@ -138,6 +189,11 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
     // Measurements
     hasAdvancedMeasurements: true,
+    hasRegionalSettings: true,
+
+    // 2D / 2.5D
+    has2DPlanView: true,
+    has2_5DVisualisation: true,
 
     // Output
     exportPNG: true,
@@ -151,14 +207,22 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     hasAdvanced3DRendering: true,
     export3DImages: true,
 
-    // Branding
+    // Branding / agency
     hasCustomBranding: true,
+    hasWhiteLabelExports: true,
     hasBrandTemplates: true,
+    hasClientBrandProfiles: true,
 
-    // Saving
+    // Saving / sharing
     hasCloudSync: true,
     hasShareLinks: true,
+    hasPrivateShareLinks: true,
     hasVersionHistory: true,
+    hasCollaboration: true,
+
+    // Gallery
+    canPublishToGallery: true,
+    canDuplicateGalleryProjects: true,
 
     // Pro workflows
     exportCAD: true,
@@ -168,7 +232,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Education: {
     // Layout
-    maxFloors: 10,
+    maxFloors: 9,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,
@@ -176,6 +240,11 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
     // Measurements
     hasAdvancedMeasurements: true,
+    hasRegionalSettings: true,
+
+    // 2D / 2.5D
+    has2DPlanView: true,
+    has2_5DVisualisation: true,
 
     // Output
     exportPNG: true,
@@ -187,19 +256,27 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     // 3D
     has3DWalkthrough: true,
     hasAdvanced3DRendering: true,
-    export3DImages: false, // optional restriction
+    export3DImages: true,
 
-    // Branding
-    hasCustomBranding: false, // keep Studio as B2B tier
+    // Branding / agency
+    hasCustomBranding: true,
+    hasWhiteLabelExports: false,
     hasBrandTemplates: false,
+    hasClientBrandProfiles: false,
 
-    // Saving
+    // Saving / sharing
     hasCloudSync: true,
     hasShareLinks: true,
-    hasVersionHistory: false,
+    hasPrivateShareLinks: true,
+    hasVersionHistory: true,
+    hasCollaboration: false,
+
+    // Gallery
+    canPublishToGallery: true,
+    canDuplicateGalleryProjects: true,
 
     // Pro workflows
-    exportCAD: false,
+    exportCAD: true,
     hasBatchExport: false,
     hasPriorityProcessing: false,
   },
@@ -212,6 +289,7 @@ export function getTierConfig(tier: SubscriptionTier | string): TierConfig {
   if (tier in SUBSCRIPTION_TIERS) {
     return SUBSCRIPTION_TIERS[tier as SubscriptionTier];
   }
+
   return SUBSCRIPTION_TIERS.Free;
 }
 
