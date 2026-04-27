@@ -318,6 +318,7 @@ type EditorState = {
   updateSelectedInteriorAssetArrowLabel: (label: string) => void;
   setSelectedInteriorAssetDoorType: (doorType: "swing" | "sliding") => void;
   setSelectedInteriorAssetShape: (shape: "rectangular" | "round") => void;
+  setSelectedBedSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -4441,6 +4442,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...cloneRoomInteriorAsset(asset),
           shape,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSelectedBedSizePreset: (widthMm, depthMm, presetName) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.widthMm === widthMm && asset.depthMm === depthMm) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          widthMm,
+          depthMm,
+          sizePreset: presetName,
         };
       });
       return nextState ?? state;

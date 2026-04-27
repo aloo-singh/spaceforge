@@ -77,6 +77,7 @@ function FurnitureInspector({
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const setSelectedInteriorAssetDoorType = useEditorStore((state) => state.setSelectedInteriorAssetDoorType);
   const setSelectedInteriorAssetShape = useEditorStore((state) => state.setSelectedInteriorAssetShape);
+  const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
     const assetId = state.selectedInteriorAsset?.assetId;
@@ -140,6 +141,34 @@ function FurnitureInspector({
           </div>
         </div>
 
+        {asset.type === "bed" ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Size</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  { label: "Single", widthMm: 900, depthMm: 1900 },
+                  { label: "Double", widthMm: 1350, depthMm: 1900 },
+                  { label: "Queen", widthMm: 1500, depthMm: 2000 },
+                  { label: "King", widthMm: 1800, depthMm: 2000 },
+                ] as const
+              ).map(({ label, widthMm, depthMm }) => (
+                <Button
+                  key={label}
+                  type="button"
+                  variant={asset.widthMm === widthMm && asset.depthMm === depthMm ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedBedSizePreset(widthMm, depthMm, label)}
+                  aria-label={`${label} bed`}
+                  aria-pressed={asset.widthMm === widthMm && asset.depthMm === depthMm}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Rotate</p>
           <ImmediateTooltipProvider>
@@ -198,7 +227,7 @@ function FurnitureInspector({
                 <InspectorIconTooltip groupItem content="Swing door">
                   <Button
                     type="button"
-                    variant={asset.doorType !== "sliding" ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
                     onClick={() => setSelectedInteriorAssetDoorType("swing")}
                     aria-label="Swing door"
@@ -210,7 +239,7 @@ function FurnitureInspector({
                 <InspectorIconTooltip groupItem content="Sliding door">
                   <Button
                     type="button"
-                    variant={asset.doorType === "sliding" ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
                     onClick={() => setSelectedInteriorAssetDoorType("sliding")}
                     aria-label="Sliding door"
@@ -232,7 +261,7 @@ function FurnitureInspector({
                 <InspectorIconTooltip groupItem content="Rectangular table">
                   <Button
                     type="button"
-                    variant={asset.shape !== "round" ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
                     onClick={() => setSelectedInteriorAssetShape("rectangular")}
                     aria-label="Rectangular table"
@@ -244,7 +273,7 @@ function FurnitureInspector({
                 <InspectorIconTooltip groupItem content="Round table">
                   <Button
                     type="button"
-                    variant={asset.shape === "round" ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
                     onClick={() => setSelectedInteriorAssetShape("round")}
                     aria-label="Round table"

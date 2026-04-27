@@ -19,6 +19,7 @@ export const DEFAULT_STAIR_TREAD_SPACING_MM = 300;
 export const MIN_STAIR_WIDTH_MM = 300;
 export const MIN_STAIR_DEPTH_MM = DEFAULT_STAIR_TREAD_SPACING_MM;
 export const MIN_WARDROBE_SIZE_MM = 500;
+export const MIN_FURNITURE_SIZE_MM = 100;
 export const DEFAULT_STAIR_NAME = "Stairs";
 export const DEFAULT_STAIR_ARROW_ENABLED = true;
 export const DEFAULT_STAIR_ARROW_DIRECTION: StairDirection = "forward";
@@ -36,10 +37,9 @@ export type InteriorAssetResizeWall = RectWall;
 export type InteriorAssetResizeCorner = RectCorner;
 
 export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAsset {
-  return {
+  const base: RoomInteriorAsset = {
     id: asset.id,
     type: asset.type,
-    connectionId: asset.connectionId ?? null,
     name: asset.name ?? DEFAULT_STAIR_NAME,
     xMm: asset.xMm,
     yMm: asset.yMm,
@@ -47,15 +47,19 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     depthMm: asset.depthMm,
     rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
     anchor: asset.anchor ?? "floor",
-    arrowEnabled: asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED,
-    arrowDirection: asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION,
-    arrowLabel: asset.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL,
-    doorType: asset.doorType,
-    doorConstraint: asset.doorConstraint,
-    shape: asset.shape,
-    unitSystem: asset.unitSystem,
-    sizePreset: asset.sizePreset,
   };
+  if (asset.type === "stairs") {
+    base.connectionId = asset.connectionId ?? null;
+    base.arrowEnabled = asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED;
+    base.arrowDirection = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
+    base.arrowLabel = asset.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL;
+  }
+  if (asset.doorType !== undefined) base.doorType = asset.doorType;
+  if (asset.doorConstraint !== undefined) base.doorConstraint = asset.doorConstraint;
+  if (asset.shape !== undefined) base.shape = asset.shape;
+  if (asset.unitSystem !== undefined) base.unitSystem = asset.unitSystem;
+  if (asset.sizePreset !== undefined) base.sizePreset = asset.sizePreset;
+  return base;
 }
 
 export function cloneRoomInteriorAssets(assets: RoomInteriorAsset[]): RoomInteriorAsset[] {
@@ -82,12 +86,14 @@ export function areRoomInteriorAssetsEqual(
       assetA.depthMm !== assetB.depthMm ||
       normalizeCanvasRotationDegrees(assetA.rotationDegrees ?? 0) !==
         normalizeCanvasRotationDegrees(assetB.rotationDegrees ?? 0) ||
-      (assetA.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) !==
-        (assetB.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) ||
-      (assetA.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) !==
-        (assetB.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) ||
-      (assetA.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) !==
-        (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) ||
+      (assetA.type === "stairs" && (
+        (assetA.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) !==
+          (assetB.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) ||
+        (assetA.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) !==
+          (assetB.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) ||
+        (assetA.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) !==
+          (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL)
+      )) ||
       (assetA.doorType ?? null) !== (assetB.doorType ?? null) ||
       (assetA.shape ?? null) !== (assetB.shape ?? null)
     ) {
@@ -632,20 +638,33 @@ function getConstrainedResizedStair(
 ): RoomInteriorAsset | null {
   const normalizedBounds = normalizeInteriorAssetResizeBounds(resizedBounds);
   const snappedBounds = { ...normalizedBounds };
-  if (isStairRunHorizontal(asset)) {
-    snappedBounds.maxX =
-      snappedBounds.minX + snapStairRunMm(normalizedBounds.maxX - normalizedBounds.minX);
-  } else {
-    snappedBounds.maxY =
-      snappedBounds.minY + snapStairRunMm(normalizedBounds.maxY - normalizedBounds.minY);
-  }
 
-  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
-  if (snappedBounds.maxY - snappedBounds.minY < minDimension) {
-    snappedBounds.maxY = snappedBounds.minY + minDimension;
-  }
-  if (snappedBounds.maxX - snappedBounds.minX < minDimension) {
-    snappedBounds.maxX = snappedBounds.minX + minDimension;
+  if (asset.type === "stairs") {
+    // Stairs snap the run length to tread-depth multiples.
+    if (isStairRunHorizontal(asset)) {
+      snappedBounds.maxX =
+        snappedBounds.minX + snapStairRunMm(normalizedBounds.maxX - normalizedBounds.minX);
+    } else {
+      snappedBounds.maxY =
+        snappedBounds.minY + snapStairRunMm(normalizedBounds.maxY - normalizedBounds.minY);
+    }
+    const minW = MIN_STAIR_WIDTH_MM;
+    const minD = MIN_STAIR_DEPTH_MM;
+    if (snappedBounds.maxY - snappedBounds.minY < minD) {
+      snappedBounds.maxY = snappedBounds.minY + minD;
+    }
+    if (snappedBounds.maxX - snappedBounds.minX < minW) {
+      snappedBounds.maxX = snappedBounds.minX + minW;
+    }
+  } else {
+    // Furniture: free resize with a small practical minimum.
+    const minDimension = asset.type === "wardrobe" ? MIN_WARDROBE_SIZE_MM : MIN_FURNITURE_SIZE_MM;
+    if (snappedBounds.maxY - snappedBounds.minY < minDimension) {
+      snappedBounds.maxY = snappedBounds.minY + minDimension;
+    }
+    if (snappedBounds.maxX - snappedBounds.minX < minDimension) {
+      snappedBounds.maxX = snappedBounds.minX + minDimension;
+    }
   }
 
   const nextAsset = getInteriorAssetFromBounds(asset, snappedBounds);
@@ -659,8 +678,15 @@ function resizeInteriorAssetBoundsForWallDrag(
   cursorWorld: Point,
   options?: { gridSizeMm?: number }
 ): RoomRectBounds {
-  const isSideways = isStairRunHorizontal(asset);
-  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
+  const isStairs = asset.type === "stairs";
+  const isSideways = isStairs && isStairRunHorizontal(asset);
+  const minDimension = isStairs
+    ? MIN_STAIR_WIDTH_MM
+    : asset.type === "wardrobe"
+      ? MIN_WARDROBE_SIZE_MM
+      : MIN_FURNITURE_SIZE_MM;
+  // Stairs snap the cursor to the tread-depth grid on the run axis.
+  // Furniture uses the general grid (or raw cursor position).
   const snappedX =
     isSideways
       ? snapToGrid(cursorWorld.x, DEFAULT_STAIR_TREAD_SPACING_MM)
@@ -682,11 +708,11 @@ function resizeInteriorAssetBoundsForWallDrag(
   }
 
   const snappedY =
-    isSideways
-      ? options?.gridSizeMm && options.gridSizeMm > 0
+    (isStairs && !isSideways)
+      ? snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM)
+      : options?.gridSizeMm && options.gridSizeMm > 0
         ? snapToGrid(cursorWorld.y, options.gridSizeMm)
-        : cursorWorld.y
-      : snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+        : cursorWorld.y;
   if (wall === "top") {
     return {
       ...bounds,
@@ -707,8 +733,13 @@ function resizeInteriorAssetBoundsForCornerDrag(
   cursorWorld: Point,
   options?: { gridSizeMm?: number }
 ): RoomRectBounds {
-  const isSideways = isStairRunHorizontal(asset);
-  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
+  const isStairs = asset.type === "stairs";
+  const isSideways = isStairs && isStairRunHorizontal(asset);
+  const minDimension = isStairs
+    ? MIN_STAIR_WIDTH_MM
+    : asset.type === "wardrobe"
+      ? MIN_WARDROBE_SIZE_MM
+      : MIN_FURNITURE_SIZE_MM;
   const snappedX =
     isSideways
       ? snapToGrid(cursorWorld.x, DEFAULT_STAIR_TREAD_SPACING_MM)
@@ -716,11 +747,11 @@ function resizeInteriorAssetBoundsForCornerDrag(
         ? snapToGrid(cursorWorld.x, options.gridSizeMm)
         : cursorWorld.x;
   const snappedY =
-    isSideways
-      ? options?.gridSizeMm && options.gridSizeMm > 0
+    (isStairs && !isSideways)
+      ? snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM)
+      : options?.gridSizeMm && options.gridSizeMm > 0
         ? snapToGrid(cursorWorld.y, options.gridSizeMm)
-        : cursorWorld.y
-      : snapToGrid(cursorWorld.y, DEFAULT_STAIR_TREAD_SPACING_MM);
+        : cursorWorld.y;
 
   if (corner === "top-left") {
     return {

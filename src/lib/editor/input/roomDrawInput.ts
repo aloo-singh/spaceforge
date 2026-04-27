@@ -535,6 +535,7 @@ export function attachRoomDrawInput(
     if (currentCursor === nextCursor) return;
     currentCursor = nextCursor;
     canvas.style.cursor = nextCursor;
+    document.body.style.cursor = nextCursor;
   };
 
   const updateCursor = () => {
