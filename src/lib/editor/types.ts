@@ -87,27 +87,34 @@ export type StairDirection = "forward" | "reverse";
  * Extensible enum for all furniture and fixtures.
  *
  * Phases:
- * - Phase 1: stairs (existing)
- * - Phase 2: bed, wardrobe, sofa, dining-table
+ * - Phase 1: stairs (existing) ✓
+ * - Phase 2: wardrobe ✓, bed, sofa, dining-table
  * - Future: sink, toilet, range, island, shelving, etc.
  */
-export type InteriorAssetType = "stairs";
+export type InteriorAssetType = "stairs" | "wardrobe";
 
 /**
  * Interior asset: a piece of furniture or fixture placed inside a room.
  *
- * This is a discriminated union (keyed by `type`) that allows type-safe
- * access to asset-specific properties while sharing common behaviours.
+ * This is a heterogeneous type that represents all interior assets.
+ * The `type` field discriminates between stairs, wardrobe, and future assets.
  *
  * Common properties (all assets):
  * - id, name: identity and display
  * - xMm, yMm: position in room coordinates
  * - widthMm, depthMm: dimensions
  * - rotationDegrees: orientation
+ * - unitSystem (optional): metric or imperial for dimension display
+ * - sizePreset (optional): preset identifier for localisation
  *
  * Type-specific properties:
- * - stairs: connectionId, arrowEnabled, arrowDirection, arrowLabel
- * - (future assets will add their own properties)
+ * - Stairs: connectionId, arrowEnabled, arrowDirection, arrowLabel
+ * - Wardrobe: doorType, doorConstraint
+ *
+ * Backward compatibility:
+ * - Existing stairs projects load unchanged (arrowEnabled, etc. already present)
+ * - New wardrobe assets add doorType and doorConstraint
+ * - Optional fields default to sensible values at runtime
  *
  * Behaviours (common across all assets):
  * - Move: translate to new position (constrained inside room)
@@ -118,8 +125,8 @@ export type InteriorAssetType = "stairs";
  * - Select: highlight and show inspector
  * - Delete: remove from room (undo-tracked)
  *
- * See src/lib/editor/interiorAssetTypes.ts for detailed type definitions
- * and behaviour documentation.
+ * See src/lib/editor/interiorAssetTypes.ts for detailed type definitions,
+ * type guards, and behaviour documentation.
  */
 export type RoomInteriorAsset = {
   id: string;
@@ -131,9 +138,16 @@ export type RoomInteriorAsset = {
   widthMm: number;
   depthMm: number;
   rotationDegrees: number;
-  arrowEnabled: boolean;
-  arrowDirection: StairDirection;
-  arrowLabel: string;
+  // Stairs-specific properties (optional for wardrobe)
+  arrowEnabled?: boolean;
+  arrowDirection?: StairDirection;
+  arrowLabel?: string;
+  // Wardrobe-specific properties (optional for stairs)
+  doorType?: "swing" | "sliding";
+  doorConstraint?: number;
+  // Optional regionalisation
+  unitSystem?: "metric" | "imperial";
+  sizePreset?: string;
 };
 
 export type RoomInteriorAssetSelection = {

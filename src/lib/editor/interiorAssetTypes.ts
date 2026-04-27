@@ -83,6 +83,34 @@ export interface InteriorAssetCommonProperties {
    * Reserved for future wall/ceiling anchoring without restructuring.
    */
   anchor: InteriorAssetAnchor;
+
+  /**
+   * Unit system preference for this asset (optional).
+   * Default: "metric"
+   *
+   * Used by display helpers to format dimensions appropriately:
+   * - "metric": metres and centimetres (e.g. "1.00m × 0.60m")
+   * - "imperial": feet and inches (e.g. "3' 3\" × 2' 0\"")
+   *
+   * Project-level defaults can override per-asset, but this allows
+   * individual assets to maintain their original units during migration.
+   * Defaults to metric for backward compatibility.
+   */
+  unitSystem?: "metric" | "imperial";
+
+  /**
+   * Preset identifier for this asset size (optional).
+   * String key for future localisation of preset names.
+   * Examples: "standard-queen-bed", "wardrobe-sliding-2door", "dining-table-6seat"
+   *
+   * Enables:
+   * - Future UI to display localised names
+   * - Analytics on common size preferences
+   * - Quick presets in asset creation UI
+   *
+   * Not enforced (assets can be custom-sized), but guides user choices.
+   */
+  sizePreset?: string;
 }
 
 /**
@@ -136,12 +164,55 @@ export interface InteriorAssetStairs extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Wardrobe: freestanding or built-in clothing storage with configurable door types.
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable within reasonable furniture dimensions
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate (respects doorType and constraint)
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with door configuration
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - doorType: "swing" (hinged) or "sliding" (gliding doors)
+ * - doorConstraint: minimum width (in current unitSystem) for sliding door operation
+ */
+export interface InteriorAssetWardrobe extends InteriorAssetCommonProperties {
+  type: "wardrobe";
+
+  /**
+   * Door mechanism type.
+   * "swing" = traditional hinged doors (like cabinet or room door)
+   * "sliding" = gliding bifold or pocket doors (space-efficient)
+   * Default: "swing"
+   */
+  doorType: "swing" | "sliding";
+
+  /**
+   * Minimum clear width (in the current unitSystem) required for sliding doors to operate.
+   * Measured in millimetres (always stored in mm for consistency).
+   * Only applied when doorType === "sliding".
+   *
+   * Example constraints:
+   * - Standard bifold: 800mm minimum
+   * - Pocket sliding: 1200mm minimum
+   * - Bypass sliding: 600mm minimum
+   *
+   * Used in room layout checks to warn users if wardrobe placement
+   * would block door operation due to insufficient clear space.
+   */
+  doorConstraint: number;
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
  * - Stairs (Phase 1) ✓
+ * - Wardrobe (Phase 2) ✓
  * - Bed (Phase 2)
- * - Wardrobe (Phase 2)
  * - Sofa (Phase 2)
  * - Dining Table (Phase 2)
  * - [Future: Sink, Toilet, Range, Island, Shelving, etc.]
@@ -152,16 +223,17 @@ export interface InteriorAssetStairs extends InteriorAssetCommonProperties {
  *   if (asset.type === "stairs") {
  *     // stairs-specific logic
  *     console.log(asset.arrowLabel);
- *   } else if (asset.type === "bed") {
- *     // bed-specific logic
+ *   } else if (asset.type === "wardrobe") {
+ *     // wardrobe-specific logic
+ *     console.log(asset.doorType);
  *   }
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe;
 
 /**
- * Type guard to safely extract asset type from discriminated union.
+ * Type guard to safely extract stairs from discriminated union.
  *
  * Usage:
  * ```typescript
@@ -172,6 +244,20 @@ export type InteriorAsset = InteriorAssetStairs;
  */
 export function isStairs(asset: InteriorAsset): asset is InteriorAssetStairs {
   return asset.type === "stairs";
+}
+
+/**
+ * Type guard to safely extract wardrobe from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isWardrobe(asset)) {
+ *   console.log(asset.doorType); // type-safe
+ * }
+ * ```
+ */
+export function isWardrobe(asset: InteriorAsset): asset is InteriorAssetWardrobe {
+  return asset.type === "wardrobe";
 }
 
 /**
@@ -306,4 +392,55 @@ export function updateAssetRotation(
 
 export function updateAssetName(asset: InteriorAsset, name: string): InteriorAsset {
   return { ...asset, name };
+}
+
+/**
+ * Format asset dimensions as a human-readable string.
+ *
+ * Respects the asset's unitSystem preference (default: metric).
+ *
+ * @param asset - The interior asset to display
+ * @returns Formatted dimension string
+ *
+ * Examples:
+ * - Metric: "1.00m × 0.60m" (1000mm × 600mm, metric units)
+ * - Imperial: "3' 3\" × 2' 0\"" (1000mm × 600mm, imperial units)
+ *
+ * Implementation:
+ * - Metric: converts mm to metres, formatted to 2 decimal places
+ * - Imperial: converts mm to feet/inches, formatted with foot symbol and inch marks
+ * - Rounds to nearest sensible value for furniture (0.01m or 1/8")
+ *
+ * Future: This helper will be used by:
+ * - Inspector UI to display dimensions
+ * - Export functions for project metadata
+ * - Localisation layer (preset names can be translated)
+ */
+export function getAssetDisplayDimensions(asset: InteriorAsset): string {
+  const unitSystem = asset.unitSystem ?? "metric";
+
+  if (unitSystem === "metric") {
+    const widthM = (asset.widthMm / 1000).toFixed(2);
+    const depthM = (asset.depthMm / 1000).toFixed(2);
+    return `${widthM}m × ${depthM}m`;
+  } else {
+    // Imperial: convert mm to feet and inches
+    const widthInches = asset.widthMm / 25.4;
+    const depthInches = asset.depthMm / 25.4;
+
+    const formatFeetInches = (inches: number): string => {
+      const feet = Math.floor(inches / 12);
+      const remainder = Math.round(inches % 12);
+      // Handle rounding up to next foot
+      if (remainder === 12) {
+        return `${feet + 1}'`;
+      }
+      if (feet === 0) {
+        return `${remainder}"`;
+      }
+      return `${feet}' ${remainder}"`;
+    };
+
+    return `${formatFeetInches(widthInches)} × ${formatFeetInches(depthInches)}`;
+  }
 }

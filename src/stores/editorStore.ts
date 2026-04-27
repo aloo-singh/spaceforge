@@ -3695,7 +3695,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         interiorAssetArrowLabelSession: {
           roomId,
           assetId,
-          initialArrowLabel: asset.arrowLabel,
+          initialArrowLabel: asset.arrowLabel ?? "",
         },
       };
     }),
@@ -3714,7 +3714,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           : {
               roomId,
               assetId,
-              initialArrowLabel: asset.arrowLabel,
+              initialArrowLabel: asset.arrowLabel ?? "",
             };
 
       if (
