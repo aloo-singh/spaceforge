@@ -137,6 +137,109 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
   };
 }
 
+/**
+ * Create a centered default bed in the given room.
+ * Standard double bed dimensions: 1350mm × 1900mm
+ */
+export function createCenteredDefaultBed(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "bed",
+    name: "Bed",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 1350, // Double bed width
+    depthMm: 1900, // Double bed depth
+    rotationDegrees: 0,
+  };
+}
+
+/**
+ * Create a centered default sofa in the given room.
+ * Standard 3-seater sofa dimensions: 2000mm × 900mm
+ */
+export function createCenteredDefaultSofa(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "sofa",
+    name: "Sofa",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 2000, // 3-seater width
+    depthMm: 900, // Standard depth
+    rotationDegrees: 0,
+  };
+}
+
+/**
+ * Create a centered default wardrobe in the given room.
+ * Standard wardrobe dimensions: 1600mm × 600mm with swing doors
+ */
+export function createCenteredDefaultWardrobe(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "wardrobe",
+    name: "Wardrobe",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 1600,
+    depthMm: 600,
+    rotationDegrees: 0,
+    doorType: "swing",
+    doorConstraint: 800,
+  };
+}
+
+/**
+ * Create a centered default dining table in the given room.
+ * Standard rectangular dining table: 1600mm × 900mm
+ */
+export function createCenteredDefaultDiningTable(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "dining-table",
+    name: "Dining Table",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 1600,
+    depthMm: 900,
+    rotationDegrees: 0,
+    shape: "rectangular",
+  };
+}
+
 export function findInteriorAssetAtScreenPoint(
   rooms: Room[],
   screenPoint: Point,

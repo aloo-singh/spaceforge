@@ -4385,39 +4385,42 @@ function drawRoomInteriorAssets(
     graphics.closePath();
     graphics.stroke();
 
-    const isQuarterTurnSideways =
-      Math.abs(normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
-    const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
-    const treadCount = Math.max(
-      0,
-      Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
-    );
-    for (let index = 1; index <= treadCount; index += 1) {
-      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
-      if (progress <= 0 || progress >= 1) continue;
-      const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
-      const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
-      const start = {
-        x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
-        y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
-      };
-      const end = {
-        x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
-        y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
-      };
-      graphics.setStrokeStyle({
-        width: Math.max(camera.pixelsPerMm * 10, 1.1),
-        color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-        alpha: isSelected ? 0.88 : 0.72,
-        cap: "round",
-      });
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
-    }
+    // Stairs-specific visuals (tread lines and direction arrow)
+    if (asset.type === "stairs") {
+      const isQuarterTurnSideways =
+        Math.abs(normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
+      const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
+      const treadCount = Math.max(
+        0,
+        Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+      );
+      for (let index = 1; index <= treadCount; index += 1) {
+        const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
+        if (progress <= 0 || progress >= 1) continue;
+        const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
+        const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
+        const start = {
+          x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
+          y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
+        };
+        const end = {
+          x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
+          y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
+        };
+        graphics.setStrokeStyle({
+          width: Math.max(camera.pixelsPerMm * 10, 1.1),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.88 : 0.72,
+          cap: "round",
+        });
+        graphics.moveTo(start.x, start.y);
+        graphics.lineTo(end.x, end.y);
+        graphics.stroke();
+      }
 
-    if (options?.includeStairDirectionVisuals !== false) {
-      drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
+      if (options?.includeStairDirectionVisuals !== false) {
+        drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
+      }
     }
 
     if (!isSelected) continue;

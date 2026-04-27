@@ -71,6 +71,10 @@ import {
   cloneRoomInteriorAssets,
   constrainInteriorAssetCenter,
   createCenteredDefaultStair,
+  createCenteredDefaultBed,
+  createCenteredDefaultSofa,
+  createCenteredDefaultWardrobe,
+  createCenteredDefaultDiningTable,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
   getRotatedInteriorAssetForRoom,
@@ -105,6 +109,7 @@ import type {
   DoorHingeSide,
   DoorOpeningSide,
   Floor,
+  InteriorAssetType,
   OpeningType,
   Point,
   Room,
@@ -297,6 +302,7 @@ type EditorState = {
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
+  placeAssetInSelectedRoom: (assetType: InteriorAssetType) => void;
   promptConnectedFloorForSelectedStair: () => void;
   addConnectedFloorAboveFromSelectedStair: () => void;
   addConnectedFloorBelowFromSelectedStair: () => void;
@@ -4211,6 +4217,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (promptRoomId && promptAssetId) {
       showConnectedFloorPrompt(promptRoomId, promptAssetId);
     }
+  },
+  placeAssetInSelectedRoom: (assetType: InteriorAssetType) => {
+    set((state) => {
+      if (!state.selectedRoomId) return state;
+      const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
+      if (!room) return state;
+
+      let asset: RoomInteriorAsset | null = null;
+
+      switch (assetType) {
+        case "stairs":
+          asset = createCenteredDefaultStair(room, createInteriorAssetId());
+          break;
+        case "bed":
+          asset = createCenteredDefaultBed(room, createInteriorAssetId());
+          break;
+        case "sofa":
+          asset = createCenteredDefaultSofa(room, createInteriorAssetId());
+          break;
+        case "wardrobe":
+          asset = createCenteredDefaultWardrobe(room, createInteriorAssetId());
+          break;
+        case "dining-table":
+          asset = createCenteredDefaultDiningTable(room, createInteriorAssetId());
+          break;
+      }
+
+      if (!asset) return state;
+
+      const command: EditorCommand = {
+        type: "add-interior-asset",
+        roomId: room.id,
+        asset,
+      };
+
+      return {
+        ...state,
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+        selectedOpening: null,
+        selectedWall: null,
+        selection: [{ type: "stair" as const, roomId: room.id, id: asset.id }],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    });
   },
   promptConnectedFloorForSelectedStair: () => {
     const state = useEditorStore.getState();
