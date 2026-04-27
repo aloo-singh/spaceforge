@@ -2,15 +2,12 @@
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorStore } from "@/stores/editorStore";
+import { AVAILABLE_TIERS, type SubscriptionTier } from "@/lib/subscription/tiers";
 import { cn } from "@/lib/utils";
-
-type SubscriptionTier = "Free" | "Pro" | "Studio" | "Education";
 
 type DevSubscriptionTierSelectorProps = {
   className?: string;
 };
-
-const TIERS: SubscriptionTier[] = ["Free", "Pro", "Studio", "Education"];
 
 export function DevSubscriptionTierSelector({
   className,
@@ -38,7 +35,7 @@ export function DevSubscriptionTierSelector({
   return (
     <Tabs value={devSubscriptionTier} onValueChange={handleTierChange} className={cn("flex-1 flex justify-center", className)}>
       <TabsList className="h-auto gap-1 bg-background/50 p-0.5">
-        {TIERS.map((tier) => (
+        {AVAILABLE_TIERS.map((tier) => (
           <TabsTrigger
             key={tier}
             value={tier}

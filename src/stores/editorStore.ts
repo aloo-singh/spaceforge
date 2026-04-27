@@ -98,6 +98,7 @@ import {
   type DrawConstraintMode,
 } from "@/lib/editor/snapping";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
 import type {
   CameraState,
@@ -190,8 +191,8 @@ type EditorState = {
    * Currently selected subscription tier in dev mode (session-only, not persisted).
    * Only used when isDevSubscriptionModeEnabled is true. Defaults to "Free".
    */
-  devSubscriptionTier: "Free" | "Pro" | "Studio" | "Education";
-  setDevSubscriptionTier: (tier: "Free" | "Pro" | "Studio" | "Education") => void;
+  devSubscriptionTier: SubscriptionTier;
+  setDevSubscriptionTier: (tier: SubscriptionTier) => void;
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
@@ -385,15 +386,15 @@ const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
  * Only loads if dev mode is enabled via env var.
  * Returns "Free" if not found or invalid.
  */
-function loadDevSubscriptionTierFromStorage(): "Free" | "Pro" | "Studio" | "Education" {
+function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
   if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
     return "Free";
   }
 
   try {
     const stored = window.localStorage.getItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY);
-    if (stored && ["Free", "Pro", "Studio", "Education"].includes(stored)) {
-      return stored as "Free" | "Pro" | "Studio" | "Education";
+    if (stored && AVAILABLE_TIERS.includes(stored as SubscriptionTier)) {
+      return stored as SubscriptionTier;
     }
   } catch {
     // localStorage may be unavailable in some environments
@@ -406,7 +407,7 @@ function loadDevSubscriptionTierFromStorage(): "Free" | "Pro" | "Studio" | "Educ
  * Save dev subscription tier to localStorage.
  * Only saves if dev mode is enabled via env var.
  */
-function saveDevSubscriptionTierToStorage(tier: "Free" | "Pro" | "Studio" | "Education"): void {
+function saveDevSubscriptionTierToStorage(tier: SubscriptionTier): void {
   if (typeof window === "undefined" || process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE !== "true") {
     return;
   }
@@ -419,38 +420,29 @@ function saveDevSubscriptionTierToStorage(tier: "Free" | "Pro" | "Studio" | "Edu
 }
 
 /**
- * Subscription tier limits for floor counts.
- * These limits apply based on the effective tier (dev or user subscription).
- */
-const SUBSCRIPTION_TIER_MAX_FLOORS: Record<"Free" | "Pro" | "Studio" | "Education", number> = {
-  Free: 2,
-  Pro: 5,
-  Studio: 10,
-  Education: 10,
-} as const;
-
-/**
  * Get the effective subscription tier for gating logic.
  * If dev mode is enabled, uses the selected dev tier.
  * Otherwise defaults to Free (non-paying user baseline).
  */
 function getEffectiveSubscriptionTier(
   isDevMode: boolean,
-  devTier: "Free" | "Pro" | "Studio" | "Education"
-): "Free" | "Pro" | "Studio" | "Education" {
+  devTier: SubscriptionTier
+): SubscriptionTier {
   return isDevMode ? devTier : "Free";
 }
 
 /**
  * Get the effective max floors for the current user/tier.
  * Respects dev tier selection when dev mode is enabled.
+ * Uses central tier configuration from @/lib/subscription/tiers.
  */
 function getEffectiveMaxFloors(
   isDevMode: boolean,
-  devTier: "Free" | "Pro" | "Studio" | "Education"
+  devTier: SubscriptionTier
 ): number {
   const effectiveTier = getEffectiveSubscriptionTier(isDevMode, devTier);
-  return SUBSCRIPTION_TIER_MAX_FLOORS[effectiveTier];
+  const tierConfig = getTierConfig(effectiveTier);
+  return tierConfig.maxFloors;
 }
 
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
