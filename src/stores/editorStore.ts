@@ -417,6 +417,42 @@ function saveDevSubscriptionTierToStorage(tier: "Free" | "Pro" | "Studio" | "Edu
     // localStorage may be unavailable in some environments
   }
 }
+
+/**
+ * Subscription tier limits for floor counts.
+ * These limits apply based on the effective tier (dev or user subscription).
+ */
+const SUBSCRIPTION_TIER_MAX_FLOORS: Record<"Free" | "Pro" | "Studio" | "Education", number> = {
+  Free: 2,
+  Pro: 5,
+  Studio: 10,
+  Education: 10,
+} as const;
+
+/**
+ * Get the effective subscription tier for gating logic.
+ * If dev mode is enabled, uses the selected dev tier.
+ * Otherwise defaults to Free (non-paying user baseline).
+ */
+function getEffectiveSubscriptionTier(
+  isDevMode: boolean,
+  devTier: "Free" | "Pro" | "Studio" | "Education"
+): "Free" | "Pro" | "Studio" | "Education" {
+  return isDevMode ? devTier : "Free";
+}
+
+/**
+ * Get the effective max floors for the current user/tier.
+ * Respects dev tier selection when dev mode is enabled.
+ */
+function getEffectiveMaxFloors(
+  isDevMode: boolean,
+  devTier: "Free" | "Pro" | "Studio" | "Education"
+): number {
+  const effectiveTier = getEffectiveSubscriptionTier(isDevMode, devTier);
+  return SUBSCRIPTION_TIER_MAX_FLOORS[effectiveTier];
+}
+
 const DEFAULT_DOCUMENT_STATE: DocumentState = createEmptyEditorDocumentState();
 const DEFAULT_CAMERA_STATE: CameraState = {
   xMm: 0,
@@ -1934,12 +1970,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     width: 1,
     height: 1,
   },
-  maxFloors: 10,
+  // Initial maxFloors respects subscription tier limits
+  maxFloors: getEffectiveMaxFloors(
+    process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true",
+    loadDevSubscriptionTierFromStorage()
+  ),
   setMaxFloors: (maxFloors) =>
     set((state) => {
-      if (state.maxFloors === maxFloors) return state;
+      // Apply subscription tier limits: effective maxFloors is the minimum of
+      // the project's maxFloors and the user's subscription tier limit
+      const effectiveLimit = getEffectiveMaxFloors(
+        state.isDevSubscriptionModeEnabled,
+        state.devSubscriptionTier
+      );
+      const constrainedMaxFloors = Math.min(maxFloors, effectiveLimit);
+      
+      if (state.maxFloors === constrainedMaxFloors) return state;
       return {
-        maxFloors,
+        maxFloors: constrainedMaxFloors,
       };
     }),
   // Dev subscription mode flag: enabled only when NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE="true"
@@ -1950,8 +1998,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.devSubscriptionTier === tier) return state;
       saveDevSubscriptionTierToStorage(tier);
+      
+      // Recalculate maxFloors based on new tier
+      const effectiveLimit = getEffectiveMaxFloors(state.isDevSubscriptionModeEnabled, tier);
+      const constrainedMaxFloors = Math.min(state.maxFloors, effectiveLimit);
+      
       return {
         devSubscriptionTier: tier,
+        // Update maxFloors if the new tier's limit is more restrictive
+        ...(constrainedMaxFloors < state.maxFloors ? { maxFloors: constrainedMaxFloors } : {}),
       };
     }),
   roomDraft: EMPTY_ROOM_DRAFT,
