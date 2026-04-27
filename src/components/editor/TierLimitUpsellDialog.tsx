@@ -48,6 +48,7 @@ export function TierLimitUpsellDialog({
     : null;
 
   const upsellText = nextTier && nextConfig ? currentConfig.upsellMessage(nextTier, nextConfig.limit) : null;
+  const hasUpgradePath = !!nextTier;
 
   return (
     <ResponsiveAlertDialog
@@ -57,25 +58,31 @@ export function TierLimitUpsellDialog({
       description={`You've reached your current limit of ${currentLimitText}.`}
       footer={
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Keep current
-          </Button>
-          {nextTier && (
-            <Button
-              onClick={() => {
-                // In dev mode, allow tier switching for testing
-                const isDevMode = useEditorStore.getState().isDevSubscriptionModeEnabled;
-                if (isDevMode) {
-                  setDevSubscriptionTier(nextTier);
-                  onOpenChange(false);
-                } else {
-                  // In production, this would navigate to upgrade flow
-                  window.open("/upgrade", "_blank");
-                }
-              }}
-            >
-              Upgrade to {nextTier}
+          {!hasUpgradePath ? (
+            <Button onClick={() => onOpenChange(false)} className="w-full">
+              Got it
             </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Stay with {currentTier}
+              </Button>
+              <Button
+                onClick={() => {
+                  // In dev mode, allow tier switching for testing
+                  const isDevMode = useEditorStore.getState().isDevSubscriptionModeEnabled;
+                  if (isDevMode) {
+                    setDevSubscriptionTier(nextTier);
+                    onOpenChange(false);
+                  } else {
+                    // In production, this would navigate to upgrade flow
+                    window.open("/upgrade", "_blank");
+                  }
+                }}
+              >
+                Upgrade to {nextTier}
+              </Button>
+            </>
           )}
         </div>
       }
@@ -91,6 +98,11 @@ export function TierLimitUpsellDialog({
         {upsellText && (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {upsellText}
+          </p>
+        )}
+        {!hasUpgradePath && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {currentConfig.terminalMessage}
           </p>
         )}
       </div>

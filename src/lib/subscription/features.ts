@@ -20,10 +20,15 @@ export interface GatedFeatureConfig {
   /** Plural label (e.g., "floors") */
   pluralLabel: string;
   /**
-   * Upsell message fragment. Positive, benefit-focused.
-   * Example: "Unlock up to 6 floors and collaborate with your team in Studio."
+   * Upsell message fragment when upgrade is available.
+   * Positive, benefit-focused. Example: "Unlock up to 6 floors and collaborate with your team in Studio."
    */
   upsellMessage: (nextTier: SubscriptionTier, nextLimit: number) => string;
+  /**
+   * Terminal message when at the highest tier with no upgrade path.
+   * Rory-approved: focus on what's possible, celebration of tier, not restriction.
+   */
+  terminalMessage: string;
 }
 
 /**
@@ -38,6 +43,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       pluralLabel: "floors",
       upsellMessage: (nextTier, nextLimit) => 
         `Upgrade to ${nextTier} to create projects with up to ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"}.`,
+      terminalMessage: "You've reached your Free tier limit. Ready to expand your creativity?",
     },
   },
 
@@ -49,6 +55,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       pluralLabel: "floors",
       upsellMessage: (nextTier, nextLimit) =>
         `Unlock ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"} and advanced 3D features with ${nextTier}.`,
+      terminalMessage: "Pro tier maxed out. Studio unlocks commercial features and 6 floors.",
     },
   },
 
@@ -59,7 +66,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       singularLabel: "floor",
       pluralLabel: "floors",
       upsellMessage: (nextTier, nextLimit) =>
-        `Education tier allows ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"} and full creative freedom.`,
+        `Unlock ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"} with ${nextTier}.`,
+      terminalMessage: "You've unlocked Studio's full creative potential. Make every floor count.",
     },
   },
 
@@ -71,6 +79,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       pluralLabel: "floors",
       upsellMessage: () =>
         `You're on Education tier with full creative freedom.`,
+      terminalMessage: "Education tier gives you 6 floors of unlimited creative freedom. You've got this.",
     },
   },
 };

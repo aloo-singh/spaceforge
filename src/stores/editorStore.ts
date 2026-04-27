@@ -1991,14 +1991,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.devSubscriptionTier === tier) return state;
       saveDevSubscriptionTierToStorage(tier);
       
-      // Recalculate maxFloors based on new tier
-      const effectiveLimit = getEffectiveMaxFloors(state.isDevSubscriptionModeEnabled, tier);
-      const constrainedMaxFloors = Math.min(state.maxFloors, effectiveLimit);
+      // When tier changes, always update maxFloors to match the new tier's limit
+      const newMaxFloors = getEffectiveMaxFloors(state.isDevSubscriptionModeEnabled, tier);
       
       return {
         devSubscriptionTier: tier,
-        // Update maxFloors if the new tier's limit is more restrictive
-        ...(constrainedMaxFloors < state.maxFloors ? { maxFloors: constrainedMaxFloors } : {}),
+        maxFloors: newMaxFloors,
       };
     }),
   roomDraft: EMPTY_ROOM_DRAFT,
