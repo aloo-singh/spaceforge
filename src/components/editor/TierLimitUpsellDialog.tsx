@@ -3,52 +3,70 @@
 import { useEditorStore } from "@/stores/editorStore";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Button } from "@/components/ui/button";
-import { getTierConfig, AVAILABLE_TIERS, type SubscriptionTier } from "@/lib/subscription/tiers";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
+import {
+  getFeatureConfig,
+  getNextTierWithMoreCapacity,
+  formatWithLabel,
+} from "@/lib/subscription/features";
 
 type TierLimitUpsellDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  feature: string; // e.g., "Floors"
+  featureKey: string; // e.g., "floors"
   currentTier: SubscriptionTier;
-  currentLimit: number;
 };
 
 export function TierLimitUpsellDialog({
   open,
   onOpenChange,
-  feature,
+  featureKey,
   currentTier,
-  currentLimit,
 }: TierLimitUpsellDialogProps) {
   const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
 
-  // Find the next tier that offers more of this feature
-  const currentTierIndex = AVAILABLE_TIERS.indexOf(currentTier);
-  const nextTierWithMore = AVAILABLE_TIERS.slice(currentTierIndex + 1).find((tier) => {
-    const config = getTierConfig(tier);
-    return config.maxFloors > currentLimit;
-  });
+  const currentConfig = getFeatureConfig(currentTier, featureKey);
+  const nextTier = getNextTierWithMoreCapacity(currentTier, featureKey);
+  const nextConfig = nextTier ? getFeatureConfig(nextTier, featureKey) : null;
 
-  const nextTierConfig = nextTierWithMore ? getTierConfig(nextTierWithMore) : null;
+  if (!currentConfig) {
+    return null;
+  }
+
+  const currentLimitText = formatWithLabel(
+    currentConfig.limit,
+    currentConfig.singularLabel,
+    currentConfig.pluralLabel
+  );
+
+  const nextLimitText = nextConfig
+    ? formatWithLabel(
+        nextConfig.limit,
+        nextConfig.singularLabel,
+        nextConfig.pluralLabel
+      )
+    : null;
+
+  const upsellText = nextTier && nextConfig ? currentConfig.upsellMessage(nextTier, nextConfig.limit) : null;
 
   return (
     <ResponsiveAlertDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`${feature} limit reached`}
-      description={`You've reached the ${currentLimit}-${feature.toLowerCase()} limit on your current plan.`}
+      title={`${currentConfig.name} limit reached`}
+      description={`You've reached your current limit of ${currentLimitText}.`}
       footer={
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Keep current
           </Button>
-          {nextTierWithMore && (
+          {nextTier && (
             <Button
               onClick={() => {
                 // In dev mode, allow tier switching for testing
                 const isDevMode = useEditorStore.getState().isDevSubscriptionModeEnabled;
                 if (isDevMode) {
-                  setDevSubscriptionTier(nextTierWithMore);
+                  setDevSubscriptionTier(nextTier);
                   onOpenChange(false);
                 } else {
                   // In production, this would navigate to upgrade flow
@@ -56,24 +74,25 @@ export function TierLimitUpsellDialog({
                 }
               }}
             >
-              Upgrade to {nextTierWithMore}
+              Upgrade to {nextTier}
             </Button>
           )}
         </div>
       }
     >
       <div className="space-y-3 py-4">
-        {nextTierWithMore && (
+        {nextTier && nextLimitText && (
           <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              <strong>{nextTierWithMore}</strong> tier offers up to{" "}
-              <strong>{nextTierConfig?.maxFloors}</strong> {feature.toLowerCase()}.
+              <strong>{nextTier}</strong> tier offers up to <strong>{nextLimitText}</strong>.
             </p>
           </div>
         )}
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Upgrade your plan to unlock more {feature.toLowerCase()} and other premium features.
-        </p>
+        {upsellText && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {upsellText}
+          </p>
+        )}
       </div>
     </ResponsiveAlertDialog>
   );

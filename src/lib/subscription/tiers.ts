@@ -130,7 +130,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Pro: {
     // Layout
-    maxFloors: 4,
+    maxFloors: 3,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,
@@ -181,7 +181,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Studio: {
     // Layout
-    maxFloors: 9,
+    maxFloors: 6,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,
@@ -232,7 +232,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
 
   Education: {
     // Layout
-    maxFloors: 9,
+    maxFloors: 6,
     maxProjects: "unlimited",
 
     hasMultiFloor: true,

@@ -938,9 +938,8 @@ export function EditorSidebarRoomsList() {
         <TierLimitUpsellDialog
           open={showTierLimitDialog}
           onOpenChange={setShowTierLimitDialog}
-          feature="Floors"
+          featureKey="floors"
           currentTier={devSubscriptionTier as SubscriptionTier}
-          currentLimit={maxFloors}
         />
       </div>
     </ImmediateTooltipProvider>
