@@ -143,6 +143,7 @@ export type RoomInteriorAsset = {
   widthMm: number;
   depthMm: number;
   rotationDegrees: number;
+  anchor: "floor" | "wall" | "ceiling";
   // Stairs-specific properties (optional for other assets)
   arrowEnabled?: boolean;
   arrowDirection?: StairDirection;

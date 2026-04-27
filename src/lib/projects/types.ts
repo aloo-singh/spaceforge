@@ -61,8 +61,14 @@ function isOpeningType(value: unknown): value is "door" | "window" {
   return value === "door" || value === "window";
 }
 
-function isInteriorAssetType(value: unknown): value is "stairs" {
-  return value === "stairs";
+function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa" | "wardrobe" | "dining-table" {
+  return (
+    value === "stairs" ||
+    value === "bed" ||
+    value === "sofa" ||
+    value === "wardrobe" ||
+    value === "dining-table"
+  );
 }
 
 function isRoomOpening(value: unknown): boolean {

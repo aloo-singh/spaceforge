@@ -18,6 +18,7 @@ export const DEFAULT_STAIR_DEPTH_MM = 2700;
 export const DEFAULT_STAIR_TREAD_SPACING_MM = 300;
 export const MIN_STAIR_WIDTH_MM = 300;
 export const MIN_STAIR_DEPTH_MM = DEFAULT_STAIR_TREAD_SPACING_MM;
+export const MIN_WARDROBE_SIZE_MM = 500;
 export const DEFAULT_STAIR_NAME = "Stairs";
 export const DEFAULT_STAIR_ARROW_ENABLED = true;
 export const DEFAULT_STAIR_ARROW_DIRECTION: StairDirection = "forward";
@@ -45,9 +46,15 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     widthMm: asset.widthMm,
     depthMm: asset.depthMm,
     rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
+    anchor: asset.anchor ?? "floor",
     arrowEnabled: asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED,
     arrowDirection: asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION,
     arrowLabel: asset.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL,
+    doorType: asset.doorType,
+    doorConstraint: asset.doorConstraint,
+    shape: asset.shape,
+    unitSystem: asset.unitSystem,
+    sizePreset: asset.sizePreset,
   };
 }
 
@@ -131,6 +138,7 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
     widthMm: DEFAULT_STAIR_WIDTH_MM,
     depthMm: DEFAULT_STAIR_DEPTH_MM,
     rotationDegrees: 0,
+    anchor: "floor",
     arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
     arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
     arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
@@ -159,6 +167,7 @@ export function createCenteredDefaultBed(room: Room, id: string): RoomInteriorAs
     widthMm: 1350, // Double bed width
     depthMm: 1900, // Double bed depth
     rotationDegrees: 0,
+    anchor: "floor",
   };
 }
 
@@ -184,6 +193,7 @@ export function createCenteredDefaultSofa(room: Room, id: string): RoomInteriorA
     widthMm: 2000, // 3-seater width
     depthMm: 900, // Standard depth
     rotationDegrees: 0,
+    anchor: "floor",
   };
 }
 
@@ -209,6 +219,7 @@ export function createCenteredDefaultWardrobe(room: Room, id: string): RoomInter
     widthMm: 1600,
     depthMm: 600,
     rotationDegrees: 0,
+    anchor: "floor",
     doorType: "swing",
     doorConstraint: 800,
   };
@@ -236,6 +247,7 @@ export function createCenteredDefaultDiningTable(room: Room, id: string): RoomIn
     widthMm: 1600,
     depthMm: 900,
     rotationDegrees: 0,
+    anchor: "floor",
     shape: "rectangular",
   };
 }
@@ -568,6 +580,7 @@ function findConstrainedInteriorAssetCenter(
     widthMm,
     depthMm,
     rotationDegrees: 0,
+    anchor: "floor" as const,
     arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
     arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
     arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
@@ -592,6 +605,7 @@ function findConstrainedInteriorAssetCenter(
         widthMm,
         depthMm,
         rotationDegrees: 0,
+        anchor: "floor" as const,
         arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
         arrowDirection: DEFAULT_STAIR_ARROW_DIRECTION,
         arrowLabel: DEFAULT_STAIR_ARROW_LABEL,
@@ -624,11 +638,12 @@ function getConstrainedResizedStair(
       snappedBounds.minY + snapStairRunMm(normalizedBounds.maxY - normalizedBounds.minY);
   }
 
-  if (snappedBounds.maxY - snappedBounds.minY < MIN_STAIR_WIDTH_MM) {
-    snappedBounds.maxY = snappedBounds.minY + MIN_STAIR_WIDTH_MM;
+  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
+  if (snappedBounds.maxY - snappedBounds.minY < minDimension) {
+    snappedBounds.maxY = snappedBounds.minY + minDimension;
   }
-  if (snappedBounds.maxX - snappedBounds.minX < MIN_STAIR_WIDTH_MM) {
-    snappedBounds.maxX = snappedBounds.minX + MIN_STAIR_WIDTH_MM;
+  if (snappedBounds.maxX - snappedBounds.minX < minDimension) {
+    snappedBounds.maxX = snappedBounds.minX + minDimension;
   }
 
   const nextAsset = getInteriorAssetFromBounds(asset, snappedBounds);
@@ -643,6 +658,7 @@ function resizeInteriorAssetBoundsForWallDrag(
   options?: { gridSizeMm?: number }
 ): RoomRectBounds {
   const isSideways = isStairRunHorizontal(asset);
+  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
   const snappedX =
     isSideways
       ? snapToGrid(cursorWorld.x, DEFAULT_STAIR_TREAD_SPACING_MM)
@@ -652,14 +668,14 @@ function resizeInteriorAssetBoundsForWallDrag(
   if (wall === "left") {
     return {
       ...bounds,
-      minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
+      minX: Math.min(snappedX, bounds.maxX - minDimension),
     };
   }
 
   if (wall === "right") {
     return {
       ...bounds,
-      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + minDimension),
     };
   }
 
@@ -672,13 +688,13 @@ function resizeInteriorAssetBoundsForWallDrag(
   if (wall === "top") {
     return {
       ...bounds,
-      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_WIDTH_MM),
+      minY: Math.min(snappedY, bounds.maxY - minDimension),
     };
   }
 
   return {
     ...bounds,
-    maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_WIDTH_MM),
+    maxY: Math.max(snappedY, bounds.minY + minDimension),
   };
 }
 
@@ -690,6 +706,7 @@ function resizeInteriorAssetBoundsForCornerDrag(
   options?: { gridSizeMm?: number }
 ): RoomRectBounds {
   const isSideways = isStairRunHorizontal(asset);
+  const minDimension = asset.type === "stairs" ? MIN_STAIR_WIDTH_MM : MIN_WARDROBE_SIZE_MM;
   const snappedX =
     isSideways
       ? snapToGrid(cursorWorld.x, DEFAULT_STAIR_TREAD_SPACING_MM)
@@ -705,9 +722,9 @@ function resizeInteriorAssetBoundsForCornerDrag(
 
   if (corner === "top-left") {
     return {
-      minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
+      minX: Math.min(snappedX, bounds.maxX - minDimension),
       maxX: bounds.maxX,
-      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_WIDTH_MM),
+      minY: Math.min(snappedY, bounds.maxY - minDimension),
       maxY: bounds.maxY,
     };
   }
@@ -715,8 +732,8 @@ function resizeInteriorAssetBoundsForCornerDrag(
   if (corner === "top-right") {
     return {
       minX: bounds.minX,
-      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
-      minY: Math.min(snappedY, bounds.maxY - MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + minDimension),
+      minY: Math.min(snappedY, bounds.maxY - minDimension),
       maxY: bounds.maxY,
     };
   }
@@ -724,27 +741,26 @@ function resizeInteriorAssetBoundsForCornerDrag(
   if (corner === "bottom-right") {
     return {
       minX: bounds.minX,
-      maxX: Math.max(snappedX, bounds.minX + MIN_STAIR_WIDTH_MM),
+      maxX: Math.max(snappedX, bounds.minX + minDimension),
       minY: bounds.minY,
-      maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_WIDTH_MM),
+      maxY: Math.max(snappedY, bounds.minY + minDimension),
     };
   }
 
   return {
-    minX: Math.min(snappedX, bounds.maxX - MIN_STAIR_WIDTH_MM),
+    minX: Math.min(snappedX, bounds.maxX - minDimension),
     maxX: bounds.maxX,
     minY: bounds.minY,
-    maxY: Math.max(snappedY, bounds.minY + MIN_STAIR_WIDTH_MM),
+    maxY: Math.max(snappedY, bounds.minY + minDimension),
   };
 }
 
 function normalizeInteriorAssetResizeBounds(bounds: RoomRectBounds): RoomRectBounds {
-  return {
-    minX: Math.min(bounds.minX, bounds.maxX),
-    maxX: Math.max(bounds.minX, bounds.maxX),
-    minY: Math.min(bounds.minY, bounds.maxY),
-    maxY: Math.max(bounds.minY, bounds.maxY),
-  };
+  const minX = Math.min(bounds.minX, bounds.maxX);
+  const maxX = Math.max(bounds.minX, bounds.maxX);
+  const minY = Math.min(bounds.minY, bounds.maxY);
+  const maxY = Math.max(bounds.minY, bounds.maxY);
+  return { minX, maxX, minY, maxY };
 }
 
 function isStairRunHorizontal(asset: RoomInteriorAsset) {
