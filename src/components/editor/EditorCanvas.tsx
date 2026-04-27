@@ -377,27 +377,13 @@ function getDisplayedInteriorAssetForAnimation(
 
   const progress = clampValue((renderedAtMs - animation.startedAtMs) / STAIR_ROTATION_ANIMATION_MS, 0, 1);
   const easedProgress = easeOutCubic(progress);
+  const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
+  const longSideMm = Math.max(asset.widthMm, asset.depthMm);
 
-  // Stairs swap width/depth during 90° rotations, but furniture should maintain proportions
-  if (asset.type === "stairs") {
-    const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
-    const longSideMm = Math.max(asset.widthMm, asset.depthMm);
-
-    return {
-      ...asset,
-      widthMm: shortSideMm,
-      depthMm: longSideMm,
-      rotationDegrees: getInterpolatedRotationDegrees(
-        animation.startRotationDegrees,
-        animation.endRotationDegrees,
-        easedProgress
-      ),
-    };
-  }
-
-  // For furniture (bed, sofa, wardrobe, dining-table), just animate rotation without dimension swaps
   return {
     ...asset,
+    widthMm: shortSideMm,
+    depthMm: longSideMm,
     rotationDegrees: getInterpolatedRotationDegrees(
       animation.startRotationDegrees,
       animation.endRotationDegrees,
@@ -4811,7 +4797,8 @@ function drawFurnitureLabels(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null
+  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  stairRotationAnimations?: Map<string, StairRotationAnimation>
 ) {
   const fontSizePx = clampValue(
     camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
@@ -4819,12 +4806,15 @@ function drawFurnitureLabels(
     FURNITURE_LABEL_MAX_FONT_SIZE_PX
   );
   const textResolution = getTextResolution();
+  const renderedAtMs = performance.now();
 
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
       if (asset.type === "stairs") continue;
-      const screenWidthPx = (asset.widthMm) * camera.pixelsPerMm;
-      const screenHeightPx = (asset.depthMm) * camera.pixelsPerMm;
+      const animation = stairRotationAnimations?.get(asset.id);
+      const displayedAsset = getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs);
+      const screenWidthPx = (displayedAsset.widthMm) * camera.pixelsPerMm;
+      const screenHeightPx = (displayedAsset.depthMm) * camera.pixelsPerMm;
       const isSelected = selectedInteriorAsset?.roomId === room.id && selectedInteriorAsset?.assetId === asset.id;
       // Show label if asset is large enough OR if it's selected
       if (!isSelected && (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5)) continue;
@@ -5194,7 +5184,7 @@ function drawRoomLabels(
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selectedInteriorAsset);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selectedInteriorAsset, options?.stairRotationAnimations);
 }
 
 type ResizeDimensionLabelSpec = {
