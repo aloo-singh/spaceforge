@@ -1,6 +1,6 @@
 "use client";
 
-import { IconTriangle, IconTriangleInverted, RotateCcw, RotateCw, Transfer } from "@/components/ui/icons";
+import { IconTriangle, IconTriangleInverted, RotateCcw, RotateCw, Transfer, Trash2 } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -17,7 +17,7 @@ import {
   DEFAULT_STAIR_TREAD_SPACING_MM,
 } from "@/lib/editor/interiorAssets";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
-import type { RoomInteriorAsset } from "@/lib/editor/types";
+import type { InteriorAssetType, RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
 type SelectedInteriorAssetInspectorProps = {
@@ -48,7 +48,248 @@ function InspectorIconTooltip({
   );
 }
 
+function assetInspectorMeta(type: InteriorAssetType): { title: string; description: string } {
+  switch (type) {
+    case "bed":
+      return { title: "Selected bed", description: "Adjust the bed's position, size, and orientation." };
+    case "sofa":
+      return { title: "Selected sofa", description: "Adjust the sofa's position, size, and orientation." };
+    case "wardrobe":
+      return { title: "Selected wardrobe", description: "Adjust the wardrobe's dimensions, door type, and orientation." };
+    case "dining-table":
+      return { title: "Selected dining table", description: "Adjust the dining table's shape, size, and orientation." };
+    case "stairs":
+      return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
+  }
+}
+
+function FurnitureInspector({
+  asset,
+  className,
+}: SelectedInteriorAssetInspectorProps) {
+  const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
+  const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
+  const commitInteriorAssetRenameSession = useEditorStore((state) => state.commitInteriorAssetRenameSession);
+  const cancelInteriorAssetRenameSession = useEditorStore((state) => state.cancelInteriorAssetRenameSession);
+  const rotateSelectedInteriorAsset = useEditorStore((state) => state.rotateSelectedInteriorAsset);
+  const deleteSelectedInteriorAsset = useEditorStore((state) => state.deleteSelectedInteriorAsset);
+  const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
+  const setSelectedInteriorAssetDoorType = useEditorStore((state) => state.setSelectedInteriorAssetDoorType);
+  const setSelectedInteriorAssetShape = useEditorStore((state) => state.setSelectedInteriorAssetShape);
+  const canRotateSelectedInteriorAsset = useEditorStore((state) => {
+    const roomId = state.selectedInteriorAsset?.roomId;
+    const assetId = state.selectedInteriorAsset?.assetId;
+    if (!roomId || !assetId) return false;
+    const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+    const selectedAsset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
+    if (!room || !selectedAsset) return false;
+    return getRotatedInteriorAssetForRoom(room, selectedAsset, 90) !== null;
+  });
+
+  const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
+  const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
+  const { title, description } = assetInspectorMeta(asset.type);
+
+  return (
+    <EditorInspectorSection title={title} description={description} className={className}>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="asset-name-input" className="text-sm font-medium">
+            Name
+          </label>
+          <Input
+            id="asset-name-input"
+            value={asset.name}
+            onFocus={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              startInteriorAssetRenameSession(selectedAssetRoomId, selectedAssetId);
+            }}
+            onChange={(event) => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              updateInteriorAssetRenameDraft(selectedAssetRoomId, selectedAssetId, event.target.value);
+            }}
+            onBlur={() => {
+              if (!selectedAssetRoomId || !selectedAssetId) return;
+              commitInteriorAssetRenameSession();
+              selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                commitInteriorAssetRenameSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                if (!selectedAssetRoomId || !selectedAssetId) return;
+                cancelInteriorAssetRenameSession();
+                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+              }
+            }}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Dimensions</p>
+          <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+            {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Rotate</p>
+          <ImmediateTooltipProvider>
+            <ButtonGroup>
+              <InspectorIconTooltip
+                groupItem
+                content={
+                  canRotateSelectedInteriorAsset
+                    ? "Rotate left 90°"
+                    : "Rotate left 90° · Won't fit after rotation"
+                }
+              >
+                <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => rotateSelectedInteriorAsset(-90)}
+                    aria-label="Rotate left 90 degrees"
+                    disabled={!canRotateSelectedInteriorAsset}
+                  >
+                    <RotateCcw />
+                  </Button>
+                </span>
+              </InspectorIconTooltip>
+              <InspectorIconTooltip
+                groupItem
+                content={
+                  canRotateSelectedInteriorAsset
+                    ? "Rotate right 90°"
+                    : "Rotate right 90° · Won't fit after rotation"
+                }
+              >
+                <span tabIndex={canRotateSelectedInteriorAsset ? -1 : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => rotateSelectedInteriorAsset(90)}
+                    aria-label="Rotate right 90 degrees"
+                    disabled={!canRotateSelectedInteriorAsset}
+                  >
+                    <RotateCw />
+                  </Button>
+                </span>
+              </InspectorIconTooltip>
+            </ButtonGroup>
+          </ImmediateTooltipProvider>
+        </div>
+
+        {asset.type === "wardrobe" ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Door type</p>
+            <ImmediateTooltipProvider>
+              <ButtonGroup>
+                <InspectorIconTooltip groupItem content="Swing door">
+                  <Button
+                    type="button"
+                    variant={asset.doorType !== "sliding" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedInteriorAssetDoorType("swing")}
+                    aria-label="Swing door"
+                    aria-pressed={asset.doorType !== "sliding"}
+                  >
+                    Swing
+                  </Button>
+                </InspectorIconTooltip>
+                <InspectorIconTooltip groupItem content="Sliding door">
+                  <Button
+                    type="button"
+                    variant={asset.doorType === "sliding" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedInteriorAssetDoorType("sliding")}
+                    aria-label="Sliding door"
+                    aria-pressed={asset.doorType === "sliding"}
+                  >
+                    Sliding
+                  </Button>
+                </InspectorIconTooltip>
+              </ButtonGroup>
+            </ImmediateTooltipProvider>
+          </div>
+        ) : null}
+
+        {asset.type === "dining-table" ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Shape</p>
+            <ImmediateTooltipProvider>
+              <ButtonGroup>
+                <InspectorIconTooltip groupItem content="Rectangular table">
+                  <Button
+                    type="button"
+                    variant={asset.shape !== "round" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedInteriorAssetShape("rectangular")}
+                    aria-label="Rectangular table"
+                    aria-pressed={asset.shape !== "round"}
+                  >
+                    Rectangular
+                  </Button>
+                </InspectorIconTooltip>
+                <InspectorIconTooltip groupItem content="Round table">
+                  <Button
+                    type="button"
+                    variant={asset.shape === "round" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedInteriorAssetShape("round")}
+                    aria-label="Round table"
+                    aria-pressed={asset.shape === "round"}
+                  >
+                    Round
+                  </Button>
+                </InspectorIconTooltip>
+              </ButtonGroup>
+            </ImmediateTooltipProvider>
+          </div>
+        ) : null}
+
+        <div className="space-y-1.5">
+          <ImmediateTooltipProvider>
+            <InspectorIconTooltip content="Delete this asset">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={deleteSelectedInteriorAsset}
+                aria-label={`Delete ${asset.name}`}
+              >
+                <Trash2 />
+                Delete
+              </Button>
+            </InspectorIconTooltip>
+          </ImmediateTooltipProvider>
+        </div>
+      </div>
+    </EditorInspectorSection>
+  );
+}
+
 export function SelectedInteriorAssetInspector({
+  asset,
+  className,
+}: SelectedInteriorAssetInspectorProps) {
+  if (asset.type !== "stairs") {
+    return <FurnitureInspector asset={asset} className={className} />;
+  }
+  return <StairsInspector asset={asset} className={className} />;
+}
+
+function StairsInspector({
   asset,
   className,
 }: SelectedInteriorAssetInspectorProps) {

@@ -87,7 +87,9 @@ export function areRoomInteriorAssetsEqual(
       (assetA.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) !==
         (assetB.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION) ||
       (assetA.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) !==
-        (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL)
+        (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL) ||
+      (assetA.doorType ?? null) !== (assetB.doorType ?? null) ||
+      (assetA.shape ?? null) !== (assetB.shape ?? null)
     ) {
       return false;
     }

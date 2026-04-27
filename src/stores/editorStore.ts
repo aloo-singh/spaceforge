@@ -316,6 +316,8 @@ type EditorState = {
   setSelectedInteriorAssetArrowEnabled: (isEnabled: boolean) => void;
   swapSelectedInteriorAssetArrowDirection: () => void;
   updateSelectedInteriorAssetArrowLabel: (label: string) => void;
+  setSelectedInteriorAssetDoorType: (doorType: "swing" | "sliding") => void;
+  setSelectedInteriorAssetShape: (shape: "rectangular" | "round") => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -4417,6 +4419,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...cloneRoomInteriorAsset(asset),
           arrowLabel: nextLabel,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSelectedInteriorAssetDoorType: (doorType) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.doorType === doorType) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          doorType,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSelectedInteriorAssetShape: (shape) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.shape === shape) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          shape,
         };
       });
       return nextState ?? state;
