@@ -31,7 +31,7 @@ function getDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getSt
     (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
   );
   const assetSelections = state.selection.filter(
-    (item): item is Extract<SharedSelectionItem, { type: "stair" }> => item.type === "stair"
+    (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
   );
 
   if (roomSelections.length === 1 && assetSelections.length === 0) {

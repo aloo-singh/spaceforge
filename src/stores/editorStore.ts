@@ -161,7 +161,7 @@ type FloorRenameSessionState = {
 type ClipboardData =
   | { type: "room"; source: "copy" | "cut"; rooms: Room[] }
   | {
-      type: "stair";
+      type: "asset";
       source: "copy" | "cut";
       asset: RoomInteriorAsset;
       sourceRoomId: string;
@@ -1637,7 +1637,7 @@ function insertDefaultStairOnSelectedRoom(
     selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
     selectedOpening: null,
     selectedWall: null,
-    selection: [{ type: "stair" as const, roomId: room.id, id: asset.id }],
+    selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2721,7 +2721,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: { roomId, assetId },
-        selection: [{ type: "stair" as const, roomId, id: assetId }],
+        selection: [{ type: "asset" as const, roomId, id: assetId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2783,7 +2783,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           if (existing.type === "opening" && item.type === "opening") {
             return existing.roomId === item.roomId && existing.id === item.id;
           }
-          if (existing.type === "stair" && item.type === "stair") {
+          if (existing.type === "asset" && item.type === "asset") {
             return existing.roomId === item.roomId && existing.id === item.id;
           }
           if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
@@ -2814,7 +2814,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (existing.type === "opening" && item.type === "opening") {
           return existing.roomId === item.roomId && existing.id === item.id;
         }
-        if (existing.type === "stair" && item.type === "stair") {
+        if (existing.type === "asset" && item.type === "asset") {
           return existing.roomId === item.roomId && existing.id === item.id;
         }
         if (existing.type === "floor" && item.type === "floor") return existing.id === item.id;
@@ -2836,7 +2836,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (existing.type === "opening" && item.type === "opening") {
           return !(existing.roomId === item.roomId && existing.id === item.id);
         }
-        if (existing.type === "stair" && item.type === "stair") {
+        if (existing.type === "asset" && item.type === "asset") {
           return !(existing.roomId === item.roomId && existing.id === item.id);
         }
         if (existing.type === "floor" && item.type === "floor") return existing.id !== item.id;
@@ -2874,12 +2874,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      if (item.type === "stair") {
-        const selectedStairItems = state.selection.filter(
-          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
-            selectionItem.type === "stair"
+      if (item.type === "asset") {
+        const selectedAssetItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "asset" }> =>
+            selectionItem.type === "asset"
         );
-        const assets = selectedStairItems
+        const assets = selectedAssetItems
           .map((selectionItem) => {
             const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
             const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
@@ -2900,7 +2900,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         return {
           clipboard: {
-            type: "stair",
+            type: "asset",
             source: "copy" as const,
             asset: firstAsset.asset,
             sourceRoomId: firstAsset.sourceRoomId,
@@ -2982,7 +2982,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      if (state.clipboard.type === "stair") {
+      if (state.clipboard.type === "asset") {
         // Paste stair into the explicitly selected room on the active floor.
         const targetRoomId = state.selectedRoomId;
 
@@ -3063,7 +3063,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const newSelection: SharedSelectionItem[] = [];
         for (const pastedItem of pastedItems) {
           newSelection.push({
-            type: "stair" as const,
+            type: "asset" as const,
             roomId: targetRoomId,
             id: pastedItem.asset.id,
           });
@@ -3140,12 +3140,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
-      if (item.type === "stair") {
-        const selectedStairItems = state.selection.filter(
-          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "stair" }> =>
-            selectionItem.type === "stair"
+      if (item.type === "asset") {
+        const selectedAssetItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "asset" }> =>
+            selectionItem.type === "asset"
         );
-        const assetsToCut = selectedStairItems
+        const assetsToCut = selectedAssetItems
           .map((selectionItem) => {
             const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
             const asset = room?.interiorAssets.find((a) => a.id === selectionItem.id);
@@ -3163,11 +3163,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         let nextDocument = state.document;
         let nextPast = state.history.past;
-        for (const stairToCut of assetsToCut) {
+        for (const assetToCut of assetsToCut) {
           const command: EditorCommand = {
             type: "cut-interior-asset",
-            cutAsset: cloneRoomInteriorAsset(stairToCut.asset),
-            roomId: stairToCut.sourceRoomId,
+            cutAsset: cloneRoomInteriorAsset(assetToCut.asset),
+            roomId: assetToCut.sourceRoomId,
           };
           nextDocument = applyEditorCommand(nextDocument, command, "redo");
           nextPast = pushToPast(nextPast, command);
@@ -3178,13 +3178,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         return {
           clipboard: {
-            type: "stair",
+            type: "asset",
             source: "cut" as const,
             asset: cloneRoomInteriorAsset(firstAsset.asset),
             sourceRoomId: firstAsset.sourceRoomId,
-            assets: assetsToCut.map((stairToCut) => ({
-              asset: cloneRoomInteriorAsset(stairToCut.asset),
-              sourceRoomId: stairToCut.sourceRoomId,
+            assets: assetsToCut.map((assetToCut) => ({
+              asset: cloneRoomInteriorAsset(assetToCut.asset),
+              sourceRoomId: assetToCut.sourceRoomId,
             })),
           },
           document: nextDocument,
@@ -3251,7 +3251,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           newSelection.push({ type: "room" as const, id: newRoomId });
         }
 
-        if (item.type === "stair") {
+        if (item.type === "asset") {
           const sourceRoom = state.document.rooms.find((r) => r.id === item.roomId);
           const sourceAsset = sourceRoom?.interiorAssets.find((a) => a.id === item.id);
           if (!sourceRoom || !sourceAsset) continue;
@@ -3275,7 +3275,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             roomId: sourceRoom.id,
             asset: duplicateAsset,
           });
-          newSelection.push({ type: "stair" as const, roomId: sourceRoom.id, id: newAssetId });
+          newSelection.push({ type: "asset" as const, roomId: sourceRoom.id, id: newAssetId });
         }
       }
 
@@ -3318,11 +3318,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const targetFloor = state.document.floors.find((f) => f.id === targetFloorId);
       if (!targetFloor) return state;
 
-      const hasStairSelection = state.selection.some((item) => item.type === "stair");
+      const hasAssetSelection = state.selection.some((item) => item.type === "asset");
       const selectedTargetRoom = state.selectedRoomId
         ? state.document.rooms.find((room) => room.id === state.selectedRoomId)
         : null;
-      if (hasStairSelection) {
+      if (hasAssetSelection) {
         if (!selectedTargetRoom || selectedTargetRoom.floorId !== targetFloorId) {
           toast("Select a room on this floor first to paste here.");
           return state;
@@ -3347,7 +3347,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           });
         }
 
-        if (item.type === "stair") {
+        if (item.type === "asset") {
           const room = state.document.rooms.find((r) => r.id === item.roomId);
           const asset = room?.interiorAssets.find((a) => a.id === item.id);
           if (!room || !asset) continue;
@@ -3375,10 +3375,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const nextDocument = applyEditorCommand(state.document, command, "redo");
       const nextSelection = state.selection.map((item) => {
-        if (item.type !== "stair") return item;
+        if (item.type !== "asset") return item;
         if (!selectedTargetRoom) return item;
         return {
-          type: "stair" as const,
+          type: "asset" as const,
           roomId: selectedTargetRoom.id,
           id: item.id,
         };
@@ -4116,7 +4116,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               openingCount++;
             }
           }
-        } else if (item.type === "stair" && item.roomId && item.id) {
+        } else if (item.type === "asset" && item.roomId && item.id) {
           // Only delete stairs from rooms that aren't being deleted
           if (!roomsToDelete.has(item.roomId)) {
             const room = state.document.rooms.find((r) => r.id === item.roomId);
@@ -4269,7 +4269,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
         selectedOpening: null,
         selectedWall: null,
-        selection: [{ type: "stair" as const, roomId: room.id, id: asset.id }],
+        selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -4748,7 +4748,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: nextDocument,
         selectedRoomId: toRoomId,
         selectedInteriorAsset: { roomId: toRoomId, assetId },
-        selection: [{ type: "stair" as const, roomId: toRoomId, id: assetId }],
+        selection: [{ type: "asset" as const, roomId: toRoomId, id: assetId }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

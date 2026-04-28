@@ -268,8 +268,8 @@ function isItemSelected(
           return existing.roomId === roomId && existing.id === itemId;
         }
         return false;
-      case "stair":
-        if (roomId && itemId && existing.type === "stair") {
+      case "asset":
+        if (roomId && itemId && existing.type === "asset") {
           return existing.roomId === roomId && existing.id === itemId;
         }
         return false;
@@ -1336,11 +1336,11 @@ export function attachRoomDrawInput(
     if (interiorAssetHit) {
       event.preventDefault();
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
-        const stairItem: SharedSelectionItem = { type: "stair", roomId: interiorAssetHit.roomId, id: interiorAssetHit.assetId };
-        if (isItemSelected(state.selection, "stair", interiorAssetHit.roomId, interiorAssetHit.assetId)) {
-          state.removeFromSelection(stairItem);
+        const assetItem: SharedSelectionItem = { type: "asset", roomId: interiorAssetHit.roomId, id: interiorAssetHit.assetId };
+        if (isItemSelected(state.selection, "asset", interiorAssetHit.roomId, interiorAssetHit.assetId)) {
+          state.removeFromSelection(assetItem);
         } else {
-          state.addToSelection(stairItem);
+          state.addToSelection(assetItem);
         }
       } else {
         state.clearSelection();

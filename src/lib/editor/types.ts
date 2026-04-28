@@ -201,5 +201,5 @@ export type SharedSelectionItem =
   | { type: "room"; id: string }
   | { type: "wall"; roomId: string; wall: RoomWall }
   | { type: "opening"; roomId: string; id: string }
-  | { type: "stair"; roomId: string; id: string }
+  | { type: "asset"; roomId: string; id: string }
   | { type: "floor"; id: string };

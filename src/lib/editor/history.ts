@@ -930,10 +930,8 @@ export function applyEditorCommand(
       // Add duplicated rooms and assets
       return {
         ...document,
-        rooms: [
-          ...document.rooms,
-          ...command.duplicatedRooms,
-          ...document.rooms.map((room) => {
+        rooms: document.rooms
+          .map((room) => {
             const assetsToAdd = command.duplicatedAssets.filter((da) => da.roomId === room.id);
             if (assetsToAdd.length === 0) return room;
 
@@ -944,14 +942,8 @@ export function applyEditorCommand(
                 ...assetsToAdd.map((da) => cloneRoomInteriorAsset(da.asset)),
               ],
             };
-          }).filter((_, idx) => {
-            // Only keep rooms that have assets to add
-            return command.duplicatedAssets.some((da) => da.roomId === document.rooms[idx].id);
-          }),
-        ].filter(
-          (room, idx, arr) =>
-            idx === arr.findIndex((r) => r.id === room.id) // Remove duplicates by ID
-        ),
+          })
+          .concat(command.duplicatedRooms),
       };
     }
   }
