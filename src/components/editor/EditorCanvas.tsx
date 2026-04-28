@@ -1541,7 +1541,7 @@ export default function EditorCanvas({
         exportOpeningGraphics,
         getRoomsForActiveFloor(state.document),
         null,
-        null,
+        [],
         exportCamera,
         exportViewport,
         exportTheme,
@@ -1570,7 +1570,7 @@ export default function EditorCanvas({
         showDimensions,
         null,
         exportTheme,
-        null,
+        [],
         { includeStairDirectionLabels: false }
       );
       drawDraft(
@@ -3590,7 +3590,7 @@ function drawScene(
     openingGraphics,
     renderedRooms,
     state.selectedOpening,
-    state.selectedInteriorAsset,
+    state.selection,
     state.camera,
     state.viewport,
     theme,
@@ -3619,7 +3619,7 @@ function drawScene(
     showDimensions,
     transformFeedback,
     theme,
-    state.selectedInteriorAsset,
+    state.selection,
     { includeStairDirectionLabels: true, stairRotationAnimations }
   );
   clearContainerChildren(dimensionOverlayContainer);
@@ -3986,7 +3986,7 @@ function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
   selectedOpening: RoomOpeningSelection | null,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
@@ -4000,7 +4000,7 @@ function drawOpenings(
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selectedInteriorAsset, camera, viewport, theme, options);
+    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, options);
   }
 }
 
@@ -4340,7 +4340,7 @@ function drawRoomOpenings(
 function drawRoomInteriorAssets(
   graphics: Graphics,
   room: Room,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
@@ -4364,9 +4364,9 @@ function drawRoomInteriorAssets(
           worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport),
         ];
     const corners = [topLeft, topRight, bottomRight, bottomLeft];
-    const isSelected =
-      selectedInteriorAsset?.roomId === room.id &&
-      selectedInteriorAsset.assetId === asset.id;
+    const isSelected = selection.some(
+      (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
+    );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
     const selectionHaloStrokePx = Math.max(
       camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
@@ -4840,7 +4840,7 @@ function drawFurnitureLabels(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   stairRotationAnimations?: Map<string, StairRotationAnimation>
 ) {
   const fontSizePx = clampValue(
@@ -4858,7 +4858,9 @@ function drawFurnitureLabels(
       const displayedAsset = getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs);
       const screenWidthPx = (displayedAsset.widthMm) * camera.pixelsPerMm;
       const screenHeightPx = (displayedAsset.depthMm) * camera.pixelsPerMm;
-      const isSelected = selectedInteriorAsset?.roomId === room.id && selectedInteriorAsset?.assetId === asset.id;
+      const isSelected = selection.some(
+        (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
+      );
       // Show label if asset is large enough OR if it's selected
       if (!isSelected && (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5)) continue;
 
@@ -5104,7 +5106,7 @@ function drawRoomLabels(
   showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   options?: {
     includeStairDirectionLabels?: boolean;
     stairRotationAnimations?: Map<string, StairRotationAnimation>;
@@ -5227,7 +5229,7 @@ function drawRoomLabels(
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selectedInteriorAsset, options?.stairRotationAnimations);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection, options?.stairRotationAnimations);
 }
 
 type ResizeDimensionLabelSpec = {
