@@ -120,16 +120,17 @@ function FurnitureInspector({
               if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter") {
                 event.preventDefault();
-                if (!selectedAssetRoomId || !selectedAssetId) return;
-                commitInteriorAssetRenameSession();
-                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                event.stopPropagation();
+                event.currentTarget.blur();
                 return;
               }
               if (event.key === "Escape") {
                 event.preventDefault();
+                event.stopPropagation();
                 if (!selectedAssetRoomId || !selectedAssetId) return;
                 cancelInteriorAssetRenameSession();
                 selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                event.currentTarget.blur();
               }
             }}
           />
@@ -439,17 +440,18 @@ function StairsInspector({
 
               if (event.key === "Enter") {
                 event.preventDefault();
-                if (!selectedAssetRoomId || !selectedAssetId) return;
-                commitInteriorAssetRenameSession();
-                selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                event.stopPropagation();
+                event.currentTarget.blur();
                 return;
               }
 
               if (event.key === "Escape") {
                 event.preventDefault();
+                event.stopPropagation();
                 if (!selectedAssetRoomId || !selectedAssetId) return;
                 cancelInteriorAssetRenameSession();
                 selectInteriorAssetById(selectedAssetRoomId, selectedAssetId);
+                event.currentTarget.blur();
               }
             }}
             aria-describedby="stair-name-hint"

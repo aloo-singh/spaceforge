@@ -826,17 +826,18 @@ export function EditorSidebarRoomsList() {
 
                                                 if (event.key === "Enter") {
                                                   event.preventDefault();
-                                                  commitInteriorAssetRenameSession();
-                                                  setSidebarRenameInteriorAssetId(null);
-                                                  selectInteriorAssetById(room.id, asset.id);
+                                                  event.stopPropagation();
+                                                  event.currentTarget.blur();
                                                   return;
                                                 }
 
                                                 if (event.key === "Escape") {
                                                   event.preventDefault();
+                                                  event.stopPropagation();
                                                   cancelInteriorAssetRenameSession();
                                                   setSidebarRenameInteriorAssetId(null);
                                                   selectInteriorAssetById(room.id, asset.id);
+                                                  event.currentTarget.blur();
                                                 }
                                               }}
                                               aria-label={`Rename ${asset.name}`}
