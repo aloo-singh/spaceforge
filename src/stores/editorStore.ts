@@ -3672,8 +3672,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
       if (!room || !asset) return state;
 
-      const trimmedName = name.trim();
-      const nextName = trimmedName.length > 0 ? trimmedName : DEFAULT_STAIR_NAME;
+      const nextName = name.length > 0 ? name : DEFAULT_STAIR_NAME;
       const interiorAssetRenameSession =
         state.interiorAssetRenameSession?.roomId === roomId &&
         state.interiorAssetRenameSession.assetId === assetId

@@ -249,7 +249,7 @@ export function createCenteredDefaultDiningTable(room: Room, id: string): RoomIn
   return {
     id,
     type: "dining-table",
-    name: "Dining Table",
+    name: "Table",
     xMm: center.x,
     yMm: center.y,
     widthMm: 1600,
@@ -815,6 +815,6 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "bed": return "Bed";
     case "sofa": return "Sofa";
     case "wardrobe": return "Wardrobe";
-    case "dining-table": return "Dining Table";
+    case "dining-table": return "Table";
   }
 }

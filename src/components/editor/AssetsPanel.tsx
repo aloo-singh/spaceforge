@@ -55,8 +55,8 @@ const ASSET_CATEGORIES: AssetCategory[] = [
       },
       {
         type: "dining-table",
-        label: "Dining Table",
-        description: "Place a dining table",
+        label: "Table",
+        description: "Place a table",
         icon: <ToolsKitchen2Filled className="size-5" />,
       },
     ],

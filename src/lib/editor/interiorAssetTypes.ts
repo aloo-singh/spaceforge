@@ -604,10 +604,10 @@ export function getAssetDisplayName(asset: InteriorAsset): string {
   if (isDiningTable(asset)) {
     const shapePrefix = asset.shape === "round" ? "Round " : "";
     // If custom name, use it; otherwise suggest based on shape
-    if (asset.name !== "Dining Table") {
+    if (asset.name !== "Table") {
       return asset.name;
     }
-    return `${shapePrefix}Dining Table`;
+    return `${shapePrefix}Table`;
   }
 
   // For all other assets, use the name field

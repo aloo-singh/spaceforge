@@ -58,7 +58,7 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
     case "wardrobe":
       return { title: "Selected wardrobe", description: "Adjust the wardrobe's dimensions, door type, and orientation." };
     case "dining-table":
-      return { title: "Selected dining table", description: "Adjust the dining table's shape, size, and orientation." };
+      return { title: "Selected table", description: "Adjust the table's shape, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }
@@ -108,8 +108,7 @@ function FurnitureInspector({
               startInteriorAssetRenameSession(selectedAssetRoomId, selectedAssetId);
             }}
             onChange={(event) => {
-              if (!selectedAssetRoomId || !selectedAssetId) return;
-              updateInteriorAssetRenameDraft(selectedAssetRoomId, selectedAssetId, event.target.value);
+              updateInteriorAssetRenameDraft(selectedAssetRoomId ?? "", selectedAssetId ?? "", event.target.value);
             }}
             onBlur={() => {
               if (!selectedAssetRoomId || !selectedAssetId) return;
@@ -427,8 +426,7 @@ function StairsInspector({
               startInteriorAssetRenameSession(selectedAssetRoomId, selectedAssetId);
             }}
             onChange={(event) => {
-              if (!selectedAssetRoomId || !selectedAssetId) return;
-              updateInteriorAssetRenameDraft(selectedAssetRoomId, selectedAssetId, event.target.value);
+              updateInteriorAssetRenameDraft(selectedAssetRoomId ?? "", selectedAssetId ?? "", event.target.value);
             }}
             onBlur={() => {
               if (!selectedAssetRoomId || !selectedAssetId) return;
@@ -455,8 +453,7 @@ function StairsInspector({
               }
             }}
             aria-describedby="stair-name-hint"
-          />
-          <p id="stair-name-hint" className="text-[11px] leading-relaxed text-muted-foreground">
+          /><p id="stair-name-hint" className="text-[11px] leading-relaxed text-muted-foreground">
             Labels this stair for future room and hierarchy context.
           </p>
         </div>
