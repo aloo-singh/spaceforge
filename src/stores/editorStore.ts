@@ -700,6 +700,42 @@ function cloneRoom(room: Room): Room {
   };
 }
 
+function getDuplicatedInteriorAssetCenter(
+  room: Room,
+  asset: RoomInteriorAsset,
+  offsetMm: number
+): Point | null {
+  let duplicatedAsset = cloneRoomInteriorAsset(asset);
+
+  const xOffsetCandidate: RoomInteriorAsset = {
+    ...duplicatedAsset,
+    xMm: duplicatedAsset.xMm + offsetMm,
+  };
+  if (isInteriorAssetWithinRoom(room, xOffsetCandidate)) {
+    duplicatedAsset = xOffsetCandidate;
+  }
+
+  const yOffsetCandidate: RoomInteriorAsset = {
+    ...duplicatedAsset,
+    yMm: duplicatedAsset.yMm + offsetMm,
+  };
+  if (isInteriorAssetWithinRoom(room, yOffsetCandidate)) {
+    duplicatedAsset = yOffsetCandidate;
+  }
+
+  if (isInteriorAssetWithinRoom(room, duplicatedAsset)) {
+    return {
+      x: duplicatedAsset.xMm,
+      y: duplicatedAsset.yMm,
+    };
+  }
+
+  return constrainInteriorAssetCenter(room, duplicatedAsset, {
+    x: duplicatedAsset.xMm,
+    y: duplicatedAsset.yMm,
+  });
+}
+
 function getConnectedStairPeer(
   document: DocumentState,
   asset: RoomInteriorAsset
@@ -3277,12 +3313,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           existingAssetNames.set(sourceRoom.id, roomAssetNames);
 
           const newAssetId = createInteriorAssetId();
+          const duplicateCenter = getDuplicatedInteriorAssetCenter(
+            sourceRoom,
+            sourceAsset,
+            DUPLICATE_OFFSET_MM
+          );
+          if (!duplicateCenter) continue;
+
           const duplicateAsset: RoomInteriorAsset = {
             ...cloneRoomInteriorAsset(sourceAsset),
             id: newAssetId,
             name: duplicateName,
-            xMm: sourceAsset.xMm + DUPLICATE_OFFSET_MM,
-            yMm: sourceAsset.yMm + DUPLICATE_OFFSET_MM,
+            xMm: duplicateCenter.x,
+            yMm: duplicateCenter.y,
           };
 
           duplicatedAssets.push({
