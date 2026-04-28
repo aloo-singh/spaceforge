@@ -533,18 +533,29 @@ function createStairConnectionId(): string {
  */
 function generateDuplicateName(baseName: string, existingNames: Set<string>): string {
   const copyPrefix = "Copy of ";
-  const candidateName = `${copyPrefix}${baseName}`;
-
+  
+  // Extract the original base name if this is already a copy
+  let originalBase = baseName;
+  if (baseName.startsWith(copyPrefix)) {
+    // "Copy of Wardrobe 2" → extract "Wardrobe"
+    originalBase = baseName.slice(copyPrefix.length);
+    // Remove trailing number and space: "Wardrobe 2" → "Wardrobe"
+    originalBase = originalBase.replace(/\s+\d+$/, "");
+  }
+  
+  // Try "Copy of {originalBase}"
+  const candidateName = `${copyPrefix}${originalBase}`;
   if (!existingNames.has(candidateName)) {
     return candidateName;
   }
 
+  // Find next available number
   let counter = 2;
-  while (existingNames.has(`${copyPrefix}${baseName} ${counter}`)) {
+  while (existingNames.has(`${copyPrefix}${originalBase} ${counter}`)) {
     counter++;
   }
 
-  return `${copyPrefix}${baseName} ${counter}`;
+  return `${copyPrefix}${originalBase} ${counter}`;
 }
 
 function getConnectedFloorAvailability(document: DocumentState, floorId: string) {
@@ -3281,6 +3292,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // If nothing was duplicated, return unchanged state
       if (duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+        if (state.selection.length > 0) {
+          toast("Could not duplicate: selected items not found in document");
+        }
         return state;
       }
 
@@ -3290,8 +3304,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         duplicatedAssets,
       };
 
+      const newDocument = applyEditorCommand(state.document, command, "redo");
+
       return {
-        document: applyEditorCommand(state.document, command, "redo"),
+        ...state,
+        document: newDocument,
         selectedRoomId: duplicatedRooms[0]?.id ?? state.selectedRoomId,
         selectedWall: null,
         selectedOpening: null,
