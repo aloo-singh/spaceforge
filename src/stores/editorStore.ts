@@ -4666,6 +4666,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "move-interior-asset",
         roomId,
         assetId,
+        assetType: asset.type,
         previousXmm: previousCenter.x,
         previousYmm: previousCenter.y,
         nextXmm: nextCenter.x,

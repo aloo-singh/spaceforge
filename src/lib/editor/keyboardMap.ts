@@ -380,7 +380,7 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "move-interior-asset") {
-    return "interior asset move";
+    return getInteriorAssetActionLabel(command.assetType, "move");
   }
 
   if (command.type === "bulk-duplicate") {
@@ -454,6 +454,10 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "interior asset edit";
   }
 
+  if (command.type === "move-interior-asset-to-room") {
+    return getInteriorAssetActionLabel(command.asset.type, "move");
+  }
+
   return "action";
 }
 
@@ -500,7 +504,7 @@ function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: Ke
 
 function getInteriorAssetActionLabel(
   type: RoomInteriorAsset["type"],
-  action: "creation" | "deletion" | "rotation" | "resize" | "edit"
+  action: "creation" | "deletion" | "rotation" | "resize" | "edit" | "move"
 ) {
   return `${getInteriorAssetTypeName(type)} ${action}`;
 }

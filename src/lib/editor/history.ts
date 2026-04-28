@@ -8,7 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
   DEFAULT_PROJECT_EXPORT_CONFIG,
@@ -184,6 +184,7 @@ export type EditorCommand =
       type: "move-interior-asset";
       roomId: string;
       assetId: string;
+      assetType: InteriorAssetType;
       previousXmm: number;
       previousYmm: number;
       nextXmm: number;

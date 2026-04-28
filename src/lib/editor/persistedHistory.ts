@@ -15,7 +15,7 @@ import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType } from "@/lib/editor/types";
 
 function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
   if (a.length !== b.length) return false;
@@ -482,6 +482,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         type: "move-interior-asset",
         roomId: changedRoom.next.id,
         assetId: movedAsset.assetId,
+        assetType: movedAsset.assetType,
         previousXmm: movedAsset.previousXmm,
         previousYmm: movedAsset.previousYmm,
         nextXmm: movedAsset.nextXmm,
@@ -639,6 +640,7 @@ function inferMovedInteriorAsset(
 ):
   | {
       assetId: string;
+      assetType: InteriorAssetType;
       previousXmm: number;
       previousYmm: number;
       nextXmm: number;
@@ -651,6 +653,7 @@ function inferMovedInteriorAsset(
   let movedAsset:
     | {
         assetId: string;
+        assetType: InteriorAssetType;
         previousXmm: number;
         previousYmm: number;
         nextXmm: number;
@@ -674,6 +677,7 @@ function inferMovedInteriorAsset(
 
     movedAsset = {
       assetId: previousAsset.id,
+      assetType: nextAsset.type,
       previousXmm: previousAsset.xMm,
       previousYmm: previousAsset.yMm,
       nextXmm: nextAsset.xMm,
