@@ -4448,14 +4448,31 @@ function drawRoomInteriorAssets(
       if (displayedAsset.type === "wardrobe") {
         graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
         if (displayedAsset.doorType === "sliding") {
-          // Two parallel sliding door lines on the front edge
-          for (const t of [1 / 3, 2 / 3]) {
-            const p1 = { x: frontC1.x + (frontC2.x - frontC1.x) * t, y: frontC1.y + (frontC2.y - frontC1.y) * t };
-            const p2 = { x: backC1.x + (backC2.x - backC1.x) * t, y: backC1.y + (backC2.y - backC1.y) * t };
-            graphics.moveTo(p1.x, p1.y);
-            graphics.lineTo(p2.x, p2.y);
-            graphics.stroke();
-          }
+          // Two equal-length parallel sliding door tracks outside the front edge
+          const midFront = { x: (frontC1.x + frontC2.x) / 2, y: (frontC1.y + frontC2.y) / 2 };
+          
+          // Calculate outward direction (opposite to depth, away from wardrobe interior)
+          const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };
+          const depthLen = Math.sqrt(depthVec.x * depthVec.x + depthVec.y * depthVec.y);
+          const outwardUnit = depthLen > 0 ? { x: -depthVec.x / depthLen, y: -depthVec.y / depthLen } : { x: 0, y: -1 };
+          
+          // Scale offset based on wardrobe depth to maintain proportions at any zoom level
+          const offsetDist = Math.max(4, depthLen * 0.08);
+          const offset2Dist = Math.max(5, depthLen * 0.1);
+          
+          // Left track: from frontC1 to midFront, offset outward
+          const track1Start = { x: frontC1.x + outwardUnit.x * offsetDist, y: frontC1.y + outwardUnit.y * offsetDist };
+          const track1End = { x: midFront.x + outwardUnit.x * offsetDist, y: midFront.y + outwardUnit.y * offsetDist };
+          graphics.moveTo(track1Start.x, track1Start.y);
+          graphics.lineTo(track1End.x, track1End.y);
+          graphics.stroke();
+          
+          // Right track: from midFront to frontC2, offset slightly more for layering effect
+          const track2Start = { x: midFront.x + outwardUnit.x * offset2Dist, y: midFront.y + outwardUnit.y * offset2Dist };
+          const track2End = { x: frontC2.x + outwardUnit.x * offset2Dist, y: frontC2.y + outwardUnit.y * offset2Dist };
+          graphics.moveTo(track2Start.x, track2Start.y);
+          graphics.lineTo(track2End.x, track2End.y);
+          graphics.stroke();
         } else {
           // Swing door: diagonals opening outward from front corners
           const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };

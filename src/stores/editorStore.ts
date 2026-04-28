@@ -1010,6 +1010,10 @@ function updateRoomInteriorAssetInDocument(
     arrowEnabled?: boolean;
     arrowDirection?: Room["interiorAssets"][number]["arrowDirection"];
     arrowLabel?: string;
+    doorType?: "swing" | "sliding";
+    doorConstraint?: number;
+    shape?: "rectangular" | "round";
+    sizePreset?: string;
   }
 ): DocumentState {
   const clonedAssetDefaults = (asset: Room["interiorAssets"][number]) => cloneRoomInteriorAsset(asset);
@@ -1034,6 +1038,10 @@ function updateRoomInteriorAssetInDocument(
                     arrowDirection:
                       nextAsset.arrowDirection ?? clonedAssetDefaults(asset).arrowDirection,
                     arrowLabel: nextAsset.arrowLabel ?? clonedAssetDefaults(asset).arrowLabel,
+                    doorType: nextAsset.doorType ?? clonedAssetDefaults(asset).doorType,
+                    doorConstraint: nextAsset.doorConstraint ?? clonedAssetDefaults(asset).doorConstraint,
+                    shape: nextAsset.shape ?? clonedAssetDefaults(asset).shape,
+                    sizePreset: nextAsset.sizePreset ?? clonedAssetDefaults(asset).sizePreset,
                   }
                 : asset
             ),
