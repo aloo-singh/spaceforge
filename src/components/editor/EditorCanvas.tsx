@@ -4387,28 +4387,35 @@ function drawRoomInteriorAssets(
       graphics.stroke();
     }
 
-    graphics.setFillStyle({
-      color: theme.roomOutline,
-      alpha: isSelected ? 0.12 : 0.08,
-    });
-    graphics.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i += 1) {
-      graphics.lineTo(corners[i].x, corners[i].y);
-    }
-    graphics.closePath();
-    graphics.fill();
+    // Skip rectangular bounding box for unselected round dining tables
+    const isRoundDiningTable =
+      displayedAsset.type === "dining-table" && displayedAsset.shape === "round";
+    const shouldDrawBoundingBox = isSelected || !isRoundDiningTable;
 
-    graphics.setStrokeStyle({
-      width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
-      color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-      alpha: isSelected ? 0.96 : 0.9,
-    });
-    graphics.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i += 1) {
-      graphics.lineTo(corners[i].x, corners[i].y);
+    if (shouldDrawBoundingBox) {
+      graphics.setFillStyle({
+        color: theme.roomOutline,
+        alpha: isSelected ? 0.12 : 0.08,
+      });
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+        color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+        alpha: isSelected ? 0.96 : 0.9,
+      });
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
+      graphics.stroke();
     }
-    graphics.closePath();
-    graphics.stroke();
 
     // Furniture-specific type visuals
     if (displayedAsset.type !== "stairs") {
@@ -4522,12 +4529,16 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") {
-        // Inscribed ellipse
+        // Ellipse fills the entire rectangular bounds
         const cx = (topLeft.x + bottomRight.x) / 2;
         const cy = (topLeft.y + bottomRight.y) / 2;
-        const rX = Math.abs(bottomRight.x - topLeft.x) / 2 * 0.84;
-        const rY = Math.abs(bottomRight.y - topLeft.y) / 2 * 0.84;
-        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha });
+        const rX = Math.abs(bottomRight.x - topLeft.x) / 2;
+        const rY = Math.abs(bottomRight.y - topLeft.y) / 2;
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
         graphics.ellipse(cx, cy, rX, rY);
         graphics.stroke();
       }
