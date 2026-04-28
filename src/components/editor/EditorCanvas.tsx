@@ -377,13 +377,32 @@ function getDisplayedInteriorAssetForAnimation(
 
   const progress = clampValue((renderedAtMs - animation.startedAtMs) / STAIR_ROTATION_ANIMATION_MS, 0, 1);
   const easedProgress = easeOutCubic(progress);
-  const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
-  const longSideMm = Math.max(asset.widthMm, asset.depthMm);
+
+  // Get start dimensions from animation
+  const startWidthMm = animation.startWidthMm;
+  const startDepthMm = animation.startDepthMm;
+
+  // Determine if this rotation swaps dimensions (90° or -90° delta)
+  const startRotNorm = normalizeCanvasRotationDegrees(animation.startRotationDegrees);
+  const endRotNorm = normalizeCanvasRotationDegrees(animation.endRotationDegrees);
+  
+  // Check if rotating from axis-aligned (0/±180) to perpendicular (±90) or vice versa
+  const startIsAxisAligned = startRotNorm === 0 || startRotNorm === 180 || startRotNorm === -180;
+  const endIsAxisAligned = endRotNorm === 0 || endRotNorm === 180 || endRotNorm === -180;
+  const isSwappingDimensions = startIsAxisAligned !== endIsAxisAligned;
+
+  // Calculate end dimensions (swapped if rotating 90°/-90°)
+  const endWidthMm = isSwappingDimensions ? startDepthMm : startWidthMm;
+  const endDepthMm = isSwappingDimensions ? startWidthMm : startDepthMm;
+
+  // Interpolate dimensions smoothly
+  const displayedWidthMm = startWidthMm + (endWidthMm - startWidthMm) * easedProgress;
+  const displayedDepthMm = startDepthMm + (endDepthMm - startDepthMm) * easedProgress;
 
   return {
     ...asset,
-    widthMm: shortSideMm,
-    depthMm: longSideMm,
+    widthMm: displayedWidthMm,
+    depthMm: displayedDepthMm,
     rotationDegrees: getInterpolatedRotationDegrees(
       animation.startRotationDegrees,
       animation.endRotationDegrees,
@@ -4401,11 +4420,18 @@ function drawRoomInteriorAssets(
       // Determine front edge based on rotation (normalizeCanvasRotationDegrees returns -180 to 180)
       // 0°=top, 90°=right, ±180°=bottom, -90°=left
       const rot = normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+      // Determine which cardinal direction is closest to current rotation (handles smooth animation)
+      const closestCardinal =
+        rot < -135 ? -180
+        : rot < -45 ? -90
+        : rot < 45 ? 0
+        : rot < 135 ? 90
+        : 180; // 135 to 180
       // Which pair of corners form the "front" edge
       const [frontC1, frontC2, backC1, backC2] =
-        rot === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
-        : rot === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
-        : rot === 180 || rot === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
+        closestCardinal === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
+        : closestCardinal === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
+        : closestCardinal === 180 || closestCardinal === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
         : [topLeft, bottomLeft, topRight, bottomRight]; // -90
 
       if (displayedAsset.type === "bed") {
