@@ -129,6 +129,9 @@ import {
   formatCanvasRotationDegrees,
   formatCanvasRotationShortcutLabel,
   normalizeCanvasRotationDegrees,
+  snapToCardinalRotationDegrees,
+  ASSET_ROTATION_DURATION_MS,
+  type AssetRotationAnimation,
 } from "@/lib/editor/canvasRotation";
 import {
   formatNorthBearingDegrees,
@@ -288,7 +291,6 @@ const STAIR_DIRECTION_ARROW_LENGTH_RATIO = 0.56;
 const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
 const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
 const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
-const STAIR_ROTATION_ANIMATION_MS = 180;
 const FURNITURE_LABEL_FONT_SIZE_WORLD_MM = 55;
 const FURNITURE_LABEL_MIN_FONT_SIZE_PX = 9;
 const FURNITURE_LABEL_MAX_FONT_SIZE_PX = 14;
@@ -312,32 +314,11 @@ function clampValue(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-type StairRotationAnimation = {
-  roomId: string;
-  assetId: string;
-  startWidthMm: number;
-  startDepthMm: number;
-  startRotationDegrees: number;
-  endRotationDegrees: number;
-  startedAtMs: number;
-};
-
 function getShortestRotationDeltaDegrees(fromDegrees: number, toDegrees: number) {
   const normalizedDelta = normalizeCanvasRotationDegrees(toDegrees - fromDegrees);
   if (normalizedDelta > 180) return normalizedDelta - 360;
   if (normalizedDelta <= -180) return normalizedDelta + 360;
   return normalizedDelta;
-}
-
-function getInterpolatedRotationDegrees(
-  startRotationDegrees: number,
-  endRotationDegrees: number,
-  progress: number
-) {
-  return normalizeCanvasRotationDegrees(
-    startRotationDegrees +
-      getShortestRotationDeltaDegrees(startRotationDegrees, endRotationDegrees) * progress
-  );
 }
 
 function getRotatedAssetScreenCorners(
@@ -366,49 +347,6 @@ function getRotatedAssetScreenCorners(
     rotatePoint(halfWidth, halfDepth),
     rotatePoint(-halfWidth, halfDepth),
   ] as const;
-}
-
-function getDisplayedInteriorAssetForAnimation(
-  asset: Room["interiorAssets"][number],
-  animation: StairRotationAnimation | undefined,
-  renderedAtMs: number
-) {
-  if (!animation) return asset;
-
-  const progress = clampValue((renderedAtMs - animation.startedAtMs) / STAIR_ROTATION_ANIMATION_MS, 0, 1);
-  const easedProgress = easeOutCubic(progress);
-
-  // Get start dimensions from animation
-  const startWidthMm = animation.startWidthMm;
-  const startDepthMm = animation.startDepthMm;
-
-  // Determine if this rotation swaps dimensions (90° or -90° delta)
-  const startRotNorm = normalizeCanvasRotationDegrees(animation.startRotationDegrees);
-  const endRotNorm = normalizeCanvasRotationDegrees(animation.endRotationDegrees);
-  
-  // Check if rotating from axis-aligned (0/±180) to perpendicular (±90) or vice versa
-  const startIsAxisAligned = startRotNorm === 0 || startRotNorm === 180 || startRotNorm === -180;
-  const endIsAxisAligned = endRotNorm === 0 || endRotNorm === 180 || endRotNorm === -180;
-  const isSwappingDimensions = startIsAxisAligned !== endIsAxisAligned;
-
-  // Calculate end dimensions (swapped if rotating 90°/-90°)
-  const endWidthMm = isSwappingDimensions ? startDepthMm : startWidthMm;
-  const endDepthMm = isSwappingDimensions ? startWidthMm : startDepthMm;
-
-  // Interpolate dimensions smoothly
-  const displayedWidthMm = startWidthMm + (endWidthMm - startWidthMm) * easedProgress;
-  const displayedDepthMm = startDepthMm + (endDepthMm - startDepthMm) * easedProgress;
-
-  return {
-    ...asset,
-    widthMm: displayedWidthMm,
-    depthMm: displayedDepthMm,
-    rotationDegrees: getInterpolatedRotationDegrees(
-      animation.startRotationDegrees,
-      animation.endRotationDegrees,
-      easedProgress
-    ),
-  };
 }
 
 function normalizeExportSingleLineText(value: string): string {
@@ -921,11 +859,13 @@ export default function EditorCanvas({
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
+  // Holds in-progress asset rotation animations keyed by assetId.
+  // Populated by the rotation command; drained by the ticker once durationMs elapses.
+  const assetRotationAnimationsRef = useRef<Map<string, AssetRotationAnimation>>(new Map());
   const draftConstraintModeRef = useRef<"orthogonal" | "diagonal45">("orthogonal");
   const transformAnimationFrameRef = useRef<number | null>(null);
-  const stairRotationAnimationsRef = useRef<Map<string, StairRotationAnimation>>(new Map());
-  const stairRotationAnimationFrameRef = useRef<number | null>(null);
   const footprintFadeAnimationFrameRef = useRef<number | null>(null);
+  const assetRotationAnimationFrameRef = useRef<number | null>(null);
   const footprintPreviewFloorIdRef = useRef<string | null>(null);
   const footprintPreviewOpacityRef = useRef(0);
   const instructionsId = "editor-canvas-controls";
@@ -1093,14 +1033,14 @@ export default function EditorCanvas({
       hoveredSelectableWallRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
-      stairRotationAnimationsRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag),
       footprintPreviewFloorIdRef.current,
       footprintPreviewOpacityRef.current,
-      assetDragTargetRoomIdRef.current
+      assetDragTargetRoomIdRef.current,
+      assetRotationAnimationsRef.current
     );
 
     if (app) {
@@ -1114,17 +1054,41 @@ export default function EditorCanvas({
     transformAnimationFrameRef.current = null;
   }, []);
 
-  const stopStairRotationAnimation = useCallback(() => {
-    if (stairRotationAnimationFrameRef.current === null) return;
-    cancelAnimationFrame(stairRotationAnimationFrameRef.current);
-    stairRotationAnimationFrameRef.current = null;
-  }, []);
-
   const stopFootprintFadeAnimation = useCallback(() => {
     if (footprintFadeAnimationFrameRef.current === null) return;
     cancelAnimationFrame(footprintFadeAnimationFrameRef.current);
     footprintFadeAnimationFrameRef.current = null;
   }, []);
+
+  const stopAssetRotationAnimation = useCallback(() => {
+    if (assetRotationAnimationFrameRef.current === null) return;
+    cancelAnimationFrame(assetRotationAnimationFrameRef.current);
+    assetRotationAnimationFrameRef.current = null;
+  }, []);
+
+  const startAssetRotationAnimation = useCallback(() => {
+    // If a loop is already running, it will pick up the new entry from the map automatically.
+    if (assetRotationAnimationFrameRef.current !== null) return;
+
+    const step = () => {
+      const now = performance.now();
+      for (const [assetId, anim] of assetRotationAnimationsRef.current) {
+        if (now - anim.startMs >= anim.durationMs) {
+          assetRotationAnimationsRef.current.delete(assetId);
+        }
+      }
+
+      drawCurrentScene();
+
+      if (assetRotationAnimationsRef.current.size > 0) {
+        assetRotationAnimationFrameRef.current = requestAnimationFrame(step);
+      } else {
+        assetRotationAnimationFrameRef.current = null;
+      }
+    };
+
+    assetRotationAnimationFrameRef.current = requestAnimationFrame(step);
+  }, [drawCurrentScene]);
 
   const startTransformAnimation = useCallback(() => {
     if (transformAnimationFrameRef.current !== null) return;
@@ -1147,36 +1111,6 @@ export default function EditorCanvas({
     };
 
     transformAnimationFrameRef.current = requestAnimationFrame(step);
-  }, [drawCurrentScene]);
-
-  const startStairRotationAnimation = useCallback(() => {
-    if (stairRotationAnimationFrameRef.current !== null) return;
-
-    const step = () => {
-      const animations = stairRotationAnimationsRef.current;
-      if (animations.size === 0) {
-        stairRotationAnimationFrameRef.current = null;
-        return;
-      }
-
-      const now = performance.now();
-      for (const [key, animation] of animations) {
-        if (now - animation.startedAtMs >= STAIR_ROTATION_ANIMATION_MS) {
-          animations.delete(key);
-        }
-      }
-
-      drawCurrentScene();
-
-      if (animations.size === 0) {
-        stairRotationAnimationFrameRef.current = null;
-        return;
-      }
-
-      stairRotationAnimationFrameRef.current = requestAnimationFrame(step);
-    };
-
-    stairRotationAnimationFrameRef.current = requestAnimationFrame(step);
   }, [drawCurrentScene]);
 
   const startFootprintFadeAnimation = useCallback(() => {
@@ -1248,7 +1182,6 @@ export default function EditorCanvas({
   useEffect(() => {
     return () => {
       stopFootprintFadeAnimation();
-      stopStairRotationAnimation();
       if (hintTransitionTimeoutRef.current) {
         clearTimeout(hintTransitionTimeoutRef.current);
       }
@@ -1262,7 +1195,7 @@ export default function EditorCanvas({
         clearTimeout(hintPauseTimeoutRef.current);
       }
     };
-  }, [stopFootprintFadeAnimation, stopStairRotationAnimation]);
+  }, [stopFootprintFadeAnimation]);
 
   useEffect(() => {
     if (!isHintFlowPaused) {
@@ -2319,9 +2252,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     }),
@@ -2330,9 +2262,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     ]
@@ -2344,9 +2275,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     } = canvasBootstrapCallbacks;
@@ -2437,57 +2367,40 @@ export default function EditorCanvas({
       resizeObserver.observe(resizeTarget);
 
       const unsubscribe = useEditorStore.subscribe((state, previousState) => {
-        let shouldAnimateStairRotation = false;
-        const previousAssets = new Map<
-          string,
-          {
-            roomId: string;
-            asset: Room["interiorAssets"][number];
+        // Detect asset rotations and populate the animation map BEFORE drawing,
+        // so that the very first drawCurrentScene call sees the animation entry
+        // and renders at progress=0 (fromDegrees) rather than the final state.
+        if (state.document !== previousState.document) {
+          const nowRooms = getRoomsForActiveFloor(state.document);
+          const prevRooms = getRoomsForActiveFloor(previousState.document);
+          let anyAdded = false;
+          for (const room of nowRooms) {
+            const prevRoom = prevRooms.find((r) => r.id === room.id);
+            if (!prevRoom) continue;
+            for (const asset of room.interiorAssets) {
+              const prevAsset = prevRoom.interiorAssets.find((a) => a.id === asset.id);
+              if (!prevAsset) continue;
+              const fromDegrees = snapToCardinalRotationDegrees(prevAsset.rotationDegrees ?? 0);
+              const toDegrees = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
+              if (fromDegrees === toDegrees) continue;
+              const usesSidewaysBaseDimensions = Math.abs(fromDegrees) === 90;
+              assetRotationAnimationsRef.current.set(asset.id, {
+                roomId: room.id,
+                assetId: asset.id,
+                fromDegrees,
+                toDegrees,
+                baseWidthMm: usesSidewaysBaseDimensions ? prevAsset.depthMm : prevAsset.widthMm,
+                baseDepthMm: usesSidewaysBaseDimensions ? prevAsset.widthMm : prevAsset.depthMm,
+                startMs: performance.now(),
+                durationMs: ASSET_ROTATION_DURATION_MS,
+              });
+              anyAdded = true;
+            }
           }
-        >();
-
-        for (const room of getRoomsForActiveFloor(previousState.document)) {
-          for (const asset of room.interiorAssets) {
-            previousAssets.set(asset.id, { roomId: room.id, asset });
-          }
-        }
-
-        const nextAssetIds = new Set<string>();
-        for (const room of getRoomsForActiveFloor(state.document)) {
-          for (const asset of room.interiorAssets) {
-            nextAssetIds.add(asset.id);
-            const previousAssetState = previousAssets.get(asset.id);
-            if (!previousAssetState) continue;
-
-            const previousRotationDegrees = normalizeCanvasRotationDegrees(
-              previousAssetState.asset.rotationDegrees ?? 0
-            );
-            const nextRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
-            if (previousRotationDegrees === nextRotationDegrees) continue;
-
-            stairRotationAnimationsRef.current.set(asset.id, {
-              roomId: room.id,
-              assetId: asset.id,
-              startWidthMm: previousAssetState.asset.widthMm,
-              startDepthMm: previousAssetState.asset.depthMm,
-              startRotationDegrees: previousRotationDegrees,
-              endRotationDegrees: nextRotationDegrees,
-              startedAtMs: performance.now(),
-            });
-            shouldAnimateStairRotation = true;
+          if (anyAdded) {
+            startAssetRotationAnimation();
           }
         }
-
-        for (const assetId of stairRotationAnimationsRef.current.keys()) {
-          if (!nextAssetIds.has(assetId)) {
-            stairRotationAnimationsRef.current.delete(assetId);
-          }
-        }
-
-        if (shouldAnimateStairRotation) {
-          startStairRotationAnimation();
-        }
-
         drawCurrentScene();
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore, {
@@ -2570,7 +2483,6 @@ export default function EditorCanvas({
         dimensionOverlayRef.current = null;
         setTransformFeedback(null);
         stopTransformAnimation();
-        stopStairRotationAnimation();
         stopFootprintFadeAnimation();
       };
     }
@@ -2583,7 +2495,6 @@ export default function EditorCanvas({
     return () => {
       destroyed = true;
       teardown?.();
-      stopStairRotationAnimation();
       stopFootprintFadeAnimation();
       if (initialized) {
         app.destroy(true, { children: true });
@@ -2594,6 +2505,7 @@ export default function EditorCanvas({
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
+    if (!app.renderer.background) return;
 
     app.renderer.background.color = editorTheme.canvasBackground;
     drawCurrentScene();
@@ -3467,14 +3379,14 @@ function drawScene(
     activeRoomId: string | null;
   },
   transformFeedback: TransformFeedback | null,
-  stairRotationAnimations: Map<string, StairRotationAnimation>,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
   theme: EditorCanvasTheme,
   hideCursorHud: boolean,
   footprintFloorId: string | null,
   footprintOpacity: number,
-  assetDragTargetRoomId: string | null = null
+  assetDragTargetRoomId: string | null = null,
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
@@ -3594,7 +3506,8 @@ function drawScene(
     state.camera,
     state.viewport,
     theme,
-    { includeStairDirectionVisuals: true, stairRotationAnimations }
+    { includeStairDirectionVisuals: true },
+    animations
   );
   drawWallInteractionOverlay(
     wallOverlayGraphics,
@@ -3620,7 +3533,7 @@ function drawScene(
     transformFeedback,
     theme,
     state.selection,
-    { includeStairDirectionLabels: true, stairRotationAnimations }
+    { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
   if (showDimensions) {
@@ -3992,15 +3905,15 @@ function drawOpenings(
   theme: EditorCanvasTheme,
   options?: {
     includeStairDirectionVisuals?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
-  }
+  },
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
   graphics.clear();
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, options);
+    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations);
   }
 }
 
@@ -4344,25 +4257,49 @@ function drawRoomInteriorAssets(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  options?: {
-    includeStairDirectionVisuals?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
-  }
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
-  const renderedAtMs = performance.now();
   for (const asset of room.interiorAssets) {
-    const animation = options?.stairRotationAnimations?.get(asset.id);
-    const displayedAsset = getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs);
-    const isAnimatingRotation = Boolean(animation && animation.roomId === room.id);
-    const bounds = getRoomInteriorAssetBounds(asset);
-    const [topLeft, topRight, bottomRight, bottomLeft] = isAnimatingRotation
-      ? getRotatedAssetScreenCorners(displayedAsset, camera, viewport)
-      : [
-          worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport),
-          worldToScreen({ x: bounds.right, y: bounds.top }, camera, viewport),
-          worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport),
-          worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport),
-        ];
+    // Animation hook: look up any in-progress rotation for this asset.
+    // baseWidthMm/baseDepthMm are the canonical local dimensions used for the
+    // whole rotation, while rotationDegrees is interpolated between the two
+    // cardinal endpoints when animation is active.
+    const anim = animations.get(asset.id) ?? null;
+
+    // displayedAsset is the view-model used for all drawing in this iteration.
+    // At rest it equals the stored asset. During animation it carries the canonical
+    // base dimensions and an eased-out interpolated rotationDegrees between fromDegrees
+    // and toDegrees so the visual shape rotates smoothly.
+    let displayedAsset: Room["interiorAssets"][number];
+    if (anim) {
+      const rawProgress = Math.min(1, (performance.now() - anim.startMs) / anim.durationMs);
+      const easedProgress = easeOutCubic(rawProgress);
+      const delta = getShortestRotationDeltaDegrees(anim.fromDegrees, anim.toDegrees);
+      displayedAsset = {
+        ...asset,
+        widthMm: anim.baseWidthMm,
+        depthMm: anim.baseDepthMm,
+        rotationDegrees: anim.fromDegrees + delta * easedProgress,
+      };
+    } else {
+      displayedAsset = asset;
+    }
+
+    // Corners: use the rotation-matrix helper when animating (supports arbitrary angles);
+    // fall back to fast axis-aligned bounds at rest (cardinal angles only).
+    let topLeft: ScreenPoint,
+        topRight: ScreenPoint,
+        bottomRight: ScreenPoint,
+        bottomLeft: ScreenPoint;
+    if (anim) {
+      [topLeft, topRight, bottomRight, bottomLeft] = getRotatedAssetScreenCorners(displayedAsset, camera, viewport);
+    } else {
+      const b = getRoomInteriorAssetBounds(asset);
+      topLeft     = worldToScreen({ x: b.left,  y: b.top    }, camera, viewport);
+      topRight    = worldToScreen({ x: b.right, y: b.top    }, camera, viewport);
+      bottomRight = worldToScreen({ x: b.right, y: b.bottom }, camera, viewport);
+      bottomLeft  = worldToScreen({ x: b.left,  y: b.bottom }, camera, viewport);
+    }
     const corners = [topLeft, topRight, bottomRight, bottomLeft];
     const isSelected = selection.some(
       (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
@@ -4424,22 +4361,21 @@ function drawRoomInteriorAssets(
       const fgColor = isSelected ? theme.wallSelectionAccent : theme.roomOutline;
       const fgFillAlpha = isSelected ? 0.30 : 0.20;
 
-      // Determine front edge based on rotation (normalizeCanvasRotationDegrees returns -180 to 180)
-      // 0°=top, 90°=right, ±180°=bottom, -90°=left
-      const rot = normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0);
-      // Determine which cardinal direction is closest to current rotation (handles smooth animation)
-      const closestCardinal =
-        rot < -135 ? -180
-        : rot < -45 ? -90
-        : rot < 45 ? 0
-        : rot < 135 ? 90
-        : 180; // 135 to 180
-      // Which pair of corners form the "front" edge
-      const [frontC1, frontC2, backC1, backC2] =
-        closestCardinal === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
-        : closestCardinal === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
-        : closestCardinal === 180 || closestCardinal === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
-        : [topLeft, bottomLeft, topRight, bottomRight]; // -90
+      // Determine front edge based on rotation.
+      // During animation, use the rotated local top/bottom edges directly so
+      // details (bed headboard, sofa backrest, wardrobe doors) rotate smoothly
+      // with the rectangle for both clockwise and counter-clockwise turns.
+      // At rest, rotationDegrees is cardinal, so map front/back by cardinal side.
+      // 0°=top, 90°=right, -180°=bottom, -90°=left
+      const [frontC1, frontC2, backC1, backC2] = anim
+        ? [topLeft, topRight, bottomLeft, bottomRight]
+        : (() => {
+            const closestCardinal = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+            return closestCardinal === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
+              : closestCardinal === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
+              : closestCardinal === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
+              : [topLeft, bottomLeft, topRight, bottomRight]; // -90
+          })();
 
       if (displayedAsset.type === "bed") {
         // Headboard: filled strip at front ~14% depth
@@ -4546,8 +4482,6 @@ function drawRoomInteriorAssets(
 
     // Stairs-specific visuals (tread lines and direction arrow)
     if (asset.type === "stairs") {
-      const isQuarterTurnSideways =
-        Math.abs(normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
       const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
       const treadCount = Math.max(
         0,
@@ -4556,16 +4490,33 @@ function drawRoomInteriorAssets(
       for (let index = 1; index <= treadCount; index += 1) {
         const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
         if (progress <= 0 || progress >= 1) continue;
-        const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
-        const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
-        const start = {
-          x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
-          y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
-        };
-        const end = {
-          x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
-          y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
-        };
+        const [start, end] = anim
+          ? [
+              {
+                x: topLeft.x + (bottomLeft.x - topLeft.x) * progress,
+                y: topLeft.y + (bottomLeft.y - topLeft.y) * progress,
+              },
+              {
+                x: topRight.x + (bottomRight.x - topRight.x) * progress,
+                y: topRight.y + (bottomRight.y - topRight.y) * progress,
+              },
+            ]
+          : (() => {
+              const isQuarterTurnSideways =
+                Math.abs(snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
+              const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
+              const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
+              return [
+                {
+                  x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
+                  y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
+                },
+                {
+                  x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
+                  y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
+                },
+              ];
+            })();
         graphics.setStrokeStyle({
           width: Math.max(camera.pixelsPerMm * 10, 1.1),
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
@@ -4577,9 +4528,7 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
-      if (options?.includeStairDirectionVisuals !== false) {
-        drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
-      }
+      drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
     }
 
     if (!isSelected) continue;
@@ -4775,8 +4724,7 @@ function drawStairDirectionLabels(
   rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme,
-  stairRotationAnimations?: Map<string, StairRotationAnimation>
+  theme: EditorCanvasTheme
 ) {
   const renderedAtMs = performance.now();
   const textResolution = getTextResolution();
@@ -4788,11 +4736,7 @@ function drawStairDirectionLabels(
 
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
-      const animation = stairRotationAnimations?.get(asset.id);
-      const displayedAsset =
-        animation && animation.roomId === room.id
-          ? getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs)
-          : asset;
+      const displayedAsset = asset;
       if ((displayedAsset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) continue;
       const normalizedRotationDegrees = normalizeCanvasRotationDegrees(
         displayedAsset.rotationDegrees ?? 0
@@ -4857,8 +4801,7 @@ function drawFurnitureLabels(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  selection: SharedSelectionItem[],
-  stairRotationAnimations?: Map<string, StairRotationAnimation>
+  selection: SharedSelectionItem[]
 ) {
   const fontSizePx = clampValue(
     camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
@@ -4871,8 +4814,7 @@ function drawFurnitureLabels(
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
       if (asset.type === "stairs") continue;
-      const animation = stairRotationAnimations?.get(asset.id);
-      const displayedAsset = getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs);
+      const displayedAsset = asset;
       const screenWidthPx = (displayedAsset.widthMm) * camera.pixelsPerMm;
       const screenHeightPx = (displayedAsset.depthMm) * camera.pixelsPerMm;
       const isSelected = selection.some(
@@ -5126,7 +5068,6 @@ function drawRoomLabels(
   selection: SharedSelectionItem[],
   options?: {
     includeStairDirectionLabels?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
   }
 ) {
   clearContainerChildren(labelContainer);
@@ -5241,12 +5182,11 @@ function drawRoomLabels(
       rooms,
       camera,
       viewport,
-      theme,
-      options?.stairRotationAnimations
+      theme
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection, options?.stairRotationAnimations);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection);
 }
 
 type ResizeDimensionLabelSpec = {

@@ -1,5 +1,5 @@
 import { worldToScreen } from "@/lib/editor/camera";
-import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
+import { snapToCardinalRotationDegrees } from "@/lib/editor/canvasRotation";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { getPolygonBounds, isPointInPolygon } from "@/lib/editor/roomGeometry";
 import type { RectCorner, RectWall, RoomRectBounds } from "@/lib/editor/rectRoomResize";
@@ -45,7 +45,7 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     yMm: asset.yMm,
     widthMm: asset.widthMm,
     depthMm: asset.depthMm,
-    rotationDegrees: normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0),
+    rotationDegrees: snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0),
     anchor: asset.anchor ?? "floor",
   };
   if (asset.type === "stairs") {
@@ -84,8 +84,8 @@ export function areRoomInteriorAssetsEqual(
       assetA.yMm !== assetB.yMm ||
       assetA.widthMm !== assetB.widthMm ||
       assetA.depthMm !== assetB.depthMm ||
-      normalizeCanvasRotationDegrees(assetA.rotationDegrees ?? 0) !==
-        normalizeCanvasRotationDegrees(assetB.rotationDegrees ?? 0) ||
+      snapToCardinalRotationDegrees(assetA.rotationDegrees ?? 0) !==
+        snapToCardinalRotationDegrees(assetB.rotationDegrees ?? 0) ||
       (assetA.type === "stairs" && (
         (assetA.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) !==
           (assetB.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) ||
@@ -360,10 +360,11 @@ export function getRotatedInteriorAssetForRoom(
 ): RoomInteriorAsset | null {
   if (!Number.isFinite(deltaDegrees) || deltaDegrees === 0) return null;
 
-  const nextRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees + deltaDegrees);
+  const currentRotationDegrees = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
+  const nextRotationDegrees = snapToCardinalRotationDegrees(currentRotationDegrees + deltaDegrees);
   const isQuarterTurn = Math.abs(deltaDegrees) % 180 === 90;
 
-  if (asset.rotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
+  if (currentRotationDegrees === nextRotationDegrees && !isQuarterTurn) return null;
 
   const rotatedAsset = {
     ...cloneRoomInteriorAsset(asset),
@@ -797,7 +798,7 @@ function normalizeInteriorAssetResizeBounds(bounds: RoomRectBounds): RoomRectBou
 }
 
 function isStairRunHorizontal(asset: RoomInteriorAsset) {
-  return Math.abs(normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0)) === 90;
+  return Math.abs(snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0)) === 90;
 }
 
 function snapStairRunMm(runMm: number) {
