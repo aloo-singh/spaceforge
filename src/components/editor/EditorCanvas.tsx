@@ -4573,6 +4573,12 @@ function drawRoomInteriorAssets(
 
     if (!isSelected) continue;
 
+    // Only show resize handles for single selection, not for multi-select
+    const assetSelections = selection.filter(
+      (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+    );
+    if (assetSelections.length !== 1) continue;
+
     const rectBounds = getInteriorAssetBoundsAsRectBounds(displayedAsset);
     const wallHandles = getWallHandleLayouts(rectBounds, camera, viewport);
     const cornerHandles = getCornerHandleLayouts(rectBounds, camera, viewport);

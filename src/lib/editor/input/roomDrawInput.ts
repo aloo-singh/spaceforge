@@ -188,6 +188,8 @@ type InteriorAssetDragSession = {
   startCenter: Point;
   latestCenter: Point | null;
   didDrag: boolean;
+  // For multi-select drag: track original positions of all selected assets
+  multiSelectStartPositions?: Map<string, { roomId: string; center: Point }>;
 };
 
 type InteriorAssetResizeSession = {
@@ -690,6 +692,13 @@ export function attachRoomDrawInput(
 
   const getSelectedInteriorAssetForHandles = () => {
     const state = store.getState();
+    
+    // Only show resize handles for single selection, not for multi-select
+    const assetSelections = state.selection.filter(
+      (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+    );
+    if (assetSelections.length !== 1) return null;
+    
     const selectedInteriorAsset = state.selectedInteriorAsset;
     if (!selectedInteriorAsset) return null;
 
@@ -905,37 +914,61 @@ export function attachRoomDrawInput(
         return;
       }
 
-      const moveTarget = getInteriorAssetMoveCenterForCursor(
-        session.roomId,
-        session.assetId,
-        cursorWorld,
-        {
-          x: session.startCenter.x - session.startWorldPoint.x,
-          y: session.startCenter.y - session.startWorldPoint.y,
-        }
+      // Check if multiple assets are selected
+      const assetSelections = state.selection.filter(
+        (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
       );
-      if (!moveTarget) {
-        setSnapGuides(null);
-        callbacks.requestRender();
-        return;
+      const isMultiAssetSelection = assetSelections.length > 1;
+
+      if (isMultiAssetSelection) {
+        // For multi-asset drag, apply snapping and boundary constraints to each asset
+        session.didDrag = true;
+        store.getState().setCanvasInteractionActive(true);
+        
+        // Preview movement for all selected assets using snapping/constraints
+        if (session.multiSelectStartPositions) {
+          for (const [key, startPosition] of session.multiSelectStartPositions) {
+            const assetId = key.split(":")[1];
+            // Calculate offset for this asset from where drag started
+            const assetOffset = {
+              x: startPosition.center.x - session.startWorldPoint.x,
+              y: startPosition.center.y - session.startWorldPoint.y,
+            };
+            // Apply snapping and boundary constraints like single-select does
+            const moveTarget = getInteriorAssetMoveCenterForCursor(
+              startPosition.roomId,
+              assetId,
+              cursorWorld,
+              assetOffset
+            );
+            if (moveTarget) {
+              store.getState().previewInteriorAssetMove(startPosition.roomId, assetId, moveTarget.nextCenter);
+            }
+          }
+        }
+      } else {
+        // Single asset drag - original logic
+        const moveTarget = getInteriorAssetMoveCenterForCursor(
+          session.roomId,
+          session.assetId,
+          cursorWorld,
+          {
+            x: session.startCenter.x - session.startWorldPoint.x,
+            y: session.startCenter.y - session.startWorldPoint.y,
+          }
+        );
+        if (!moveTarget) {
+          setSnapGuides(null);
+          callbacks.requestRender();
+          return;
+        }
+
+        session.didDrag = true;
+        store.getState().setCanvasInteractionActive(true);
+        session.latestCenter = moveTarget.nextCenter;
+        store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
       }
 
-      // Detect which room is under the cursor for cross-room drag
-      const hoveredRoom = findRoomLabelAtScreenPoint(
-        getRoomsForActiveFloor(state.document),
-        screenPoint,
-        state.camera,
-        state.viewport
-      );
-      session.targetRoomId = hoveredRoom?.id ?? session.roomId;
-      // Notify when drag target switches to a different room
-      const isDifferentRoom = session.targetRoomId !== session.roomId;
-      callbacks.onInteriorAssetDragTargetChange?.(isDifferentRoom ? session.targetRoomId : null);
-
-      session.didDrag = true;
-      store.getState().setCanvasInteractionActive(true);
-      session.latestCenter = moveTarget.nextCenter;
-      store.getState().previewInteriorAssetMove(session.roomId, session.assetId, moveTarget.nextCenter);
       setSnapGuides(
         state.settings.showGuidelines
           ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
@@ -1343,8 +1376,13 @@ export function attachRoomDrawInput(
           state.addToSelection(assetItem);
         }
       } else {
-        state.clearSelection();
-        state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+        // If clicked asset is already selected, keep the multi-selection
+        // Only clear and re-select if clicking a different asset
+        const isAlreadySelected = isItemSelected(state.selection, "asset", interiorAssetHit.roomId, interiorAssetHit.assetId);
+        if (!isAlreadySelected) {
+          state.clearSelection();
+          state.selectInteriorAssetById(interiorAssetHit.roomId, interiorAssetHit.assetId);
+        }
       }
       hoveredInteriorAsset = interiorAssetHit;
       setHoveredSelectableWall(null);
@@ -1352,6 +1390,26 @@ export function attachRoomDrawInput(
       const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === interiorAssetHit.roomId) ?? null;
       const asset = room?.interiorAssets.find((candidate) => candidate.id === interiorAssetHit.assetId) ?? null;
       if (room && asset) {
+        // Check if multiple assets are selected - if so, capture their original positions
+        const assetSelections = state.selection.filter(
+          (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+        );
+        const isMultiAssetSelection = assetSelections.length > 1;
+        
+        const multiSelectStartPositions = new Map<string, { roomId: string; center: Point }>();
+        if (isMultiAssetSelection) {
+          for (const selection of assetSelections) {
+            const selRoom = getRoomsForActiveFloor(state.document).find((r) => r.id === selection.roomId);
+            const selAsset = selRoom?.interiorAssets.find((a) => a.id === selection.id);
+            if (selRoom && selAsset) {
+              multiSelectStartPositions.set(`${selection.roomId}:${selection.id}`, {
+                roomId: selection.roomId,
+                center: { x: selAsset.xMm, y: selAsset.yMm },
+              });
+            }
+          }
+        }
+        
         canvas.setPointerCapture(event.pointerId);
         activeInteriorAssetDragSession = {
           pointerId: event.pointerId,
@@ -1363,6 +1421,7 @@ export function attachRoomDrawInput(
           startCenter: { x: asset.xMm, y: asset.yMm },
           latestCenter: null,
           didDrag: false,
+          multiSelectStartPositions: isMultiAssetSelection ? multiSelectStartPositions : undefined,
         };
       }
       updateCursor();
@@ -1522,24 +1581,58 @@ export function attachRoomDrawInput(
     if (activeInteriorAssetDragSession && event.pointerId === activeInteriorAssetDragSession.pointerId) {
       const session = activeInteriorAssetDragSession;
       if (session.didDrag) {
-        const nextCenter = session.latestCenter ?? session.startCenter;
-        if (nextCenter.x !== session.startCenter.x || nextCenter.y !== session.startCenter.y) {
-          // Check if asset was dragged to a different room
-          if (session.targetRoomId && session.targetRoomId !== session.roomId) {
-            store.getState().commitInteriorAssetMoveToRoom(
-              session.roomId,
-              session.targetRoomId,
-              session.assetId,
-              session.startCenter,
-              nextCenter
-            );
-          } else {
-            commitInteriorAssetMove(
-              session.roomId,
-              session.assetId,
-              session.startCenter,
-              nextCenter
-            );
+        // Check if multiple assets were dragged
+        const assetSelections = store.getState().selection.filter(
+          (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+        );
+        const isMultiAssetSelection = assetSelections.length > 1;
+
+        if (isMultiAssetSelection) {
+          // Commit move for all selected assets with snapping/boundary constraints
+          const state = store.getState();
+          const endCursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+
+          if (session.multiSelectStartPositions) {
+            for (const [key, startPosition] of session.multiSelectStartPositions) {
+              const assetId = key.split(":")[1];
+              // Calculate offset for this asset from where drag started
+              const assetOffset = {
+                x: startPosition.center.x - session.startWorldPoint.x,
+                y: startPosition.center.y - session.startWorldPoint.y,
+              };
+              // Apply snapping and boundary constraints like single-select does
+              const moveTarget = getInteriorAssetMoveCenterForCursor(
+                startPosition.roomId,
+                assetId,
+                endCursorWorld,
+                assetOffset
+              );
+              if (moveTarget && (moveTarget.nextCenter.x !== startPosition.center.x || moveTarget.nextCenter.y !== startPosition.center.y)) {
+                commitInteriorAssetMove(startPosition.roomId, assetId, startPosition.center, moveTarget.nextCenter);
+              }
+            }
+          }
+        } else {
+          // Single asset drag - original logic
+          const nextCenter = session.latestCenter ?? session.startCenter;
+          if (nextCenter.x !== session.startCenter.x || nextCenter.y !== session.startCenter.y) {
+            // Check if asset was dragged to a different room
+            if (session.targetRoomId && session.targetRoomId !== session.roomId) {
+              store.getState().commitInteriorAssetMoveToRoom(
+                session.roomId,
+                session.targetRoomId,
+                session.assetId,
+                session.startCenter,
+                nextCenter
+              );
+            } else {
+              commitInteriorAssetMove(
+                session.roomId,
+                session.assetId,
+                session.startCenter,
+                nextCenter
+              );
+            }
           }
         }
       }
