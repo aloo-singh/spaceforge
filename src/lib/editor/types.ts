@@ -76,9 +76,63 @@ export type RoomOpeningSelection = {
   openingId: string;
 };
 
-export type InteriorAssetType = "stairs";
+/**
+ * Direction of a stair's directional arrow.
+ * Used to indicate flow direction (e.g., "UP" or "DOWN").
+ */
 export type StairDirection = "forward" | "reverse";
 
+/**
+ * Interior asset type discriminant.
+ * Extensible enum for all furniture and fixtures.
+ *
+ * Phases:
+ * - Phase 1: stairs (existing) ✓
+ * - Phase 2: wardrobe ✓
+ * - Phase 3: bed, sofa, dining-table ✓
+ * - Future: sink, toilet, range, island, shelving, armchair, etc.
+ */
+export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table";
+
+/**
+ * Interior asset: a piece of furniture or fixture placed inside a room.
+ *
+ * This is a heterogeneous type that represents all interior assets.
+ * The `type` field discriminates between stairs, wardrobe, bed, sofa, and dining table.
+ *
+ * Common properties (all assets):
+ * - id, name: identity and display
+ * - xMm, yMm: position in room coordinates
+ * - widthMm, depthMm: dimensions
+ * - rotationDegrees: orientation
+ * - unitSystem (optional): metric or imperial for dimension display
+ * - sizePreset (optional): preset identifier for localisation
+ *
+ * Type-specific properties:
+ * - Stairs: connectionId, arrowEnabled, arrowDirection, arrowLabel
+ * - Wardrobe: doorType, doorConstraint
+ * - Bed: no specific properties (extensible for future use)
+ * - Sofa: no specific properties (extensible for future use)
+ * - Dining Table: shape ("rectangular" | "round")
+ *
+ * Backward compatibility:
+ * - Existing stairs projects load unchanged
+ * - Wardrobe assets from Step 2 load unchanged (doorType, doorConstraint optional)
+ * - New bed, sofa, dining table assets follow same pattern as wardrobe
+ * - Optional fields default to sensible values at runtime
+ *
+ * Behaviours (common across all assets):
+ * - Move: translate to new position (constrained inside room)
+ * - Resize: change dimensions (asset-specific constraints apply)
+ * - Rotate: change orientation (may auto-constrain if out of bounds)
+ * - Copy/Paste: duplicate asset (new ID, unique name)
+ * - Cut/Paste: move asset between rooms
+ * - Select: highlight and show inspector
+ * - Delete: remove from room (undo-tracked)
+ *
+ * See src/lib/editor/interiorAssetTypes.ts for detailed type definitions,
+ * type guards, and behaviour documentation.
+ */
 export type RoomInteriorAsset = {
   id: string;
   type: InteriorAssetType;
@@ -89,9 +143,19 @@ export type RoomInteriorAsset = {
   widthMm: number;
   depthMm: number;
   rotationDegrees: number;
-  arrowEnabled: boolean;
-  arrowDirection: StairDirection;
-  arrowLabel: string;
+  anchor: "floor" | "wall" | "ceiling";
+  // Stairs-specific properties (optional for other assets)
+  arrowEnabled?: boolean;
+  arrowDirection?: StairDirection;
+  arrowLabel?: string;
+  // Wardrobe-specific properties (optional for other assets)
+  doorType?: "swing" | "sliding";
+  doorConstraint?: number;
+  // Dining Table-specific properties (optional for other assets)
+  shape?: "rectangular" | "round";
+  // Optional regionalisation (all assets)
+  unitSystem?: "metric" | "imperial";
+  sizePreset?: string;
 };
 
 export type RoomInteriorAssetSelection = {
@@ -120,16 +184,22 @@ export type Room = {
 
 /**
  * Shared selection model — single source of truth for all selections.
- * Supports rooms, walls, openings, stairs, and floors.
+ * Supports rooms, walls, openings, interior assets (currently stairs), and floors.
+ *
  * Each selection item has a type and associated identifiers.
  *
  * Undo semantics rule:
  * - Selection is transient UI state and must not be written to undo history.
  * - Only geometry/structural document changes belong in history.
+ *
+ * Note on "stair" type:
+ * - Currently the only interior asset type
+ * - Will be renamed to "interior-asset" once other furniture types are added
+ * - For now, "stair" remains for backward compatibility
  */
 export type SharedSelectionItem =
   | { type: "room"; id: string }
   | { type: "wall"; roomId: string; wall: RoomWall }
   | { type: "opening"; roomId: string; id: string }
-  | { type: "stair"; roomId: string; id: string }
+  | { type: "asset"; roomId: string; id: string }
   | { type: "floor"; id: string };

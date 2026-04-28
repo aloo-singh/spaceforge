@@ -32,6 +32,7 @@ import {
   getStairRunLengthMm,
   getInteriorAssetBoundsAsRectBounds,
   getRoomInteriorAssetBounds,
+  getInteriorAssetDisplayName,
 } from "@/lib/editor/interiorAssets";
 import {
   getFortyFiveVertexHandleLayouts,
@@ -128,6 +129,9 @@ import {
   formatCanvasRotationDegrees,
   formatCanvasRotationShortcutLabel,
   normalizeCanvasRotationDegrees,
+  snapToCardinalRotationDegrees,
+  ASSET_ROTATION_DURATION_MS,
+  type AssetRotationAnimation,
 } from "@/lib/editor/canvasRotation";
 import {
   formatNorthBearingDegrees,
@@ -287,7 +291,9 @@ const STAIR_DIRECTION_ARROW_LENGTH_RATIO = 0.56;
 const STAIR_DIRECTION_ARROW_MIN_LENGTH_MM = 900;
 const STAIR_DIRECTION_ARROW_HEAD_WORLD_MM = 140;
 const STAIR_DIRECTION_LABEL_OFFSET_WORLD_MM = 140;
-const STAIR_ROTATION_ANIMATION_MS = 180;
+const FURNITURE_LABEL_FONT_SIZE_WORLD_MM = 55;
+const FURNITURE_LABEL_MIN_FONT_SIZE_PX = 9;
+const FURNITURE_LABEL_MAX_FONT_SIZE_PX = 14;
 const CANVAS_ROTATION_ENABLED = false;
 function isDefaultRoomName(name: string) {
   return /^Room \d+$/.test(name);
@@ -308,32 +314,11 @@ function clampValue(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-type StairRotationAnimation = {
-  roomId: string;
-  assetId: string;
-  startWidthMm: number;
-  startDepthMm: number;
-  startRotationDegrees: number;
-  endRotationDegrees: number;
-  startedAtMs: number;
-};
-
 function getShortestRotationDeltaDegrees(fromDegrees: number, toDegrees: number) {
   const normalizedDelta = normalizeCanvasRotationDegrees(toDegrees - fromDegrees);
   if (normalizedDelta > 180) return normalizedDelta - 360;
   if (normalizedDelta <= -180) return normalizedDelta + 360;
   return normalizedDelta;
-}
-
-function getInterpolatedRotationDegrees(
-  startRotationDegrees: number,
-  endRotationDegrees: number,
-  progress: number
-) {
-  return normalizeCanvasRotationDegrees(
-    startRotationDegrees +
-      getShortestRotationDeltaDegrees(startRotationDegrees, endRotationDegrees) * progress
-  );
 }
 
 function getRotatedAssetScreenCorners(
@@ -362,30 +347,6 @@ function getRotatedAssetScreenCorners(
     rotatePoint(halfWidth, halfDepth),
     rotatePoint(-halfWidth, halfDepth),
   ] as const;
-}
-
-function getDisplayedInteriorAssetForAnimation(
-  asset: Room["interiorAssets"][number],
-  animation: StairRotationAnimation | undefined,
-  renderedAtMs: number
-) {
-  if (!animation) return asset;
-
-  const progress = clampValue((renderedAtMs - animation.startedAtMs) / STAIR_ROTATION_ANIMATION_MS, 0, 1);
-  const easedProgress = easeOutCubic(progress);
-  const shortSideMm = Math.min(asset.widthMm, asset.depthMm);
-  const longSideMm = Math.max(asset.widthMm, asset.depthMm);
-
-  return {
-    ...asset,
-    widthMm: shortSideMm,
-    depthMm: longSideMm,
-    rotationDegrees: getInterpolatedRotationDegrees(
-      animation.startRotationDegrees,
-      animation.endRotationDegrees,
-      easedProgress
-    ),
-  };
 }
 
 function normalizeExportSingleLineText(value: string): string {
@@ -898,11 +859,13 @@ export default function EditorCanvas({
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
+  // Holds in-progress asset rotation animations keyed by assetId.
+  // Populated by the rotation command; drained by the ticker once durationMs elapses.
+  const assetRotationAnimationsRef = useRef<Map<string, AssetRotationAnimation>>(new Map());
   const draftConstraintModeRef = useRef<"orthogonal" | "diagonal45">("orthogonal");
   const transformAnimationFrameRef = useRef<number | null>(null);
-  const stairRotationAnimationsRef = useRef<Map<string, StairRotationAnimation>>(new Map());
-  const stairRotationAnimationFrameRef = useRef<number | null>(null);
   const footprintFadeAnimationFrameRef = useRef<number | null>(null);
+  const assetRotationAnimationFrameRef = useRef<number | null>(null);
   const footprintPreviewFloorIdRef = useRef<string | null>(null);
   const footprintPreviewOpacityRef = useRef(0);
   const instructionsId = "editor-canvas-controls";
@@ -1070,14 +1033,14 @@ export default function EditorCanvas({
       hoveredSelectableWallRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
-      stairRotationAnimationsRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
       editorThemeRef.current,
       Boolean(activeNorthDragRef.current?.didDrag),
       footprintPreviewFloorIdRef.current,
       footprintPreviewOpacityRef.current,
-      assetDragTargetRoomIdRef.current
+      assetDragTargetRoomIdRef.current,
+      assetRotationAnimationsRef.current
     );
 
     if (app) {
@@ -1091,17 +1054,41 @@ export default function EditorCanvas({
     transformAnimationFrameRef.current = null;
   }, []);
 
-  const stopStairRotationAnimation = useCallback(() => {
-    if (stairRotationAnimationFrameRef.current === null) return;
-    cancelAnimationFrame(stairRotationAnimationFrameRef.current);
-    stairRotationAnimationFrameRef.current = null;
-  }, []);
-
   const stopFootprintFadeAnimation = useCallback(() => {
     if (footprintFadeAnimationFrameRef.current === null) return;
     cancelAnimationFrame(footprintFadeAnimationFrameRef.current);
     footprintFadeAnimationFrameRef.current = null;
   }, []);
+
+  const stopAssetRotationAnimation = useCallback(() => {
+    if (assetRotationAnimationFrameRef.current === null) return;
+    cancelAnimationFrame(assetRotationAnimationFrameRef.current);
+    assetRotationAnimationFrameRef.current = null;
+  }, []);
+
+  const startAssetRotationAnimation = useCallback(() => {
+    // If a loop is already running, it will pick up the new entry from the map automatically.
+    if (assetRotationAnimationFrameRef.current !== null) return;
+
+    const step = () => {
+      const now = performance.now();
+      for (const [assetId, anim] of assetRotationAnimationsRef.current) {
+        if (now - anim.startMs >= anim.durationMs) {
+          assetRotationAnimationsRef.current.delete(assetId);
+        }
+      }
+
+      drawCurrentScene();
+
+      if (assetRotationAnimationsRef.current.size > 0) {
+        assetRotationAnimationFrameRef.current = requestAnimationFrame(step);
+      } else {
+        assetRotationAnimationFrameRef.current = null;
+      }
+    };
+
+    assetRotationAnimationFrameRef.current = requestAnimationFrame(step);
+  }, [drawCurrentScene]);
 
   const startTransformAnimation = useCallback(() => {
     if (transformAnimationFrameRef.current !== null) return;
@@ -1124,36 +1111,6 @@ export default function EditorCanvas({
     };
 
     transformAnimationFrameRef.current = requestAnimationFrame(step);
-  }, [drawCurrentScene]);
-
-  const startStairRotationAnimation = useCallback(() => {
-    if (stairRotationAnimationFrameRef.current !== null) return;
-
-    const step = () => {
-      const animations = stairRotationAnimationsRef.current;
-      if (animations.size === 0) {
-        stairRotationAnimationFrameRef.current = null;
-        return;
-      }
-
-      const now = performance.now();
-      for (const [key, animation] of animations) {
-        if (now - animation.startedAtMs >= STAIR_ROTATION_ANIMATION_MS) {
-          animations.delete(key);
-        }
-      }
-
-      drawCurrentScene();
-
-      if (animations.size === 0) {
-        stairRotationAnimationFrameRef.current = null;
-        return;
-      }
-
-      stairRotationAnimationFrameRef.current = requestAnimationFrame(step);
-    };
-
-    stairRotationAnimationFrameRef.current = requestAnimationFrame(step);
   }, [drawCurrentScene]);
 
   const startFootprintFadeAnimation = useCallback(() => {
@@ -1225,7 +1182,6 @@ export default function EditorCanvas({
   useEffect(() => {
     return () => {
       stopFootprintFadeAnimation();
-      stopStairRotationAnimation();
       if (hintTransitionTimeoutRef.current) {
         clearTimeout(hintTransitionTimeoutRef.current);
       }
@@ -1239,7 +1195,7 @@ export default function EditorCanvas({
         clearTimeout(hintPauseTimeoutRef.current);
       }
     };
-  }, [stopFootprintFadeAnimation, stopStairRotationAnimation]);
+  }, [stopFootprintFadeAnimation]);
 
   useEffect(() => {
     if (!isHintFlowPaused) {
@@ -1518,7 +1474,7 @@ export default function EditorCanvas({
         exportOpeningGraphics,
         getRoomsForActiveFloor(state.document),
         null,
-        null,
+        [],
         exportCamera,
         exportViewport,
         exportTheme,
@@ -1547,6 +1503,7 @@ export default function EditorCanvas({
         showDimensions,
         null,
         exportTheme,
+        [],
         { includeStairDirectionLabels: false }
       );
       drawDraft(
@@ -2295,9 +2252,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     }),
@@ -2306,9 +2262,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     ]
@@ -2320,9 +2275,8 @@ export default function EditorCanvas({
       completeHint,
       drawCurrentScene,
       setTransformFeedback,
-      startStairRotationAnimation,
+      startAssetRotationAnimation,
       stopFootprintFadeAnimation,
-      stopStairRotationAnimation,
       stopTransformAnimation,
       updateCanvasRotationTooltip,
     } = canvasBootstrapCallbacks;
@@ -2413,57 +2367,40 @@ export default function EditorCanvas({
       resizeObserver.observe(resizeTarget);
 
       const unsubscribe = useEditorStore.subscribe((state, previousState) => {
-        let shouldAnimateStairRotation = false;
-        const previousAssets = new Map<
-          string,
-          {
-            roomId: string;
-            asset: Room["interiorAssets"][number];
+        // Detect asset rotations and populate the animation map BEFORE drawing,
+        // so that the very first drawCurrentScene call sees the animation entry
+        // and renders at progress=0 (fromDegrees) rather than the final state.
+        if (state.document !== previousState.document) {
+          const nowRooms = getRoomsForActiveFloor(state.document);
+          const prevRooms = getRoomsForActiveFloor(previousState.document);
+          let anyAdded = false;
+          for (const room of nowRooms) {
+            const prevRoom = prevRooms.find((r) => r.id === room.id);
+            if (!prevRoom) continue;
+            for (const asset of room.interiorAssets) {
+              const prevAsset = prevRoom.interiorAssets.find((a) => a.id === asset.id);
+              if (!prevAsset) continue;
+              const fromDegrees = snapToCardinalRotationDegrees(prevAsset.rotationDegrees ?? 0);
+              const toDegrees = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
+              if (fromDegrees === toDegrees) continue;
+              const usesSidewaysBaseDimensions = Math.abs(fromDegrees) === 90;
+              assetRotationAnimationsRef.current.set(asset.id, {
+                roomId: room.id,
+                assetId: asset.id,
+                fromDegrees,
+                toDegrees,
+                baseWidthMm: usesSidewaysBaseDimensions ? prevAsset.depthMm : prevAsset.widthMm,
+                baseDepthMm: usesSidewaysBaseDimensions ? prevAsset.widthMm : prevAsset.depthMm,
+                startMs: performance.now(),
+                durationMs: ASSET_ROTATION_DURATION_MS,
+              });
+              anyAdded = true;
+            }
           }
-        >();
-
-        for (const room of getRoomsForActiveFloor(previousState.document)) {
-          for (const asset of room.interiorAssets) {
-            previousAssets.set(asset.id, { roomId: room.id, asset });
-          }
-        }
-
-        const nextAssetIds = new Set<string>();
-        for (const room of getRoomsForActiveFloor(state.document)) {
-          for (const asset of room.interiorAssets) {
-            nextAssetIds.add(asset.id);
-            const previousAssetState = previousAssets.get(asset.id);
-            if (!previousAssetState) continue;
-
-            const previousRotationDegrees = normalizeCanvasRotationDegrees(
-              previousAssetState.asset.rotationDegrees ?? 0
-            );
-            const nextRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
-            if (previousRotationDegrees === nextRotationDegrees) continue;
-
-            stairRotationAnimationsRef.current.set(asset.id, {
-              roomId: room.id,
-              assetId: asset.id,
-              startWidthMm: previousAssetState.asset.widthMm,
-              startDepthMm: previousAssetState.asset.depthMm,
-              startRotationDegrees: previousRotationDegrees,
-              endRotationDegrees: nextRotationDegrees,
-              startedAtMs: performance.now(),
-            });
-            shouldAnimateStairRotation = true;
+          if (anyAdded) {
+            startAssetRotationAnimation();
           }
         }
-
-        for (const assetId of stairRotationAnimationsRef.current.keys()) {
-          if (!nextAssetIds.has(assetId)) {
-            stairRotationAnimationsRef.current.delete(assetId);
-          }
-        }
-
-        if (shouldAnimateStairRotation) {
-          startStairRotationAnimation();
-        }
-
         drawCurrentScene();
       });
       const detachPanZoomInput = attachPanZoomInput(app.canvas, useEditorStore, {
@@ -2546,7 +2483,6 @@ export default function EditorCanvas({
         dimensionOverlayRef.current = null;
         setTransformFeedback(null);
         stopTransformAnimation();
-        stopStairRotationAnimation();
         stopFootprintFadeAnimation();
       };
     }
@@ -2559,7 +2495,6 @@ export default function EditorCanvas({
     return () => {
       destroyed = true;
       teardown?.();
-      stopStairRotationAnimation();
       stopFootprintFadeAnimation();
       if (initialized) {
         app.destroy(true, { children: true });
@@ -2570,6 +2505,7 @@ export default function EditorCanvas({
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
+    if (!app.renderer.background) return;
 
     app.renderer.background.color = editorTheme.canvasBackground;
     drawCurrentScene();
@@ -3443,14 +3379,14 @@ function drawScene(
     activeRoomId: string | null;
   },
   transformFeedback: TransformFeedback | null,
-  stairRotationAnimations: Map<string, StairRotationAnimation>,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
   theme: EditorCanvasTheme,
   hideCursorHud: boolean,
   footprintFloorId: string | null,
   footprintOpacity: number,
-  assetDragTargetRoomId: string | null = null
+  assetDragTargetRoomId: string | null = null,
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
@@ -3566,11 +3502,12 @@ function drawScene(
     openingGraphics,
     renderedRooms,
     state.selectedOpening,
-    state.selectedInteriorAsset,
+    state.selection,
     state.camera,
     state.viewport,
     theme,
-    { includeStairDirectionVisuals: true, stairRotationAnimations }
+    { includeStairDirectionVisuals: true },
+    animations
   );
   drawWallInteractionOverlay(
     wallOverlayGraphics,
@@ -3595,7 +3532,8 @@ function drawScene(
     showDimensions,
     transformFeedback,
     theme,
-    { includeStairDirectionLabels: true, stairRotationAnimations }
+    state.selection,
+    { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
   if (showDimensions) {
@@ -3961,21 +3899,21 @@ function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
   selectedOpening: RoomOpeningSelection | null,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
   options?: {
     includeStairDirectionVisuals?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
-  }
+  },
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
   graphics.clear();
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selectedInteriorAsset, camera, viewport, theme, options);
+    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations);
   }
 }
 
@@ -4315,33 +4253,57 @@ function drawRoomOpenings(
 function drawRoomInteriorAssets(
   graphics: Graphics,
   room: Room,
-  selectedInteriorAsset: RoomInteriorAssetSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  options?: {
-    includeStairDirectionVisuals?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
-  }
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
-  const renderedAtMs = performance.now();
   for (const asset of room.interiorAssets) {
-    const animation = options?.stairRotationAnimations?.get(asset.id);
-    const displayedAsset = getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs);
-    const isAnimatingRotation = Boolean(animation && animation.roomId === room.id);
-    const bounds = getRoomInteriorAssetBounds(asset);
-    const [topLeft, topRight, bottomRight, bottomLeft] = isAnimatingRotation
-      ? getRotatedAssetScreenCorners(displayedAsset, camera, viewport)
-      : [
-          worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport),
-          worldToScreen({ x: bounds.right, y: bounds.top }, camera, viewport),
-          worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport),
-          worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport),
-        ];
+    // Animation hook: look up any in-progress rotation for this asset.
+    // baseWidthMm/baseDepthMm are the canonical local dimensions used for the
+    // whole rotation, while rotationDegrees is interpolated between the two
+    // cardinal endpoints when animation is active.
+    const anim = animations.get(asset.id) ?? null;
+
+    // displayedAsset is the view-model used for all drawing in this iteration.
+    // At rest it equals the stored asset. During animation it carries the canonical
+    // base dimensions and an eased-out interpolated rotationDegrees between fromDegrees
+    // and toDegrees so the visual shape rotates smoothly.
+    let displayedAsset: Room["interiorAssets"][number];
+    if (anim) {
+      const rawProgress = Math.min(1, (performance.now() - anim.startMs) / anim.durationMs);
+      const easedProgress = easeOutCubic(rawProgress);
+      const delta = getShortestRotationDeltaDegrees(anim.fromDegrees, anim.toDegrees);
+      displayedAsset = {
+        ...asset,
+        widthMm: anim.baseWidthMm,
+        depthMm: anim.baseDepthMm,
+        rotationDegrees: anim.fromDegrees + delta * easedProgress,
+      };
+    } else {
+      displayedAsset = asset;
+    }
+
+    // Corners: use the rotation-matrix helper when animating (supports arbitrary angles);
+    // fall back to fast axis-aligned bounds at rest (cardinal angles only).
+    let topLeft: ScreenPoint,
+        topRight: ScreenPoint,
+        bottomRight: ScreenPoint,
+        bottomLeft: ScreenPoint;
+    if (anim) {
+      [topLeft, topRight, bottomRight, bottomLeft] = getRotatedAssetScreenCorners(displayedAsset, camera, viewport);
+    } else {
+      const b = getRoomInteriorAssetBounds(asset);
+      topLeft     = worldToScreen({ x: b.left,  y: b.top    }, camera, viewport);
+      topRight    = worldToScreen({ x: b.right, y: b.top    }, camera, viewport);
+      bottomRight = worldToScreen({ x: b.right, y: b.bottom }, camera, viewport);
+      bottomLeft  = worldToScreen({ x: b.left,  y: b.bottom }, camera, viewport);
+    }
     const corners = [topLeft, topRight, bottomRight, bottomLeft];
-    const isSelected =
-      selectedInteriorAsset?.roomId === room.id &&
-      selectedInteriorAsset.assetId === asset.id;
+    const isSelected = selection.some(
+      (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
+    );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
     const selectionHaloStrokePx = Math.max(
       camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
@@ -4362,65 +4324,228 @@ function drawRoomInteriorAssets(
       graphics.stroke();
     }
 
-    graphics.setFillStyle({
-      color: theme.roomOutline,
-      alpha: isSelected ? 0.12 : 0.08,
-    });
-    graphics.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i += 1) {
-      graphics.lineTo(corners[i].x, corners[i].y);
-    }
-    graphics.closePath();
-    graphics.fill();
+    // Skip rectangular bounding box for unselected round dining tables
+    const isRoundDiningTable =
+      displayedAsset.type === "dining-table" && displayedAsset.shape === "round";
+    const shouldDrawBoundingBox = isSelected || !isRoundDiningTable;
 
-    graphics.setStrokeStyle({
-      width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
-      color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-      alpha: isSelected ? 0.96 : 0.9,
-    });
-    graphics.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i += 1) {
-      graphics.lineTo(corners[i].x, corners[i].y);
-    }
-    graphics.closePath();
-    graphics.stroke();
-
-    const isQuarterTurnSideways =
-      Math.abs(normalizeCanvasRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
-    const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
-    const treadCount = Math.max(
-      0,
-      Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
-    );
-    for (let index = 1; index <= treadCount; index += 1) {
-      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
-      if (progress <= 0 || progress >= 1) continue;
-      const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
-      const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
-      const start = {
-        x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
-        y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
-      };
-      const end = {
-        x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
-        y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
-      };
-      graphics.setStrokeStyle({
-        width: Math.max(camera.pixelsPerMm * 10, 1.1),
-        color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-        alpha: isSelected ? 0.88 : 0.72,
-        cap: "round",
+    if (shouldDrawBoundingBox) {
+      graphics.setFillStyle({
+        color: theme.roomOutline,
+        alpha: isSelected ? 0.12 : 0.08,
       });
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+
+      graphics.setStrokeStyle({
+        width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+        color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+        alpha: isSelected ? 0.96 : 0.9,
+      });
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        graphics.lineTo(corners[i].x, corners[i].y);
+      }
+      graphics.closePath();
       graphics.stroke();
     }
 
-    if (options?.includeStairDirectionVisuals !== false) {
-      drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
+    // Furniture-specific type visuals
+    if (displayedAsset.type !== "stairs") {
+      const fgAlpha = isSelected ? 0.78 : 0.56;
+      const fgLineWidth = Math.max(camera.pixelsPerMm * 10, 1.1);
+      const fgColor = isSelected ? theme.wallSelectionAccent : theme.roomOutline;
+      const fgFillAlpha = isSelected ? 0.30 : 0.20;
+
+      // Determine front edge based on rotation.
+      // During animation, use the rotated local top/bottom edges directly so
+      // details (bed headboard, sofa backrest, wardrobe doors) rotate smoothly
+      // with the rectangle for both clockwise and counter-clockwise turns.
+      // At rest, rotationDegrees is cardinal, so map front/back by cardinal side.
+      // 0°=top, 90°=right, -180°=bottom, -90°=left
+      const [frontC1, frontC2, backC1, backC2] = anim
+        ? [topLeft, topRight, bottomLeft, bottomRight]
+        : (() => {
+            const closestCardinal = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+            return closestCardinal === 0 ? [topLeft, topRight, bottomLeft, bottomRight]
+              : closestCardinal === 90 ? [topRight, bottomRight, topLeft, bottomLeft]
+              : closestCardinal === -180 ? [bottomLeft, bottomRight, topLeft, topRight]
+              : [topLeft, bottomLeft, topRight, bottomRight]; // -90
+          })();
+
+      if (displayedAsset.type === "bed") {
+        // Headboard: filled strip at front ~14% depth
+        const hFrac = 0.14;
+        const hC1 = { x: frontC1.x + (backC1.x - frontC1.x) * hFrac, y: frontC1.y + (backC1.y - frontC1.y) * hFrac };
+        const hC2 = { x: frontC2.x + (backC2.x - frontC2.x) * hFrac, y: frontC2.y + (backC2.y - frontC2.y) * hFrac };
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha });
+        graphics.moveTo(frontC1.x, frontC1.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(hC2.x, hC2.y);
+        graphics.lineTo(hC1.x, hC1.y);
+        graphics.closePath();
+        graphics.fill();
+      }
+
+      if (displayedAsset.type === "sofa") {
+        // Back rest: filled strip at front ~30%
+        const bFrac = 0.30;
+        const bC1 = { x: frontC1.x + (backC1.x - frontC1.x) * bFrac, y: frontC1.y + (backC1.y - frontC1.y) * bFrac };
+        const bC2 = { x: frontC2.x + (backC2.x - frontC2.x) * bFrac, y: frontC2.y + (backC2.y - frontC2.y) * bFrac };
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha - 0.04 });
+        graphics.moveTo(frontC1.x, frontC1.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(bC2.x, bC2.y);
+        graphics.lineTo(bC1.x, bC1.y);
+        graphics.closePath();
+        graphics.fill();
+        // 2 cushion dividers perpendicular to front edge
+        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
+        for (const t of [1 / 3, 2 / 3]) {
+          const divStart = { x: bC1.x + (bC2.x - bC1.x) * t, y: bC1.y + (bC2.y - bC1.y) * t };
+          const divEnd = { x: backC1.x + (backC2.x - backC1.x) * t, y: backC1.y + (backC2.y - backC1.y) * t };
+          graphics.moveTo(divStart.x, divStart.y);
+          graphics.lineTo(divEnd.x, divEnd.y);
+          graphics.stroke();
+        }
+      }
+
+      if (displayedAsset.type === "wardrobe") {
+        graphics.setStrokeStyle({ width: fgLineWidth, color: fgColor, alpha: fgAlpha, cap: "round" });
+        if (displayedAsset.doorType === "sliding") {
+          // Two equal-length parallel sliding door tracks outside the front edge
+          const midFront = { x: (frontC1.x + frontC2.x) / 2, y: (frontC1.y + frontC2.y) / 2 };
+          
+          // Calculate outward direction (opposite to depth, away from wardrobe interior)
+          const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };
+          const depthLen = Math.sqrt(depthVec.x * depthVec.x + depthVec.y * depthVec.y);
+          const outwardUnit = depthLen > 0 ? { x: -depthVec.x / depthLen, y: -depthVec.y / depthLen } : { x: 0, y: -1 };
+          
+          // Scale offset based on wardrobe depth to maintain proportions at any zoom level
+          const offsetDist = Math.max(4, depthLen * 0.08);
+          const offset2Dist = Math.max(5, depthLen * 0.1);
+          
+          // Left track: from frontC1 to midFront, offset outward
+          const track1Start = { x: frontC1.x + outwardUnit.x * offsetDist, y: frontC1.y + outwardUnit.y * offsetDist };
+          const track1End = { x: midFront.x + outwardUnit.x * offsetDist, y: midFront.y + outwardUnit.y * offsetDist };
+          graphics.moveTo(track1Start.x, track1Start.y);
+          graphics.lineTo(track1End.x, track1End.y);
+          graphics.stroke();
+          
+          // Right track: from midFront to frontC2, offset slightly more for layering effect
+          const track2Start = { x: midFront.x + outwardUnit.x * offset2Dist, y: midFront.y + outwardUnit.y * offset2Dist };
+          const track2End = { x: frontC2.x + outwardUnit.x * offset2Dist, y: frontC2.y + outwardUnit.y * offset2Dist };
+          graphics.moveTo(track2Start.x, track2Start.y);
+          graphics.lineTo(track2End.x, track2End.y);
+          graphics.stroke();
+        } else {
+          // Swing door: diagonals opening outward from front corners
+          const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };
+          const depthLen = Math.sqrt(depthVec.x * depthVec.x + depthVec.y * depthVec.y);
+          const depthUnit = depthLen > 0 ? { x: depthVec.x / depthLen, y: depthVec.y / depthLen } : { x: 0, y: 0 };
+          
+          const widthVec = { x: frontC2.x - frontC1.x, y: frontC2.y - frontC1.y };
+          const widthLen = Math.sqrt(widthVec.x * widthVec.x + widthVec.y * widthVec.y);
+          const leafLen = Math.min(widthLen * 0.4, depthLen * 0.6);
+          
+          // Left door swings outward (away from center, towards -y in 0° config)
+          graphics.moveTo(frontC1.x, frontC1.y);
+          graphics.lineTo(frontC1.x - depthUnit.x * leafLen, frontC1.y - depthUnit.y * leafLen);
+          graphics.stroke();
+          
+          // Right door swings outward
+          graphics.moveTo(frontC2.x, frontC2.y);
+          graphics.lineTo(frontC2.x - depthUnit.x * leafLen, frontC2.y - depthUnit.y * leafLen);
+          graphics.stroke();
+        }
+      }
+
+      if (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") {
+        // Ellipse fills the entire rectangular bounds
+        const cx = (topLeft.x + bottomRight.x) / 2;
+        const cy = (topLeft.y + bottomRight.y) / 2;
+        const rX = Math.abs(bottomRight.x - topLeft.x) / 2;
+        const rY = Math.abs(bottomRight.y - topLeft.y) / 2;
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.ellipse(cx, cy, rX, rY);
+        graphics.stroke();
+      }
+    }
+
+    // Stairs-specific visuals (tread lines and direction arrow)
+    if (asset.type === "stairs") {
+      const stairRunLengthMm = Math.max(anim ? anim.baseDepthMm : getStairRunLengthMm(displayedAsset), 1);
+      const treadCount = Math.max(
+        0,
+        Math.floor(stairRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+      );
+      for (let index = 1; index <= treadCount; index += 1) {
+        const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / stairRunLengthMm;
+        if (progress <= 0 || progress >= 1) continue;
+        const [start, end] = anim
+          ? [
+              {
+                x: topLeft.x + (bottomLeft.x - topLeft.x) * progress,
+                y: topLeft.y + (bottomLeft.y - topLeft.y) * progress,
+              },
+              {
+                x: topRight.x + (bottomRight.x - topRight.x) * progress,
+                y: topRight.y + (bottomRight.y - topRight.y) * progress,
+              },
+            ]
+          : (() => {
+              const isQuarterTurnSideways =
+                Math.abs(snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0)) === 90;
+              const startEdgeEnd = isQuarterTurnSideways ? topRight : bottomLeft;
+              const endEdgeStart = isQuarterTurnSideways ? bottomLeft : topRight;
+              return [
+                {
+                  x: topLeft.x + (startEdgeEnd.x - topLeft.x) * progress,
+                  y: topLeft.y + (startEdgeEnd.y - topLeft.y) * progress,
+                },
+                {
+                  x: endEdgeStart.x + (bottomRight.x - endEdgeStart.x) * progress,
+                  y: endEdgeStart.y + (bottomRight.y - endEdgeStart.y) * progress,
+                },
+              ];
+            })();
+        graphics.setStrokeStyle({
+          width: Math.max(camera.pixelsPerMm * 10, 1.1),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.88 : 0.72,
+          cap: "round",
+        });
+        graphics.moveTo(start.x, start.y);
+        graphics.lineTo(end.x, end.y);
+        graphics.stroke();
+      }
+
+      drawStairDirectionArrow(
+        graphics,
+        displayedAsset,
+        camera,
+        viewport,
+        theme,
+        isSelected,
+        stairRunLengthMm
+      );
     }
 
     if (!isSelected) continue;
+
+    // Only show resize handles for single selection, not for multi-select
+    const assetSelections = selection.filter(
+      (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+    );
+    if (assetSelections.length !== 1) continue;
 
     const rectBounds = getInteriorAssetBoundsAsRectBounds(displayedAsset);
     const wallHandles = getWallHandleLayouts(rectBounds, camera, viewport);
@@ -4532,7 +4657,8 @@ function drawStairDirectionArrow(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  isSelected: boolean
+  isSelected: boolean,
+  runLengthMm = getStairRunLengthMm(asset)
 ) {
   if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) return;
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
@@ -4542,7 +4668,6 @@ function drawStairDirectionArrow(
     x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
     y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
   };
-  const runLengthMm = getStairRunLengthMm(asset);
   const arrowLengthMm = Math.max(
     STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
     Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)
@@ -4607,8 +4732,7 @@ function drawStairDirectionLabels(
   rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme,
-  stairRotationAnimations?: Map<string, StairRotationAnimation>
+  theme: EditorCanvasTheme
 ) {
   const renderedAtMs = performance.now();
   const textResolution = getTextResolution();
@@ -4620,11 +4744,7 @@ function drawStairDirectionLabels(
 
   for (const room of rooms) {
     for (const asset of room.interiorAssets) {
-      const animation = stairRotationAnimations?.get(asset.id);
-      const displayedAsset =
-        animation && animation.roomId === room.id
-          ? getDisplayedInteriorAssetForAnimation(asset, animation, renderedAtMs)
-          : asset;
+      const displayedAsset = asset;
       if ((displayedAsset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) continue;
       const normalizedRotationDegrees = normalizeCanvasRotationDegrees(
         displayedAsset.rotationDegrees ?? 0
@@ -4678,6 +4798,62 @@ function drawStairDirectionLabels(
       );
       text.angle = 0;
       text.alpha = 0.82;
+      labelContainer.addChild(text);
+    }
+  }
+}
+
+function drawFurnitureLabels(
+  labelContainer: Container,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme,
+  selection: SharedSelectionItem[]
+) {
+  const fontSizePx = clampValue(
+    camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
+    FURNITURE_LABEL_MIN_FONT_SIZE_PX,
+    FURNITURE_LABEL_MAX_FONT_SIZE_PX
+  );
+  const textResolution = getTextResolution();
+  const renderedAtMs = performance.now();
+
+  for (const room of rooms) {
+    for (const asset of room.interiorAssets) {
+      if (asset.type === "stairs") continue;
+      const displayedAsset = asset;
+      const screenWidthPx = (displayedAsset.widthMm) * camera.pixelsPerMm;
+      const screenHeightPx = (displayedAsset.depthMm) * camera.pixelsPerMm;
+      const isSelected = selection.some(
+        (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
+      );
+      // Show label if asset is large enough OR if it's selected
+      if (!isSelected && (screenWidthPx < fontSizePx * 2.5 || screenHeightPx < fontSizePx * 2.5)) continue;
+
+      const center = worldToScreen({ x: asset.xMm, y: asset.yMm }, camera, viewport);
+      const labelText = asset.name || getInteriorAssetDisplayName(asset.type);
+
+      const text = new Text({
+        text: labelText,
+        resolution: textResolution,
+        style: {
+          fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
+          fontSize: fontSizePx,
+          fontWeight: ROOM_LABEL_AREA_FONT_WEIGHT,
+          fill: theme.roomLabelFill,
+          stroke: {
+            color: theme.roomLabelStroke,
+            width: Math.max(1.1, fontSizePx * 0.12),
+            join: "round",
+          },
+          letterSpacing: 0.15,
+        },
+      });
+      text.roundPixels = true;
+      text.anchor.set(0.5);
+      text.position.set(snapToPixel(center.x, textResolution), snapToPixel(center.y, textResolution));
+      text.alpha = isSelected ? 0.98 : 0.72;
       labelContainer.addChild(text);
     }
   }
@@ -4897,9 +5073,9 @@ function drawRoomLabels(
   showDimensions: boolean,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
+  selection: SharedSelectionItem[],
   options?: {
     includeStairDirectionLabels?: boolean;
-    stairRotationAnimations?: Map<string, StairRotationAnimation>;
   }
 ) {
   clearContainerChildren(labelContainer);
@@ -5014,10 +5190,11 @@ function drawRoomLabels(
       rooms,
       camera,
       viewport,
-      theme,
-      options?.stairRotationAnimations
+      theme
     );
   }
+
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection);
 }
 
 type ResizeDimensionLabelSpec = {

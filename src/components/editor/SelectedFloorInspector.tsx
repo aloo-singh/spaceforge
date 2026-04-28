@@ -218,6 +218,7 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
                     disabled={!canDeleteSelectedFloor}
                     aria-label={`Delete ${selectedFloor.name}`}
                     aria-describedby="delete-floor-hint"
+                    suppressHydrationWarning
                   >
                     <Trash2 />
                   </Button>

@@ -8,7 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
   DEFAULT_PROJECT_EXPORT_CONFIG,
@@ -184,6 +184,7 @@ export type EditorCommand =
       type: "move-interior-asset";
       roomId: string;
       assetId: string;
+      assetType: InteriorAssetType;
       previousXmm: number;
       previousYmm: number;
       nextXmm: number;
@@ -274,6 +275,18 @@ export type EditorCommand =
       duplicatedAssets: Array<{
         roomId: string;
         asset: RoomInteriorAsset;
+      }>;
+    }
+  | {
+      type: "bulk-move-interior-assets";
+      movedAssets: Array<{
+        roomId: string;
+        assetId: string;
+        assetType: InteriorAssetType;
+        previousXmm: number;
+        previousYmm: number;
+        nextXmm: number;
+        nextYmm: number;
       }>;
     }
   | {
@@ -929,10 +942,8 @@ export function applyEditorCommand(
       // Add duplicated rooms and assets
       return {
         ...document,
-        rooms: [
-          ...document.rooms,
-          ...command.duplicatedRooms,
-          ...document.rooms.map((room) => {
+        rooms: document.rooms
+          .map((room) => {
             const assetsToAdd = command.duplicatedAssets.filter((da) => da.roomId === room.id);
             if (assetsToAdd.length === 0) return room;
 
@@ -943,16 +954,34 @@ export function applyEditorCommand(
                 ...assetsToAdd.map((da) => cloneRoomInteriorAsset(da.asset)),
               ],
             };
-          }).filter((_, idx) => {
-            // Only keep rooms that have assets to add
-            return command.duplicatedAssets.some((da) => da.roomId === document.rooms[idx].id);
-          }),
-        ].filter(
-          (room, idx, arr) =>
-            idx === arr.findIndex((r) => r.id === room.id) // Remove duplicates by ID
-        ),
+          })
+          .concat(command.duplicatedRooms),
       };
     }
+  }
+
+  if (command.type === "bulk-move-interior-assets") {
+    return {
+      ...document,
+      rooms: document.rooms.map((room) => ({
+        ...room,
+        interiorAssets: room.interiorAssets.map((asset) => {
+          const moveCmd = command.movedAssets.find(
+            (cmd) => cmd.roomId === room.id && cmd.assetId === asset.id
+          );
+          if (!moveCmd) return asset;
+
+          const nextXmm = direction === "undo" ? moveCmd.previousXmm : moveCmd.nextXmm;
+          const nextYmm = direction === "undo" ? moveCmd.previousYmm : moveCmd.nextYmm;
+
+          return {
+            ...asset,
+            xMm: nextXmm,
+            yMm: nextYmm,
+          };
+        }),
+      })),
+    };
   }
 
   if (command.type === "move-selection-to-floor") {

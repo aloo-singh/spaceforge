@@ -380,28 +380,32 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "move-interior-asset") {
-    return "interior asset move";
+    return getInteriorAssetActionLabel(command.assetType, "move");
   }
 
   if (command.type === "bulk-duplicate") {
     const roomCount = command.duplicatedRooms.length;
-    const stairCount = command.duplicatedAssets.length;
-    if (roomCount > 0 && stairCount > 0) return "rooms and stairs duplication";
+    const assetCount = command.duplicatedAssets.length;
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets duplication";
     if (roomCount > 1) return "rooms duplication";
     if (roomCount === 1) return "room duplication";
-    if (stairCount > 1) return "stairs duplication";
-    if (stairCount === 1) return "stair duplication";
+    const firstDupAsset = command.duplicatedAssets[0]?.asset;
+    const dupTypeName = firstDupAsset ? getInteriorAssetTypeName(firstDupAsset.type) : "asset";
+    if (assetCount > 1) return `${dupTypeName} duplication`;
+    if (assetCount === 1) return `${dupTypeName} duplication`;
     return "selection duplication";
   }
 
   if (command.type === "move-selection-to-floor") {
     const roomCount = command.movedRooms.length;
-    const stairCount = command.movedAssets.length;
-    if (roomCount > 0 && stairCount > 0) return "rooms and stairs move";
+    const assetCount = command.movedAssets.length;
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets move";
     if (roomCount > 1) return "rooms move";
     if (roomCount === 1) return "room move";
-    if (stairCount > 1) return "stairs move";
-    if (stairCount === 1) return "stair move";
+    const firstMovedAsset = command.movedAssets[0]?.asset;
+    const movedTypeName = firstMovedAsset ? getInteriorAssetTypeName(firstMovedAsset.type) : "asset";
+    if (assetCount > 1) return `${movedTypeName} move`;
+    if (assetCount === 1) return `${movedTypeName} move`;
     return "selection move";
   }
 
@@ -418,7 +422,9 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "paste-interior-assets") {
-    return command.pastedAssets.length === 1 ? "stair paste" : "stairs paste";
+    const firstPastedAsset = command.pastedAssets[0]?.asset;
+    const pasteTypeName = firstPastedAsset ? getInteriorAssetTypeName(firstPastedAsset.type) : "asset";
+    return command.pastedAssets.length === 1 ? `${pasteTypeName} paste` : `${pasteTypeName} paste`;
   }
 
   if (command.type === "update-interior-asset") {
@@ -436,16 +442,54 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
       return getInteriorAssetActionLabel(nextAsset.type, "resize");
     }
 
+    // Check for shape changes (dining tables)
+    if (previousAsset.shape !== nextAsset.shape && nextAsset.shape) {
+      const typeName = getInteriorAssetTypeName(nextAsset.type);
+      return `${typeName} ${nextAsset.shape}`;
+    }
+
+    // Check for name changes
+    if (previousAsset.name !== nextAsset.name) {
+      return `${getInteriorAssetTypeName(nextAsset.type)} renamed`;
+    }
+
+    // Check for arrow settings changes (stairs)
     if (
-      previousAsset.name !== nextAsset.name ||
       previousAsset.arrowLabel !== nextAsset.arrowLabel ||
       previousAsset.arrowDirection !== nextAsset.arrowDirection ||
       previousAsset.arrowEnabled !== nextAsset.arrowEnabled
     ) {
-      return getInteriorAssetActionLabel(nextAsset.type, "edit");
+      return `${getInteriorAssetTypeName(nextAsset.type)} arrow edited`;
     }
 
-    return "interior asset edit";
+    // Fallback for other edits
+    return `${getInteriorAssetTypeName(nextAsset.type)} configured`;
+  }
+
+  if (command.type === "move-interior-asset-to-room") {
+    return getInteriorAssetActionLabel(command.asset.type, "move");
+  }
+
+  if (command.type === "bulk-move-interior-assets") {
+    if (command.movedAssets.length === 0) return "action";
+    if (command.movedAssets.length === 1) {
+      const firstMove = command.movedAssets[0];
+      return getInteriorAssetActionLabel(firstMove.assetType, "move");
+    }
+    // Multiple items moved
+    const typeCounts = new Map<string, number>();
+    for (const move of command.movedAssets) {
+      const typeName = getInteriorAssetTypeName(move.assetType);
+      typeCounts.set(typeName, (typeCounts.get(typeName) ?? 0) + 1);
+    }
+
+    if (typeCounts.size === 1) {
+      const [typeName, count] = Array.from(typeCounts.entries())[0];
+      return `${count} ${typeName}${count === 1 ? "" : "s"} move`;
+    }
+
+    // Mixed types
+    return `${command.movedAssets.length} items move`;
   }
 
   return "action";
@@ -494,8 +538,17 @@ function doesBindingMatchEvent(binding: EditorKeyboardShortcutBinding, event: Ke
 
 function getInteriorAssetActionLabel(
   type: RoomInteriorAsset["type"],
-  action: "creation" | "deletion" | "rotation" | "resize" | "edit"
+  action: "creation" | "deletion" | "rotation" | "resize" | "edit" | "move"
 ) {
-  const assetLabel = type === "stairs" ? "stair" : "interior asset";
-  return `${assetLabel} ${action}`;
+  return `${getInteriorAssetTypeName(type)} ${action}`;
+}
+
+function getInteriorAssetTypeName(type: RoomInteriorAsset["type"]): string {
+  switch (type) {
+    case "stairs": return "stair";
+    case "bed": return "bed";
+    case "sofa": return "sofa";
+    case "wardrobe": return "wardrobe";
+    case "dining-table": return "table";
+  }
 }

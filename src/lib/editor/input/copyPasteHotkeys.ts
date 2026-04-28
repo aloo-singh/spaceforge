@@ -1,10 +1,10 @@
 import { matchEditorKeyboardShortcut, showKeyboardShortcutFeedback } from "@/lib/editor/keyboardMap";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
-import type { SharedSelectionItem } from "@/lib/editor/types";
+import type { SharedSelectionItem, Room, RoomInteriorAsset } from "@/lib/editor/types";
 
 export type CopyPasteStore = {
   getState: () => {
-    document: { rooms: Array<{ id: string; name: string }> };
+    document: { rooms: Room[] };
     history: { past: unknown[] };
     selection: SharedSelectionItem[];
     clipboard: unknown;
@@ -16,23 +16,47 @@ export type CopyPasteStore = {
   };
 };
 
+function getAssetTypeLabel(type: RoomInteriorAsset["type"]): string {
+  switch (type) {
+    case "stairs": return "stair";
+    case "bed": return "bed";
+    case "sofa": return "sofa";
+    case "wardrobe": return "wardrobe";
+    case "dining-table": return "dining table";
+  }
+}
+
 function getDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getState"]>): string {
   const roomSelections = state.selection.filter(
     (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
   );
-  const stairSelections = state.selection.filter(
-    (item): item is Extract<SharedSelectionItem, { type: "stair" }> => item.type === "stair"
+  const assetSelections = state.selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
   );
 
-  if (roomSelections.length === 1 && stairSelections.length === 0) {
+  if (roomSelections.length === 1 && assetSelections.length === 0) {
     const room = state.document.rooms.find((candidate) => candidate.id === roomSelections[0].id);
     return room ? `${room.name} duplicated` : "Room duplicated";
   }
 
-  if (roomSelections.length > 1 && stairSelections.length === 0) return "Rooms duplicated";
-  if (stairSelections.length === 1 && roomSelections.length === 0) return "Stair duplicated";
-  if (stairSelections.length > 1 && roomSelections.length === 0) return "Stairs duplicated";
-  if (roomSelections.length > 0 && stairSelections.length > 0) return "Rooms and stairs duplicated";
+  if (roomSelections.length > 1 && assetSelections.length === 0) return "Rooms duplicated";
+
+  if (assetSelections.length > 0 && roomSelections.length === 0) {
+    // Get the actual asset type from the first selected asset
+    const firstSelection = assetSelections[0];
+    if (firstSelection) {
+      const room = state.document.rooms.find((r) => r.id === firstSelection.roomId);
+      const asset = room?.interiorAssets.find((a) => a.id === firstSelection.id);
+      if (asset) {
+        const typeLabel = getAssetTypeLabel(asset.type);
+        if (assetSelections.length === 1) return `${typeLabel} duplicated`;
+        // For multiple assets, use the type of the first one (or could say "assets duplicated")
+        return `${typeLabel}s duplicated`;
+      }
+    }
+  }
+
+  if (roomSelections.length > 0 && assetSelections.length > 0) return "Rooms and assets duplicated";
 
   return "Selection duplicated";
 }

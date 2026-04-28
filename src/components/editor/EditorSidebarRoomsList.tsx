@@ -89,7 +89,7 @@ function isItemInSelection(item: SharedSelectionItem, selection: SharedSelection
       return item.roomId === selected.roomId && item.wall === selected.wall;
     } else if (item.type === "opening" && selected.type === "opening") {
       return item.roomId === selected.roomId && item.id === selected.id;
-    } else if (item.type === "stair" && selected.type === "stair") {
+    } else if (item.type === "asset" && selected.type === "asset") {
       return item.roomId === selected.roomId && item.id === selected.id;
     }
     return false;
@@ -795,7 +795,7 @@ export function EditorSidebarRoomsList() {
                                     const isAssetSelected =
                                       selectedInteriorAsset?.roomId === room.id &&
                                       selectedInteriorAsset.assetId === asset.id;
-                                    const assetItem: SharedSelectionItem = { type: "stair", roomId: room.id, id: asset.id };
+                                    const assetItem: SharedSelectionItem = { type: "asset", roomId: room.id, id: asset.id };
                                     const isInMultiSelection = isItemInSelection(assetItem, selection) && !isAssetSelected;
                                     const isAssetRenaming =
                                       interiorAssetRenameSession?.roomId === room.id &&
@@ -826,17 +826,18 @@ export function EditorSidebarRoomsList() {
 
                                                 if (event.key === "Enter") {
                                                   event.preventDefault();
-                                                  commitInteriorAssetRenameSession();
-                                                  setSidebarRenameInteriorAssetId(null);
-                                                  selectInteriorAssetById(room.id, asset.id);
+                                                  event.stopPropagation();
+                                                  event.currentTarget.blur();
                                                   return;
                                                 }
 
                                                 if (event.key === "Escape") {
                                                   event.preventDefault();
+                                                  event.stopPropagation();
                                                   cancelInteriorAssetRenameSession();
                                                   setSidebarRenameInteriorAssetId(null);
                                                   selectInteriorAssetById(room.id, asset.id);
+                                                  event.currentTarget.blur();
                                                 }
                                               }}
                                               aria-label={`Rename ${asset.name}`}

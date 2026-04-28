@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorSettingsDialog } from "@/components/editor/EditorSettingsDialog";
+import { AssetsPanel } from "@/components/editor/AssetsPanel";
 import { DevSubscriptionTierSelector } from "@/components/editor/DevSubscriptionTierSelector";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
@@ -147,6 +148,9 @@ export function HistoryControls({
   );
   const insertDefaultStairInSelectedRoom = useEditorStore(
     (state) => state.insertDefaultStairInSelectedRoom
+  );
+  const placeAssetInSelectedRoom = useEditorStore(
+    (state) => state.placeAssetInSelectedRoom
   );
   const isResetCameraDisabled = !hasHydrated || !hasRooms;
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
@@ -425,6 +429,20 @@ export function HistoryControls({
                   >
                     <Construction />
                   </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    selectedRoomId
+                      ? "Add furniture"
+                      : "Select a room to add furniture"
+                  }
+                >
+                  <AssetsPanel
+                    onPlaceAsset={placeAssetInSelectedRoom}
+                    isDisabled={!selectedRoomId}
+                    disabledReason={selectedRoomId ? "Add furniture" : "Select a room to add furniture"}
+                  />
                 </EditorChromeTooltip>
               </ButtonGroup>
               <EditorChromeTooltip content="Editor settings">

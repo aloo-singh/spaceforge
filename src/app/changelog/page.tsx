@@ -10,6 +10,28 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.66.0</h2>
+            <span className="text-sm text-muted-foreground">2026-04-28</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Complete interior asset framework (Bed, Sofa, Wardrobe, Dining Table)</li>
+                <li>Distinct 2D visuals, labels, resize/rotate/name/delete support</li>
+                <li>New Assets panel/drawer for easy placement (desktop popover + mobile Vaul)</li>
+                <li>Full copy/cut/paste/duplicate with smart naming and bounds safety</li>
+                <li>Type-specific inspector controls (wardrobe doors, dining table shape)</li>
+                <li>Regionalisation foundation (metric/imperial + size presets)</li>
+                <li>Meaningful undo/redo labels and batch operations</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.65.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-27</span>
           </div>
