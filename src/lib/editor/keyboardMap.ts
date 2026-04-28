@@ -442,16 +442,28 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
       return getInteriorAssetActionLabel(nextAsset.type, "resize");
     }
 
+    // Check for shape changes (dining tables)
+    if (previousAsset.shape !== nextAsset.shape && nextAsset.shape) {
+      const typeName = getInteriorAssetTypeName(nextAsset.type);
+      return `${typeName} ${nextAsset.shape}`;
+    }
+
+    // Check for name changes
+    if (previousAsset.name !== nextAsset.name) {
+      return `${getInteriorAssetTypeName(nextAsset.type)} renamed`;
+    }
+
+    // Check for arrow settings changes (stairs)
     if (
-      previousAsset.name !== nextAsset.name ||
       previousAsset.arrowLabel !== nextAsset.arrowLabel ||
       previousAsset.arrowDirection !== nextAsset.arrowDirection ||
       previousAsset.arrowEnabled !== nextAsset.arrowEnabled
     ) {
-      return getInteriorAssetActionLabel(nextAsset.type, "edit");
+      return `${getInteriorAssetTypeName(nextAsset.type)} arrow edited`;
     }
 
-    return "interior asset edit";
+    // Fallback for other edits
+    return `${getInteriorAssetTypeName(nextAsset.type)} configured`;
   }
 
   if (command.type === "move-interior-asset-to-room") {
