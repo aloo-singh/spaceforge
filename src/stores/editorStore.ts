@@ -350,6 +350,9 @@ type EditorState = {
     previousCenter: Point,
     nextCenter: Point
   ) => void;
+  commitBulkInteriorAssetMove: (
+    moves: Array<{ roomId: string; assetId: string; previousCenter: Point; nextCenter: Point }>
+  ) => void;
   previewInteriorAssetResize: (
     roomId: string,
     assetId: string,
@@ -4766,6 +4769,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedRoomId: toRoomId,
         selectedInteriorAsset: { roomId: toRoomId, assetId },
         selection: [{ type: "asset" as const, roomId: toRoomId, id: assetId }],
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  commitBulkInteriorAssetMove: (moves: Array<{ roomId: string; assetId: string; previousCenter: Point; nextCenter: Point }>) =>
+    set((state) => {
+      if (moves.length === 0) return state;
+
+      // Filter out moves that don't change position
+      const validMoves = moves.filter(move => 
+        move.previousCenter.x !== move.nextCenter.x || 
+        move.previousCenter.y !== move.nextCenter.y
+      );
+      if (validMoves.length === 0) return state;
+
+      // Build the bulk move command
+      const movedAssets: Array<{
+        roomId: string;
+        assetId: string;
+        assetType: InteriorAssetType;
+        previousXmm: number;
+        previousYmm: number;
+        nextXmm: number;
+        nextYmm: number;
+      }> = [];
+      let nextDocument = state.document;
+
+      for (const move of validMoves) {
+        const room = nextDocument.rooms.find((candidate) => candidate.id === move.roomId);
+        const asset = room?.interiorAssets.find((candidate) => candidate.id === move.assetId);
+        if (!room || !asset) continue;
+
+        movedAssets.push({
+          roomId: move.roomId,
+          assetId: move.assetId,
+          assetType: asset.type,
+          previousXmm: move.previousCenter.x,
+          previousYmm: move.previousCenter.y,
+          nextXmm: move.nextCenter.x,
+          nextYmm: move.nextCenter.y,
+        });
+
+        nextDocument = updateRoomInteriorAssetPositionInDocument(
+          nextDocument,
+          move.roomId,
+          move.assetId,
+          move.nextCenter
+        );
+      }
+
+      if (movedAssets.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-move-interior-assets",
+        movedAssets,
+      };
+
+      return {
+        document: nextDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

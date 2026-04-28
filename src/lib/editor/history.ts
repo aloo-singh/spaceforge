@@ -278,6 +278,18 @@ export type EditorCommand =
       }>;
     }
   | {
+      type: "bulk-move-interior-assets";
+      movedAssets: Array<{
+        roomId: string;
+        assetId: string;
+        assetType: InteriorAssetType;
+        previousXmm: number;
+        previousYmm: number;
+        nextXmm: number;
+        nextYmm: number;
+      }>;
+    }
+  | {
       type: "move-selection-to-floor";
       targetFloorId: string;
       targetRoomId: string | null;
@@ -946,6 +958,30 @@ export function applyEditorCommand(
           .concat(command.duplicatedRooms),
       };
     }
+  }
+
+  if (command.type === "bulk-move-interior-assets") {
+    return {
+      ...document,
+      rooms: document.rooms.map((room) => ({
+        ...room,
+        interiorAssets: room.interiorAssets.map((asset) => {
+          const moveCmd = command.movedAssets.find(
+            (cmd) => cmd.roomId === room.id && cmd.assetId === asset.id
+          );
+          if (!moveCmd) return asset;
+
+          const nextXmm = direction === "undo" ? moveCmd.previousXmm : moveCmd.nextXmm;
+          const nextYmm = direction === "undo" ? moveCmd.previousYmm : moveCmd.nextYmm;
+
+          return {
+            ...asset,
+            xMm: nextXmm,
+            yMm: nextYmm,
+          };
+        }),
+      })),
+    };
   }
 
   if (command.type === "move-selection-to-floor") {

@@ -116,6 +116,9 @@ type RoomDrawStoreState = {
     previousCenter: Point,
     nextCenter: Point
   ) => void;
+  commitBulkInteriorAssetMove: (
+    moves: Array<{ roomId: string; assetId: string; previousCenter: Point; nextCenter: Point }>
+  ) => void;
   previewInteriorAssetResize: (
     roomId: string,
     assetId: string,
@@ -1593,6 +1596,8 @@ export function attachRoomDrawInput(
           const endCursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
 
           if (session.multiSelectStartPositions) {
+            const bulkMoves: Array<{ roomId: string; assetId: string; previousCenter: Point; nextCenter: Point }> = [];
+
             for (const [key, startPosition] of session.multiSelectStartPositions) {
               const assetId = key.split(":")[1];
               // Calculate offset for this asset from where drag started
@@ -1608,8 +1613,17 @@ export function attachRoomDrawInput(
                 assetOffset
               );
               if (moveTarget && (moveTarget.nextCenter.x !== startPosition.center.x || moveTarget.nextCenter.y !== startPosition.center.y)) {
-                commitInteriorAssetMove(startPosition.roomId, assetId, startPosition.center, moveTarget.nextCenter);
+                bulkMoves.push({
+                  roomId: startPosition.roomId,
+                  assetId,
+                  previousCenter: startPosition.center,
+                  nextCenter: moveTarget.nextCenter,
+                });
               }
+            }
+
+            if (bulkMoves.length > 0) {
+              store.getState().commitBulkInteriorAssetMove(bulkMoves);
             }
           }
         } else {

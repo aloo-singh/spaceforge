@@ -470,6 +470,28 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return getInteriorAssetActionLabel(command.asset.type, "move");
   }
 
+  if (command.type === "bulk-move-interior-assets") {
+    if (command.movedAssets.length === 0) return "action";
+    if (command.movedAssets.length === 1) {
+      const firstMove = command.movedAssets[0];
+      return getInteriorAssetActionLabel(firstMove.assetType, "move");
+    }
+    // Multiple items moved
+    const typeCounts = new Map<string, number>();
+    for (const move of command.movedAssets) {
+      const typeName = getInteriorAssetTypeName(move.assetType);
+      typeCounts.set(typeName, (typeCounts.get(typeName) ?? 0) + 1);
+    }
+
+    if (typeCounts.size === 1) {
+      const [typeName, count] = Array.from(typeCounts.entries())[0];
+      return `${count} ${typeName}${count === 1 ? "" : "s"} move`;
+    }
+
+    // Mixed types
+    return `${command.movedAssets.length} items move`;
+  }
+
   return "action";
 }
 
