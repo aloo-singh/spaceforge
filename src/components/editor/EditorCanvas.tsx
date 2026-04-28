@@ -4482,13 +4482,13 @@ function drawRoomInteriorAssets(
 
     // Stairs-specific visuals (tread lines and direction arrow)
     if (asset.type === "stairs") {
-      const treadRunLengthMm = Math.max(getStairRunLengthMm(displayedAsset), 1);
+      const stairRunLengthMm = Math.max(anim ? anim.baseDepthMm : getStairRunLengthMm(displayedAsset), 1);
       const treadCount = Math.max(
         0,
-        Math.floor(treadRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
+        Math.floor(stairRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1
       );
       for (let index = 1; index <= treadCount; index += 1) {
-        const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / treadRunLengthMm;
+        const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / stairRunLengthMm;
         if (progress <= 0 || progress >= 1) continue;
         const [start, end] = anim
           ? [
@@ -4528,7 +4528,15 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
-      drawStairDirectionArrow(graphics, displayedAsset, camera, viewport, theme, isSelected);
+      drawStairDirectionArrow(
+        graphics,
+        displayedAsset,
+        camera,
+        viewport,
+        theme,
+        isSelected,
+        stairRunLengthMm
+      );
     }
 
     if (!isSelected) continue;
@@ -4649,7 +4657,8 @@ function drawStairDirectionArrow(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  isSelected: boolean
+  isSelected: boolean,
+  runLengthMm = getStairRunLengthMm(asset)
 ) {
   if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) === false) return;
   const normalizedRotationDegrees = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
@@ -4659,7 +4668,6 @@ function drawStairDirectionArrow(
     x: Math.sin(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
     y: -Math.cos(rotationRadians) * (resolvedDirection === "reverse" ? -1 : 1),
   };
-  const runLengthMm = getStairRunLengthMm(asset);
   const arrowLengthMm = Math.max(
     STAIR_DIRECTION_ARROW_MIN_LENGTH_MM,
     Math.min(runLengthMm * STAIR_DIRECTION_ARROW_LENGTH_RATIO, runLengthMm - 260)
