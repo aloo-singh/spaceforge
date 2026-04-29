@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
+import { detectMacPlatform } from "@/lib/platform";
 
 type SidebarWallEntry = {
   wall: RoomWall;
@@ -181,6 +182,7 @@ export function EditorSidebarRoomsList() {
   const shouldAutoFocusRenameInputRef = useRef(false);
   const shouldAutoFocusInteriorAssetRenameInputRef = useRef(false);
   const shouldAutoFocusFloorRenameInputRef = useRef(false);
+  const [isMacPlatform, setIsMacPlatform] = useState(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
@@ -239,6 +241,11 @@ export function EditorSidebarRoomsList() {
     "flex flex-1 min-w-0 items-center gap-2 text-left",
     isCompactDensity ? "-my-1 py-1" : "-my-2 py-2"
   );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMacPlatform(detectMacPlatform());
+  }, []);
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -768,7 +775,7 @@ export function EditorSidebarRoomsList() {
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); bulkDeleteSelection(); }}
                                                 >
                                                   Delete
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">Del</span>
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌫" : "Del"}</span>
                                                 </ContextMenuItem>
                                               </ContextMenuContent>
                                             </ContextMenu>
