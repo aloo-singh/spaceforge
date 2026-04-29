@@ -351,6 +351,18 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "room deletion";
   }
 
+  if (command.type === "delete-floor") {
+    return `floor "${command.floor.name}" deleted`;
+  }
+
+  if (command.type === "add-floor") {
+    return `floor "${command.floor.name}" created`;
+  }
+
+  if (command.type === "rename-floor") {
+    return `floor renamed to "${command.nextName}"`;
+  }
+
   if (command.type === "rename-room") {
     return "room rename";
   }
