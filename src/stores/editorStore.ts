@@ -3689,8 +3689,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const doorCount = duplicatedOpenings.length;
           toast(
             doorCount === 1
-              ? "Door mirror-duplicated"
-              : `${doorCount} doors mirror-duplicated`
+              ? "Door mirror duplicated"
+              : `${doorCount} doors mirror duplicated`
           );
         } else {
           // Regular duplicate with type awareness
