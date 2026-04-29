@@ -276,6 +276,10 @@ export type EditorCommand =
         roomId: string;
         asset: RoomInteriorAsset;
       }>;
+      duplicatedOpenings?: Array<{
+        roomId: string;
+        opening: RoomOpening;
+      }>;
     }
   | {
       type: "bulk-move-interior-assets";
@@ -914,44 +918,62 @@ export function applyEditorCommand(
 
   if (command.type === "bulk-duplicate") {
     if (direction === "undo") {
-      // Remove duplicated rooms and assets
+      // Remove duplicated rooms, assets, and openings
       const duplicatedRoomIds = new Set(command.duplicatedRooms.map((r) => r.id));
       const duplicatedAssetIds = new Set(command.duplicatedAssets.map((da) => da.asset.id));
+      const duplicatedOpeningIds = new Set(
+        (command.duplicatedOpenings ?? []).map((do_) => do_.opening.id)
+      );
 
       return {
         ...document,
         rooms: document.rooms.filter((room) => {
           if (duplicatedRoomIds.has(room.id)) return false;
-          // Keep the room but filter out duplicated assets
+          // Keep the room but filter out duplicated assets and openings
           return true;
         }).map((room) => {
           const duplicatedAssetsInRoom = command.duplicatedAssets.filter(
             (da) => da.roomId === room.id
           );
-          if (duplicatedAssetsInRoom.length === 0) return room;
+          const duplicatedOpeningsInRoom = (command.duplicatedOpenings ?? []).filter(
+            (do_) => do_.roomId === room.id
+          );
+          if (duplicatedAssetsInRoom.length === 0 && duplicatedOpeningsInRoom.length === 0) {
+            return room;
+          }
 
           return {
             ...room,
             interiorAssets: room.interiorAssets.filter(
               (asset) => !duplicatedAssetIds.has(asset.id)
             ),
+            openings: room.openings.filter(
+              (opening) => !duplicatedOpeningIds.has(opening.id)
+            ),
           };
         }),
       };
     } else {
-      // Add duplicated rooms and assets
+      // Add duplicated rooms, assets, and openings
       return {
         ...document,
         rooms: document.rooms
           .map((room) => {
             const assetsToAdd = command.duplicatedAssets.filter((da) => da.roomId === room.id);
-            if (assetsToAdd.length === 0) return room;
+            const openingsToAdd = (command.duplicatedOpenings ?? []).filter(
+              (do_) => do_.roomId === room.id
+            );
+            if (assetsToAdd.length === 0 && openingsToAdd.length === 0) return room;
 
             return {
               ...room,
               interiorAssets: [
                 ...room.interiorAssets,
                 ...assetsToAdd.map((da) => cloneRoomInteriorAsset(da.asset)),
+              ],
+              openings: [
+                ...room.openings,
+                ...openingsToAdd.map((do_) => cloneRoomOpening(do_.opening)),
               ],
             };
           })

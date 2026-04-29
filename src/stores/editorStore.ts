@@ -3488,6 +3488,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const duplicatedRooms: Room[] = [];
       const duplicatedAssets: Array<{ roomId: string; asset: RoomInteriorAsset }> = [];
+      const duplicatedOpenings: Array<{ roomId: string; opening: RoomOpening }> = [];
       const newSelection: SharedSelectionItem[] = [];
 
       // Process each item in selection
@@ -3551,10 +3552,50 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           });
           newSelection.push({ type: "asset" as const, roomId: sourceRoom.id, id: newAssetId });
         }
+
+        if (item.type === "opening") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.roomId);
+          const sourceOpening = sourceRoom?.openings.find((o) => o.id === item.openingId);
+          if (!sourceRoom || !sourceOpening) continue;
+
+          // Get the wall segment for offset constraint
+          const wallSegment = getRoomWallSegment(sourceRoom, sourceOpening.wall);
+          if (!wallSegment) continue;
+
+          const newOpeningId = createOpeningId();
+          const candidateOffset = sourceOpening.offsetMm + DUPLICATE_OFFSET_MM;
+          
+          // Constrain offset to valid range on same wall
+          const constrainedOffsetMm = constrainOpeningOffset(
+            { widthMm: sourceOpening.widthMm },
+            candidateOffset,
+            wallSegment.lengthMm
+          );
+
+          const duplicateOpening: RoomOpening = {
+            ...cloneRoomOpening(sourceOpening),
+            id: newOpeningId,
+            offsetMm: constrainedOffsetMm,
+          };
+
+          duplicatedOpenings.push({
+            roomId: sourceRoom.id,
+            opening: duplicateOpening,
+          });
+          newSelection.push({
+            type: "opening" as const,
+            roomId: sourceRoom.id,
+            openingId: newOpeningId,
+          });
+        }
       }
 
       // If nothing was duplicated, return unchanged state
-      if (duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+      if (
+        duplicatedRooms.length === 0 &&
+        duplicatedAssets.length === 0 &&
+        duplicatedOpenings.length === 0
+      ) {
         if (state.selection.length > 0) {
           toast("Could not duplicate: selected items not found in document");
         }
@@ -3565,9 +3606,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "bulk-duplicate",
         duplicatedRooms,
         duplicatedAssets,
+        duplicatedOpenings:
+          duplicatedOpenings.length > 0 ? duplicatedOpenings : undefined,
       };
 
       const newDocument = applyEditorCommand(state.document, command, "redo");
+
+      // Show success message
+      if (duplicatedOpenings.length > 0 && duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+        toast(
+          duplicatedOpenings.length === 1
+            ? "Opening duplicated"
+            : `${duplicatedOpenings.length} openings duplicated`
+        );
+      }
 
       return {
         ...state,

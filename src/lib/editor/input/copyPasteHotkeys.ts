@@ -33,15 +33,18 @@ function getDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getSt
   const assetSelections = state.selection.filter(
     (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
   );
+  const openingSelections = state.selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "opening" }> => item.type === "opening"
+  );
 
-  if (roomSelections.length === 1 && assetSelections.length === 0) {
+  if (roomSelections.length === 1 && assetSelections.length === 0 && openingSelections.length === 0) {
     const room = state.document.rooms.find((candidate) => candidate.id === roomSelections[0].id);
     return room ? `${room.name} duplicated` : "Room duplicated";
   }
 
-  if (roomSelections.length > 1 && assetSelections.length === 0) return "Rooms duplicated";
+  if (roomSelections.length > 1 && assetSelections.length === 0 && openingSelections.length === 0) return "Rooms duplicated";
 
-  if (assetSelections.length > 0 && roomSelections.length === 0) {
+  if (assetSelections.length > 0 && roomSelections.length === 0 && openingSelections.length === 0) {
     // Get the actual asset type from the first selected asset
     const firstSelection = assetSelections[0];
     if (firstSelection) {
@@ -56,7 +59,17 @@ function getDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getSt
     }
   }
 
-  if (roomSelections.length > 0 && assetSelections.length > 0) return "Rooms and assets duplicated";
+  if (openingSelections.length > 0 && roomSelections.length === 0 && assetSelections.length === 0) {
+    return openingSelections.length === 1 ? "Opening duplicated" : "Openings duplicated";
+  }
+
+  if (roomSelections.length > 0 && assetSelections.length > 0 && openingSelections.length === 0) return "Rooms and assets duplicated";
+
+  if (roomSelections.length > 0 && openingSelections.length > 0 && assetSelections.length === 0) return "Rooms and openings duplicated";
+
+  if (assetSelections.length > 0 && openingSelections.length > 0 && roomSelections.length === 0) return "Assets and openings duplicated";
+
+  if (roomSelections.length > 0 && assetSelections.length > 0 && openingSelections.length > 0) return "Rooms, assets, and openings duplicated";
 
   return "Selection duplicated";
 }
