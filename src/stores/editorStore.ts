@@ -86,6 +86,7 @@ import {
   areRoomOpeningsEqual,
   cloneRoomOpening,
   cloneRoomOpenings,
+  constrainOpeningOffset,
   getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
   getSymmetricOpeningWidthForWorldPoint,
@@ -3184,6 +3185,120 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selection: newSelection,
           history: {
             past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      if (state.clipboard.type === "opening") {
+        // Require a wall to be selected for opening paste
+        if (!state.selectedWall) {
+          toast("Select a wall to paste the opening here.");
+          return state;
+        }
+
+        const targetRoomId = state.selectedWall.roomId;
+        const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
+        if (!targetRoom || (targetRoom.floorId ?? activeFloorId) !== activeFloorId) {
+          toast("Select a wall on this floor first to paste here.");
+          return state;
+        }
+
+        // Validate target wall exists
+        if (!getRoomWallSegment(targetRoom, state.selectedWall.wall)) {
+          toast("The selected wall no longer exists.");
+          return state;
+        }
+
+        const targetWall = state.selectedWall.wall;
+        const targetWallSegment = getRoomWallSegment(targetRoom, targetWall);
+        if (!targetWallSegment) return state;
+
+        // Get all openings from clipboard (support both single and multi-opening payloads)
+        const clipboardOpenings = state.clipboard.openings ?? [
+          { opening: state.clipboard.opening, sourceRoomId: state.clipboard.sourceRoomId },
+        ];
+        if (clipboardOpenings.length === 0) return state;
+
+        const isCopyOpening = state.clipboard.source === "copy";
+        const pastedOpenings: RoomOpening[] = [];
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+
+        for (const openingClipboardItem of clipboardOpenings) {
+          const sourceOpening = openingClipboardItem.opening;
+          const sourceRoomId = openingClipboardItem.sourceRoomId;
+          const sourceRoom = state.document.rooms.find((r) => r.id === sourceRoomId);
+
+          const newOpeningId = createOpeningId();
+
+          // Calculate offset for paste:
+          // - If pasting from same wall to same wall and it's a copy, try to offset
+          // - Otherwise, use source offset (will be constrained to new wall)
+          let pasteOffsetMm = sourceOpening.offsetMm;
+          if (
+            isCopyOpening &&
+            sourceRoom &&
+            sourceRoom.id === targetRoom.id &&
+            sourceOpening.wall === targetWall
+          ) {
+            // Same wall, same room, copy — try to offset by PASTE_OFFSET_MM
+            const candidateOffset = sourceOpening.offsetMm + PASTE_OFFSET_MM;
+            pasteOffsetMm = candidateOffset;
+          }
+
+          // Constrain offset to valid range for target wall
+          const constrainedOffsetMm = constrainOpeningOffset(
+            { widthMm: sourceOpening.widthMm },
+            pasteOffsetMm,
+            targetWallSegment.lengthMm
+          );
+
+          const pastedOpening: RoomOpening = {
+            ...cloneRoomOpening(sourceOpening),
+            id: newOpeningId,
+            wall: targetWall,
+            offsetMm: constrainedOffsetMm,
+          };
+
+          // Create add-opening command
+          const command: EditorCommand = {
+            type: "add-opening",
+            roomId: targetRoomId,
+            opening: cloneRoomOpening(pastedOpening),
+          };
+
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+          pastedOpenings.push(pastedOpening);
+        }
+
+        // Build selection for all pasted openings
+        const newSelection: SharedSelectionItem[] = pastedOpenings.map((opening) => ({
+          type: "opening" as const,
+          roomId: targetRoomId,
+          openingId: opening.id,
+        }));
+
+        // Show calm message
+        const messageCount = pastedOpenings.length;
+        const message = messageCount === 1 ? "Opening pasted" : `${messageCount} openings pasted`;
+        toast(message, { duration: 3200 });
+
+        return {
+          document: nextDocument,
+          selectedRoomId: targetRoomId,
+          selectedWall: state.selectedWall,
+          selectedOpening:
+            pastedOpenings.length > 0
+              ? { roomId: targetRoomId, openingId: pastedOpenings[pastedOpenings.length - 1].id }
+              : null,
+          selectedInteriorAsset: null,
+          selection: newSelection,
+          history: {
+            past: nextPast,
             future: [],
           },
           canUndo: true,
