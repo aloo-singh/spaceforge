@@ -90,7 +90,6 @@ import {
   getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
   getSymmetricOpeningWidthForWorldPoint,
-  getHandleAnchoredOpeningWidthForWorldPoint,
   getHandleAnchoredOpeningWidthAndOffsetForWorldPoint,
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
@@ -4946,7 +4945,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (opening.widthMm === nextWidthMm && nextOffsetMm === undefined) return state;
       if (opening.widthMm === nextWidthMm && opening.offsetMm === nextOffsetMm) return state;
 
-      let updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
       
       // If offset changed (for handle-anchored resizing), also update the offset
       if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
@@ -4985,7 +4984,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       };
 
-      let updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
       
       // If offset changed, also update the offset
       if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
