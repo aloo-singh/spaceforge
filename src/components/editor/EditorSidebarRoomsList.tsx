@@ -284,6 +284,21 @@ export function EditorSidebarRoomsList() {
   }, [isOpeningContextMenuOpen]);
 
   useEffect(() => {
+    const body = globalThis.document?.body;
+    if (!body) return;
+
+    if (isOpeningContextMenuOpen) {
+      body.setAttribute("data-opening-context-menu-open", "true");
+    } else {
+      body.removeAttribute("data-opening-context-menu-open");
+    }
+
+    return () => {
+      body.removeAttribute("data-opening-context-menu-open");
+    };
+  }, [isOpeningContextMenuOpen]);
+
+  useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
     inputRef.current?.focus();
     inputRef.current?.select();
