@@ -13,6 +13,7 @@ export type EditorKeyboardShortcutId =
   | "cut"
   | "paste"
   | "duplicate-selection"
+  | "mirror-duplicate-selection"
   | "delete-selection"
   | "hold-pan"
   | "cancel-draft-or-clear-selection"
@@ -163,6 +164,17 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "action",
     bindings: [{ key: "d", code: "KeyD", primaryModifier: true, altKey: false, shiftKey: false }],
     sonnerMessage: ({ actionLabel }) => actionLabel ?? "Selection duplicated",
+  },
+  {
+    id: "mirror-duplicate-selection",
+    section: "Edit",
+    keyCombination: "Primary+Opt+D",
+    description: "Mirror duplicate the current selection (doors only)",
+    macKeys: "Cmd+Opt+D",
+    windowsKeys: "Ctrl+Alt+D",
+    type: "action",
+    bindings: [{ key: "d", code: "KeyD", primaryModifier: true, altKey: true, shiftKey: false }],
+    sonnerMessage: ({ actionLabel }) => actionLabel ?? "Selection mirror duplicated",
   },
   {
     id: "delete-selection",

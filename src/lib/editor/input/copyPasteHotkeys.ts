@@ -11,7 +11,7 @@ export type CopyPasteStore = {
     copySelection: () => void;
     cutSelection: () => void;
     pasteSelection: () => void;
-    duplicateSelection: () => void;
+    duplicateSelection: (options?: { isMirror?: boolean }) => void;
     keyboardShortcutFeedbackEnabled: boolean;
   };
 };
@@ -74,6 +74,38 @@ function getDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getSt
   return "Selection duplicated";
 }
 
+function getMirrorDuplicateShortcutActionLabel(state: ReturnType<CopyPasteStore["getState"]>): string {
+  const openingSelections = state.selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "opening" }> => item.type === "opening"
+  );
+
+  if (openingSelections.length === 0) {
+    return "No doors to mirror duplicate";
+  }
+
+  // Check how many are actually doors (vs windows)
+  const doors = openingSelections.filter((sel) => {
+    const room = state.document.rooms.find((r) => r.id === sel.roomId);
+    const opening = room?.openings.find((o) => o.id === sel.openingId);
+    return opening?.type === "door";
+  });
+
+  if (doors.length === 0) {
+    return openingSelections.length === 1 ? "Window duplicated" : "Windows duplicated";
+  }
+
+  if (doors.length === 1 && doors.length === openingSelections.length) {
+    return "Door mirror-duplicated";
+  }
+
+  if (doors.length > 1 && doors.length === openingSelections.length) {
+    return "Doors mirror-duplicated";
+  }
+
+  // Mixed doors and windows
+  return doors.length === 1 ? "Door mirror-duplicated" : `${doors.length} doors mirror-duplicated`;
+}
+
 export function attachCopyPasteHotkeys(store: CopyPasteStore) {
   const handleDuplicateShortcut = (event: KeyboardEvent): boolean => {
     const isPrimaryModifier = event.metaKey || event.ctrlKey;
@@ -106,8 +138,41 @@ export function attachCopyPasteHotkeys(store: CopyPasteStore) {
     return true;
   };
 
+  const handleMirrorDuplicateShortcut = (event: KeyboardEvent): boolean => {
+    const isPrimaryModifier = event.metaKey || event.ctrlKey;
+    const eventKey = event.key.toLowerCase();
+    const isMirrorDuplicateCombo =
+      isPrimaryModifier &&
+      event.altKey &&
+      (event.code === "KeyD" || eventKey === "d") &&
+      !event.shiftKey;
+    if (!isMirrorDuplicateCombo) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    // Extra cancellation flags help with browser-reserved shortcuts in some engines.
+    event.returnValue = false;
+    event.cancelBubble = true;
+
+    const state = store.getState();
+    if (state.selection.length === 0) return true;
+
+    const actionLabel = getMirrorDuplicateShortcutActionLabel(state);
+    state.duplicateSelection({ isMirror: true });
+
+    showKeyboardShortcutFeedback("mirror-duplicate-selection", {
+      feedbackEnabled: state.keyboardShortcutFeedbackEnabled,
+      context: { actionLabel },
+    });
+
+    return true;
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (isEditableTarget(event.target)) return;
+
+    if (handleMirrorDuplicateShortcut(event)) return;
 
     if (handleDuplicateShortcut(event)) return;
 

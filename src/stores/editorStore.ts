@@ -278,7 +278,7 @@ type EditorState = {
   /** Cut selected room(s) or stair(s) to clipboard (remove from location) */
   cutSelection: () => void;
   /** Duplicate selected room(s) or stair(s) with smart naming and offset placement */
-  duplicateSelection: () => void;
+  duplicateSelection: (options?: { isMirror?: boolean }) => void;
   /** Move selected room(s) and stair(s) to a different floor */
   moveSelectionToFloor: (targetFloorId: string) => void;
   /** Reorder a room within its floor */
@@ -3469,10 +3469,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return state;
     }),
-  duplicateSelection: () =>
+  duplicateSelection: (options?: { isMirror?: boolean }) =>
     set((state) => {
       if (state.selection.length === 0) return state;
 
+      const isMirror = options?.isMirror ?? false;
       const activeFloorId = getNormalizedActiveFloorId(state.document);
       const DUPLICATE_OFFSET_MM = 500; // Offset duplicates 500mm from originals
 
@@ -3572,10 +3573,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             wallSegment.lengthMm
           );
 
+          // For mirror duplicate: flip hingeSide for doors, keep for windows
+          let flippedHingeSide = sourceOpening.hingeSide;
+          if (isMirror && sourceOpening.type === "door") {
+            flippedHingeSide = sourceOpening.hingeSide === "start" ? "end" : "start";
+          }
+
           const duplicateOpening: RoomOpening = {
             ...cloneRoomOpening(sourceOpening),
             id: newOpeningId,
             offsetMm: constrainedOffsetMm,
+            hingeSide: flippedHingeSide,
           };
 
           duplicatedOpenings.push({
@@ -3614,11 +3622,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // Show success message
       if (duplicatedOpenings.length > 0 && duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
-        toast(
-          duplicatedOpenings.length === 1
-            ? "Opening duplicated"
-            : `${duplicatedOpenings.length} openings duplicated`
-        );
+        if (isMirror) {
+          // Count doors for mirror duplicate message
+          const doorCount = duplicatedOpenings.filter((do_) => {
+            const room = state.document.rooms.find((r) => r.id === do_.roomId);
+            return room?.openings.find((o) => o.id === do_.opening.id)?.type === "door";
+          }).length;
+          
+          if (doorCount > 0) {
+            toast(
+              doorCount === 1
+                ? "Door mirror-duplicated"
+                : `${doorCount} doors mirror-duplicated`
+            );
+          } else {
+            toast(
+              duplicatedOpenings.length === 1
+                ? "Window duplicated"
+                : `${duplicatedOpenings.length} windows duplicated`
+            );
+          }
+        } else {
+          toast(
+            duplicatedOpenings.length === 1
+              ? "Opening duplicated"
+              : `${duplicatedOpenings.length} openings duplicated`
+          );
+        }
       }
 
       return {
