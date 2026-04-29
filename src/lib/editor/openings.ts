@@ -274,6 +274,88 @@ export function getSymmetricOpeningWidthForWorldPoint(
   return clamp(nextWidthMm, Math.min(MIN_OPENING_WIDTH_MM, maxHalfWidthMm * 2), maxHalfWidthMm * 2);
 }
 
+export function getHandleAnchoredOpeningWidthForWorldPoint(
+  room: Room,
+  opening: RoomOpening,
+  draggedEdge: "start" | "end",
+  worldPoint: Point,
+  options?: { gridSizeMm?: number }
+): number | null {
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
+  const halfWidthMm = opening.widthMm / 2;
+  const pointerOffsetMm = getWallOffsetForWorldPoint(segment, worldPoint);
+  
+  let nextWidthMm: number;
+  if (draggedEdge === "start") {
+    // Dragging start edge, end is anchored at (centerOffset + halfWidth)
+    const fixedEndOffsetMm = centerOffsetMm + halfWidthMm;
+    nextWidthMm = Math.max(0, fixedEndOffsetMm - pointerOffsetMm);
+  } else {
+    // Dragging end edge, start is anchored at (centerOffset - halfWidth)
+    const fixedStartOffsetMm = centerOffsetMm - halfWidthMm;
+    nextWidthMm = Math.max(0, pointerOffsetMm - fixedStartOffsetMm);
+  }
+
+  const snappedWidthMm =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(nextWidthMm, options.gridSizeMm)
+      : nextWidthMm;
+
+  // Ensure width doesn't exceed bounds
+  const maxWidthMm = segment.lengthMm;
+  return clamp(snappedWidthMm, Math.min(MIN_OPENING_WIDTH_MM, maxWidthMm), maxWidthMm);
+}
+
+export function getHandleAnchoredOpeningWidthAndOffsetForWorldPoint(
+  room: Room,
+  opening: RoomOpening,
+  draggedEdge: "start" | "end",
+  worldPoint: Point,
+  options?: { gridSizeMm?: number }
+): { widthMm: number; offsetMm: number } | null {
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return null;
+
+  const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
+  const halfWidthMm = opening.widthMm / 2;
+  const pointerOffsetMm = getWallOffsetForWorldPoint(segment, worldPoint);
+  
+  let nextWidthMm: number;
+  let nextOffsetMm: number;
+  
+  if (draggedEdge === "start") {
+    // Dragging start edge, end is anchored at (centerOffset + halfWidth)
+    const fixedEndOffsetMm = centerOffsetMm + halfWidthMm;
+    nextWidthMm = Math.max(0, fixedEndOffsetMm - pointerOffsetMm);
+    // New center = fixedEnd - (width / 2)
+    nextOffsetMm = fixedEndOffsetMm - nextWidthMm / 2;
+  } else {
+    // Dragging end edge, start is anchored at (centerOffset - halfWidth)
+    const fixedStartOffsetMm = centerOffsetMm - halfWidthMm;
+    nextWidthMm = Math.max(0, pointerOffsetMm - fixedStartOffsetMm);
+    // New center = fixedStart + (width / 2)
+    nextOffsetMm = fixedStartOffsetMm + nextWidthMm / 2;
+  }
+
+  const snappedWidthMm =
+    options?.gridSizeMm && options.gridSizeMm > 0
+      ? snapToGrid(nextWidthMm, options.gridSizeMm)
+      : nextWidthMm;
+
+  // Ensure width and offset don't exceed bounds
+  const maxWidthMm = segment.lengthMm;
+  const clampedWidthMm = clamp(snappedWidthMm, Math.min(MIN_OPENING_WIDTH_MM, maxWidthMm), maxWidthMm);
+  const clampedOffsetMm = clamp(nextOffsetMm, 0, segment.lengthMm - clampedWidthMm);
+
+  return {
+    widthMm: clampedWidthMm,
+    offsetMm: clampedOffsetMm,
+  };
+}
+
 export function getResolvedRoomOpeningLayoutFromRoom(
   room: Room,
   opening: RoomOpening

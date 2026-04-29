@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
+import { detectMacPlatform } from "@/lib/platform";
 
 type SidebarWallEntry = {
   wall: RoomWall;
@@ -88,7 +89,7 @@ function isItemInSelection(item: SharedSelectionItem, selection: SharedSelection
     } else if (item.type === "wall" && selected.type === "wall") {
       return item.roomId === selected.roomId && item.wall === selected.wall;
     } else if (item.type === "opening" && selected.type === "opening") {
-      return item.roomId === selected.roomId && item.id === selected.id;
+      return item.roomId === selected.roomId && item.openingId === selected.openingId;
     } else if (item.type === "asset" && selected.type === "asset") {
       return item.roomId === selected.roomId && item.id === selected.id;
     }
@@ -146,6 +147,11 @@ export function EditorSidebarRoomsList() {
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const addToSelection = useEditorStore((state) => state.addToSelection);
   const removeFromSelection = useEditorStore((state) => state.removeFromSelection);
+  const copySelection = useEditorStore((state) => state.copySelection);
+  const cutSelection = useEditorStore((state) => state.cutSelection);
+  const pasteSelection = useEditorStore((state) => state.pasteSelection);
+  const duplicateSelection = useEditorStore((state) => state.duplicateSelection);
+  const bulkDeleteSelection = useEditorStore((state) => state.bulkDeleteSelection);
   const startInteriorAssetRenameSession = useEditorStore(
     (state) => state.startInteriorAssetRenameSession
   );
@@ -176,6 +182,9 @@ export function EditorSidebarRoomsList() {
   const shouldAutoFocusRenameInputRef = useRef(false);
   const shouldAutoFocusInteriorAssetRenameInputRef = useRef(false);
   const shouldAutoFocusFloorRenameInputRef = useRef(false);
+  const [isMacPlatform, setIsMacPlatform] = useState(false);
+  const [isOpeningContextMenuOpen, setIsOpeningContextMenuOpen] = useState(false);
+  const [isAltPressed, setIsAltPressed] = useState(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
@@ -234,6 +243,60 @@ export function EditorSidebarRoomsList() {
     "flex flex-1 min-w-0 items-center gap-2 text-left",
     isCompactDensity ? "-my-1 py-1" : "-my-2 py-2"
   );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMacPlatform(detectMacPlatform());
+  }, []);
+
+  useEffect(() => {
+    if (!isOpeningContextMenuOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAltPressed(false);
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Alt" || event.altKey) {
+        setIsAltPressed(true);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Alt" || !event.altKey) {
+        setIsAltPressed(false);
+      }
+    };
+
+    const handleBlur = () => {
+      setIsAltPressed(false);
+    };
+
+    globalThis.document.addEventListener("keydown", handleKeyDown, true);
+    globalThis.document.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      globalThis.document.removeEventListener("keydown", handleKeyDown, true);
+      globalThis.document.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [isOpeningContextMenuOpen]);
+
+  useEffect(() => {
+    const body = globalThis.document?.body;
+    if (!body) return;
+
+    if (isOpeningContextMenuOpen) {
+      body.setAttribute("data-opening-context-menu-open", "true");
+    } else {
+      body.removeAttribute("data-opening-context-menu-open");
+    }
+
+    return () => {
+      body.removeAttribute("data-opening-context-menu-open");
+    };
+  }, [isOpeningContextMenuOpen]);
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -704,40 +767,93 @@ export function EditorSidebarRoomsList() {
                                           const isOpeningSelected =
                                             selectedOpening?.roomId === room.id &&
                                             selectedOpening.openingId === opening.id;
-                                          const openingItem: SharedSelectionItem = { type: "opening", roomId: room.id, id: opening.id };
+                                          const openingItem: SharedSelectionItem = { type: "opening", roomId: room.id, openingId: opening.id };
                                           const isInMultiSelection = isItemInSelection(openingItem, selection) && !isOpeningSelected;
 
                                           return (
-                                            <button
+                                            <ContextMenu 
                                               key={opening.id}
-                                              type="button"
-                                              onClick={(e) => {
-                                                if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                  if (isItemInSelection(openingItem, selection)) {
-                                                    removeFromSelection(openingItem);
-                                                  } else {
-                                                    addToSelection(openingItem);
-                                                  }
-                                                } else {
-                                                  selectOpeningById(room.id, opening.id);
+                                              onOpenChange={(isOpen) => {
+                                                setIsOpeningContextMenuOpen(isOpen);
+                                                if (!isOpen) {
+                                                  setIsAltPressed(false);
                                                 }
                                               }}
-                                              onMouseDown={(e) => {
-                                                if ((e.ctrlKey || e.metaKey) && e.button === 0) {
-                                                  e.preventDefault();
-                                                }
-                                              }}
-                                              className={cn(
-                                                openingRowClass,
-                                                isOpeningSelected
-                                                  ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
-                                                  : isInMultiSelection
-                                                  ? "bg-zinc-300/50 text-zinc-900 dark:bg-zinc-700/50 dark:text-zinc-100"
-                                                  : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                                              )}
                                             >
-                                              {getOpeningLabel(opening)}
-                                            </button>
+                                              <ContextMenuTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                      if (isItemInSelection(openingItem, selection)) {
+                                                        removeFromSelection(openingItem);
+                                                      } else {
+                                                        addToSelection(openingItem);
+                                                      }
+                                                    } else {
+                                                      selectOpeningById(room.id, opening.id);
+                                                    }
+                                                  }}
+                                                  onMouseDown={(e) => {
+                                                    if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+                                                      e.preventDefault();
+                                                    }
+                                                  }}
+                                                  className={cn(
+                                                    openingRowClass,
+                                                    isOpeningSelected
+                                                      ? "bg-zinc-300/80 text-zinc-950 dark:bg-zinc-700/80 dark:text-zinc-50"
+                                                      : isInMultiSelection
+                                                      ? "bg-zinc-300/50 text-zinc-900 dark:bg-zinc-700/50 dark:text-zinc-100"
+                                                      : "text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                                                  )}
+                                                >
+                                                  {getOpeningLabel(opening)}
+                                                </button>
+                                              </ContextMenuTrigger>
+                                              <ContextMenuContent 
+                                                className="w-48"
+                                                onKeyDownCapture={(event) => {
+                                                  if (event.key === "Alt" || event.altKey) {
+                                                    setIsAltPressed(true);
+                                                  }
+                                                }}
+                                                onKeyUpCapture={(event) => {
+                                                  if (event.key === "Alt" || !event.altKey) {
+                                                    setIsAltPressed(false);
+                                                  }
+                                                }}
+                                              >
+                                                <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); cutSelection(); }}>
+                                                  Cut
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘X" : "Ctrl+X"}</span>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); copySelection(); }}>
+                                                  Copy
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘C" : "Ctrl+C"}</span>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => pasteSelection()}>
+                                                  Paste
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘V" : "Ctrl+V"}</span>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem 
+                                                  onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
+                                                >
+                                                  {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">
+                                                    {isAltPressed && opening.type === "door" ? (isMacPlatform ? "⌥⌘D" : "Ctrl+Alt+D") : (isMacPlatform ? "⌘D" : "Ctrl+D")}
+                                                  </span>
+                                                </ContextMenuItem>
+                                                <ContextMenuSeparator />
+                                                <ContextMenuItem 
+                                                  variant="destructive"
+                                                  onSelect={() => { selectOpeningById(room.id, opening.id); bulkDeleteSelection(); }}
+                                                >
+                                                  Delete
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌫" : "Del"}</span>
+                                                </ContextMenuItem>
+                                              </ContextMenuContent>
+                                            </ContextMenu>
                                           );
                                         })}
                                       </div>

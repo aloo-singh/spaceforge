@@ -89,7 +89,7 @@ type RoomDrawStoreState = {
   addToSelection: (item: SharedSelectionItem) => void;
   removeFromSelection: (item: SharedSelectionItem) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
-  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
+  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number, nextOffsetMm?: number) => void;
   commitOpeningMove: (
     roomId: string,
     openingId: string,
@@ -100,7 +100,9 @@ type RoomDrawStoreState = {
     roomId: string,
     openingId: string,
     previousWidthMm: number,
-    nextWidthMm: number
+    nextWidthMm: number,
+    previousOffsetMm?: number,
+    nextOffsetMm?: number
   ) => void;
   previewInteriorAssetMove: (roomId: string, assetId: string, nextCenter: Point) => void;
   commitInteriorAssetMove: (
@@ -175,9 +177,12 @@ type OpeningResizeSession = {
   pointerId: number;
   roomId: string;
   openingId: string;
+  draggedEdge: "start" | "end";
   startScreenPoint: Point;
   startWidthMm: number;
+  startOffsetMm: number;
   latestWidthMm: number | null;
+  latestOffsetMm: number | null;
   didDrag: boolean;
 };
 
@@ -270,7 +275,7 @@ function isItemSelected(
         return false;
       case "opening":
         if (roomId && itemId && existing.type === "opening") {
-          return existing.roomId === roomId && existing.id === itemId;
+          return existing.roomId === roomId && existing.openingId === itemId;
         }
         return false;
       case "asset":
@@ -832,7 +837,9 @@ export function attachRoomDrawInput(
       const resizeTarget = getOpeningResizeWidthForCursor(
         session.roomId,
         session.openingId,
-        cursorWorld
+        cursorWorld,
+        session.draggedEdge,
+        event.altKey
       );
       if (!resizeTarget) {
         setSnapGuides(null);
@@ -843,9 +850,12 @@ export function attachRoomDrawInput(
       session.didDrag = true;
       store.getState().setCanvasInteractionActive(true);
       session.latestWidthMm = resizeTarget.nextWidthMm;
+      if (resizeTarget.nextOffsetMm !== undefined) {
+        session.latestOffsetMm = resizeTarget.nextOffsetMm;
+      }
       store
         .getState()
-        .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm);
+        .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm, resizeTarget.nextOffsetMm);
       setSnapGuides(
         state.settings.showGuidelines
           ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
@@ -1234,7 +1244,7 @@ export function attachRoomDrawInput(
     if (openingWidthHandleHit) {
       event.preventDefault();
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
-        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, id: openingWidthHandleHit.openingId };
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, openingId: openingWidthHandleHit.openingId };
         if (isItemSelected(state.selection, "opening", openingWidthHandleHit.roomId, openingWidthHandleHit.openingId)) {
           state.removeFromSelection(openingItem);
         } else {
@@ -1260,8 +1270,11 @@ export function attachRoomDrawInput(
           openingId: openingWidthHandleHit.openingId,
           startScreenPoint: screenPoint,
           startWidthMm: opening.widthMm,
+          startOffsetMm: opening.offsetMm,
           latestWidthMm: null,
+          latestOffsetMm: null,
           didDrag: false,
+          draggedEdge: openingWidthHandleHit.edge,
         };
       }
       updateCursor();
@@ -1332,7 +1345,7 @@ export function attachRoomDrawInput(
     if (openingHit) {
       event.preventDefault();
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
-        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, id: openingHit.openingId };
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, openingId: openingHit.openingId };
         if (isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId)) {
           state.removeFromSelection(openingItem);
         } else {
@@ -1548,8 +1561,9 @@ export function attachRoomDrawInput(
       const session = activeOpeningResizeSession;
       if (session.didDrag) {
         const nextWidthMm = session.latestWidthMm ?? session.startWidthMm;
-        if (nextWidthMm !== session.startWidthMm) {
-          commitOpeningResize(session.roomId, session.openingId, session.startWidthMm, nextWidthMm);
+        const nextOffsetMm = session.latestOffsetMm ?? session.startOffsetMm;
+        if (nextWidthMm !== session.startWidthMm || nextOffsetMm !== session.startOffsetMm) {
+          commitOpeningResize(session.roomId, session.openingId, session.startWidthMm, nextWidthMm, session.startOffsetMm, nextOffsetMm);
         }
       }
       stopOpeningResizeSession();

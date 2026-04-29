@@ -196,10 +196,37 @@ export type Room = {
  * - Currently the only interior asset type
  * - Will be renamed to "interior-asset" once other furniture types are added
  * - For now, "stair" remains for backward compatibility
+ *
+ * Openings selection structure:
+ * - Uses 'openingId' (not 'id') to be explicit and consistent with RoomOpeningSelection
  */
 export type SharedSelectionItem =
   | { type: "room"; id: string }
   | { type: "wall"; roomId: string; wall: RoomWall }
-  | { type: "opening"; roomId: string; id: string }
+  | { type: "opening"; roomId: string; openingId: string }
   | { type: "asset"; roomId: string; id: string }
   | { type: "floor"; id: string };
+
+/**
+ * Type guard helpers for SharedSelectionItem narrowing.
+ * Enables clean pattern matching in selection handling code.
+ */
+export function isOpeningSelection(item: SharedSelectionItem): item is Extract<SharedSelectionItem, { type: "opening" }> {
+  return item.type === "opening";
+}
+
+export function isAssetSelection(item: SharedSelectionItem): item is Extract<SharedSelectionItem, { type: "asset" }> {
+  return item.type === "asset";
+}
+
+export function isRoomSelection(item: SharedSelectionItem): item is Extract<SharedSelectionItem, { type: "room" }> {
+  return item.type === "room";
+}
+
+export function isWallSelection(item: SharedSelectionItem): item is Extract<SharedSelectionItem, { type: "wall" }> {
+  return item.type === "wall";
+}
+
+export function isFloorSelection(item: SharedSelectionItem): item is Extract<SharedSelectionItem, { type: "floor" }> {
+  return item.type === "floor";
+}

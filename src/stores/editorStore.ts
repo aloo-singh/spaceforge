@@ -86,9 +86,11 @@ import {
   areRoomOpeningsEqual,
   cloneRoomOpening,
   cloneRoomOpenings,
+  constrainOpeningOffset,
   getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
   getSymmetricOpeningWidthForWorldPoint,
+  getHandleAnchoredOpeningWidthAndOffsetForWorldPoint,
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
@@ -166,6 +168,13 @@ type ClipboardData =
       asset: RoomInteriorAsset;
       sourceRoomId: string;
       assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
+    }
+  | {
+      type: "opening";
+      source: "copy" | "cut";
+      opening: RoomOpening;
+      sourceRoomId: string;
+      openings?: Array<{ opening: RoomOpening; sourceRoomId: string }>;
     }
   | null;
 
@@ -270,7 +279,7 @@ type EditorState = {
   /** Cut selected room(s) or stair(s) to clipboard (remove from location) */
   cutSelection: () => void;
   /** Duplicate selected room(s) or stair(s) with smart naming and offset placement */
-  duplicateSelection: () => void;
+  duplicateSelection: (options?: { isMirror?: boolean }) => void;
   /** Move selected room(s) and stair(s) to a different floor */
   moveSelectionToFloor: (targetFloorId: string) => void;
   /** Reorder a room within its floor */
@@ -322,12 +331,14 @@ type EditorState = {
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
-  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
+  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number, nextOffsetMm?: number) => void;
   commitOpeningResize: (
     roomId: string,
     openingId: string,
     previousWidthMm: number,
-    nextWidthMm: number
+    nextWidthMm: number,
+    previousOffsetMm?: number,
+    nextOffsetMm?: number
   ) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   commitOpeningMove: (
@@ -1656,7 +1667,7 @@ function insertOpeningOnSelectedWall(
     selectedWall: null,
     selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
     selectedInteriorAsset: null,
-    selection: [{ type: "opening" as const, roomId: hostRoom.id, id: opening.id }],
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: opening.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -1746,6 +1757,37 @@ function resolveOpeningResizeWidth(
     room,
     opening,
     nextWidthMm,
+    nextOffsetMm: undefined, // Symmetric resize doesn't change offset
+  };
+}
+
+function resolveOpeningResizeWidthFromHandle(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  draggedEdge: "start" | "end",
+  cursorWorld: Point,
+  gridSizeMm: number | null
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingId);
+  if (!room || !opening) return null;
+
+  const result = getHandleAnchoredOpeningWidthAndOffsetForWorldPoint(
+    room,
+    opening,
+    draggedEdge,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
+  if (!result) return null;
+
+  return {
+    room,
+    opening,
+    nextWidthMm: result.widthMm,
+    nextOffsetMm: result.offsetMm,
+    draggedEdge,
   };
 }
 
@@ -2740,7 +2782,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: { roomId, openingId },
         selectedInteriorAsset: null,
-        selection: [{ type: "opening" as const, roomId, id: openingId }],
+        selection: [{ type: "opening" as const, roomId, openingId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2831,7 +2873,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             return existing.roomId === item.roomId && existing.wall === item.wall;
           }
           if (existing.type === "opening" && item.type === "opening") {
-            return existing.roomId === item.roomId && existing.id === item.id;
+            return existing.roomId === item.roomId && existing.openingId === item.openingId;
           }
           if (existing.type === "asset" && item.type === "asset") {
             return existing.roomId === item.roomId && existing.id === item.id;
@@ -2862,7 +2904,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return existing.roomId === item.roomId && existing.wall === item.wall;
         }
         if (existing.type === "opening" && item.type === "opening") {
-          return existing.roomId === item.roomId && existing.id === item.id;
+          return existing.roomId === item.roomId && existing.openingId === item.openingId;
         }
         if (existing.type === "asset" && item.type === "asset") {
           return existing.roomId === item.roomId && existing.id === item.id;
@@ -2884,7 +2926,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return !(existing.roomId === item.roomId && existing.wall === item.wall);
         }
         if (existing.type === "opening" && item.type === "opening") {
-          return !(existing.roomId === item.roomId && existing.id === item.id);
+          return !(existing.roomId === item.roomId && existing.openingId === item.openingId);
         }
         if (existing.type === "asset" && item.type === "asset") {
           return !(existing.roomId === item.roomId && existing.id === item.id);
@@ -2955,6 +2997,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             asset: firstAsset.asset,
             sourceRoomId: firstAsset.sourceRoomId,
             assets,
+          },
+        };
+      }
+
+      if (item.type === "opening") {
+        const selectedOpeningItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "opening" }> =>
+            selectionItem.type === "opening"
+        );
+        const openings = selectedOpeningItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const opening = room?.openings.find((o) => o.id === selectionItem.openingId);
+            if (!room || !opening) return null;
+
+            return {
+              opening: cloneRoomOpening(opening),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { opening: RoomOpening; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (openings.length === 0) return state;
+
+        const firstOpening = openings[0];
+        if (!firstOpening) return state;
+
+        // Show type-specific copy message
+        const openingType = firstOpening.opening.type;
+        const typeLabel = openingType === "door" ? "Door" : "Window";
+        toast(`${typeLabel} copied to clipboard`);
+
+        return {
+          clipboard: {
+            type: "opening",
+            source: "copy" as const,
+            opening: firstOpening.opening,
+            sourceRoomId: firstOpening.sourceRoomId,
+            openings,
           },
         };
       }
@@ -3149,6 +3231,137 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
+      if (state.clipboard.type === "opening") {
+        // Require a wall to be selected for opening paste
+        if (!state.selectedWall) {
+          toast("Select a wall to paste the opening here.");
+          return state;
+        }
+
+        const targetRoomId = state.selectedWall.roomId;
+        const targetRoom = state.document.rooms.find((r) => r.id === targetRoomId);
+        if (!targetRoom || (targetRoom.floorId ?? activeFloorId) !== activeFloorId) {
+          toast("Select a wall on this floor first to paste here.");
+          return state;
+        }
+
+        // Validate target wall exists
+        if (!getRoomWallSegment(targetRoom, state.selectedWall.wall)) {
+          toast("The selected wall no longer exists.");
+          return state;
+        }
+
+        const targetWall = state.selectedWall.wall;
+        const targetWallSegment = getRoomWallSegment(targetRoom, targetWall);
+        if (!targetWallSegment) return state;
+
+        // Get all openings from clipboard (support both single and multi-opening payloads)
+        const clipboardOpenings = state.clipboard.openings ?? [
+          { opening: state.clipboard.opening, sourceRoomId: state.clipboard.sourceRoomId },
+        ];
+        if (clipboardOpenings.length === 0) return state;
+
+        const isCopyOpening = state.clipboard.source === "copy";
+        const pastedOpenings: RoomOpening[] = [];
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+
+        for (const openingClipboardItem of clipboardOpenings) {
+          const sourceOpening = openingClipboardItem.opening;
+          const sourceRoomId = openingClipboardItem.sourceRoomId;
+          const sourceRoom = state.document.rooms.find((r) => r.id === sourceRoomId);
+
+          const newOpeningId = createOpeningId();
+
+          // Calculate offset for paste:
+          // - If pasting from same wall to same wall and it's a copy, try to offset
+          // - Otherwise, use source offset (will be constrained to new wall)
+          let pasteOffsetMm = sourceOpening.offsetMm;
+          if (
+            isCopyOpening &&
+            sourceRoom &&
+            sourceRoom.id === targetRoom.id &&
+            sourceOpening.wall === targetWall
+          ) {
+            // Same wall, same room, copy — try to offset by PASTE_OFFSET_MM
+            const candidateOffset = sourceOpening.offsetMm + PASTE_OFFSET_MM;
+            pasteOffsetMm = candidateOffset;
+          }
+
+          // Constrain offset to valid range for target wall
+          const constrainedOffsetMm = constrainOpeningOffset(
+            { widthMm: sourceOpening.widthMm },
+            pasteOffsetMm,
+            targetWallSegment.lengthMm
+          );
+
+          const pastedOpening: RoomOpening = {
+            ...cloneRoomOpening(sourceOpening),
+            id: newOpeningId,
+            wall: targetWall,
+            offsetMm: constrainedOffsetMm,
+          };
+
+          // Create add-opening command with paste source
+          const command: EditorCommand = {
+            type: "add-opening",
+            roomId: targetRoomId,
+            opening: cloneRoomOpening(pastedOpening),
+            source: "paste",
+          };
+
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+          pastedOpenings.push(pastedOpening);
+        }
+
+        // Build selection for all pasted openings
+        const newSelection: SharedSelectionItem[] = pastedOpenings.map((opening) => ({
+          type: "opening" as const,
+          roomId: targetRoomId,
+          openingId: opening.id,
+        }));
+
+        // Show calm message with type-awareness
+        const messageCount = pastedOpenings.length;
+        let message: string;
+        if (messageCount === 1) {
+          const openingType = pastedOpenings[0].type;
+          const typeLabel = openingType === "door" ? "Door" : "Window";
+          message = `${typeLabel} pasted`;
+        } else {
+          // Check if all openings are the same type
+          const allDoors = pastedOpenings.every((o) => o.type === "door");
+          const allWindows = pastedOpenings.every((o) => o.type === "window");
+          if (allDoors) {
+            message = `${messageCount} doors pasted`;
+          } else if (allWindows) {
+            message = `${messageCount} windows pasted`;
+          } else {
+            message = `${messageCount} openings pasted`;
+          }
+        }
+        toast(message, { duration: 3200 });
+
+        return {
+          document: nextDocument,
+          selectedRoomId: targetRoomId,
+          selectedWall: null,
+          selectedOpening:
+            pastedOpenings.length > 0
+              ? { roomId: targetRoomId, openingId: pastedOpenings[pastedOpenings.length - 1].id }
+              : null,
+          selectedInteriorAsset: null,
+          selection: newSelection,
+          history: {
+            past: nextPast,
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
       return state;
     }),
   cutSelection: () =>
@@ -3250,12 +3463,78 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
+      if (item.type === "opening") {
+        const selectedOpeningItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "opening" }> =>
+            selectionItem.type === "opening"
+        );
+        const openingsToCut = selectedOpeningItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const opening = room?.openings.find((o) => o.id === selectionItem.openingId);
+            if (!room || !opening) return null;
+
+            return {
+              opening: cloneRoomOpening(opening),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { opening: RoomOpening; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (openingsToCut.length === 0) return state;
+
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+        for (const openingToCut of openingsToCut) {
+          const command: EditorCommand = {
+            type: "delete-opening",
+            roomId: openingToCut.sourceRoomId,
+            opening: cloneRoomOpening(openingToCut.opening),
+          };
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+        }
+
+        const firstOpening = openingsToCut[0];
+        if (!firstOpening) return state;
+
+        // Show type-specific cut message
+        const openingType = firstOpening.opening.type;
+        const typeLabel = openingType === "door" ? "Door" : "Window";
+        toast(`${typeLabel} cut to clipboard`);
+
+        return {
+          clipboard: {
+            type: "opening",
+            source: "cut" as const,
+            opening: cloneRoomOpening(firstOpening.opening),
+            sourceRoomId: firstOpening.sourceRoomId,
+            openings: openingsToCut.map((openingToCut) => ({
+              opening: cloneRoomOpening(openingToCut.opening),
+              sourceRoomId: openingToCut.sourceRoomId,
+            })),
+          },
+          document: nextDocument,
+          selectedRoomId: firstOpening.sourceRoomId,
+          selectedOpening: null,
+          selection: [{ type: "room" as const, id: firstOpening.sourceRoomId }],
+          history: {
+            past: nextPast,
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
       return state;
     }),
-  duplicateSelection: () =>
+  duplicateSelection: (options?: { isMirror?: boolean }) =>
     set((state) => {
       if (state.selection.length === 0) return state;
 
+      const isMirror = options?.isMirror ?? false;
       const activeFloorId = getNormalizedActiveFloorId(state.document);
       const DUPLICATE_OFFSET_MM = 500; // Offset duplicates 500mm from originals
 
@@ -3271,6 +3550,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const duplicatedRooms: Room[] = [];
       const duplicatedAssets: Array<{ roomId: string; asset: RoomInteriorAsset }> = [];
+      const duplicatedOpenings: Array<{ roomId: string; opening: RoomOpening }> = [];
       const newSelection: SharedSelectionItem[] = [];
 
       // Process each item in selection
@@ -3334,10 +3614,57 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           });
           newSelection.push({ type: "asset" as const, roomId: sourceRoom.id, id: newAssetId });
         }
+
+        if (item.type === "opening") {
+          const sourceRoom = state.document.rooms.find((r) => r.id === item.roomId);
+          const sourceOpening = sourceRoom?.openings.find((o) => o.id === item.openingId);
+          if (!sourceRoom || !sourceOpening) continue;
+
+          // Get the wall segment for offset constraint
+          const wallSegment = getRoomWallSegment(sourceRoom, sourceOpening.wall);
+          if (!wallSegment) continue;
+
+          const newOpeningId = createOpeningId();
+          const candidateOffset = sourceOpening.offsetMm + DUPLICATE_OFFSET_MM;
+          
+          // Constrain offset to valid range on same wall
+          const constrainedOffsetMm = constrainOpeningOffset(
+            { widthMm: sourceOpening.widthMm },
+            candidateOffset,
+            wallSegment.lengthMm
+          );
+
+          // For mirror duplicate: flip hingeSide for doors, keep for windows
+          let flippedHingeSide = sourceOpening.hingeSide;
+          if (isMirror && sourceOpening.type === "door") {
+            flippedHingeSide = sourceOpening.hingeSide === "start" ? "end" : "start";
+          }
+
+          const duplicateOpening: RoomOpening = {
+            ...cloneRoomOpening(sourceOpening),
+            id: newOpeningId,
+            offsetMm: constrainedOffsetMm,
+            hingeSide: flippedHingeSide,
+          };
+
+          duplicatedOpenings.push({
+            roomId: sourceRoom.id,
+            opening: duplicateOpening,
+          });
+          newSelection.push({
+            type: "opening" as const,
+            roomId: sourceRoom.id,
+            openingId: newOpeningId,
+          });
+        }
       }
 
       // If nothing was duplicated, return unchanged state
-      if (duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+      if (
+        duplicatedRooms.length === 0 &&
+        duplicatedAssets.length === 0 &&
+        duplicatedOpenings.length === 0
+      ) {
         if (state.selection.length > 0) {
           toast("Could not duplicate: selected items not found in document");
         }
@@ -3348,9 +3675,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "bulk-duplicate",
         duplicatedRooms,
         duplicatedAssets,
+        duplicatedOpenings:
+          duplicatedOpenings.length > 0 ? duplicatedOpenings : undefined,
+        isMirror: isMirror || undefined,
       };
 
       const newDocument = applyEditorCommand(state.document, command, "redo");
+
+      // Show success message with type-awareness
+      if (duplicatedOpenings.length > 0 && duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
+        if (isMirror) {
+          // Mirror duplicate is doors-only
+          const doorCount = duplicatedOpenings.length;
+          toast(
+            doorCount === 1
+              ? "Door mirror duplicated"
+              : `${doorCount} doors mirror duplicated`
+          );
+        } else {
+          // Regular duplicate with type awareness
+          const messageCount = duplicatedOpenings.length;
+          let message: string;
+          if (messageCount === 1) {
+            const openingType = duplicatedOpenings[0].opening.type;
+            const typeLabel = openingType === "door" ? "Door" : "Window";
+            message = `${typeLabel} duplicated`;
+          } else {
+            // Check if all openings are the same type
+            const allDoors = duplicatedOpenings.every((o) => o.opening.type === "door");
+            const allWindows = duplicatedOpenings.every((o) => o.opening.type === "window");
+            if (allDoors) {
+              message = `${messageCount} doors duplicated`;
+            } else if (allWindows) {
+              message = `${messageCount} windows duplicated`;
+            } else {
+              message = `${messageCount} openings duplicated`;
+            }
+          }
+          toast(message);
+        }
+      }
 
       return {
         ...state,
@@ -4141,7 +4505,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const deleteCommands: EditorCommand[] = [];
       const roomsToDelete = new Set<string>();
       let roomCount = 0;
-      let openingCount = 0;
       let stairCount = 0;
 
       for (const item of state.selection) {
@@ -4164,18 +4527,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             roomsToDelete.add(room.id);
             roomCount++;
           }
-        } else if (item.type === "opening" && item.roomId && item.id) {
+        } else if (item.type === "opening" && item.roomId && item.openingId) {
           // Only delete openings from rooms that aren't being deleted
           if (!roomsToDelete.has(item.roomId)) {
             const room = state.document.rooms.find((r) => r.id === item.roomId);
-            const opening = room?.openings.find((o) => o.id === item.id);
+            const opening = room?.openings.find((o) => o.id === item.openingId);
             if (room && opening) {
               deleteCommands.push({
                 type: "delete-opening",
                 roomId: room.id,
                 opening: cloneRoomOpening(opening),
               } as EditorCommand);
-              openingCount++;
             }
           }
         } else if (item.type === "asset" && item.roomId && item.id) {
@@ -4206,9 +4568,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       // Show confirmation toast with counts
+      // Count door vs window deletions for opening-specific messaging
+      let doorCount = 0;
+      let windowCount = 0;
+      for (const command of deleteCommands) {
+        if (command.type === "delete-opening") {
+          if (command.opening.type === "door") {
+            doorCount++;
+          } else {
+            windowCount++;
+          }
+        }
+      }
+
       const parts = [];
       if (roomCount > 0) parts.push(`${roomCount} room${roomCount > 1 ? "s" : ""}`);
-      if (openingCount > 0) parts.push(`${openingCount} opening${openingCount > 1 ? "s" : ""}`);
+      if (doorCount > 0) parts.push(`${doorCount} door${doorCount > 1 ? "s" : ""}`);
+      if (windowCount > 0) parts.push(`${windowCount} window${windowCount > 1 ? "s" : ""}`);
       if (stairCount > 0) parts.push(`${stairCount} stair${stairCount > 1 ? "s" : ""}`);
       const confirmationText = parts.join(" and ");
 
@@ -4604,23 +4980,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       return nextState ?? state;
     }),
-  previewOpeningResize: (roomId, openingId, nextWidthMm) =>
+  previewOpeningResize: (roomId, openingId, nextWidthMm, nextOffsetMm?) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
-      if (opening.widthMm === nextWidthMm) return state;
+      if (opening.widthMm === nextWidthMm && nextOffsetMm === undefined) return state;
+      if (opening.widthMm === nextWidthMm && opening.offsetMm === nextOffsetMm) return state;
+
+      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      
+      // If offset changed (for handle-anchored resizing), also update the offset
+      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
+        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
+        if (updatedRoom) {
+          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
+          if (updatedOpening) {
+            updatedOpening.offsetMm = nextOffsetMm;
+          }
+        }
+      }
 
       return {
-        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+        document: updatedDocument,
       };
     }),
-  commitOpeningResize: (roomId, openingId, previousWidthMm, nextWidthMm) =>
+  commitOpeningResize: (roomId, openingId, previousWidthMm, nextWidthMm, previousOffsetMm, nextOffsetMm) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
-      if (previousWidthMm === nextWidthMm) return state;
+      if (previousWidthMm === nextWidthMm && previousOffsetMm === nextOffsetMm) return state;
 
       const command: EditorCommand = {
         type: "update-opening",
@@ -4628,15 +5018,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousOpening: {
           ...cloneRoomOpening(opening),
           widthMm: previousWidthMm,
+          offsetMm: previousOffsetMm ?? opening.offsetMm,
         },
         nextOpening: {
           ...cloneRoomOpening(opening),
           widthMm: nextWidthMm,
+          offsetMm: nextOffsetMm ?? opening.offsetMm,
         },
       };
 
+      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      
+      // If offset changed, also update the offset
+      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
+        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
+        if (updatedRoom) {
+          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
+          if (updatedOpening) {
+            updatedOpening.offsetMm = nextOffsetMm;
+          }
+        }
+      }
+
       return {
-        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+        document: updatedDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -4667,6 +5072,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "move-opening",
         roomId,
         openingId,
+        openingType: opening.type,
         previousOffsetMm,
         nextOffsetMm,
       };
@@ -5654,7 +6060,9 @@ export function getOpeningMoveOffsetForCursor(
 export function getOpeningResizeWidthForCursor(
   roomId: string,
   openingId: string,
-  cursorWorld: Point
+  cursorWorld: Point,
+  draggedEdge?: "start" | "end",
+  isAltHeld?: boolean
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
@@ -5665,6 +6073,21 @@ export function getOpeningResizeWidthForCursor(
     state.settings
   );
   const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
+  
+  // Use symmetric (center-anchor) if Alt is held, otherwise use handle-anchor as default
+  const shouldUseSymmetric = isAltHeld === true;
+  
+  if (!shouldUseSymmetric && draggedEdge) {
+    return resolveOpeningResizeWidthFromHandle(
+      state.document,
+      roomId,
+      openingId,
+      draggedEdge,
+      resolvedCursorWorld,
+      activeSnapStepMm
+    );
+  }
+  
   return resolveOpeningResizeWidth(
     state.document,
     roomId,

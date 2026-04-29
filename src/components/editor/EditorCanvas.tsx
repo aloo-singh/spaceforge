@@ -1837,7 +1837,14 @@ export default function EditorCanvas({
   }, []);
 
   useEffect(() => {
+    const isOpeningContextMenuOpen = () =>
+      globalThis.document?.body?.hasAttribute("data-opening-context-menu-open") ?? false;
+
     const syncDimensionsOverride = (isActive: boolean) => {
+      // Don't respond to Alt when opening context menu is open
+      if (isOpeningContextMenuOpen()) {
+        return;
+      }
       const state = useEditorStore.getState();
       state.setDimensionsVisibilityOverrideActive(state.roomDraft.points.length > 0 ? false : isActive);
     };
