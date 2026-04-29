@@ -5,13 +5,13 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Badge } from "@/components/ui/badge";
+import { VersionLink } from "@/components/version-link";
 import {
   appSansFont,
   appUiMonoFont,
   appUiSansFont,
   measurementMonoFont,
 } from "@/lib/fonts";
-import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import { AppToaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
@@ -72,11 +72,9 @@ export default function RootLayout({
               >
                 Editor
               </Link>
-              <Link href="/changelog" className="ml-4 leading-none">
-                <Badge variant="outline" className="text-[11px] font-medium">
-                  {APP_VERSION_LABEL}
-                </Badge>
-              </Link>
+              <div className="ml-4">
+                <VersionLink />
+              </div>
             </nav>
           </header>
           {children}
