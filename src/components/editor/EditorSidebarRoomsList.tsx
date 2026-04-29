@@ -826,22 +826,22 @@ export function EditorSidebarRoomsList() {
                                               >
                                                 <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); cutSelection(); }}>
                                                   Cut
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">⌘X</span>
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘X" : "Ctrl+X"}</span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); copySelection(); }}>
                                                   Copy
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">⌘C</span>
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘C" : "Ctrl+C"}</span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => pasteSelection()}>
                                                   Paste
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">⌘V</span>
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘V" : "Ctrl+V"}</span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem 
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
                                                 >
                                                   {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
                                                   <span className="ml-auto text-[11px] text-muted-foreground">
-                                                    {isAltPressed && opening.type === "door" ? "⌥⌘D" : "⌘D"}
+                                                    {isAltPressed && opening.type === "door" ? (isMacPlatform ? "⌥⌘D" : "Ctrl+Alt+D") : (isMacPlatform ? "⌘D" : "Ctrl+D")}
                                                   </span>
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />

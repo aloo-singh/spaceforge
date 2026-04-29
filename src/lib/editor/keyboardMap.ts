@@ -398,13 +398,33 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   if (command.type === "bulk-duplicate") {
     const roomCount = command.duplicatedRooms.length;
     const assetCount = command.duplicatedAssets.length;
+    const openingCount = command.duplicatedOpenings?.length ?? 0;
+    
+    // Handle mixed selections
+    if (roomCount > 0 && assetCount > 0 && openingCount > 0) return "rooms, assets, and openings duplication";
     if (roomCount > 0 && assetCount > 0) return "rooms and assets duplication";
+    if (roomCount > 0 && openingCount > 0) return "rooms and openings duplication";
+    if (assetCount > 0 && openingCount > 0) {
+      const firstAsset = command.duplicatedAssets[0]?.asset;
+      const assetTypeName = firstAsset ? getInteriorAssetTypeName(firstAsset.type) : "asset";
+      return `${assetTypeName} and opening duplication`;
+    }
+    
+    // Handle rooms
     if (roomCount > 1) return "rooms duplication";
     if (roomCount === 1) return "room duplication";
-    const firstDupAsset = command.duplicatedAssets[0]?.asset;
-    const dupTypeName = firstDupAsset ? getInteriorAssetTypeName(firstDupAsset.type) : "asset";
-    if (assetCount > 1) return `${dupTypeName} duplication`;
-    if (assetCount === 1) return `${dupTypeName} duplication`;
+    
+    // Handle assets
+    const firstAsset = command.duplicatedAssets[0]?.asset;
+    const assetTypeName = firstAsset ? getInteriorAssetTypeName(firstAsset.type) : "asset";
+    if (assetCount > 1) return `${assetTypeName} duplication`;
+    if (assetCount === 1) return `${assetTypeName} duplication`;
+    
+    // Handle openings
+    if (openingCount > 0) {
+      return openingCount === 1 ? "opening duplication" : "openings duplication";
+    }
+    
     return "selection duplication";
   }
 
