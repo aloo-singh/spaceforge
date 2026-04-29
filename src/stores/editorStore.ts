@@ -3325,7 +3325,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           document: nextDocument,
           selectedRoomId: targetRoomId,
-          selectedWall: state.selectedWall,
+          selectedWall: null,
           selectedOpening:
             pastedOpenings.length > 0
               ? { roomId: targetRoomId, openingId: pastedOpenings[pastedOpenings.length - 1].id }
