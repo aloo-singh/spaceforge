@@ -48,6 +48,10 @@ function formatOpeningType(type: RoomOpening["type"]) {
   return type === "door" ? "Door" : "Window";
 }
 
+function isIntegerInput(value: string) {
+  return /^\d+$/.test(value.trim());
+}
+
 export function SelectedOpeningInspector({
   opening,
   className,
@@ -59,6 +63,8 @@ export function SelectedOpeningInspector({
   const updateSelectedDoorHingeSide = useEditorStore((state) => state.updateSelectedDoorHingeSide);
 
   const commitWidthDraft = (widthValue: string) => {
+    if (!isIntegerInput(widthValue)) return;
+
     const parsedWidth = Number(widthValue);
     if (!Number.isFinite(parsedWidth) || parsedWidth <= 0) return;
     updateSelectedOpeningWidth(parsedWidth);
@@ -94,8 +100,12 @@ export function SelectedOpeningInspector({
             id="opening-width-input"
             key={`${opening.id}-${opening.widthMm}`}
             inputMode="numeric"
+            pattern="[0-9]*"
             defaultValue={String(opening.widthMm)}
             onBlur={(event) => commitWidthDraft(event.target.value)}
+            onInput={(event) => {
+              event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "");
+            }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
 
@@ -113,7 +123,7 @@ export function SelectedOpeningInspector({
             aria-describedby="opening-width-hint"
           />
           <p id="opening-width-hint" className="text-[11px] leading-relaxed text-muted-foreground">
-            Width is constrained to the current host segment when saved.
+            Width snaps to 100 mm and is constrained to the current host segment when saved.
           </p>
         </div>
 

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  GRID_SIZE_MM,
+  GRID_MINOR_SIZE_MM,
   INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
 import {
@@ -4949,11 +4949,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   updateSelectedOpeningWidth: (widthMm) =>
     set((state) => {
-      const nextState = updateSelectedOpening(state, (room, opening) =>
-        getUpdatedOpeningForWidth(room, opening, widthMm, {
-          gridSizeMm: GRID_SIZE_MM,
-        })
-      );
+      let constrainedWidthMm: number | null = null;
+      const nextState = updateSelectedOpening(state, (room, opening) => {
+        const nextOpening = getUpdatedOpeningForWidth(room, opening, widthMm, {
+          gridSizeMm: GRID_MINOR_SIZE_MM,
+          minWidthMm: GRID_MINOR_SIZE_MM,
+        });
+        constrainedWidthMm = nextOpening?.widthMm ?? null;
+        return nextOpening;
+      });
+      const requestedWidthMm = Math.round(widthMm / GRID_MINOR_SIZE_MM) * GRID_MINOR_SIZE_MM;
+      if (constrainedWidthMm !== null && constrainedWidthMm < requestedWidthMm) {
+        toast(`In this position, this wall only has room for ${constrainedWidthMm} mm.`, {
+          duration: 5000,
+        });
+      }
       return nextState ?? state;
     }),
   updateSelectedDoorOpeningSide: (openingSide) =>

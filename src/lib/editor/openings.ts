@@ -216,13 +216,13 @@ export function constrainOpeningOffset(
 export function constrainOpeningWidth(
   widthMm: number,
   wallLengthMm: number,
-  options?: { gridSizeMm?: number }
+  options?: { gridSizeMm?: number; minWidthMm?: number }
 ) {
   const snappedWidthMm =
     options?.gridSizeMm && options.gridSizeMm > 0
       ? snapToGrid(widthMm, options.gridSizeMm)
       : widthMm;
-  const minWidthMm = Math.min(MIN_OPENING_WIDTH_MM, wallLengthMm);
+  const minWidthMm = Math.min(options?.minWidthMm ?? MIN_OPENING_WIDTH_MM, wallLengthMm);
 
   return clamp(snappedWidthMm, minWidthMm, wallLengthMm);
 }
@@ -231,22 +231,20 @@ export function getUpdatedOpeningForWidth(
   room: Room,
   opening: RoomOpening,
   widthMm: number,
-  options?: { gridSizeMm?: number }
+  options?: { gridSizeMm?: number; minWidthMm?: number }
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, opening.wall);
   if (!segment || segment.lengthMm <= 0) return null;
 
-  const nextWidthMm = constrainOpeningWidth(widthMm, segment.lengthMm, options);
-  const nextOffsetMm = constrainOpeningOffset(
-    { widthMm: nextWidthMm },
-    opening.offsetMm,
-    segment.lengthMm
-  );
+  const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
+  const maxCenteredWidthMm = Math.min(centerOffsetMm, segment.lengthMm - centerOffsetMm) * 2;
+  if (maxCenteredWidthMm <= 0) return null;
+  const nextWidthMm = constrainOpeningWidth(widthMm, maxCenteredWidthMm, options);
 
   return {
     ...normalizeRoomOpening(opening),
     widthMm: nextWidthMm,
-    offsetMm: nextOffsetMm,
+    offsetMm: centerOffsetMm,
   };
 }
 
