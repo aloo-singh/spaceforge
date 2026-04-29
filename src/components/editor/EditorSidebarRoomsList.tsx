@@ -373,7 +373,7 @@ export function EditorSidebarRoomsList() {
         ) : (
           <div className="flex flex-col gap-1">
             {displayedFloors.map((floor, floorIndex) => {
-                const floorNumber = displayedFloors.length - 1 - floorIndex;
+                const floorNumber = displayedFloors.length - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
                 const floorAreaSquareMillimetres = floorRooms.reduce(
