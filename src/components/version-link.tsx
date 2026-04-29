@@ -5,17 +5,22 @@ import { usePathname } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
 
-export function VersionLink() {
+interface VersionLinkProps {
+  isAdmin: boolean;
+}
+
+export function VersionLink({ isAdmin }: VersionLinkProps) {
   const pathname = usePathname();
 
-  const href =
-    pathname === "/admin/changelog"
+  const href = isAdmin
+    ? pathname === "/admin/changelog"
       ? "/changelog"
       : pathname === "/changelog"
         ? "/admin/changelog"
         : pathname.startsWith("/admin")
           ? "/admin/changelog"
-          : "/changelog";
+          : "/changelog"
+    : "/changelog";
 
   return (
     <Link href={href} className="leading-none">

@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Badge } from "@/components/ui/badge";
 import { VersionLink } from "@/components/version-link";
+import { getAuthenticatedAdminUser } from "@/lib/supabase/admin";
 import {
   appSansFont,
   appUiMonoFont,
@@ -37,11 +38,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const adminUser = await getAuthenticatedAdminUser();
+  const isAdmin = adminUser !== null;
   return (
     <html lang="en" suppressHydrationWarning className={cn("font-sans", appSansFont.variable)}>
       <body
@@ -73,7 +76,7 @@ export default function RootLayout({
                 Editor
               </Link>
               <div className="ml-4">
-                <VersionLink />
+                <VersionLink isAdmin={isAdmin} />
               </div>
             </nav>
           </header>
