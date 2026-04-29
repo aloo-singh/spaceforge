@@ -3620,12 +3620,16 @@ function drawGrid(
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
       width: 1,
       color: theme.gridMinor,
-      alpha: 1,
+      alpha: 0.5,
     });
   }
 
-  drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
+  drawAlternatingGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
     width: 1,
+    color: theme.gridMajor,
+    alpha: 0.4,
+  }, {
+    width: 2,
     color: theme.gridMajor,
     alpha: 1,
   });
@@ -6610,6 +6614,49 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function drawAlternatingGridLines(
+  graphics: Graphics,
+  camera: CameraState,
+  viewport: ViewportSize,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  stepMm: number,
+  subtleStroke: { width: number; color: number; alpha: number },
+  prominentStroke: { width: number; color: number; alpha: number }
+) {
+  const firstX = Math.floor(minX / stepMm) * stepMm;
+  const firstY = Math.floor(minY / stepMm) * stepMm;
+  const doubleStep = stepMm * 2;
+
+  // Draw vertical lines, alternating between subtle and prominent
+  for (let xMm = firstX; xMm <= maxX; xMm += stepMm) {
+    const isProminent = Math.round(xMm / stepMm) % 2 === 0;
+    const stroke = isProminent ? prominentStroke : subtleStroke;
+    graphics.setStrokeStyle(stroke);
+
+    const start = worldToScreen({ x: xMm, y: minY }, camera, viewport);
+    const end = worldToScreen({ x: xMm, y: maxY }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+  }
+
+  // Draw horizontal lines, alternating between subtle and prominent
+  for (let yMm = firstY; yMm <= maxY; yMm += stepMm) {
+    const isProminent = Math.round(yMm / stepMm) % 2 === 0;
+    const stroke = isProminent ? prominentStroke : subtleStroke;
+    graphics.setStrokeStyle(stroke);
+
+    const start = worldToScreen({ x: minX, y: yMm }, camera, viewport);
+    const end = worldToScreen({ x: maxX, y: yMm }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+  }
 }
 
 function getViewportWorldBounds(
