@@ -364,23 +364,28 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "add-opening") {
-    return "opening creation";
+    const openingType = command.opening.type === "door" ? "door" : "window";
+    const action = command.source === "paste" ? "pasted" : "created";
+    return `${openingType} ${action}`;
   }
 
   if (command.type === "delete-opening") {
-    return "opening deletion";
+    const openingType = command.opening.type === "door" ? "door" : "window";
+    return `${openingType} deleted`;
   }
 
   if (command.type === "move-opening") {
-    return "opening move";
+    const openingType = command.openingType === "door" ? "door" : "window";
+    return `${openingType} moved`;
   }
 
   if (command.type === "update-opening") {
+    const openingType = command.nextOpening.type === "door" ? "door" : "window";
     if (command.previousOpening.widthMm !== command.nextOpening.widthMm) {
-      return "opening resize";
+      return `${openingType} resized`;
     }
 
-    return "opening edit";
+    return `${openingType} edited`;
   }
 
   if (command.type === "add-interior-asset") {
@@ -400,63 +405,92 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     const assetCount = command.duplicatedAssets.length;
     const openingCount = command.duplicatedOpenings?.length ?? 0;
     
+    // Helper to get opening type label for duplicated items
+    const getOpeningTypeLabel = (): string => {
+      if (openingCount === 0) return "opening";
+      const allDoors = command.duplicatedOpenings?.every((o) => o.opening.type === "door") ?? false;
+      const allWindows = command.duplicatedOpenings?.every((o) => o.opening.type === "window") ?? false;
+      if (allDoors) return openingCount === 1 ? "door" : "doors";
+      if (allWindows) return openingCount === 1 ? "window" : "windows";
+      return openingCount === 1 ? "opening" : "openings";
+    };
+    
     // Handle mixed selections
-    if (roomCount > 0 && assetCount > 0 && openingCount > 0) return "rooms, assets, and openings duplication";
-    if (roomCount > 0 && assetCount > 0) return "rooms and assets duplication";
-    if (roomCount > 0 && openingCount > 0) return "rooms and openings duplication";
+    if (roomCount > 0 && assetCount > 0 && openingCount > 0) {
+      const openingLabel = getOpeningTypeLabel();
+      return `rooms, assets, and ${openingLabel} duplicated`;
+    }
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets duplicated";
+    if (roomCount > 0 && openingCount > 0) {
+      const openingLabel = getOpeningTypeLabel();
+      return `rooms and ${openingLabel} duplicated`;
+    }
     if (assetCount > 0 && openingCount > 0) {
       const firstAsset = command.duplicatedAssets[0]?.asset;
       const assetTypeName = firstAsset ? getInteriorAssetTypeName(firstAsset.type) : "asset";
-      return `${assetTypeName} and opening duplication`;
+      const openingLabel = getOpeningTypeLabel();
+      return `${assetTypeName} and ${openingLabel} duplicated`;
     }
     
     // Handle rooms
-    if (roomCount > 1) return "rooms duplication";
-    if (roomCount === 1) return "room duplication";
+    if (roomCount > 1) return "rooms duplicated";
+    if (roomCount === 1) return "room duplicated";
     
     // Handle assets
     const firstAsset = command.duplicatedAssets[0]?.asset;
     const assetTypeName = firstAsset ? getInteriorAssetTypeName(firstAsset.type) : "asset";
-    if (assetCount > 1) return `${assetTypeName} duplication`;
-    if (assetCount === 1) return `${assetTypeName} duplication`;
+    if (assetCount > 1) return `${assetTypeName} duplicated`;
+    if (assetCount === 1) return `${assetTypeName} duplicated`;
     
     // Handle openings
     if (openingCount > 0) {
-      return openingCount === 1 ? "opening duplication" : "openings duplication";
+      // Check if all are same type for specific messaging
+      const mirrorSuffix = command.isMirror ? " mirror" : "";
+      if (command.duplicatedOpenings) {
+        const allDoors = command.duplicatedOpenings.every((o) => o.opening.type === "door");
+        const allWindows = command.duplicatedOpenings.every((o) => o.opening.type === "window");
+        if (allDoors) {
+          return openingCount === 1 ? `door${mirrorSuffix} duplicated` : `doors${mirrorSuffix} duplicated`;
+        } else if (allWindows) {
+          return openingCount === 1 ? `window${mirrorSuffix} duplicated` : `windows${mirrorSuffix} duplicated`;
+        }
+      }
+      return openingCount === 1 ? `opening${mirrorSuffix} duplicated` : `openings${mirrorSuffix} duplicated`;
     }
     
-    return "selection duplication";
+    return "selection duplicated";
   }
 
   if (command.type === "move-selection-to-floor") {
     const roomCount = command.movedRooms.length;
     const assetCount = command.movedAssets.length;
-    if (roomCount > 0 && assetCount > 0) return "rooms and assets move";
-    if (roomCount > 1) return "rooms move";
-    if (roomCount === 1) return "room move";
+    if (roomCount > 0 && assetCount > 0) return "rooms and assets moved";
+    if (roomCount > 1) return "rooms moved";
+    if (roomCount === 1) return "room moved";
     const firstMovedAsset = command.movedAssets[0]?.asset;
     const movedTypeName = firstMovedAsset ? getInteriorAssetTypeName(firstMovedAsset.type) : "asset";
-    if (assetCount > 1) return `${movedTypeName} move`;
-    if (assetCount === 1) return `${movedTypeName} move`;
-    return "selection move";
+    if (assetCount > 1) return `${movedTypeName} moved`;
+    if (assetCount === 1) return `${movedTypeName} moved`;
+    return "selection moved";
   }
 
   if (command.type === "reorder-rooms-in-floor") {
-    return "room reorder";
+    return "room reordered";
   }
 
   if (command.type === "paste-rooms") {
-    return command.pastedRooms.length === 1 ? "room paste" : "rooms paste";
+    return command.pastedRooms.length === 1 ? "room pasted" : "rooms pasted";
   }
 
   if (command.type === "paste-interior-asset") {
-    return getInteriorAssetActionLabel(command.pastedAsset.type, "creation");
+    const pasteTypeName = getInteriorAssetTypeName(command.pastedAsset.type);
+    return `${pasteTypeName} pasted`;
   }
 
   if (command.type === "paste-interior-assets") {
     const firstPastedAsset = command.pastedAssets[0]?.asset;
     const pasteTypeName = firstPastedAsset ? getInteriorAssetTypeName(firstPastedAsset.type) : "asset";
-    return command.pastedAssets.length === 1 ? `${pasteTypeName} paste` : `${pasteTypeName} paste`;
+    return command.pastedAssets.length === 1 ? `${pasteTypeName} pasted` : `${pasteTypeName} pasted`;
   }
 
   if (command.type === "update-interior-asset") {

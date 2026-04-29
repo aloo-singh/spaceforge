@@ -3025,6 +3025,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const firstOpening = openings[0];
         if (!firstOpening) return state;
 
+        // Show type-specific copy message
+        const openingType = firstOpening.opening.type;
+        const typeLabel = openingType === "door" ? "Door" : "Window";
+        toast(`${typeLabel} copied to clipboard`);
+
         return {
           clipboard: {
             type: "opening",
@@ -3297,11 +3302,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             offsetMm: constrainedOffsetMm,
           };
 
-          // Create add-opening command
+          // Create add-opening command with paste source
           const command: EditorCommand = {
             type: "add-opening",
             roomId: targetRoomId,
             opening: cloneRoomOpening(pastedOpening),
+            source: "paste",
           };
 
           nextDocument = applyEditorCommand(nextDocument, command, "redo");
@@ -3316,9 +3322,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           openingId: opening.id,
         }));
 
-        // Show calm message
+        // Show calm message with type-awareness
         const messageCount = pastedOpenings.length;
-        const message = messageCount === 1 ? "Opening pasted" : `${messageCount} openings pasted`;
+        let message: string;
+        if (messageCount === 1) {
+          const openingType = pastedOpenings[0].type;
+          const typeLabel = openingType === "door" ? "Door" : "Window";
+          message = `${typeLabel} pasted`;
+        } else {
+          // Check if all openings are the same type
+          const allDoors = pastedOpenings.every((o) => o.type === "door");
+          const allWindows = pastedOpenings.every((o) => o.type === "window");
+          if (allDoors) {
+            message = `${messageCount} doors pasted`;
+          } else if (allWindows) {
+            message = `${messageCount} windows pasted`;
+          } else {
+            message = `${messageCount} openings pasted`;
+          }
+        }
         toast(message, { duration: 3200 });
 
         return {
@@ -3476,6 +3498,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         const firstOpening = openingsToCut[0];
         if (!firstOpening) return state;
+
+        // Show type-specific cut message
+        const openingType = firstOpening.opening.type;
+        const typeLabel = openingType === "door" ? "Door" : "Window";
+        toast(`${typeLabel} cut to clipboard`);
 
         return {
           clipboard: {
@@ -3650,38 +3677,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         duplicatedAssets,
         duplicatedOpenings:
           duplicatedOpenings.length > 0 ? duplicatedOpenings : undefined,
+        isMirror: isMirror || undefined,
       };
 
       const newDocument = applyEditorCommand(state.document, command, "redo");
 
-      // Show success message
+      // Show success message with type-awareness
       if (duplicatedOpenings.length > 0 && duplicatedRooms.length === 0 && duplicatedAssets.length === 0) {
         if (isMirror) {
-          // Count doors for mirror duplicate message
-          const doorCount = duplicatedOpenings.filter((do_) => {
-            const room = state.document.rooms.find((r) => r.id === do_.roomId);
-            return room?.openings.find((o) => o.id === do_.opening.id)?.type === "door";
-          }).length;
-          
-          if (doorCount > 0) {
-            toast(
-              doorCount === 1
-                ? "Door mirror-duplicated"
-                : `${doorCount} doors mirror-duplicated`
-            );
-          } else {
-            toast(
-              duplicatedOpenings.length === 1
-                ? "Window duplicated"
-                : `${duplicatedOpenings.length} windows duplicated`
-            );
-          }
-        } else {
+          // Mirror duplicate is doors-only
+          const doorCount = duplicatedOpenings.length;
           toast(
-            duplicatedOpenings.length === 1
-              ? "Opening duplicated"
-              : `${duplicatedOpenings.length} openings duplicated`
+            doorCount === 1
+              ? "Door mirror-duplicated"
+              : `${doorCount} doors mirror-duplicated`
           );
+        } else {
+          // Regular duplicate with type awareness
+          const messageCount = duplicatedOpenings.length;
+          let message: string;
+          if (messageCount === 1) {
+            const openingType = duplicatedOpenings[0].opening.type;
+            const typeLabel = openingType === "door" ? "Door" : "Window";
+            message = `${typeLabel} duplicated`;
+          } else {
+            // Check if all openings are the same type
+            const allDoors = duplicatedOpenings.every((o) => o.opening.type === "door");
+            const allWindows = duplicatedOpenings.every((o) => o.opening.type === "window");
+            if (allDoors) {
+              message = `${messageCount} doors duplicated`;
+            } else if (allWindows) {
+              message = `${messageCount} windows duplicated`;
+            } else {
+              message = `${messageCount} openings duplicated`;
+            }
+          }
+          toast(message);
         }
       }
 
@@ -4474,7 +4505,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const deleteCommands: EditorCommand[] = [];
       const roomsToDelete = new Set<string>();
       let roomCount = 0;
-      let openingCount = 0;
       let stairCount = 0;
 
       for (const item of state.selection) {
@@ -4508,7 +4538,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 roomId: room.id,
                 opening: cloneRoomOpening(opening),
               } as EditorCommand);
-              openingCount++;
             }
           }
         } else if (item.type === "asset" && item.roomId && item.id) {
@@ -4539,9 +4568,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       // Show confirmation toast with counts
+      // Count door vs window deletions for opening-specific messaging
+      let doorCount = 0;
+      let windowCount = 0;
+      for (const command of deleteCommands) {
+        if (command.type === "delete-opening") {
+          if (command.opening.type === "door") {
+            doorCount++;
+          } else {
+            windowCount++;
+          }
+        }
+      }
+
       const parts = [];
       if (roomCount > 0) parts.push(`${roomCount} room${roomCount > 1 ? "s" : ""}`);
-      if (openingCount > 0) parts.push(`${openingCount} opening${openingCount > 1 ? "s" : ""}`);
+      if (doorCount > 0) parts.push(`${doorCount} door${doorCount > 1 ? "s" : ""}`);
+      if (windowCount > 0) parts.push(`${windowCount} window${windowCount > 1 ? "s" : ""}`);
       if (stairCount > 0) parts.push(`${stairCount} stair${stairCount > 1 ? "s" : ""}`);
       const confirmationText = parts.join(" and ");
 
@@ -5029,6 +5072,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "move-opening",
         roomId,
         openingId,
+        openingType: opening.type,
         previousOffsetMm,
         nextOffsetMm,
       };

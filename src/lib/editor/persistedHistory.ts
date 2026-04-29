@@ -429,6 +429,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         type: "move-opening",
         roomId: changedRoom.next.id,
         openingId: movedOpening.openingId,
+        openingType: movedOpening.openingType,
         previousOffsetMm: movedOpening.previousOffsetMm,
         nextOffsetMm: movedOpening.nextOffsetMm,
       };
@@ -577,11 +578,11 @@ function inferDeletedOpening(
 function inferMovedOpening(
   previousOpenings: RoomOpening[],
   nextOpenings: RoomOpening[]
-): { openingId: string; previousOffsetMm: number; nextOffsetMm: number } | null {
+): { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null {
   if (previousOpenings.length !== nextOpenings.length) return null;
 
   const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
-  let movedOpening: { openingId: string; previousOffsetMm: number; nextOffsetMm: number } | null = null;
+  let movedOpening: { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null = null;
 
   for (const previousOpening of previousOpenings) {
     const nextOpening = nextById.get(previousOpening.id);
@@ -600,6 +601,7 @@ function inferMovedOpening(
 
     movedOpening = {
       openingId: previousOpening.id,
+      openingType: nextOpening.type,
       previousOffsetMm: previousOpening.offsetMm,
       nextOffsetMm: nextOpening.offsetMm,
     };

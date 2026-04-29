@@ -157,6 +157,7 @@ export type EditorCommand =
       type: "add-opening";
       roomId: string;
       opening: RoomOpening;
+      source?: "direct" | "paste";
     }
   | {
       type: "add-interior-asset";
@@ -177,6 +178,7 @@ export type EditorCommand =
       type: "move-opening";
       roomId: string;
       openingId: string;
+      openingType: "door" | "window";
       previousOffsetMm: number;
       nextOffsetMm: number;
     }
@@ -280,6 +282,7 @@ export type EditorCommand =
         roomId: string;
         opening: RoomOpening;
       }>;
+      isMirror?: boolean;
     }
   | {
       type: "bulk-move-interior-assets";
