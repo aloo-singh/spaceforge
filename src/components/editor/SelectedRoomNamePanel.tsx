@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Trash2 } from "@/components/ui/icons";
+import { Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
@@ -55,11 +55,13 @@ function RoomDimensionsDisplay({ room }: { room: Room }) {
     <div className="space-y-1.5">
       <p className="text-sm font-medium">Dimensions</p>
       <div className="space-y-2">
-        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-          <span className="font-medium">Length:</span> <span className="ml-1">{formatMetricWallDimension(length)}</span>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure2 className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(length)}</span>
         </div>
-        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-          <span className="font-medium">Width:</span> <span className="ml-1">{formatMetricWallDimension(width)}</span>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(width)}</span>
         </div>
       </div>
     </div>

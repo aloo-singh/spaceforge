@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorStore } from "@/stores/editorStore";
 import { AVAILABLE_TIERS, type SubscriptionTier } from "@/lib/subscription/tiers";
@@ -12,6 +13,7 @@ type DevSubscriptionTierSelectorProps = {
 export function DevSubscriptionTierSelector({
   className,
 }: DevSubscriptionTierSelectorProps) {
+  const [mounted, setMounted] = useState(false);
   const isDevSubscriptionModeEnabled = useEditorStore(
     (state) => state.isDevSubscriptionModeEnabled
   );
@@ -22,8 +24,13 @@ export function DevSubscriptionTierSelector({
     (state) => state.setDevSubscriptionTier
   );
 
-  // Don't render if dev mode is not enabled
-  if (!isDevSubscriptionModeEnabled) {
+  // Only render after client hydration to prevent SSR/client mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render if dev mode is not enabled or not yet mounted
+  if (!isDevSubscriptionModeEnabled || !mounted) {
     return null;
   }
 

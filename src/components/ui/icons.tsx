@@ -46,6 +46,8 @@ export {
   IconRestore as Restore,
   IconRotate2 as RotateCcw,
   IconRotateClockwise2 as RotateCw,
+  IconRulerMeasure as RulerMeasure,
+  IconRulerMeasure2 as RulerMeasure2,
   IconSend as Send,
   IconSofa as Sofa,
   IconStairs as Construction,
