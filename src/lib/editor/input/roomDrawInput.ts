@@ -270,7 +270,7 @@ function isItemSelected(
         return false;
       case "opening":
         if (roomId && itemId && existing.type === "opening") {
-          return existing.roomId === roomId && existing.id === itemId;
+          return existing.roomId === roomId && existing.openingId === itemId;
         }
         return false;
       case "asset":
@@ -1234,7 +1234,7 @@ export function attachRoomDrawInput(
     if (openingWidthHandleHit) {
       event.preventDefault();
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
-        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, id: openingWidthHandleHit.openingId };
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingWidthHandleHit.roomId, openingId: openingWidthHandleHit.openingId };
         if (isItemSelected(state.selection, "opening", openingWidthHandleHit.roomId, openingWidthHandleHit.openingId)) {
           state.removeFromSelection(openingItem);
         } else {
@@ -1332,7 +1332,7 @@ export function attachRoomDrawInput(
     if (openingHit) {
       event.preventDefault();
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
-        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, id: openingHit.openingId };
+        const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, openingId: openingHit.openingId };
         if (isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId)) {
           state.removeFromSelection(openingItem);
         } else {

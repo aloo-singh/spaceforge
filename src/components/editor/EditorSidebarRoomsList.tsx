@@ -88,7 +88,7 @@ function isItemInSelection(item: SharedSelectionItem, selection: SharedSelection
     } else if (item.type === "wall" && selected.type === "wall") {
       return item.roomId === selected.roomId && item.wall === selected.wall;
     } else if (item.type === "opening" && selected.type === "opening") {
-      return item.roomId === selected.roomId && item.id === selected.id;
+      return item.roomId === selected.roomId && item.openingId === selected.openingId;
     } else if (item.type === "asset" && selected.type === "asset") {
       return item.roomId === selected.roomId && item.id === selected.id;
     }
@@ -704,7 +704,7 @@ export function EditorSidebarRoomsList() {
                                           const isOpeningSelected =
                                             selectedOpening?.roomId === room.id &&
                                             selectedOpening.openingId === opening.id;
-                                          const openingItem: SharedSelectionItem = { type: "opening", roomId: room.id, id: opening.id };
+                                          const openingItem: SharedSelectionItem = { type: "opening", roomId: room.id, openingId: opening.id };
                                           const isInMultiSelection = isItemInSelection(openingItem, selection) && !isOpeningSelected;
 
                                           return (

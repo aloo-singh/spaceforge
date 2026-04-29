@@ -1656,7 +1656,7 @@ function insertOpeningOnSelectedWall(
     selectedWall: null,
     selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
     selectedInteriorAsset: null,
-    selection: [{ type: "opening" as const, roomId: hostRoom.id, id: opening.id }],
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: opening.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2740,7 +2740,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedWall: null,
         selectedOpening: { roomId, openingId },
         selectedInteriorAsset: null,
-        selection: [{ type: "opening" as const, roomId, id: openingId }],
+        selection: [{ type: "opening" as const, roomId, openingId }],
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -2831,7 +2831,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             return existing.roomId === item.roomId && existing.wall === item.wall;
           }
           if (existing.type === "opening" && item.type === "opening") {
-            return existing.roomId === item.roomId && existing.id === item.id;
+            return existing.roomId === item.roomId && existing.openingId === item.openingId;
           }
           if (existing.type === "asset" && item.type === "asset") {
             return existing.roomId === item.roomId && existing.id === item.id;
@@ -2862,7 +2862,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return existing.roomId === item.roomId && existing.wall === item.wall;
         }
         if (existing.type === "opening" && item.type === "opening") {
-          return existing.roomId === item.roomId && existing.id === item.id;
+          return existing.roomId === item.roomId && existing.openingId === item.openingId;
         }
         if (existing.type === "asset" && item.type === "asset") {
           return existing.roomId === item.roomId && existing.id === item.id;
@@ -2884,7 +2884,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return !(existing.roomId === item.roomId && existing.wall === item.wall);
         }
         if (existing.type === "opening" && item.type === "opening") {
-          return !(existing.roomId === item.roomId && existing.id === item.id);
+          return !(existing.roomId === item.roomId && existing.openingId === item.openingId);
         }
         if (existing.type === "asset" && item.type === "asset") {
           return !(existing.roomId === item.roomId && existing.id === item.id);
@@ -4164,11 +4164,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             roomsToDelete.add(room.id);
             roomCount++;
           }
-        } else if (item.type === "opening" && item.roomId && item.id) {
+        } else if (item.type === "opening" && item.roomId && item.openingId) {
           // Only delete openings from rooms that aren't being deleted
           if (!roomsToDelete.has(item.roomId)) {
             const room = state.document.rooms.find((r) => r.id === item.roomId);
-            const opening = room?.openings.find((o) => o.id === item.id);
+            const opening = room?.openings.find((o) => o.id === item.openingId);
             if (room && opening) {
               deleteCommands.push({
                 type: "delete-opening",
