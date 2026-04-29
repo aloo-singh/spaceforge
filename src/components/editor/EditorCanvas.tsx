@@ -3620,14 +3620,14 @@ function drawGrid(
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
       width: 1,
       color: theme.gridMinor,
-      alpha: 0.5,
+      alpha: 0.9,
     });
   }
 
   drawAlternatingGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
     width: 1,
     color: theme.gridMajor,
-    alpha: 0.4,
+    alpha: 0.8,
   }, {
     width: 2,
     color: theme.gridMajor,
