@@ -546,7 +546,7 @@ function CanvasMiniMap({
             y={miniMapState.viewportRect.y}
             width={miniMapState.viewportRect.width}
             height={miniMapState.viewportRect.height}
-            rx={compact ? 6 : 8}
+            rx={compact ? 2 : 3}
             fill="none"
             stroke={frameStroke}
             strokeWidth={compact ? 1.1 : 1.5}
