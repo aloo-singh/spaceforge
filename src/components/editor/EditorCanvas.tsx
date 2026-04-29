@@ -913,19 +913,22 @@ export default function EditorCanvas({
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
+  const showFloorFootprint = useEditorStore((state) => state.settings.showFloorFootprint);
   const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
   const [previousActiveFloorId, setPreviousActiveFloorId] = useState<string | null>(null);
   const [isFloorAnimating, setIsFloorAnimating] = useState(false);
   const floorButtonsContainerRef = useRef<HTMLDivElement | null>(null);
   const floorButtonRefsMap = useRef<Map<string, HTMLElement | null>>(new Map());
   const footprintFloorId = useMemo(() => {
-    if (hoveredFloorPreviewId) {
+    if (hoveredFloorPreviewId && hoveredFloorPreviewId !== activeFloorId) {
       return hoveredFloorPreviewId;
     }
 
+    if (!showFloorFootprint) return null;
+
     const activeFloorIndex = floors.findIndex((floor) => floor.id === activeFloorId);
     return activeFloorIndex > 0 ? floors[activeFloorIndex - 1]?.id ?? null : null;
-  }, [activeFloorId, floors, hoveredFloorPreviewId]);
+  }, [activeFloorId, floors, hoveredFloorPreviewId, showFloorFootprint]);
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
@@ -3468,12 +3471,12 @@ function drawScene(
     }
   }
   
-  // Always clear floor footprint graphics, then conditionally draw
+  // Always clear floor footprint graphics, then draw the resolved persistent or hover preview footprint.
   floorFootprintGraphics.clear();
-  if (state.settings.showFloorFootprint) {
+  if (footprintFloorId) {
     drawFloorFootprint(
       floorFootprintGraphics,
-      footprintFloorId ? getRoomsForFloor(state.document, footprintFloorId) : [],
+      getRoomsForFloor(state.document, footprintFloorId),
       state.camera,
       state.viewport,
       theme,
