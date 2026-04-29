@@ -13,7 +13,7 @@ import {
 import { getOrCreateAnonymousClientToken } from "@/lib/projects/clientIdentity";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { detectMacPlatform } from "@/lib/platform";
 import { useMobile } from "@/lib/use-mobile";
@@ -305,9 +305,9 @@ function FeedbackPanelContent({
               className={cn(isDarkSurface ? "text-white/72 hover:bg-white/10 hover:text-white" : "")}
             >
               <span>Back</span>
-              <Keycap aria-hidden="true" className="ml-1 border-current/20 bg-transparent text-current/70 shadow-none">
+              <Kbd aria-hidden="true" className="ml-1 border-current/20 bg-transparent text-current/70 shadow-none">
                 Esc
-              </Keycap>
+              </Kbd>
             </Button>
             <Button
               type="button"
@@ -331,11 +331,11 @@ function FeedbackPanelContent({
                     : "grid-cols-[0fr] opacity-0 translate-x-1"
                 )}
               >
-                <Keycap
+                <Kbd
                   className="h-5 min-w-0 overflow-hidden rounded-sm border-white/18 bg-white/12 px-1 text-[10px] text-white/86 shadow-none"
                 >
                   {submitShortcutLabel}
-                </Keycap>
+                </Kbd>
               </span>
             </Button>
           </div>

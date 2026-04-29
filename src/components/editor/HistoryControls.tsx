@@ -21,7 +21,7 @@ import {
 } from "@/components/editor/ExportPngDialog";
 import { EarlyExplorerBadge } from "@/components/ui/EarlyExplorerBadge";
 import { Button, ButtonGroup } from "@/components/ui/button";
-import { KeycapCombo } from "@/components/ui/keycap";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
   ImmediateTooltipProvider,
@@ -79,6 +79,21 @@ function EditorChromeTooltip({
         {content}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function ShortcutKbdGroup({ keys }: { keys: string[] }) {
+  return (
+    <KbdGroup>
+      {keys.map((key, index) => (
+        <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
+          {index > 0 ? (
+            <span className="font-measurement text-[10px] text-muted-foreground/70">+</span>
+          ) : null}
+          <Kbd>{key}</Kbd>
+        </span>
+      ))}
+    </KbdGroup>
   );
 }
 
@@ -527,7 +542,7 @@ export function HistoryControls({
                       ) : (
                         <span className="inline-flex items-center gap-2">
                           <span>Undo</span>
-                          <KeycapCombo keys={undoShortcut} />
+                          <ShortcutKbdGroup keys={undoShortcut} />
                         </span>
                       )
                     }
@@ -637,7 +652,7 @@ export function HistoryControls({
                       ) : (
                         <span className="inline-flex items-center gap-2">
                           <span>Redo</span>
-                          <KeycapCombo keys={redoShortcut} />
+                          <ShortcutKbdGroup keys={redoShortcut} />
                         </span>
                       )
                     }

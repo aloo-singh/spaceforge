@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -280,12 +280,12 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
                   Show canvas HUD
                 </h3>
-                <Keycap
+                <Kbd
                   aria-hidden="true"
                   className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
                 >
                   H
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Keep the scale and north instruments visible on the canvas as a calm orientation aid.
@@ -386,12 +386,12 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-guidelines-title" className="text-sm font-medium text-foreground">
                   Show guidelines
                 </h3>
-                <Keycap
+                <Kbd
                   aria-hidden="true"
                   className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
                 >
                   G
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Show predictive muted guides from nearby room edges while moving, drawing, and resizing.
@@ -443,12 +443,12 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-snapping-title" className="text-sm font-medium text-foreground">
                   Enable snapping
                 </h3>
-                <Keycap
+                <Kbd
                   aria-hidden="true"
                   className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
                 >
                   S
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Magnetically snap active edits to the current grid and nearby predictive guides.

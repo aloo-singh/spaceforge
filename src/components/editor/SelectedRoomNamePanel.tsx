@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
@@ -245,14 +245,14 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               id="room-name-input-hint"
               className="mt-1.5 flex items-center justify-end gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:mt-1"
             >
-              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
                 Enter
-              </Keycap>
+              </Kbd>
               <span>save</span>
               <span aria-hidden="true">·</span>
-              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
                 Esc
-              </Keycap>
+              </Kbd>
               <span>cancel</span>
             </p>
           ) : null}
@@ -275,9 +275,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                     <span className="inline-flex items-center gap-2">
                       <span>Delete room</span>
                       <span className="inline-flex items-center gap-1">
-                        <Keycap aria-hidden="true" className="shadow-none">Del</Keycap>
+                        <Kbd aria-hidden="true" className="shadow-none">Del</Kbd>
                         <span aria-hidden="true" className="text-muted-foreground/70">/</span>
-                        <Keycap aria-hidden="true" className="shadow-none">⌫</Keycap>
+                        <Kbd aria-hidden="true" className="shadow-none">⌫</Kbd>
                       </span>
                     </span>
                   )}
