@@ -472,55 +472,44 @@ export function EditorSettingsDialog({
               Off
             </Button>
           </div>
-        </div>
 
-        <div
-          aria-labelledby="editor-settings-asset-labels-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <div>
-              <h3 id="editor-settings-asset-labels-title" className="text-sm font-medium text-foreground">
-                Show asset labels
-              </h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Display labels on furniture and fixtures for quick item identification.
-              </p>
-            </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Asset labels status</dt>
-                <dd>{areAssetLabelsVisible ? "On" : "Off"}</dd>
+          {areAssetsVisible && (
+            <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+              <div>
+                <h4 className="text-xs font-medium text-foreground">Show asset labels</h4>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Display labels on furniture and fixtures for quick item identification.
+                </p>
               </div>
-            </dl>
-          </div>
 
-          <div
-            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
-            role="group"
-            aria-label="Show asset labels"
-          >
-            <Button
-              type="button"
-              size="sm"
-              variant={areAssetLabelsVisible ? "secondary" : "ghost"}
-              aria-pressed={areAssetLabelsVisible}
-              onClick={() => updateSettings({ showAssetLabels: true })}
-              className="min-w-20 flex-1 sm:flex-none"
-            >
-              On
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={!areAssetLabelsVisible ? "secondary" : "ghost"}
-              aria-pressed={!areAssetLabelsVisible}
-              onClick={() => updateSettings({ showAssetLabels: false })}
-              className="min-w-20 flex-1 sm:flex-none"
-            >
-              Off
-            </Button>
-          </div>
+              <div
+                className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+                role="group"
+                aria-label="Show asset labels"
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={areAssetLabelsVisible ? "secondary" : "ghost"}
+                  aria-pressed={areAssetLabelsVisible}
+                  onClick={() => updateSettings({ showAssetLabels: true })}
+                  className="min-w-20 flex-1 sm:flex-none"
+                >
+                  On
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!areAssetLabelsVisible ? "secondary" : "ghost"}
+                  aria-pressed={!areAssetLabelsVisible}
+                  onClick={() => updateSettings({ showAssetLabels: false })}
+                  className="min-w-20 flex-1 sm:flex-none"
+                >
+                  Off
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div

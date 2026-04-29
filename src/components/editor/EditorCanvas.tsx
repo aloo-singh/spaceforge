@@ -1481,6 +1481,7 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         exportTheme,
+        true,
         { includeStairDirectionVisuals: false }
       );
       drawWallInteractionOverlay(
@@ -1507,6 +1508,9 @@ export default function EditorCanvas({
         null,
         exportTheme,
         [],
+        state.settings.showRoomNames,
+        state.settings.showAssets,
+        state.settings.showAssetLabels,
         { includeStairDirectionLabels: false }
       );
       drawDraft(
@@ -3516,6 +3520,7 @@ function drawScene(
     state.camera,
     state.viewport,
     theme,
+    state.settings.showAssets,
     { includeStairDirectionVisuals: true },
     animations
   );
@@ -3543,6 +3548,9 @@ function drawScene(
     transformFeedback,
     theme,
     state.selection,
+    state.settings.showRoomNames,
+    state.settings.showAssets,
+    state.settings.showAssetLabels,
     { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
@@ -3913,6 +3921,7 @@ function drawOpenings(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
+  showAssets: boolean = true,
   options?: {
     includeStairDirectionVisuals?: boolean;
   },
@@ -3923,7 +3932,7 @@ function drawOpenings(
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations);
+    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations, showAssets);
   }
 }
 
@@ -4267,10 +4276,12 @@ function drawRoomInteriorAssets(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map(),
+  showAssets: boolean = true
 ) {
   for (const asset of room.interiorAssets) {
-    // Animation hook: look up any in-progress rotation for this asset.
+    // Always show stairs, but hide other assets if showAssets is false
+    if (asset.type !== "stairs" && !showAssets) continue;
     // baseWidthMm/baseDepthMm are the canonical local dimensions used for the
     // whole rotation, while rotationDegrees is interpolated between the two
     // cardinal endpoints when animation is active.
@@ -4819,8 +4830,13 @@ function drawFurnitureLabels(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  selection: SharedSelectionItem[]
+  selection: SharedSelectionItem[],
+  showAssetLabels: boolean = true,
+  showAssets: boolean = true
 ) {
+  // Don't show labels if assets are hidden or if asset labels are hidden
+  if (!showAssets || !showAssetLabels) return;
+  
   const fontSizePx = clampValue(
     camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
     FURNITURE_LABEL_MIN_FONT_SIZE_PX,
@@ -5084,6 +5100,9 @@ function drawRoomLabels(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
   selection: SharedSelectionItem[],
+  showRoomNames: boolean = true,
+  showAssets: boolean = true,
+  showAssetLabels: boolean = true,
   options?: {
     includeStairDirectionLabels?: boolean;
   }
@@ -5097,6 +5116,7 @@ function drawRoomLabels(
       showArea: showDimensions,
     });
     if (!layout) continue;
+    if (!showRoomNames) continue;
     const textResolution = getTextResolution();
     const left = snapToPixel(layout.left, textResolution);
     const top = snapToPixel(layout.top, textResolution);
@@ -5204,7 +5224,7 @@ function drawRoomLabels(
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection, showAssetLabels, showAssets);
 }
 
 type ResizeDimensionLabelSpec = {
