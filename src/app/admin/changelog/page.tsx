@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.4</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Switched shortcut affordances to shadcn-style kbd primitives, replacing custom keycap styling.</li>
+                <li>Migrated editor settings, inspectors, feedback widget, admin feedback inbox, undo/redo tooltips, and opening context-menu shortcuts to unified Kbd components.</li>
+                <li>Removed + separators from keyboard combo rendering.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Undo/redo tooltip keycap contrast now uses readable foreground/background colours in both light and dark mode.</li>
+                <li>Door right-click context menu now widens appropriately when Alt/Option is held for mirror duplicate, staying on one line.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.3</h2>
             <span className="text-sm text-muted-foreground">2026-04-29</span>
           </div>
