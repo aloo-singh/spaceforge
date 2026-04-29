@@ -88,7 +88,7 @@ function ShortcutKbdGroup({ keys }: { keys: string[] }) {
       {keys.map((key, index) => (
         <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
           {index > 0 ? (
-            <span className="font-measurement text-[10px] text-muted-foreground/70">+</span>
+            <span className="font-measurement text-[10px] text-popover-foreground/65">+</span>
           ) : null}
           <Kbd>{key}</Kbd>
         </span>
