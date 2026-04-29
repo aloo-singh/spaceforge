@@ -167,6 +167,13 @@ type ClipboardData =
       sourceRoomId: string;
       assets?: Array<{ asset: RoomInteriorAsset; sourceRoomId: string }>;
     }
+  | {
+      type: "opening";
+      source: "copy" | "cut";
+      opening: RoomOpening;
+      sourceRoomId: string;
+      openings?: Array<{ opening: RoomOpening; sourceRoomId: string }>;
+    }
   | null;
 
 type AddFloorOptions = {
@@ -2959,6 +2966,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
 
+      if (item.type === "opening") {
+        const selectedOpeningItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "opening" }> =>
+            selectionItem.type === "opening"
+        );
+        const openings = selectedOpeningItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const opening = room?.openings.find((o) => o.id === selectionItem.openingId);
+            if (!room || !opening) return null;
+
+            return {
+              opening: cloneRoomOpening(opening),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { opening: RoomOpening; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (openings.length === 0) return state;
+
+        const firstOpening = openings[0];
+        if (!firstOpening) return state;
+
+        return {
+          clipboard: {
+            type: "opening",
+            source: "copy" as const,
+            opening: firstOpening.opening,
+            sourceRoomId: firstOpening.sourceRoomId,
+            openings,
+          },
+        };
+      }
+
       return state;
     }),
   pasteSelection: () =>
@@ -3241,6 +3283,66 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedRoomId: firstAsset.sourceRoomId,
           selectedInteriorAsset: null,
           selection: [{ type: "room" as const, id: firstAsset.sourceRoomId }],
+          history: {
+            past: nextPast,
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
+      }
+
+      if (item.type === "opening") {
+        const selectedOpeningItems = state.selection.filter(
+          (selectionItem): selectionItem is Extract<SharedSelectionItem, { type: "opening" }> =>
+            selectionItem.type === "opening"
+        );
+        const openingsToCut = selectedOpeningItems
+          .map((selectionItem) => {
+            const room = state.document.rooms.find((r) => r.id === selectionItem.roomId);
+            const opening = room?.openings.find((o) => o.id === selectionItem.openingId);
+            if (!room || !opening) return null;
+
+            return {
+              opening: cloneRoomOpening(opening),
+              sourceRoomId: selectionItem.roomId,
+            };
+          })
+          .filter((entry): entry is { opening: RoomOpening; sourceRoomId: string } =>
+            Boolean(entry)
+          );
+        if (openingsToCut.length === 0) return state;
+
+        let nextDocument = state.document;
+        let nextPast = state.history.past;
+        for (const openingToCut of openingsToCut) {
+          const command: EditorCommand = {
+            type: "delete-opening",
+            roomId: openingToCut.sourceRoomId,
+            opening: cloneRoomOpening(openingToCut.opening),
+          };
+          nextDocument = applyEditorCommand(nextDocument, command, "redo");
+          nextPast = pushToPast(nextPast, command);
+        }
+
+        const firstOpening = openingsToCut[0];
+        if (!firstOpening) return state;
+
+        return {
+          clipboard: {
+            type: "opening",
+            source: "cut" as const,
+            opening: cloneRoomOpening(firstOpening.opening),
+            sourceRoomId: firstOpening.sourceRoomId,
+            openings: openingsToCut.map((openingToCut) => ({
+              opening: cloneRoomOpening(openingToCut.opening),
+              sourceRoomId: openingToCut.sourceRoomId,
+            })),
+          },
+          document: nextDocument,
+          selectedRoomId: firstOpening.sourceRoomId,
+          selectedOpening: null,
+          selection: [{ type: "room" as const, id: firstOpening.sourceRoomId }],
           history: {
             past: nextPast,
             future: [],
