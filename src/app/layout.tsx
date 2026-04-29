@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Badge } from "@/components/ui/badge";
+import { VersionLink } from "@/components/version-link";
+import { getAuthenticatedAdminUser } from "@/lib/supabase/admin";
 import {
   appSansFont,
   appUiMonoFont,
   appUiSansFont,
   measurementMonoFont,
 } from "@/lib/fonts";
-import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import { AppToaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
@@ -37,11 +38,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const adminUser = await getAuthenticatedAdminUser();
+  const isAdmin = adminUser !== null;
   return (
     <html lang="en" suppressHydrationWarning className={cn("font-sans", appSansFont.variable)}>
       <body
@@ -72,11 +75,9 @@ export default function RootLayout({
               >
                 Editor
               </Link>
-              <Link href="/changelog" className="ml-4 leading-none">
-                <Badge variant="outline" className="text-[11px] font-medium">
-                  {APP_VERSION_LABEL}
-                </Badge>
-              </Link>
+              <div className="ml-4">
+                <VersionLink isAdmin={isAdmin} />
+              </div>
             </nav>
           </header>
           {children}
