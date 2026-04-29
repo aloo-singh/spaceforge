@@ -837,7 +837,6 @@ export function EditorSidebarRoomsList() {
                                                   <span className="ml-auto text-[11px] text-muted-foreground">⌘V</span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem 
-                                                  key={isAltPressed && opening.type === "door" ? "mirror-duplicate" : "duplicate"}
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
                                                 >
                                                   {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
