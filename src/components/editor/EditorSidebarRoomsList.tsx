@@ -825,7 +825,10 @@ export function EditorSidebarRoomsList() {
                                                 </button>
                                               </ContextMenuTrigger>
                                               <ContextMenuContent 
-                                                className="w-48"
+                                                className={cn(
+                                                  "w-48",
+                                                  isAltPressed && opening.type === "door" && "w-52"
+                                                )}
                                                 onKeyDownCapture={(event) => {
                                                   if (event.key === "Alt" || event.altKey) {
                                                     setIsAltPressed(true);
@@ -852,7 +855,9 @@ export function EditorSidebarRoomsList() {
                                                 <ContextMenuItem 
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
                                                 >
-                                                  {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
+                                                  <span className="whitespace-nowrap">
+                                                    {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
+                                                  </span>
                                                   <ShortcutKbdGroup
                                                     keys={
                                                       isAltPressed && opening.type === "door"
