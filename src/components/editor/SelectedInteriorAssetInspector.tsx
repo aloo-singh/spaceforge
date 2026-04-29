@@ -1,6 +1,6 @@
 "use client";
 
-import { IconTriangle, IconTriangleInverted, RotateCcw, RotateCw, Transfer, Trash2 } from "@/components/ui/icons";
+import { IconCaretUpFilled, IconCaretDownFilled, RotateCcw, RotateCw, Transfer, Trash2 } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -543,7 +543,7 @@ function StairsInspector({
                         aria-label="Add floor above"
                         disabled={!canAddFloorAbove}
                       >
-                        <IconTriangle />
+                        <IconCaretUpFilled />
                       </Button>
                     </span>
                   </InspectorIconTooltip>
@@ -564,7 +564,7 @@ function StairsInspector({
                         aria-label="Add floor below"
                         disabled={!canAddFloorBelow}
                       >
-                        <IconTriangleInverted />
+                        <IconCaretDownFilled />
                       </Button>
                     </span>
                   </InspectorIconTooltip>
