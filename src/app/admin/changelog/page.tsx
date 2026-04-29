@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.5</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Undo labels and Sonner confirmations for all asset rotations now read &ldquo;bed rotated left 90°&rdquo; or &ldquo;stair rotated right 90°&rdquo; instead of generic &ldquo;rotation&rdquo;.</li>
+                <li>Inspector keyboard hint keycaps (Enter, Esc) now use proper shadcn Kbd styling with readable backgrounds in both light and dark mode.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Mini-map viewing area rounded corners reduced so it remains visually rectangular at all zoom levels.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.4</h2>
             <span className="text-sm text-muted-foreground">2026-04-29</span>
           </div>
