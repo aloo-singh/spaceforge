@@ -183,6 +183,8 @@ export function EditorSidebarRoomsList() {
   const shouldAutoFocusInteriorAssetRenameInputRef = useRef(false);
   const shouldAutoFocusFloorRenameInputRef = useRef(false);
   const [isMacPlatform, setIsMacPlatform] = useState(false);
+  const [isOpeningContextMenuOpen, setIsOpeningContextMenuOpen] = useState(false);
+  const [isAltPressed, setIsAltPressed] = useState(false);
   const [sidebarRenameRoomId, setSidebarRenameRoomId] = useState<string | null>(null);
   const [sidebarRenameInteriorAssetId, setSidebarRenameInteriorAssetId] = useState<string | null>(null);
   const [sidebarRenameFloorId, setSidebarRenameFloorId] = useState<string | null>(null);
@@ -246,6 +248,40 @@ export function EditorSidebarRoomsList() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMacPlatform(detectMacPlatform());
   }, []);
+
+  useEffect(() => {
+    if (!isOpeningContextMenuOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAltPressed(false);
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Alt" || event.altKey) {
+        setIsAltPressed(true);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Alt" || !event.altKey) {
+        setIsAltPressed(false);
+      }
+    };
+
+    const handleBlur = () => {
+      setIsAltPressed(false);
+    };
+
+    globalThis.document.addEventListener("keydown", handleKeyDown, true);
+    globalThis.document.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      globalThis.document.removeEventListener("keydown", handleKeyDown, true);
+      globalThis.document.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [isOpeningContextMenuOpen]);
 
   useEffect(() => {
     if (!activeRenameRoomId || isRenameBlocked || !shouldAutoFocusRenameInputRef.current) return;
@@ -720,7 +756,15 @@ export function EditorSidebarRoomsList() {
                                           const isInMultiSelection = isItemInSelection(openingItem, selection) && !isOpeningSelected;
 
                                           return (
-                                            <ContextMenu key={opening.id}>
+                                            <ContextMenu 
+                                              key={opening.id}
+                                              onOpenChange={(isOpen) => {
+                                                setIsOpeningContextMenuOpen(isOpen);
+                                                if (!isOpen) {
+                                                  setIsAltPressed(false);
+                                                }
+                                              }}
+                                            >
                                               <ContextMenuTrigger asChild>
                                                 <button
                                                   type="button"
@@ -752,7 +796,19 @@ export function EditorSidebarRoomsList() {
                                                   {getOpeningLabel(opening)}
                                                 </button>
                                               </ContextMenuTrigger>
-                                              <ContextMenuContent className="w-48">
+                                              <ContextMenuContent 
+                                                className="w-48"
+                                                onKeyDownCapture={(event) => {
+                                                  if (event.key === "Alt" || event.altKey) {
+                                                    setIsAltPressed(true);
+                                                  }
+                                                }}
+                                                onKeyUpCapture={(event) => {
+                                                  if (event.key === "Alt" || !event.altKey) {
+                                                    setIsAltPressed(false);
+                                                  }
+                                                }}
+                                              >
                                                 <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); cutSelection(); }}>
                                                   Cut
                                                   <span className="ml-auto text-[11px] text-muted-foreground">⌘X</span>
@@ -765,9 +821,14 @@ export function EditorSidebarRoomsList() {
                                                   Paste
                                                   <span className="ml-auto text-[11px] text-muted-foreground">⌘V</span>
                                                 </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(); }}>
-                                                  Duplicate
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">⌘D</span>
+                                                <ContextMenuItem 
+                                                  key={isAltPressed && opening.type === "door" ? "mirror-duplicate" : "duplicate"}
+                                                  onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
+                                                >
+                                                  {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
+                                                  <span className="ml-auto text-[11px] text-muted-foreground">
+                                                    {isAltPressed && opening.type === "door" ? "⌥⌘D" : "⌘D"}
+                                                  </span>
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
                                                 <ContextMenuItem 
