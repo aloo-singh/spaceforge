@@ -14,6 +14,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { getPolygonBounds } from "@/lib/editor/roomGeometry";
+import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -38,6 +41,28 @@ function InspectorIconTooltip({
         {content}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function RoomDimensionsDisplay({ room }: { room: Room }) {
+  const bounds = getPolygonBounds(room.points);
+  if (!bounds) return null;
+
+  const width = bounds.maxX - bounds.minX;
+  const length = bounds.maxY - bounds.minY;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">Dimensions</p>
+      <div className="space-y-2">
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+          <span className="font-medium">Length:</span> <span className="ml-1">{formatMetricWallDimension(length)}</span>
+        </div>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+          <span className="font-medium">Width:</span> <span className="ml-1">{formatMetricWallDimension(width)}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -256,6 +281,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               <span>cancel</span>
             </p>
           ) : null}
+          <div className="mt-4">
+            <RoomDimensionsDisplay room={selectedRoom} />
+          </div>
           <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 [@media(max-height:540px)_and_(orientation:landscape)]:mt-3 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
