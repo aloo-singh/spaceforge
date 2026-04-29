@@ -47,7 +47,7 @@ function ShortcutKbdGroup({ keys }: { keys: string[] }) {
   return (
     <KbdGroup className="ml-auto">
       {keys.map((key, index) => (
-        <Kbd key={`${key}-${index}`} className="h-4 min-w-0 rounded-sm bg-transparent px-1 text-[9px] shadow-none">
+        <Kbd key={`${key}-${index}`}>
           {key}
         </Kbd>
       ))}

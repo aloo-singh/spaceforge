@@ -163,12 +163,12 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
               id="floor-name-input-hint"
               className="mt-1.5 flex items-center justify-end gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:mt-1"
             >
-              <Kbd aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true">
                 Enter
               </Kbd>
               <span>save</span>
               <span aria-hidden="true">·</span>
-              <Kbd aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true">
                 Esc
               </Kbd>
               <span>cancel</span>

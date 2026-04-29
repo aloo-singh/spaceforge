@@ -280,10 +280,7 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
                   Show canvas HUD
                 </h3>
-                <Kbd
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   H
                 </Kbd>
               </div>
@@ -386,10 +383,7 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-guidelines-title" className="text-sm font-medium text-foreground">
                   Show guidelines
                 </h3>
-                <Kbd
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   G
                 </Kbd>
               </div>
@@ -443,10 +437,7 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-snapping-title" className="text-sm font-medium text-foreground">
                   Enable snapping
                 </h3>
-                <Kbd
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   S
                 </Kbd>
               </div>
