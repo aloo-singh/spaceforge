@@ -10,6 +10,32 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.1</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a dedicated <code className="bg-muted px-1.5 py-0.5 rounded text-xs">/admin/changelog</code> page as an internal companion to the public changelog.</li>
+                <li>Added a shared version badge link component in the global header so changelog routing can respond to the current area of the app.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Clicking the version badge from admin routes now opens the admin changelog, while non-admin routes still open the public changelog.</li>
+                <li>When already inside either changelog, clicking the version badge now toggles between the public and admin changelog views.</li>
+                <li>Reworked the public changelog into a shorter, consumer-friendly release history while keeping the admin changelog as the detailed internal record.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.0</h2>
             <span className="text-sm text-muted-foreground">2026-04-29</span>
           </div>
