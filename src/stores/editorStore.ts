@@ -90,6 +90,8 @@ import {
   getUpdatedOpeningForWidth,
   createCenteredRoomOpening,
   getSymmetricOpeningWidthForWorldPoint,
+  getHandleAnchoredOpeningWidthForWorldPoint,
+  getHandleAnchoredOpeningWidthAndOffsetForWorldPoint,
   getRoomWallSegment,
   getOpeningOffsetForWorldPoint,
 } from "@/lib/editor/openings";
@@ -330,12 +332,14 @@ type EditorState = {
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
-  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number) => void;
+  previewOpeningResize: (roomId: string, openingId: string, nextWidthMm: number, nextOffsetMm?: number) => void;
   commitOpeningResize: (
     roomId: string,
     openingId: string,
     previousWidthMm: number,
-    nextWidthMm: number
+    nextWidthMm: number,
+    previousOffsetMm?: number,
+    nextOffsetMm?: number
   ) => void;
   previewOpeningMove: (roomId: string, openingId: string, nextOffsetMm: number) => void;
   commitOpeningMove: (
@@ -1754,6 +1758,37 @@ function resolveOpeningResizeWidth(
     room,
     opening,
     nextWidthMm,
+    nextOffsetMm: undefined, // Symmetric resize doesn't change offset
+  };
+}
+
+function resolveOpeningResizeWidthFromHandle(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  draggedEdge: "start" | "end",
+  cursorWorld: Point,
+  gridSizeMm: number | null
+) {
+  const room = document.rooms.find((candidate) => candidate.id === roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingId);
+  if (!room || !opening) return null;
+
+  const result = getHandleAnchoredOpeningWidthAndOffsetForWorldPoint(
+    room,
+    opening,
+    draggedEdge,
+    cursorWorld,
+    gridSizeMm ? { gridSizeMm } : undefined
+  );
+  if (!result) return null;
+
+  return {
+    room,
+    opening,
+    nextWidthMm: result.widthMm,
+    nextOffsetMm: result.offsetMm,
+    draggedEdge,
   };
 }
 
@@ -4903,23 +4938,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
       return nextState ?? state;
     }),
-  previewOpeningResize: (roomId, openingId, nextWidthMm) =>
+  previewOpeningResize: (roomId, openingId, nextWidthMm, nextOffsetMm?) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
-      if (opening.widthMm === nextWidthMm) return state;
+      if (opening.widthMm === nextWidthMm && nextOffsetMm === undefined) return state;
+      if (opening.widthMm === nextWidthMm && opening.offsetMm === nextOffsetMm) return state;
+
+      let updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      
+      // If offset changed (for handle-anchored resizing), also update the offset
+      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
+        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
+        if (updatedRoom) {
+          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
+          if (updatedOpening) {
+            updatedOpening.offsetMm = nextOffsetMm;
+          }
+        }
+      }
 
       return {
-        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+        document: updatedDocument,
       };
     }),
-  commitOpeningResize: (roomId, openingId, previousWidthMm, nextWidthMm) =>
+  commitOpeningResize: (roomId, openingId, previousWidthMm, nextWidthMm, previousOffsetMm, nextOffsetMm) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
-      if (previousWidthMm === nextWidthMm) return state;
+      if (previousWidthMm === nextWidthMm && previousOffsetMm === nextOffsetMm) return state;
 
       const command: EditorCommand = {
         type: "update-opening",
@@ -4927,15 +4976,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousOpening: {
           ...cloneRoomOpening(opening),
           widthMm: previousWidthMm,
+          offsetMm: previousOffsetMm ?? opening.offsetMm,
         },
         nextOpening: {
           ...cloneRoomOpening(opening),
           widthMm: nextWidthMm,
+          offsetMm: nextOffsetMm ?? opening.offsetMm,
         },
       };
 
+      let updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+      
+      // If offset changed, also update the offset
+      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
+        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
+        if (updatedRoom) {
+          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
+          if (updatedOpening) {
+            updatedOpening.offsetMm = nextOffsetMm;
+          }
+        }
+      }
+
       return {
-        document: updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm),
+        document: updatedDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -5953,7 +6017,9 @@ export function getOpeningMoveOffsetForCursor(
 export function getOpeningResizeWidthForCursor(
   roomId: string,
   openingId: string,
-  cursorWorld: Point
+  cursorWorld: Point,
+  draggedEdge?: "start" | "end",
+  isAltHeld?: boolean
 ) {
   const state = useEditorStore.getState();
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
@@ -5964,6 +6030,21 @@ export function getOpeningResizeWidthForCursor(
     state.settings
   );
   const resolvedCursorWorld = getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, predictiveGuides);
+  
+  // Use symmetric (center-anchor) if Alt is held, otherwise use handle-anchor as default
+  const shouldUseSymmetric = isAltHeld === true;
+  
+  if (!shouldUseSymmetric && draggedEdge) {
+    return resolveOpeningResizeWidthFromHandle(
+      state.document,
+      roomId,
+      openingId,
+      draggedEdge,
+      resolvedCursorWorld,
+      activeSnapStepMm
+    );
+  }
+  
   return resolveOpeningResizeWidth(
     state.document,
     roomId,
