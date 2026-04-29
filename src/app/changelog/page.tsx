@@ -21,7 +21,7 @@ const latestHighlights: ReleaseNote[] = [
     date: "2026-04-28",
     title: "Interior assets arrive",
     items: [
-      "You can now add furniture-style assets such as beds, sofas, wardrobes, and dining tables.",
+      "You can now add furniture-style assets such as beds, sofas, wardrobes, and tables.",
       "Assets support naming, moving, resizing, rotation, and duplication.",
       "The inspector now offers more tailored controls for different asset types.",
     ],
