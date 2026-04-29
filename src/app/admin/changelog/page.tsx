@@ -10,6 +10,30 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.8</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Floor operation undo labels now include the specific floor name: &ldquo;floor &quot;Kitchen&quot; deleted&rdquo;, &ldquo;floor &quot;Master Suite&quot; created&rdquo;, etc. for crystal-clear history context.</li>
+                <li>Sidebar floor numbering now starts from 1 instead of 0, matching the HUD floor selector display (1-9 range).</li>
+                <li>Stairs inspector icons for &ldquo;Add floor above&rdquo; and &ldquo;Add floor below&rdquo; now use caret icons matching the floor sidebar context menu.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed SSR hydration error in DevSubscriptionTierSelector when localStorage tier differs from server default.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.7</h2>
             <span className="text-sm text-muted-foreground">2026-04-29</span>
           </div>
