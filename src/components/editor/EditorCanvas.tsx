@@ -169,6 +169,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
+import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
@@ -2592,6 +2593,8 @@ export default function EditorCanvas({
   
   const inspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector className="h-full" />
+  ) : roomDraftPointCount > 0 ? (
+    <RoomDrawingInspector className="h-full" />
   ) : selectedRoomId ? (
     <SelectedRoomNamePanel className="h-full" />
   ) : selectedFloorId ? (
@@ -2601,6 +2604,8 @@ export default function EditorCanvas({
   );
   const compactInspectorContent = selectedNorthIndicator ? (
     <SelectedNorthInspector />
+  ) : roomDraftPointCount > 0 ? (
+    <RoomDrawingInspector />
   ) : selectedRoomId ? (
     <SelectedRoomNamePanel />
   ) : selectedFloorId ? (
