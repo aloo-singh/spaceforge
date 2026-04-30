@@ -11,6 +11,7 @@ import {
   normalizeEditorExportSignature,
   shouldShowDimensions,
 } from "@/lib/editor/settings";
+import { saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -718,7 +719,10 @@ export function EditorSettingsDialog({
               size="sm"
               variant={!isCompactSidebarDensity ? "secondary" : "ghost"}
               aria-pressed={!isCompactSidebarDensity}
-              onClick={() => updateSettings({ sidebarDensity: "comfortable" })}
+              onClick={() => {
+                updateSettings({ sidebarDensity: "comfortable" });
+                saveGlobalSettings({ sidebarDensity: "comfortable" });
+              }}
               className="min-w-28 flex-1 sm:flex-none"
             >
               Comfortable
@@ -728,7 +732,10 @@ export function EditorSettingsDialog({
               size="sm"
               variant={isCompactSidebarDensity ? "secondary" : "ghost"}
               aria-pressed={isCompactSidebarDensity}
-              onClick={() => updateSettings({ sidebarDensity: "compact" })}
+              onClick={() => {
+                updateSettings({ sidebarDensity: "compact" });
+                saveGlobalSettings({ sidebarDensity: "compact" });
+              }}
               className="min-w-24 flex-1 sm:flex-none"
             >
               Compact
