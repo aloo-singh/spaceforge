@@ -50,7 +50,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Export dialog appearance selector now matches the settings dialog appearance selector for consistency: simplified "System" label without system theme suffix, updated wording to "Choose the appearance of the exported file", and improved layout to prevent indicator badge from affecting text flow.</li>
+                <li>Export dialog appearance selector now matches the settings dialog appearance selector for consistency: simplified &quot;System&quot; label without system theme suffix, updated wording to &quot;Choose the appearance of the exported file&quot;, and improved layout to prevent indicator badge from affecting text flow.</li>
               </ul>
             </div>
           </div>
@@ -376,12 +376,12 @@ export default function ChangelogPage() {
                 <li>Deleting projects is now reversible—Sonner confirmation with undo option shown for 5 seconds</li>
                 <li>Mobile zoom and cancel controls no longer appear on desktop HUD</li>
                 <li>Floor switcher on HUD now animates with grow-shrink style when switching floors</li>
-                <li>New projects from homepage now work consistently with "New project" button from /projects</li>
+                <li>New projects from homepage now work consistently with &quot;New project&quot; button from /projects</li>
                 <li>Projects can now be opened by clicking the thumbnail (not just the button)</li>
                 <li>Toggling HUD visibility no longer shifts the floor selector position</li>
                 <li>Sonner confirmations for keyboard shortcuts with Ctrl/Cmd modifier now persist correctly</li>
                 <li>Moving rooms no longer resizes them—exact measurements always retained during repositioning</li>
-                <li>Duplicate "Selection deleted" toast when deleting floors—now shows only floor-specific notification</li>
+                <li>Duplicate &quot;Selection deleted&quot; toast when deleting floors—now shows only floor-specific notification</li>
                 <li>Floor selector HUD now displays floors as 1-based (1, 2, 3...) instead of 0-based, matching sidebar</li>
                 <li>Clicking a floor when a room is selected in sidebar now correctly selects the floor</li>
                 <li>Selected floors and rooms in sidebar can now be expanded/collapsed (expand/collapse icons always work)</li>
@@ -392,7 +392,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Canvas auto-fit on project load and refresh now uses consistent, device-aware padding (48px landscape desktop, 96px otherwise) matching manual "Fit View" button for optimal zoom on all screen sizes</li>
+                <li>Canvas auto-fit on project load and refresh now uses consistent, device-aware padding (48px landscape desktop, 96px otherwise) matching manual &quot;Fit View&quot; button for optimal zoom on all screen sizes</li>
                 <li>Outline visibility of other floors on canvas improved—added outline visibility slider setting (default more visible)</li>
                 <li>Selected floors, rooms, and walls now have distinct selection colours in sidebar (previously same colour)</li>
                 <li>Sidebar and inspector state (collapsed/expanded) now retained per project when opened or browser is refreshed</li>

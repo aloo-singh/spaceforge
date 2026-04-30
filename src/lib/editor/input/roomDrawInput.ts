@@ -67,6 +67,7 @@ type RoomDrawStoreState = {
   viewport: { width: number; height: number };
   settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
   keyboardShortcutFeedbackEnabled: boolean;
+  is45DegreeDrawingEnabled: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -381,8 +382,11 @@ export function attachRoomDrawInput(
     callbacks.requestRender();
   };
 
-  const getDrawConstraintMode = (shiftOverride?: boolean): DrawConstraintMode =>
-    shiftOverride ?? isShiftHeld ? "diagonal45" : "orthogonal";
+  const getDrawConstraintMode = (shiftOverride?: boolean): DrawConstraintMode => {
+    const state = store.getState();
+    const is45DegreeEnabled = (shiftOverride ?? isShiftHeld) || state.is45DegreeDrawingEnabled;
+    return is45DegreeEnabled ? "diagonal45" : "orthogonal";
+  };
 
   const syncDraftConstraintMode = (shiftOverride?: boolean) => {
     callbacks.onDraftConstraintModeChange?.(getDrawConstraintMode(shiftOverride));
@@ -1170,8 +1174,9 @@ export function attachRoomDrawInput(
     );
 
     if (state.roomDraft.points.length > 0) {
+      const is45DegreeEnabled = event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled;
       state.placeDraftPointFromCursor(cursorWorld, {
-        constraintMode: event.shiftKey || isShiftHeld ? "diagonal45" : "orthogonal",
+        constraintMode: is45DegreeEnabled ? "diagonal45" : "orthogonal",
       });
       syncDraftSnapGuides();
       updateCursor();
@@ -1515,7 +1520,7 @@ export function attachRoomDrawInput(
     }
 
     state.placeDraftPointFromCursor(cursorWorld, {
-      constraintMode: event.shiftKey || isShiftHeld ? "diagonal45" : "orthogonal",
+      constraintMode: event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled ? "diagonal45" : "orthogonal",
     });
     syncDraftSnapGuides();
     updateCursor();

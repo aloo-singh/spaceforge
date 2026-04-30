@@ -191,6 +191,8 @@ type EditorState = {
   pendingProjectOpenEmptyLayoutPixelsPerMm: number | null;
   settings: EditorSettings;
   keyboardShortcutFeedbackEnabled: boolean;
+  is45DegreeDrawingEnabled: boolean;
+  setIs45DegreeDrawingEnabled: (enabled: boolean) => void;
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
@@ -2076,6 +2078,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingProjectOpenEmptyLayoutPixelsPerMm: null,
   settings: createInitialEditorSettings(),
   keyboardShortcutFeedbackEnabled: loadGlobalSettings().keyboardShortcutFeedbackEnabled,
+  is45DegreeDrawingEnabled: false,
+  setIs45DegreeDrawingEnabled: (enabled) =>
+    set(() => ({ is45DegreeDrawingEnabled: enabled })),
   exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
   viewport: {

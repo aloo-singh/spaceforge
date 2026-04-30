@@ -3,6 +3,7 @@ export {
   IconAdjustmentsHorizontal as Settings2,
   IconAlignLeft as AlignStartHorizontal,
   IconAlignRight as AlignEndHorizontal,
+  IconAngle as IconAngle,
   IconArrowBackUp as Undo2,
   IconArrowDownToArc as ArrowDownToLine,
   IconArrowForwardUp as Redo2,

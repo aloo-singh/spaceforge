@@ -184,6 +184,7 @@ import {
   PanelRightCollapse,
   PanelRightExpand,
   X,
+  IconAngle,
 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
@@ -192,6 +193,8 @@ import {
   TooltipTrigger,
   tooltipContentClassName,
 } from "@/components/ui/tooltip";
+import { Toggle } from "@/components/ui/toggle";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
@@ -968,6 +971,16 @@ export default function EditorCanvas({
     useState<NorthIndicatorSurfaceState>(
       Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01 ? "visible" : "hidden"
     );
+  const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
+  const is45DegreeDrawingEnabled = useEditorStore((state) => state.is45DegreeDrawingEnabled);
+  const setIs45DegreeDrawingEnabled = useEditorStore((state) => state.setIs45DegreeDrawingEnabled);
+
+  const handleToggle45DegreeDrawing = useCallback(
+    (pressed: boolean) => {
+      setIs45DegreeDrawingEnabled(pressed);
+    },
+    [setIs45DegreeDrawingEnabled]
+  );
 
   useEffect(() => {
     setHasMountedClient(true);
@@ -1859,6 +1872,11 @@ export default function EditorCanvas({
     const onKeyDown = (event: KeyboardEvent) => {
       syncDimensionsOverride(event.getModifierState("Alt"));
 
+      if (event.key === "Shift" && !event.repeat) {
+        setIsShiftKeyPressed(true);
+        return;
+      }
+
       if (
         event.defaultPrevented ||
         event.repeat ||
@@ -1910,6 +1928,10 @@ export default function EditorCanvas({
 
     const onKeyUp = (event: KeyboardEvent) => {
       syncDimensionsOverride(event.getModifierState("Alt"));
+
+      if (event.key === "Shift") {
+        setIsShiftKeyPressed(false);
+      }
     };
 
     const onPointerEvent = (event: PointerEvent) => {
@@ -3098,7 +3120,7 @@ export default function EditorCanvas({
               </div>
             </div>
           ) : null}
-          {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
+          {shouldShowTouchCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
             <div
               className={cn(
                 "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
@@ -3137,6 +3159,35 @@ export default function EditorCanvas({
                     </Button>
                   </div>
                 </ButtonGroup>
+              ) : null}
+              {roomDraftPointCount > 0 ? (
+                <ImmediateTooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Toggle
+                        pressed={is45DegreeDrawingEnabled}
+                        onPressedChange={handleToggle45DegreeDrawing}
+                        size={useCompactMobileControls ? "icon-sm" : "icon"}
+                        className={cn(
+                          "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)] transition-colors",
+                          useCompactMobileControls && "size-9 rounded-xl",
+                          is45DegreeDrawingEnabled || isShiftKeyPressed ? "bg-blue-500 text-white" : "bg-transparent hover:bg-muted"
+                        )}
+                        aria-label="Enable 45 degree angles"
+                      >
+                        <IconAngle className="size-4" />
+                      </Toggle>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={12}>
+                      <div className="flex items-center gap-2">
+                        <span>Enable 45° angles</span>
+                        <KbdGroup>
+                          <Kbd>Shift</Kbd>
+                        </KbdGroup>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </ImmediateTooltipProvider>
               ) : null}
               {shouldShowTouchCancelButton ? (
                 <Button
