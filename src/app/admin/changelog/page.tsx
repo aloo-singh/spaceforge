@@ -10,6 +10,23 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.11</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Sidebar density setting now persists across browser sessions and applies consistently across all projects.</li>
+                <li>Keyboard shortcut feedback toggle now persists across browser sessions and applies universally across all projects.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.10</h2>
             <span className="text-sm text-muted-foreground">2026-04-30</span>
           </div>
