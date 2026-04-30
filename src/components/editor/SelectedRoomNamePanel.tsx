@@ -286,46 +286,32 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
           <div className="mt-4">
             <RoomDimensionsDisplay room={selectedRoom} />
           </div>
-          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 [@media(max-height:540px)_and_(orientation:landscape)]:mt-3 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Delete selected room</p>
-                <p
-                  id="delete-room-hint"
-                  className="mt-1 text-[11px] leading-relaxed text-muted-foreground [@media(max-height:540px)_and_(orientation:landscape)]:text-[10px]"
-                >
-                  Removes this room from the layout. Undo restores it immediately.
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <ImmediateTooltipProvider>
-                <InspectorIconTooltip
-                  content={shouldHideKeyboardHints ? "Delete room" : (
-                    <span className="inline-flex items-center gap-2">
-                      <span>Delete room</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Kbd aria-hidden="true" className="shadow-none">Del</Kbd>
-                        <span aria-hidden="true" className="text-muted-foreground/70">/</span>
-                        <Kbd aria-hidden="true" className="shadow-none">⌫</Kbd>
-                      </span>
+          <div className="mt-4">
+            <ImmediateTooltipProvider>
+              <InspectorIconTooltip
+                content={shouldHideKeyboardHints ? "Delete room" : (
+                  <span className="inline-flex items-center gap-2">
+                    <span>Delete room</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Kbd aria-hidden="true" className="shadow-none">Del</Kbd>
+                      <span aria-hidden="true" className="text-muted-foreground/70">/</span>
+                      <Kbd aria-hidden="true" className="shadow-none">⌫</Kbd>
                     </span>
-                  )}
+                  </span>
+                )}
+              >
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  onClick={deleteSelectedRoom}
+                  disabled={!canDeleteSelectedRoom}
+                  aria-label={`Delete ${selectedRoom.name}`}
                 >
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon-sm"
-                    onClick={deleteSelectedRoom}
-                    disabled={!canDeleteSelectedRoom}
-                    aria-label={`Delete ${selectedRoom.name}`}
-                    aria-describedby="delete-room-hint"
-                  >
-                    <Trash2 />
-                  </Button>
-                </InspectorIconTooltip>
-              </ImmediateTooltipProvider>
-            </div>
+                  <Trash2 />
+                </Button>
+              </InspectorIconTooltip>
+            </ImmediateTooltipProvider>
           </div>
         </aside>
       </EditorInspectorSection>
