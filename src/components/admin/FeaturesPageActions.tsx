@@ -7,7 +7,6 @@ import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscription
 import { useEditorStore } from "@/stores/editorStore";
 import { Button } from "@/components/ui/button";
 import { Copy } from "@/components/ui/icons";
-import { cn } from "@/lib/utils";
 
 const TIERS: SubscriptionTier[] = ["Free", "Pro", "Studio", "Education"];
 
