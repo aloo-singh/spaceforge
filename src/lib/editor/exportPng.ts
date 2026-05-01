@@ -1,6 +1,7 @@
 import type { Container, ICanvas, Renderer } from "pixi.js";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
+import type { EditorExportResolution } from "@/lib/editor/exportPreferences";
 
 export type PixiPngExportSource =
   | Renderer
@@ -12,6 +13,7 @@ export type PixiPngExportSource =
 export type PixiPngExportOptions = {
   backgroundColor?: string;
   paddingPx?: number;
+  exportResolution?: EditorExportResolution;
   header?: {
     title?: string;
     description?: string;
@@ -680,7 +682,7 @@ function getBottomLeftBlockHeight(
  * Resizes a canvas to the standard export width (1280px) while preserving aspect ratio.
  * Height is calculated automatically based on the canvas's current aspect ratio.
  */
-function resizeCanvasToStandardExportDimensions(sourceCanvas: ICanvas): HTMLCanvasElement {
+function resizeCanvasToStandardExportDimensions(sourceCanvas: ICanvas, exportResolution?: EditorExportResolution): HTMLCanvasElement {
   const sourceWidth = sourceCanvas.width;
   const sourceHeight = sourceCanvas.height;
   
@@ -688,14 +690,17 @@ function resizeCanvasToStandardExportDimensions(sourceCanvas: ICanvas): HTMLCanv
     throw new Error("Cannot resize canvas with invalid dimensions");
   }
 
+  // Calculate export width based on resolution
+  const baseWidth = STANDARD_EXPORT_WIDTH_PX;
+  const exportWidth = exportResolution === "hi-res" ? baseWidth * 4 : baseWidth;
+  
   // Calculate height to preserve aspect ratio
-  const standardWidth = STANDARD_EXPORT_WIDTH_PX;
-  const scale = standardWidth / sourceWidth;
-  const standardHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const scale = exportWidth / sourceWidth;
+  const exportHeight = Math.max(1, Math.round(sourceHeight * scale));
 
   const resizedCanvas = document.createElement("canvas");
-  resizedCanvas.width = standardWidth;
-  resizedCanvas.height = standardHeight;
+  resizedCanvas.width = exportWidth;
+  resizedCanvas.height = exportHeight;
 
   const context = resizedCanvas.getContext("2d");
   if (!context) {
@@ -704,7 +709,7 @@ function resizeCanvasToStandardExportDimensions(sourceCanvas: ICanvas): HTMLCanv
 
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
-  context.drawImage(sourceCanvas as unknown as CanvasImageSource, 0, 0, standardWidth, standardHeight);
+  context.drawImage(sourceCanvas as unknown as CanvasImageSource, 0, 0, exportWidth, exportHeight);
 
   return resizedCanvas;
 }
@@ -756,7 +761,7 @@ export async function exportPixiCanvasToPngDataUrl(
   options: PixiPngExportOptions = {}
 ): Promise<string> {
   const composedCanvas = renderPixiCanvasToCanvas(source, options);
-  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas);
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas, options.exportResolution);
   const toDataUrl = standardizedCanvas.toDataURL;
 
   if (!toDataUrl) {
@@ -771,6 +776,6 @@ export async function exportPixiCanvasToPngBlob(
   options: PixiPngExportOptions = {}
 ): Promise<Blob> {
   const composedCanvas = renderPixiCanvasToCanvas(source, options);
-  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas);
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas, options.exportResolution);
   return canvasToPngBlob(standardizedCanvas);
 }
