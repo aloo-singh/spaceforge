@@ -171,6 +171,8 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
 import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
+import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
+import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
@@ -2594,28 +2596,101 @@ export default function EditorCanvas({
   } = usePersistentPanelState(projectId);
   const hasInitializedMobileSidebarRef = useRef(false);
   
-  const inspectorContent = selectedNorthIndicator ? (
-    <SelectedNorthInspector className="h-full" />
-  ) : roomDraftPointCount > 0 ? (
-    <RoomDrawingInspector className="h-full" />
-  ) : selectedRoomId ? (
-    <SelectedRoomNamePanel className="h-full" />
-  ) : selectedFloorId ? (
-    <SelectedFloorInspector className="h-full" />
-  ) : (
-    <EditorInspectorEmptyState className="h-full" />
-  );
-  const compactInspectorContent = selectedNorthIndicator ? (
-    <SelectedNorthInspector />
-  ) : roomDraftPointCount > 0 ? (
-    <RoomDrawingInspector />
-  ) : selectedRoomId ? (
-    <SelectedRoomNamePanel />
-  ) : selectedFloorId ? (
-    <SelectedFloorInspector />
-  ) : (
-    <EditorInspectorEmptyState />
-  );
+  // Determine which inspector card to show based on selection
+  const getInspectorContent = (isCompact: boolean) => {
+    if (selectedNorthIndicator) {
+      return isCompact ? <SelectedNorthInspector /> : <SelectedNorthInspector className="h-full" />;
+    }
+    
+    if (roomDraftPointCount > 0) {
+      return isCompact ? <RoomDrawingInspector /> : <RoomDrawingInspector className="h-full" />;
+    }
+
+    // Get the last selected item from the selection array
+    const selectedItem = selection.length > 0 ? selection[selection.length - 1] : null;
+    
+    if (selectedItem) {
+      if (selectedItem.type === "floor") {
+        return isCompact ? (
+          <SelectedFloorInspector />
+        ) : (
+          <SelectedFloorInspector className="h-full" />
+        );
+      } else if (selectedItem.type === "room") {
+        return isCompact ? (
+          <SelectedRoomNamePanel />
+        ) : (
+          <SelectedRoomNamePanel className="h-full" />
+        );
+      } else if (selectedItem.type === "wall") {
+        // Wall doesn't have its own card, show parent room
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        if (room) {
+          return isCompact ? (
+            <SelectedRoomNamePanel />
+          ) : (
+            <SelectedRoomNamePanel className="h-full" />
+          );
+        }
+      } else if (selectedItem.type === "opening") {
+        // Show opening inspector if available
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        const opening = room?.openings.find((o) => o.id === selectedItem.openingId);
+        if (opening) {
+          return isCompact ? (
+            <SelectedOpeningInspector opening={opening} />
+          ) : (
+            <SelectedOpeningInspector opening={opening} className="h-full" />
+          );
+        }
+        // Fallback to room if opening not found
+        if (room) {
+          return isCompact ? (
+            <SelectedRoomNamePanel />
+          ) : (
+            <SelectedRoomNamePanel className="h-full" />
+          );
+        }
+      } else if (selectedItem.type === "asset") {
+        // Show asset inspector if available
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        const asset = room?.interiorAssets.find((a) => a.id === selectedItem.id);
+        if (asset) {
+          return isCompact ? (
+            <SelectedInteriorAssetInspector asset={asset} />
+          ) : (
+            <SelectedInteriorAssetInspector asset={asset} className="h-full" />
+          );
+        }
+        // Fallback to room if asset not found
+        if (room) {
+          return isCompact ? (
+            <SelectedRoomNamePanel />
+          ) : (
+            <SelectedRoomNamePanel className="h-full" />
+          );
+        }
+      }
+    }
+
+    // Fallback: show floor or empty state
+    if (selectedFloorId) {
+      return isCompact ? (
+        <SelectedFloorInspector />
+      ) : (
+        <SelectedFloorInspector className="h-full" />
+      );
+    }
+
+    return isCompact ? (
+      <EditorInspectorEmptyState />
+    ) : (
+      <EditorInspectorEmptyState className="h-full" />
+    );
+  };
+  
+  const inspectorContent = getInspectorContent(false);
+  const compactInspectorContent = getInspectorContent(true);
   const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
