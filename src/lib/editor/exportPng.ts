@@ -57,6 +57,7 @@ const DEFAULT_EXPORT_BACKGROUND = "#ffffff";
 const DEFAULT_EXPORT_PADDING_PX = 48;
 const DEFAULT_EDGE_CROP_PX = 1;
 const EXPORT_TEXT_FONT_FAMILY = "system-ui, sans-serif";
+const STANDARD_EXPORT_WIDTH_PX = 1280;
 
 type ExportTextLine = {
   text: string;
@@ -675,6 +676,39 @@ function getBottomLeftBlockHeight(
   return scaleBarBlock?.height ?? legendBlock?.height ?? 0;
 }
 
+/**
+ * Resizes a canvas to the standard export width (1280px) while preserving aspect ratio.
+ * Height is calculated automatically based on the canvas's current aspect ratio.
+ */
+function resizeCanvasToStandardExportDimensions(sourceCanvas: ICanvas): HTMLCanvasElement {
+  const sourceWidth = sourceCanvas.width;
+  const sourceHeight = sourceCanvas.height;
+  
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    throw new Error("Cannot resize canvas with invalid dimensions");
+  }
+
+  // Calculate height to preserve aspect ratio
+  const standardWidth = STANDARD_EXPORT_WIDTH_PX;
+  const scale = standardWidth / sourceWidth;
+  const standardHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+  const resizedCanvas = document.createElement("canvas");
+  resizedCanvas.width = standardWidth;
+  resizedCanvas.height = standardHeight;
+
+  const context = resizedCanvas.getContext("2d");
+  if (!context) {
+    throw new Error("Failed to get 2D context for export canvas resize");
+  }
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(sourceCanvas as unknown as CanvasImageSource, 0, 0, standardWidth, standardHeight);
+
+  return resizedCanvas;
+}
+
 function extractSourceCanvas(source: PixiPngExportSource): ICanvas {
   const renderer = resolveRenderer(source);
   const target = resolveTarget(source);
@@ -722,13 +756,14 @@ export async function exportPixiCanvasToPngDataUrl(
   options: PixiPngExportOptions = {}
 ): Promise<string> {
   const composedCanvas = renderPixiCanvasToCanvas(source, options);
-  const toDataUrl = composedCanvas.toDataURL;
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas);
+  const toDataUrl = standardizedCanvas.toDataURL;
 
   if (!toDataUrl) {
     throw new Error("Pixi PNG export failed: canvas does not support data URL export.");
   }
 
-  return toDataUrl.call(composedCanvas, "image/png");
+  return toDataUrl.call(standardizedCanvas, "image/png");
 }
 
 export async function exportPixiCanvasToPngBlob(
@@ -736,5 +771,6 @@ export async function exportPixiCanvasToPngBlob(
   options: PixiPngExportOptions = {}
 ): Promise<Blob> {
   const composedCanvas = renderPixiCanvasToCanvas(source, options);
-  return canvasToPngBlob(composedCanvas);
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(composedCanvas);
+  return canvasToPngBlob(standardizedCanvas);
 }
