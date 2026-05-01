@@ -122,7 +122,7 @@ export function HomeHeroContent() {
       <div className={`${revealClass(isVisible)} pt-1 sm:pt-2`} style={revealStyle(700)}>
         <Safari
           url="spaceforge.app"
-          imageSrc="/images/home/editor-hero.png?v=20260318"
+          imageSrc="/images/home/editor-hero.png?v=20260501"
           className="w-full"
         />
       </div>
