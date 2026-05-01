@@ -13,6 +13,10 @@ export type SubscriptionTier = "Free" | "Pro" | "Studio" | "Education";
 export interface GatedFeatureConfig {
   /** Feature name for display */
   name: string;
+  /** Short human-readable label for the feature */
+  label?: string;
+  /** Benefit-focused description of the feature */
+  description?: string;
   /** Max allowed value (e.g., 3 for max 3 floors) */
   limit: number;
   /** Singular label (e.g., "floor" not "floors") */
@@ -38,6 +42,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
   Free: {
     floors: {
       name: "Floors",
+      label: "Floors per project",
+      description: "Build multi-story projects with multiple floors in a single design.",
       limit: 1,
       singularLabel: "floor",
       pluralLabel: "floors",
@@ -47,6 +53,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
     },
     projects: {
       name: "Projects",
+      label: "Projects",
+      description: "Create and organize multiple floor plan projects.",
       limit: 2,
       singularLabel: "project",
       pluralLabel: "projects",
@@ -59,6 +67,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
   Pro: {
     floors: {
       name: "Floors",
+      label: "Floors per project",
+      description: "Design multi-level properties with enhanced architectural flexibility.",
       limit: 3,
       singularLabel: "floor",
       pluralLabel: "floors",
@@ -68,6 +78,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
     },
     projects: {
       name: "Projects",
+      label: "Projects",
+      description: "Organize unlimited floor plans across multiple projects.",
       limit: Infinity,
       singularLabel: "project",
       pluralLabel: "projects",
@@ -80,6 +92,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
   Studio: {
     floors: {
       name: "Floors",
+      label: "Floors per project",
+      description: "Create complex multi-level designs with full creative freedom.",
       limit: 6,
       singularLabel: "floor",
       pluralLabel: "floors",
@@ -89,6 +103,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
     },
     projects: {
       name: "Projects",
+      label: "Projects",
+      description: "Organize unlimited projects for professional workflow.",
       limit: Infinity,
       singularLabel: "project",
       pluralLabel: "projects",
@@ -101,6 +117,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
   Education: {
     floors: {
       name: "Floors",
+      label: "Floors per project",
+      description: "Explore multi-level design with comprehensive creative capabilities.",
       limit: 6,
       singularLabel: "floor",
       pluralLabel: "floors",
@@ -110,6 +128,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
     },
     projects: {
       name: "Projects",
+      label: "Projects",
+      description: "Build unlimited projects for coursework and exploration.",
       limit: Infinity,
       singularLabel: "project",
       pluralLabel: "projects",
