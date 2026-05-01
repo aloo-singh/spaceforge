@@ -45,6 +45,15 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `Upgrade to ${nextTier} to create projects with up to ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"}.`,
       terminalMessage: "You've reached your Free tier limit. Ready to expand your creativity?",
     },
+    projects: {
+      name: "Projects",
+      limit: 2,
+      singularLabel: "project",
+      pluralLabel: "projects",
+      upsellMessage: (nextTier, nextLimit) =>
+        `Upgrade to ${nextTier} to create unlimited projects and unlock advanced features.`,
+      terminalMessage: "You've reached your Free tier project limit. Ready to expand?",
+    },
   },
 
   Pro: {
@@ -56,6 +65,15 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: (nextTier, nextLimit) =>
         `Unlock ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"} and advanced 3D features with ${nextTier}.`,
       terminalMessage: "Pro tier maxed out. Studio unlocks commercial features and 6 floors.",
+    },
+    projects: {
+      name: "Projects",
+      limit: Infinity,
+      singularLabel: "project",
+      pluralLabel: "projects",
+      upsellMessage: () =>
+        `You've unlocked unlimited projects on Pro. Create freely.`,
+      terminalMessage: "You have unlimited projects on Pro tier. Build away!",
     },
   },
 
@@ -69,6 +87,15 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `Unlock ${nextLimit} ${nextLimit === 1 ? "floor" : "floors"} with ${nextTier}.`,
       terminalMessage: "You've unlocked Studio's full creative potential. Make every floor count.",
     },
+    projects: {
+      name: "Projects",
+      limit: Infinity,
+      singularLabel: "project",
+      pluralLabel: "projects",
+      upsellMessage: () =>
+        `You've unlocked unlimited projects on Studio. Create freely.`,
+      terminalMessage: "You have unlimited projects on Studio tier. Build away!",
+    },
   },
 
   Education: {
@@ -80,6 +107,15 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You're on Education tier with full creative freedom.`,
       terminalMessage: "Education tier gives you 6 floors of unlimited creative freedom. You've got this.",
+    },
+    projects: {
+      name: "Projects",
+      limit: Infinity,
+      singularLabel: "project",
+      pluralLabel: "projects",
+      upsellMessage: () =>
+        `You've unlocked unlimited projects on Education. Create freely.`,
+      terminalMessage: "You have unlimited projects on Education tier. Build away!",
     },
   },
 };
@@ -150,4 +186,17 @@ export function getNextTierLimit(currentTier: SubscriptionTier, feature: string)
   
   const nextConfig = getFeatureConfig(nextTier, feature);
   return nextConfig?.limit ?? null;
+}
+
+/**
+ * Get the effective max projects for a subscription tier.
+ * Safely handles "unlimited" by returning Infinity.
+ */
+export function getEffectiveMaxProjects(tier: SubscriptionTier | string): number {
+  const config = getFeatureConfig(tier, "projects");
+  if (!config) {
+    // Default to Free tier limit if tier not found
+    return 2;
+  }
+  return config.limit;
 }
