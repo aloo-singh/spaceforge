@@ -1433,6 +1433,7 @@ export default function EditorCanvas({
       descriptionText,
       legendItems,
       themeMode,
+      exportResolution,
     }: {
       includeSignature: boolean;
       includeNorthIndicator?: boolean;
@@ -1447,6 +1448,7 @@ export default function EditorCanvas({
       descriptionText?: string;
       legendItems?: { name: string; area: string }[];
       themeMode: "light" | "dark";
+      exportResolution?: "normal" | "hi-res";
     }) => {
       const app = appRef.current;
       if (!app) return null;
@@ -1553,6 +1555,7 @@ export default function EditorCanvas({
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           paddingPx,
+          exportResolution,
           header:
             titleText || descriptionText
               ? {
@@ -1655,6 +1658,7 @@ export default function EditorCanvas({
       legendItems: exportLegendItems,
       signatureText: exportSignatureText || undefined,
       themeMode: resolvedThemeMode,
+      exportResolution: request.exportResolution,
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
 

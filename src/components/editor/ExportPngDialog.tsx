@@ -7,11 +7,13 @@ import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
 import type {
   EditorExportLegendPosition,
   EditorExportScaleBarPosition,
+  EditorExportResolution,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -19,6 +21,8 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
+import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
@@ -37,6 +41,7 @@ export type ExportPngRequest = {
   showGrid: boolean;
   showDimensions: boolean;
   theme: ExportPngThemeOption;
+  exportResolution: EditorExportResolution;
 };
 
 type ExportPngDialogProps = {
@@ -59,6 +64,7 @@ type ExportPngDialogProps = {
   theme: ExportPngThemeOption;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
+  exportResolution: EditorExportResolution;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
@@ -71,6 +77,7 @@ type ExportPngDialogProps = {
   onThemeChange: (value: ExportPngThemeOption) => void;
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
+  onExportResolutionChange: (value: EditorExportResolution) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -95,6 +102,7 @@ export function ExportPngDialog({
   theme,
   legendPosition,
   scaleBarPosition,
+  exportResolution,
   onTitleChange,
   onDescriptionChange,
   onTitlePositionChange,
@@ -107,6 +115,7 @@ export function ExportPngDialog({
   onThemeChange,
   onLegendPositionChange,
   onScaleBarPositionChange,
+  onExportResolutionChange,
   currentThemeLabel,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
@@ -115,7 +124,12 @@ export function ExportPngDialog({
   const [previewDimensions, setPreviewDimensions] = useState({ width: 1600, height: 1200 });
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
+  const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
   const previewRequestIdRef = useRef(0);
+
+  const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
+  const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
+  const isDevSubscriptionModeEnabled = useEditorStore((state) => state.isDevSubscriptionModeEnabled);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
   const effectiveLegendPosition: EditorExportLegendPosition =
@@ -150,6 +164,7 @@ export function ExportPngDialog({
         showGrid,
         showDimensions,
         theme,
+        exportResolution,
       })
         .then((nextPreviewSrc) => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -191,6 +206,7 @@ export function ExportPngDialog({
     showGrid,
     showDimensions,
     theme,
+    exportResolution,
   ]);
 
   const handleExport = () => {
@@ -211,6 +227,7 @@ export function ExportPngDialog({
       showGrid,
       showDimensions,
       theme,
+      exportResolution,
     });
   };
 
@@ -223,27 +240,61 @@ export function ExportPngDialog({
   };
 
   return (
-    <ResponsiveDialog
-      open={open}
-      onOpenChange={handleOpenChange}
-      title="Export PNG"
-      description="Adjust a few export details without changing the live editor."
-      className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
-      contentClassName="min-h-0 pr-0 overflow-y-auto lg:overflow-hidden"
-      footerClassName="px-0"
-      stickyFooter
-      contentScrollable={false}
+    <>
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        title="Export PNG"
+        description="Adjust a few export details without changing the live editor."
+        className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
+        contentClassName="min-h-0 pr-0 overflow-y-auto lg:overflow-hidden"
+        footerClassName="px-0"
+        stickyFooter
+        contentScrollable={false}
       footer={
-        <Button
-          type="button"
-          onClick={handleExport}
-          disabled={isExportButtonDisabled}
-          title={isExportButtonDisabled ? exportDisabledReason : undefined}
-          className="w-full sm:w-auto"
-        >
-          <Download />
-          {isExporting ? "Exporting..." : "Export PNG"}
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="grid w-full gap-1 rounded-lg border border-border/70 bg-background/90 p-1 sm:w-auto"
+            style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+            role="group"
+            aria-label="Export resolution"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={exportResolution === "normal" ? "secondary" : "ghost"}
+              aria-pressed={exportResolution === "normal"}
+              onClick={() => onExportResolutionChange("normal")}
+            >
+              Normal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportResolution === "hi-res" ? "secondary" : "ghost"}
+              aria-pressed={exportResolution === "hi-res"}
+              onClick={() => {
+                if (devSubscriptionTier === "Free") {
+                  setShowHiResUpsellDialog(true);
+                } else {
+                  onExportResolutionChange("hi-res");
+                }
+              }}
+            >
+              Hi-res
+            </Button>
+          </div>
+          <Button
+            type="button"
+            onClick={handleExport}
+            disabled={isExportButtonDisabled}
+            title={isExportButtonDisabled ? exportDisabledReason : undefined}
+            className="w-full sm:w-auto"
+          >
+            <Download />
+            {isExporting ? "Exporting..." : "Export PNG"}
+          </Button>
+        </div>
       }
     >
       <div className="grid min-h-0 gap-3 sm:gap-4 lg:h-full lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,23.5rem)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:overflow-hidden xl:grid-cols-[minmax(0,1.08fr)_minmax(23rem,24.5rem)] xl:gap-5">
@@ -518,6 +569,50 @@ export function ExportPngDialog({
         </section>
       </div>
     </ResponsiveDialog>
+
+    <ResponsiveAlertDialog
+      open={showHiResUpsellDialog}
+      onOpenChange={setShowHiResUpsellDialog}
+      title="Hi-res export for premium plans"
+      description="Crystal-clear prints and presentations—exactly what you'd expect from spaceforge."
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowHiResUpsellDialog(false)}
+            className="w-full sm:w-auto"
+          >
+            Stay with Normal
+          </Button>
+          <Button
+            onClick={() => {
+              if (isDevSubscriptionModeEnabled) {
+                setDevSubscriptionTier("Pro");
+                setShowHiResUpsellDialog(false);
+                onExportResolutionChange("hi-res");
+              } else {
+                window.open("/upgrade", "_blank");
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            Upgrade to Pro
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 py-4">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>4x resolution = 16x total pixels</strong> for prints that stay sharp at any size.
+          </p>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Pro and Studio tiers unlock premium export options to scale your presentations.
+        </p>
+      </div>
+    </ResponsiveAlertDialog>
+    </>
   );
 }
 

@@ -1,6 +1,7 @@
 export type EditorExportThemePreference = "light" | "dark" | "system";
 export type EditorExportLegendPosition = "bottom" | "right-side" | "none";
 export type EditorExportScaleBarPosition = "bottom-left" | "none";
+export type EditorExportResolution = "normal" | "hi-res";
 
 export type EditorExportPreferences = {
   showLegend: boolean;
@@ -10,6 +11,7 @@ export type EditorExportPreferences = {
   theme: EditorExportThemePreference;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
+  exportResolution: EditorExportResolution;
 };
 
 export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
@@ -20,6 +22,7 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   theme: "system",
   legendPosition: "bottom",
   scaleBarPosition: "bottom-left",
+  exportResolution: "normal",
 };
 
 export function cloneEditorExportPreferences(
@@ -33,6 +36,7 @@ export function cloneEditorExportPreferences(
     theme: preferences.theme,
     legendPosition: preferences.legendPosition,
     scaleBarPosition: preferences.scaleBarPosition,
+    exportResolution: preferences.exportResolution,
   };
 }
 
@@ -47,7 +51,8 @@ export function areEditorExportPreferencesEqual(
     a.showDimensions === b.showDimensions &&
     a.theme === b.theme &&
     a.legendPosition === b.legendPosition &&
-    a.scaleBarPosition === b.scaleBarPosition
+    a.scaleBarPosition === b.scaleBarPosition &&
+    a.exportResolution === b.exportResolution
   );
 }
 
@@ -90,5 +95,10 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       (value.scaleBarPosition === "bottom-left" || value.scaleBarPosition === "none")
         ? value.scaleBarPosition
         : DEFAULT_EDITOR_EXPORT_PREFERENCES.scaleBarPosition,
+    exportResolution:
+      "exportResolution" in value &&
+      (value.exportResolution === "normal" || value.exportResolution === "hi-res")
+        ? value.exportResolution
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportResolution,
   };
 }
