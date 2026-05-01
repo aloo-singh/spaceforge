@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertCircle, ArrowRight, Plus, RefreshCcw, LoaderCircle } from "@/components/ui/icons";
+import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
@@ -30,8 +30,11 @@ import {
 } from "@/lib/projects/listState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ProjectDeleteDialog } from "@/components/projects/ProjectDeleteDialog";
+import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { getEffectiveMaxProjects } from "@/lib/subscription/features";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 export function ProjectsPageClient() {
   const router = useRouter();
@@ -44,8 +47,12 @@ export function ProjectsPageClient() {
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
+  const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
+  
+  // Current subscription tier (all free-tier users by default)
+  const currentTier: SubscriptionTier = "Free";
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
@@ -110,6 +117,13 @@ export function ProjectsPageClient() {
 
   const handleCreateProject = () => {
     if (!canCreateProject) return;
+
+    // Check project limit
+    const maxProjects = getEffectiveMaxProjects(currentTier);
+    if (projects.length >= maxProjects) {
+      setIsProjectLimitDialogOpen(true);
+      return;
+    }
 
     startCreateProjectTransition(() => {
       void (async () => {
@@ -387,6 +401,13 @@ export function ProjectsPageClient() {
             if (!projectPendingDelete) return;
             void handleDeleteProject(projectPendingDelete.id);
           }}
+        />
+
+        <TierLimitUpsellDialog
+          open={isProjectLimitDialogOpen}
+          onOpenChange={setIsProjectLimitDialogOpen}
+          featureKey="projects"
+          currentTier={currentTier}
         />
       </section>
       <FeedbackWidget
