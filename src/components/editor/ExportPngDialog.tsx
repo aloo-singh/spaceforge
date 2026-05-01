@@ -468,14 +468,14 @@ export function ExportPngDialog({
             </ExportToggleCard>
 
             <ExportToggleCard
-              title="Export theme"
-              description={`Follow the editor or choose Light or Dark (${currentThemeLabel}).`}
-              value={theme === "system" ? `System (${currentThemeLabel})` : theme === "light" ? "Light" : "Dark"}
+              title="Appearance"
+              description="Choose the appearance of the exported file."
+              value={theme === "system" ? "System" : theme === "light" ? "Light" : "Dark"}
             >
               <div
-                className="mt-2.5 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
+                className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
                 role="group"
-                aria-label="Export theme"
+                aria-label="Appearance"
               >
                 <Button
                   type="button"
@@ -484,7 +484,7 @@ export function ExportPngDialog({
                   aria-pressed={theme === "system"}
                   onClick={() => onThemeChange("system")}
                 >
-                  {`System (${currentThemeLabel})`}
+                  System
                 </Button>
                 <Button
                   type="button"
@@ -530,15 +530,18 @@ type ExportToggleCardProps = {
 
 function ExportToggleCard({ title, description, value, children }: ExportToggleCardProps) {
   return (
-    <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
-      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <div>
+    <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="flex-1">
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
-          {value}
-        </div>
+        <dl className="shrink-0 self-start">
+          <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <dt className="sr-only">{title}</dt>
+            <dd>{value}</dd>
+          </div>
+        </dl>
       </div>
       {children}
     </div>

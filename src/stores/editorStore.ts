@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  GRID_SIZE_MM,
+  GRID_MINOR_SIZE_MM,
   INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
 import {
@@ -56,6 +56,7 @@ import {
   DEFAULT_EDITOR_SETTINGS,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import { loadGlobalSettings, saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import {
   buildPersistedHistorySnapshot,
@@ -190,6 +191,8 @@ type EditorState = {
   pendingProjectOpenEmptyLayoutPixelsPerMm: number | null;
   settings: EditorSettings;
   keyboardShortcutFeedbackEnabled: boolean;
+  is45DegreeDrawingEnabled: boolean;
+  setIs45DegreeDrawingEnabled: (enabled: boolean) => void;
   exportPreferences: EditorExportPreferences;
   isDimensionsVisibilityOverrideActive: boolean;
   viewport: ViewportSize;
@@ -1983,21 +1986,31 @@ function createInitialCameraState(): CameraState {
 }
 
 function createInitialEditorSettings(): EditorSettings {
+  // Start with hydrated settings from the project document
+  let initialSettings: EditorSettings;
+  
   if (hydrationSnapshot?.settings) {
-    return hydrationSnapshot.settings;
+    initialSettings = hydrationSnapshot.settings;
+  } else {
+    // No persisted settings - check if mobile and default HUD elements to off
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+    if (isMobile) {
+      initialSettings = {
+        ...cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
+        showCanvasHud: false,
+        showMiniMap: false,
+      };
+    } else {
+      initialSettings = cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
+    }
   }
 
-  // No persisted settings - check if mobile and default HUD elements to off
-  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
-  if (isMobile) {
-    return {
-      ...cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
-      showCanvasHud: false,
-      showMiniMap: false,
-    };
-  }
-
-  return cloneEditorSettings(DEFAULT_EDITOR_SETTINGS);
+  // Apply global settings (sidebar density) to override project-specific value
+  const globalSettings = loadGlobalSettings();
+  return {
+    ...initialSettings,
+    sidebarDensity: globalSettings.sidebarDensity,
+  };
 }
 
 function createInitialEditorExportPreferences(): EditorExportPreferences {
@@ -2064,7 +2077,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingProjectOpenCameraFit: false,
   pendingProjectOpenEmptyLayoutPixelsPerMm: null,
   settings: createInitialEditorSettings(),
-  keyboardShortcutFeedbackEnabled: true,
+  keyboardShortcutFeedbackEnabled: loadGlobalSettings().keyboardShortcutFeedbackEnabled,
+  is45DegreeDrawingEnabled: false,
+  setIs45DegreeDrawingEnabled: (enabled) =>
+    set(() => ({ is45DegreeDrawingEnabled: enabled })),
   exportPreferences: createInitialEditorExportPreferences(),
   isDimensionsVisibilityOverrideActive: false,
   viewport: {
@@ -2193,6 +2209,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setKeyboardShortcutFeedbackEnabled: (isEnabled) =>
     set((state) => {
       if (state.keyboardShortcutFeedbackEnabled === isEnabled) return state;
+      
+      saveGlobalSettings({ keyboardShortcutFeedbackEnabled: isEnabled });
 
       return {
         keyboardShortcutFeedbackEnabled: isEnabled,
@@ -4949,11 +4967,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   updateSelectedOpeningWidth: (widthMm) =>
     set((state) => {
-      const nextState = updateSelectedOpening(state, (room, opening) =>
-        getUpdatedOpeningForWidth(room, opening, widthMm, {
-          gridSizeMm: GRID_SIZE_MM,
-        })
-      );
+      let constrainedWidthMm: number | null = null;
+      const nextState = updateSelectedOpening(state, (room, opening) => {
+        const nextOpening = getUpdatedOpeningForWidth(room, opening, widthMm, {
+          gridSizeMm: GRID_MINOR_SIZE_MM,
+          minWidthMm: GRID_MINOR_SIZE_MM,
+        });
+        constrainedWidthMm = nextOpening?.widthMm ?? null;
+        return nextOpening;
+      });
+      const requestedWidthMm = Math.round(widthMm / GRID_MINOR_SIZE_MM) * GRID_MINOR_SIZE_MM;
+      if (constrainedWidthMm !== null && constrainedWidthMm < requestedWidthMm) {
+        toast(`In this position, this wall only has room for ${constrainedWidthMm} mm.`, {
+          duration: 5000,
+        });
+      }
       return nextState ?? state;
     }),
   updateSelectedDoorOpeningSide: (openingSide) =>
@@ -5853,6 +5881,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         camera: nextCamera,
+        settings: {
+          ...state.settings,
+          sidebarDensity: loadGlobalSettings().sidebarDensity,
+        },
+        keyboardShortcutFeedbackEnabled: loadGlobalSettings().keyboardShortcutFeedbackEnabled,
         pendingProjectOpenCameraFit: shouldDeferCameraFit,
         pendingProjectOpenEmptyLayoutPixelsPerMm: shouldDeferCameraFit
           ? emptyLayoutPixelsPerMm ?? null

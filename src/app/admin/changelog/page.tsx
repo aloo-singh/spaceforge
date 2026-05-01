@@ -10,6 +10,342 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.20</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Wall inspector card showing wall metrics (length, opening count) with streamlined delete controls.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.19</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Inspector now shows only the selected item's card—no duplicate parent cards (e.g., selecting a window shows only the opening inspector, not also the room card).</li>
+                <li>Items without their own inspector cards (e.g., walls) automatically show their parent room inspector for context.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.18</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Inspector breadcrumb navigation showing selection hierarchy (Floor → Room → Wall → Item) with collapsible ellipsis for long paths.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.17</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Simplified delete actions in inspectors by removing heavy delete panels—buttons now appear inline with clean tooltip styling.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.16</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Drawing mode inspector showing room sketch instructions and available keyboard shortcuts (Shift for 45° angles, Backspace to undo last point, S/G to toggle snapping/guides, Space to pan, Esc to cancel).</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.15</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>45-degree drawing toggle button during room drawing—click to enable/disable 45-degree angles without holding Shift. Button shows blue when 45-degree mode is active (either from toggle or Shift key).</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.14</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Admin login sessions now persist for 24 hours instead of 1 hour, reducing the need for frequent re-authentication.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.13</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Grid zoom levels now perfectly align with snapping levels: snapping switches to 0.1m increments at the exact zoom level where 0.1m gridlines appear, creating a cohesive experience.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.12</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export dialog appearance selector now matches the settings dialog appearance selector for consistency: simplified &quot;System&quot; label without system theme suffix, updated wording to &quot;Choose the appearance of the exported file&quot;, and improved layout to prevent indicator badge from affecting text flow.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.11</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Sidebar density setting now persists across browser sessions and applies consistently across all projects.</li>
+                <li>Keyboard shortcut feedback toggle now persists across browser sessions and applies universally across all projects.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.10</h2>
+            <span className="text-sm text-muted-foreground">2026-04-30</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Grid visual hierarchy enhanced with alternating prominence: 1m lines (prominent with width 2, alpha 1.0), 0.5m lines (subtle with width 1, alpha 0.8), and 0.1m lines (fine details with width 1, alpha 0.9) for better spatial orientation during design.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.9</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Show/hide toggle for room names on canvas for flexible floorplan visualization.</li>
+                <li>Show/hide toggle for assets (furniture and fixtures) to create clean, minimal floorplans while keeping room structure visible.</li>
+                <li>Nested show/hide toggle for asset labels, only visible when assets are displayed to prevent orphaned text.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.8</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Floor operation undo labels now include the specific floor name: &ldquo;floor &quot;Kitchen&quot; deleted&rdquo;, &ldquo;floor &quot;Master Suite&quot; created&rdquo;, etc. for crystal-clear history context.</li>
+                <li>Sidebar floor numbering now starts from 1 instead of 0, matching the HUD floor selector display (1-9 range).</li>
+                <li>Stairs inspector icons for &ldquo;Add floor above&rdquo; and &ldquo;Add floor below&rdquo; now use caret icons matching the floor sidebar context menu.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed SSR hydration error in DevSubscriptionTierSelector when localStorage tier differs from server default.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.7</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>All animations now respect the user&rsquo;s &ldquo;reduce motion&rdquo; accessibility preference. Dialogs, tooltips, and interactive elements skip animations when <code className="bg-muted px-1.5 py-0.5 rounded text-xs">prefers-reduced-motion: reduce</code> is set.</li>
+                <li>Global CSS fallback ensures animations are disabled across the entire application when motion reduction is preferred.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.6</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Room inspector now displays the room&rsquo;s length (vertical Y-axis extent) and width (horizontal X-axis extent) below the name field, with visual ruler icons.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.5</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Undo labels and Sonner confirmations for all asset rotations now read &ldquo;bed rotated left 90°&rdquo; or &ldquo;stair rotated right 90°&rdquo; instead of generic &ldquo;rotation&rdquo;.</li>
+                <li>Inspector keyboard hint keycaps (Enter, Esc) now use proper shadcn Kbd styling with readable backgrounds in both light and dark mode.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Mini-map viewing area rounded corners reduced so it remains visually rectangular at all zoom levels.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.4</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Changed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Switched shortcut affordances to shadcn-style kbd primitives, replacing custom keycap styling.</li>
+                <li>Migrated editor settings, inspectors, feedback widget, admin feedback inbox, undo/redo tooltips, and opening context-menu shortcuts to unified Kbd components.</li>
+                <li>Removed + separators from keyboard combo rendering.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Undo/redo tooltip keycap contrast now uses readable foreground/background colours in both light and dark mode.</li>
+                <li>Door right-click context menu now widens appropriately when Alt/Option is held for mirror duplicate, staying on one line.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.3</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hovering a non-selected floor number in the HUD now always previews that floor footprint, even when the persistent floor-below footprint setting is off.</li>
+                <li>The setting still controls the always-on floor-below footprint, keeping temporary hover previews separate from persistent canvas visibility.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.67.2</h2>
+            <span className="text-sm text-muted-foreground">2026-04-29</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Door and window widths can now be typed directly in the selected opening inspector.</li>
+                <li>Inspector-entered opening widths resize from the opening centre, snap to 100 mm, and stay within the available wall space.</li>
+                <li>When a typed opening width cannot fit in its current position, a five-second Sonner explains the largest available size.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.1</h2>
             <span className="text-sm text-muted-foreground">2026-04-29</span>
           </div>
@@ -137,12 +473,12 @@ export default function ChangelogPage() {
                 <li>Deleting projects is now reversible—Sonner confirmation with undo option shown for 5 seconds</li>
                 <li>Mobile zoom and cancel controls no longer appear on desktop HUD</li>
                 <li>Floor switcher on HUD now animates with grow-shrink style when switching floors</li>
-                <li>New projects from homepage now work consistently with "New project" button from /projects</li>
+                <li>New projects from homepage now work consistently with &quot;New project&quot; button from /projects</li>
                 <li>Projects can now be opened by clicking the thumbnail (not just the button)</li>
                 <li>Toggling HUD visibility no longer shifts the floor selector position</li>
                 <li>Sonner confirmations for keyboard shortcuts with Ctrl/Cmd modifier now persist correctly</li>
                 <li>Moving rooms no longer resizes them—exact measurements always retained during repositioning</li>
-                <li>Duplicate "Selection deleted" toast when deleting floors—now shows only floor-specific notification</li>
+                <li>Duplicate &quot;Selection deleted&quot; toast when deleting floors—now shows only floor-specific notification</li>
                 <li>Floor selector HUD now displays floors as 1-based (1, 2, 3...) instead of 0-based, matching sidebar</li>
                 <li>Clicking a floor when a room is selected in sidebar now correctly selects the floor</li>
                 <li>Selected floors and rooms in sidebar can now be expanded/collapsed (expand/collapse icons always work)</li>
@@ -153,7 +489,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Canvas auto-fit on project load and refresh now uses consistent, device-aware padding (48px landscape desktop, 96px otherwise) matching manual "Fit View" button for optimal zoom on all screen sizes</li>
+                <li>Canvas auto-fit on project load and refresh now uses consistent, device-aware padding (48px landscape desktop, 96px otherwise) matching manual &quot;Fit View&quot; button for optimal zoom on all screen sizes</li>
                 <li>Outline visibility of other floors on canvas improved—added outline visibility slider setting (default more visible)</li>
                 <li>Selected floors, rooms, and walls now have distinct selection colours in sidebar (previously same colour)</li>
                 <li>Sidebar and inspector state (collapsed/expanded) now retained per project when opened or browser is refreshed</li>

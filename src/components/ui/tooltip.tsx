@@ -1,12 +1,16 @@
 import * as React from "react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion"
 import { cn } from "@/lib/utils"
 
 const IMMEDIATE_TOOLTIP_DELAY_DURATION = 0
 
 export const tooltipContentClassName =
   "z-50 overflow-hidden rounded-md border border-border/80 bg-popover px-2.5 py-1.5 text-[11px] font-medium text-popover-foreground shadow-md backdrop-blur-sm animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1"
+
+export const tooltipContentClassNameNoMotion =
+  "z-50 overflow-hidden rounded-md border border-border/80 bg-popover px-2.5 py-1.5 text-[11px] font-medium text-popover-foreground shadow-md backdrop-blur-sm"
 
 function TooltipProvider({
   delayDuration = 120,
@@ -39,12 +43,15 @@ function TooltipContent({
   sideOffset = 8,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const contentClassName = prefersReducedMotion ? tooltipContentClassNameNoMotion : tooltipContentClassName;
+  
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
-        className={cn(tooltipContentClassName, className)}
+        className={cn(contentClassName, className)}
         {...props}
       />
     </TooltipPrimitive.Portal>

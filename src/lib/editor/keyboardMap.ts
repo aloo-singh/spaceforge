@@ -351,6 +351,18 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "room deletion";
   }
 
+  if (command.type === "delete-floor") {
+    return `floor "${command.floor.name}" deleted`;
+  }
+
+  if (command.type === "add-floor") {
+    return `floor "${command.floor.name}" created`;
+  }
+
+  if (command.type === "rename-floor") {
+    return `floor renamed to "${command.nextName}"`;
+  }
+
   if (command.type === "rename-room") {
     return "room rename";
   }
@@ -498,7 +510,9 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     const nextAsset = command.nextAsset;
 
     if (previousAsset.rotationDegrees !== nextAsset.rotationDegrees) {
-      return getInteriorAssetActionLabel(nextAsset.type, "rotation");
+      const rotationDelta = ((nextAsset.rotationDegrees ?? 0) - (previousAsset.rotationDegrees ?? 0) + 360) % 360;
+      const direction = rotationDelta === 90 || rotationDelta === 270 ? "rotated right" : "rotated left";
+      return `${getInteriorAssetTypeName(nextAsset.type)} ${direction} 90°`;
     }
 
     if (

@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -11,6 +11,7 @@ import {
   normalizeEditorExportSignature,
   shouldShowDimensions,
 } from "@/lib/editor/settings";
+import { saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -38,6 +39,9 @@ export function EditorSettingsDialog({
   const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
   const isCanvasHudVisible = settings.showCanvasHud;
   const isMiniMapVisible = settings.showMiniMap;
+  const areRoomNamesVisible = settings.showRoomNames;
+  const areAssetsVisible = settings.showAssets;
+  const areAssetLabelsVisible = settings.showAssetLabels;
   const areGuidelinesVisible = settings.showGuidelines;
   const isSnappingEnabled = settings.snappingEnabled;
   const isFloorFootprintVisible = settings.showFloorFootprint;
@@ -280,12 +284,9 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-canvas-hud-title" className="text-sm font-medium text-foreground">
                   Show canvas HUD
                 </h3>
-                <Keycap
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   H
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Keep the scale and north instruments visible on the canvas as a calm orientation aid.
@@ -377,6 +378,142 @@ export function EditorSettingsDialog({
         </div>
 
         <div
+          aria-labelledby="editor-settings-room-names-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-room-names-title" className="text-sm font-medium text-foreground">
+                Show room names
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Display room labels in the canvas for quick spatial identification.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Room names status</dt>
+                <dd>{areRoomNamesVisible ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Show room names"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={areRoomNamesVisible ? "secondary" : "ghost"}
+              aria-pressed={areRoomNamesVisible}
+              onClick={() => updateSettings({ showRoomNames: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!areRoomNamesVisible ? "secondary" : "ghost"}
+              aria-pressed={!areRoomNamesVisible}
+              onClick={() => updateSettings({ showRoomNames: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-assets-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-assets-title" className="text-sm font-medium text-foreground">
+                Show assets
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Display furniture and fixtures on the canvas, or hide them for a clean floorplan view.
+              </p>
+            </div>
+            <dl className="shrink-0 self-start">
+              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <dt className="sr-only">Assets status</dt>
+                <dd>{areAssetsVisible ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Show assets"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={areAssetsVisible ? "secondary" : "ghost"}
+              aria-pressed={areAssetsVisible}
+              onClick={() => updateSettings({ showAssets: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!areAssetsVisible ? "secondary" : "ghost"}
+              aria-pressed={!areAssetsVisible}
+              onClick={() => updateSettings({ showAssets: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+
+          {areAssetsVisible && (
+            <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+              <div>
+                <h4 className="text-xs font-medium text-foreground">Show asset labels</h4>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Display labels on furniture and fixtures for quick item identification.
+                </p>
+              </div>
+
+              <div
+                className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+                role="group"
+                aria-label="Show asset labels"
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={areAssetLabelsVisible ? "secondary" : "ghost"}
+                  aria-pressed={areAssetLabelsVisible}
+                  onClick={() => updateSettings({ showAssetLabels: true })}
+                  className="min-w-20 flex-1 sm:flex-none"
+                >
+                  On
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!areAssetLabelsVisible ? "secondary" : "ghost"}
+                  aria-pressed={!areAssetLabelsVisible}
+                  onClick={() => updateSettings({ showAssetLabels: false })}
+                  className="min-w-20 flex-1 sm:flex-none"
+                >
+                  Off
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
           aria-labelledby="editor-settings-guidelines-title"
           className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
         >
@@ -386,12 +523,9 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-guidelines-title" className="text-sm font-medium text-foreground">
                   Show guidelines
                 </h3>
-                <Keycap
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   G
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Show predictive muted guides from nearby room edges while moving, drawing, and resizing.
@@ -443,12 +577,9 @@ export function EditorSettingsDialog({
                 <h3 id="editor-settings-snapping-title" className="text-sm font-medium text-foreground">
                   Enable snapping
                 </h3>
-                <Keycap
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none"
-                >
+                <Kbd aria-hidden="true">
                   S
-                </Keycap>
+                </Kbd>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Magnetically snap active edits to the current grid and nearby predictive guides.
@@ -588,7 +719,10 @@ export function EditorSettingsDialog({
               size="sm"
               variant={!isCompactSidebarDensity ? "secondary" : "ghost"}
               aria-pressed={!isCompactSidebarDensity}
-              onClick={() => updateSettings({ sidebarDensity: "comfortable" })}
+              onClick={() => {
+                updateSettings({ sidebarDensity: "comfortable" });
+                saveGlobalSettings({ sidebarDensity: "comfortable" });
+              }}
               className="min-w-28 flex-1 sm:flex-none"
             >
               Comfortable
@@ -598,7 +732,10 @@ export function EditorSettingsDialog({
               size="sm"
               variant={isCompactSidebarDensity ? "secondary" : "ghost"}
               aria-pressed={isCompactSidebarDensity}
-              onClick={() => updateSettings({ sidebarDensity: "compact" })}
+              onClick={() => {
+                updateSettings({ sidebarDensity: "compact" });
+                saveGlobalSettings({ sidebarDensity: "compact" });
+              }}
               className="min-w-24 flex-1 sm:flex-none"
             >
               Compact

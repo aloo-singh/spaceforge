@@ -12,6 +12,9 @@ export type EditorSettings = {
   wallMeasurementPosition: EditorWallMeasurementPosition;
   showCanvasHud: boolean;
   showMiniMap: boolean;
+  showRoomNames: boolean;
+  showAssets: boolean;
+  showAssetLabels: boolean;
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
@@ -28,6 +31,9 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   wallMeasurementPosition: "inside",
   showCanvasHud: true,
   showMiniMap: true,
+  showRoomNames: true,
+  showAssets: true,
+  showAssetLabels: true,
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
@@ -45,6 +51,9 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     wallMeasurementPosition: settings.wallMeasurementPosition,
     showCanvasHud: settings.showCanvasHud,
     showMiniMap: settings.showMiniMap,
+    showRoomNames: settings.showRoomNames,
+    showAssets: settings.showAssets,
+    showAssetLabels: settings.showAssetLabels,
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
@@ -63,6 +72,9 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.wallMeasurementPosition === b.wallMeasurementPosition &&
     a.showCanvasHud === b.showCanvasHud &&
     a.showMiniMap === b.showMiniMap &&
+    a.showRoomNames === b.showRoomNames &&
+    a.showAssets === b.showAssets &&
+    a.showAssetLabels === b.showAssetLabels &&
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
@@ -145,6 +157,18 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showMiniMap" in value && typeof value.showMiniMap === "boolean"
         ? value.showMiniMap
         : DEFAULT_EDITOR_SETTINGS.showMiniMap,
+    showRoomNames:
+      "showRoomNames" in value && typeof value.showRoomNames === "boolean"
+        ? value.showRoomNames
+        : DEFAULT_EDITOR_SETTINGS.showRoomNames,
+    showAssets:
+      "showAssets" in value && typeof value.showAssets === "boolean"
+        ? value.showAssets
+        : DEFAULT_EDITOR_SETTINGS.showAssets,
+    showAssetLabels:
+      "showAssetLabels" in value && typeof value.showAssetLabels === "boolean"
+        ? value.showAssetLabels
+        : DEFAULT_EDITOR_SETTINGS.showAssetLabels,
     showGuidelines:
       "showGuidelines" in value && typeof value.showGuidelines === "boolean"
         ? value.showGuidelines

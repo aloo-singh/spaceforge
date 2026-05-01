@@ -22,6 +22,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useMobile } from "@/lib/use-mobile";
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
 type ResponsiveDialogProps = {
@@ -63,6 +64,7 @@ export function ResponsiveDialog({
 }: ResponsiveDialogProps) {
   const fallbackContentId = useId();
   const { isMobile, isReady: isMobileReady } = useMobile();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const resolvedContentId = contentId ?? fallbackContentId;
   if (!surfaceOverride && open && !isMobileReady) {
     return null;
@@ -138,8 +140,8 @@ export function ResponsiveDialog({
       <DialogPortal>
         <DialogOverlay
           className={cn(
-            motionState === "opening" && "animate-in fade-in-0 duration-300",
-            motionState === "closing" && "animate-out fade-out-0 duration-200"
+            !prefersReducedMotion && motionState === "opening" && "animate-in fade-in-0 duration-300",
+            !prefersReducedMotion && motionState === "closing" && "animate-out fade-out-0 duration-200"
           )}
         />
         <DialogContent
@@ -149,8 +151,8 @@ export function ResponsiveDialog({
           className={cn(
             "w-[min(100%,28rem)] max-h-[calc(100vh-2rem)] p-5",
             stickyFooter ? "flex min-h-0 flex-col overflow-hidden" : "overflow-y-auto",
-            motionState === "opening" && "animate-in zoom-in-95 fade-in-0 duration-200",
-            motionState === "closing" && "animate-out zoom-out-95 fade-out-0 duration-150",
+            !prefersReducedMotion && motionState === "opening" && "animate-in zoom-in-95 fade-in-0 duration-200",
+            !prefersReducedMotion && motionState === "closing" && "animate-out zoom-out-95 fade-out-0 duration-150",
             className
           )}
         >

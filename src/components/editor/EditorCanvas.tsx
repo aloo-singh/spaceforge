@@ -169,10 +169,15 @@ import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
+import { SelectedWallInspector } from "@/components/editor/SelectedWallInspector";
+import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
+import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
+import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import { InspectorBreadcrumbHeader } from "@/components/editor/InspectorBreadcrumbHeader";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import {
   Minus,
@@ -184,6 +189,7 @@ import {
   PanelRightCollapse,
   PanelRightExpand,
   X,
+  IconAngle,
 } from "@/components/ui/icons";
 import {
   ImmediateTooltipProvider,
@@ -192,6 +198,8 @@ import {
   TooltipTrigger,
   tooltipContentClassName,
 } from "@/components/ui/tooltip";
+import { Toggle } from "@/components/ui/toggle";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
@@ -546,7 +554,7 @@ function CanvasMiniMap({
             y={miniMapState.viewportRect.y}
             width={miniMapState.viewportRect.width}
             height={miniMapState.viewportRect.height}
-            rx={compact ? 6 : 8}
+            rx={compact ? 2 : 3}
             fill="none"
             stroke={frameStroke}
             strokeWidth={compact ? 1.1 : 1.5}
@@ -913,19 +921,22 @@ export default function EditorCanvas({
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
+  const showFloorFootprint = useEditorStore((state) => state.settings.showFloorFootprint);
   const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
   const [previousActiveFloorId, setPreviousActiveFloorId] = useState<string | null>(null);
   const [isFloorAnimating, setIsFloorAnimating] = useState(false);
   const floorButtonsContainerRef = useRef<HTMLDivElement | null>(null);
   const floorButtonRefsMap = useRef<Map<string, HTMLElement | null>>(new Map());
   const footprintFloorId = useMemo(() => {
-    if (hoveredFloorPreviewId) {
+    if (hoveredFloorPreviewId && hoveredFloorPreviewId !== activeFloorId) {
       return hoveredFloorPreviewId;
     }
 
+    if (!showFloorFootprint) return null;
+
     const activeFloorIndex = floors.findIndex((floor) => floor.id === activeFloorId);
     return activeFloorIndex > 0 ? floors[activeFloorIndex - 1]?.id ?? null : null;
-  }, [activeFloorId, floors, hoveredFloorPreviewId]);
+  }, [activeFloorId, floors, hoveredFloorPreviewId, showFloorFootprint]);
   const hydratedCanvasRotationDegrees = hasHydratedClient ? canvasRotationDegrees : 0;
   const hydratedNorthBearingDegrees = hasHydratedClient ? northBearingDegrees : 0;
   const [isExportingPng, setIsExportingPng] = useState(false);
@@ -965,6 +976,18 @@ export default function EditorCanvas({
     useState<NorthIndicatorSurfaceState>(
       Math.abs(normalizeCanvasRotationDegrees(canvasRotationDegrees)) > 0.01 ? "visible" : "hidden"
     );
+  const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
+  const is45DegreeDrawingEnabled = useEditorStore((state) => state.is45DegreeDrawingEnabled);
+  const setIs45DegreeDrawingEnabled = useEditorStore((state) => state.setIs45DegreeDrawingEnabled);
+  const selection = useEditorStore((state) => state.selection);
+  const selectRoomById = useEditorStore((state) => state.selectRoomById);
+
+  const handleToggle45DegreeDrawing = useCallback(
+    (pressed: boolean) => {
+      setIs45DegreeDrawingEnabled(pressed);
+    },
+    [setIs45DegreeDrawingEnabled]
+  );
 
   useEffect(() => {
     setHasMountedClient(true);
@@ -1478,6 +1501,7 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         exportTheme,
+        true,
         { includeStairDirectionVisuals: false }
       );
       drawWallInteractionOverlay(
@@ -1504,6 +1528,9 @@ export default function EditorCanvas({
         null,
         exportTheme,
         [],
+        state.settings.showRoomNames,
+        state.settings.showAssets,
+        state.settings.showAssetLabels,
         { includeStairDirectionLabels: false }
       );
       drawDraft(
@@ -1852,6 +1879,11 @@ export default function EditorCanvas({
     const onKeyDown = (event: KeyboardEvent) => {
       syncDimensionsOverride(event.getModifierState("Alt"));
 
+      if (event.key === "Shift" && !event.repeat) {
+        setIsShiftKeyPressed(true);
+        return;
+      }
+
       if (
         event.defaultPrevented ||
         event.repeat ||
@@ -1903,6 +1935,10 @@ export default function EditorCanvas({
 
     const onKeyUp = (event: KeyboardEvent) => {
       syncDimensionsOverride(event.getModifierState("Alt"));
+
+      if (event.key === "Shift") {
+        setIsShiftKeyPressed(false);
+      }
     };
 
     const onPointerEvent = (event: PointerEvent) => {
@@ -2561,24 +2597,101 @@ export default function EditorCanvas({
   } = usePersistentPanelState(projectId);
   const hasInitializedMobileSidebarRef = useRef(false);
   
-  const inspectorContent = selectedNorthIndicator ? (
-    <SelectedNorthInspector className="h-full" />
-  ) : selectedRoomId ? (
-    <SelectedRoomNamePanel className="h-full" />
-  ) : selectedFloorId ? (
-    <SelectedFloorInspector className="h-full" />
-  ) : (
-    <EditorInspectorEmptyState className="h-full" />
-  );
-  const compactInspectorContent = selectedNorthIndicator ? (
-    <SelectedNorthInspector />
-  ) : selectedRoomId ? (
-    <SelectedRoomNamePanel />
-  ) : selectedFloorId ? (
-    <SelectedFloorInspector />
-  ) : (
-    <EditorInspectorEmptyState />
-  );
+  // Determine which inspector card to show based on selection
+  const getInspectorContent = (isCompact: boolean) => {
+    if (selectedNorthIndicator) {
+      return isCompact ? <SelectedNorthInspector /> : <SelectedNorthInspector className="h-full" />;
+    }
+    
+    if (roomDraftPointCount > 0) {
+      return isCompact ? <RoomDrawingInspector /> : <RoomDrawingInspector className="h-full" />;
+    }
+
+    // Get the last selected item from the selection array
+    const selectedItem = selection.length > 0 ? selection[selection.length - 1] : null;
+    
+    if (selectedItem) {
+      if (selectedItem.type === "floor") {
+        return isCompact ? (
+          <SelectedFloorInspector />
+        ) : (
+          <SelectedFloorInspector className="h-full" />
+        );
+      } else if (selectedItem.type === "room") {
+        return isCompact ? (
+          <SelectedRoomNamePanel />
+        ) : (
+          <SelectedRoomNamePanel className="h-full" />
+        );
+      } else if (selectedItem.type === "wall") {
+        // Show wall inspector
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        if (room) {
+          return isCompact ? (
+            <SelectedWallInspector room={room} wall={selectedItem.wall} />
+          ) : (
+            <SelectedWallInspector room={room} wall={selectedItem.wall} className="h-full" />
+          );
+        }
+      } else if (selectedItem.type === "opening") {
+        // Show opening inspector if available
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        const opening = room?.openings.find((o) => o.id === selectedItem.openingId);
+        if (opening) {
+          return isCompact ? (
+            <SelectedOpeningInspector opening={opening} />
+          ) : (
+            <SelectedOpeningInspector opening={opening} className="h-full" />
+          );
+        }
+        // Fallback to room if opening not found
+        if (room) {
+          return isCompact ? (
+            <SelectedRoomNamePanel />
+          ) : (
+            <SelectedRoomNamePanel className="h-full" />
+          );
+        }
+      } else if (selectedItem.type === "asset") {
+        // Show asset inspector if available
+        const room = rooms.find((r) => r.id === selectedItem.roomId);
+        const asset = room?.interiorAssets.find((a) => a.id === selectedItem.id);
+        if (asset) {
+          return isCompact ? (
+            <SelectedInteriorAssetInspector asset={asset} />
+          ) : (
+            <SelectedInteriorAssetInspector asset={asset} className="h-full" />
+          );
+        }
+        // Fallback to room if asset not found
+        if (room) {
+          return isCompact ? (
+            <SelectedRoomNamePanel />
+          ) : (
+            <SelectedRoomNamePanel className="h-full" />
+          );
+        }
+      }
+    }
+
+    // Fallback: show floor or empty state
+    if (selectedFloorId) {
+      return isCompact ? (
+        <SelectedFloorInspector />
+      ) : (
+        <SelectedFloorInspector className="h-full" />
+      );
+    }
+
+    return isCompact ? (
+      <EditorInspectorEmptyState />
+    ) : (
+      <EditorInspectorEmptyState className="h-full" />
+    );
+  };
+  
+  const inspectorContent = getInspectorContent(false);
+  const compactInspectorContent = getInspectorContent(true);
   const usesPortraitBottomInspector = isMobile && isPortraitViewport;
   const isCompactLandscapeInspector = isCompactLandscapeViewport && !isPortraitViewport;
   const canvasBackgroundCss = `#${editorTheme.canvasBackground.toString(16).padStart(6, "0")}`;
@@ -3091,7 +3204,7 @@ export default function EditorCanvas({
               </div>
             </div>
           ) : null}
-          {shouldShowTouchCancelButton || shouldShowTouchZoomControls ? (
+          {shouldShowTouchCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
             <div
               className={cn(
                 "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
@@ -3130,6 +3243,35 @@ export default function EditorCanvas({
                     </Button>
                   </div>
                 </ButtonGroup>
+              ) : null}
+              {roomDraftPointCount > 0 ? (
+                <ImmediateTooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Toggle
+                        pressed={is45DegreeDrawingEnabled}
+                        onPressedChange={handleToggle45DegreeDrawing}
+                        size={useCompactMobileControls ? "icon-sm" : "icon"}
+                        className={cn(
+                          "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)] transition-colors",
+                          useCompactMobileControls && "size-9 rounded-xl",
+                          is45DegreeDrawingEnabled || isShiftKeyPressed ? "bg-blue-500 text-white" : "bg-transparent hover:bg-muted"
+                        )}
+                        aria-label="Enable 45 degree angles"
+                      >
+                        <IconAngle className="size-4" />
+                      </Toggle>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={12}>
+                      <div className="flex items-center gap-2">
+                        <span>Enable 45° angles</span>
+                        <KbdGroup>
+                          <Kbd>Shift</Kbd>
+                        </KbdGroup>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </ImmediateTooltipProvider>
               ) : null}
               {shouldShowTouchCancelButton ? (
                 <Button
@@ -3226,32 +3368,42 @@ export default function EditorCanvas({
           }}
         >
           <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <ImmediateTooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
-                      onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
-                      className={cn(
-                        "absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
-                        useCompactMobileControls && "size-9 rounded-xl"
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                        onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
+                          useCompactMobileControls && "size-9 rounded-xl"
+                        )}
+                      >
+                      {isDesktopInspectorCollapsed ? (
+                        <PanelRightExpand className="size-4" />
+                      ) : (
+                        <PanelRightCollapse className="size-4" />
                       )}
-                    >
-                    {isDesktopInspectorCollapsed ? (
-                      <PanelRightExpand className="size-4" />
-                    ) : (
-                      <PanelRightCollapse className="size-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left" align="start">
-                  {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
-                </TooltipContent>
-              </Tooltip>
-            </ImmediateTooltipProvider>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" align="start">
+                    {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+              <InspectorBreadcrumbHeader
+                selection={selection}
+                floors={floors}
+                rooms={rooms}
+                onSelectFloor={selectFloorById}
+                onSelectRoom={selectRoomById}
+                activeFloorId={selectedFloorId ?? undefined}
+              />
+            </div>
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",
@@ -3468,12 +3620,12 @@ function drawScene(
     }
   }
   
-  // Always clear floor footprint graphics, then conditionally draw
+  // Always clear floor footprint graphics, then draw the resolved persistent or hover preview footprint.
   floorFootprintGraphics.clear();
-  if (state.settings.showFloorFootprint) {
+  if (footprintFloorId) {
     drawFloorFootprint(
       floorFootprintGraphics,
-      footprintFloorId ? getRoomsForFloor(state.document, footprintFloorId) : [],
+      getRoomsForFloor(state.document, footprintFloorId),
       state.camera,
       state.viewport,
       theme,
@@ -3513,6 +3665,7 @@ function drawScene(
     state.camera,
     state.viewport,
     theme,
+    state.settings.showAssets,
     { includeStairDirectionVisuals: true },
     animations
   );
@@ -3540,6 +3693,9 @@ function drawScene(
     transformFeedback,
     theme,
     state.selection,
+    state.settings.showRoomNames,
+    state.settings.showAssets,
+    state.settings.showAssetLabels,
     { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
@@ -3609,12 +3765,16 @@ function drawGrid(
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
       width: 1,
       color: theme.gridMinor,
-      alpha: 1,
+      alpha: 0.9,
     });
   }
 
-  drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
+  drawAlternatingGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_SIZE_MM, {
     width: 1,
+    color: theme.gridMajor,
+    alpha: 0.8,
+  }, {
+    width: 2,
     color: theme.gridMajor,
     alpha: 1,
   });
@@ -3910,6 +4070,7 @@ function drawOpenings(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
+  showAssets: boolean = true,
   options?: {
     includeStairDirectionVisuals?: boolean;
   },
@@ -3920,7 +4081,7 @@ function drawOpenings(
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
-    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations);
+    drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations, showAssets);
   }
 }
 
@@ -4264,10 +4425,12 @@ function drawRoomInteriorAssets(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map(),
+  showAssets: boolean = true
 ) {
   for (const asset of room.interiorAssets) {
-    // Animation hook: look up any in-progress rotation for this asset.
+    // Always show stairs, but hide other assets if showAssets is false
+    if (asset.type !== "stairs" && !showAssets) continue;
     // baseWidthMm/baseDepthMm are the canonical local dimensions used for the
     // whole rotation, while rotationDegrees is interpolated between the two
     // cardinal endpoints when animation is active.
@@ -4816,8 +4979,13 @@ function drawFurnitureLabels(
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme,
-  selection: SharedSelectionItem[]
+  selection: SharedSelectionItem[],
+  showAssetLabels: boolean = true,
+  showAssets: boolean = true
 ) {
+  // Don't show labels if assets are hidden or if asset labels are hidden
+  if (!showAssets || !showAssetLabels) return;
+  
   const fontSizePx = clampValue(
     camera.pixelsPerMm * FURNITURE_LABEL_FONT_SIZE_WORLD_MM,
     FURNITURE_LABEL_MIN_FONT_SIZE_PX,
@@ -5081,6 +5249,9 @@ function drawRoomLabels(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
   selection: SharedSelectionItem[],
+  showRoomNames: boolean = true,
+  showAssets: boolean = true,
+  showAssetLabels: boolean = true,
   options?: {
     includeStairDirectionLabels?: boolean;
   }
@@ -5094,6 +5265,7 @@ function drawRoomLabels(
       showArea: showDimensions,
     });
     if (!layout) continue;
+    if (!showRoomNames) continue;
     const textResolution = getTextResolution();
     const left = snapToPixel(layout.left, textResolution);
     const top = snapToPixel(layout.top, textResolution);
@@ -5201,7 +5373,7 @@ function drawRoomLabels(
     );
   }
 
-  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection);
+  drawFurnitureLabels(labelContainer, rooms, camera, viewport, theme, selection, showAssetLabels, showAssets);
 }
 
 type ResizeDimensionLabelSpec = {
@@ -6587,6 +6759,49 @@ function drawGridLines(
   }
 
   graphics.stroke();
+}
+
+function drawAlternatingGridLines(
+  graphics: Graphics,
+  camera: CameraState,
+  viewport: ViewportSize,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  stepMm: number,
+  subtleStroke: { width: number; color: number; alpha: number },
+  prominentStroke: { width: number; color: number; alpha: number }
+) {
+  const firstX = Math.floor(minX / stepMm) * stepMm;
+  const firstY = Math.floor(minY / stepMm) * stepMm;
+  const doubleStep = stepMm * 2;
+
+  // Draw vertical lines, alternating between subtle and prominent
+  for (let xMm = firstX; xMm <= maxX; xMm += stepMm) {
+    const isProminent = Math.round(xMm / stepMm) % 2 === 0;
+    const stroke = isProminent ? prominentStroke : subtleStroke;
+    graphics.setStrokeStyle(stroke);
+
+    const start = worldToScreen({ x: xMm, y: minY }, camera, viewport);
+    const end = worldToScreen({ x: xMm, y: maxY }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+  }
+
+  // Draw horizontal lines, alternating between subtle and prominent
+  for (let yMm = firstY; yMm <= maxY; yMm += stepMm) {
+    const isProminent = Math.round(yMm / stepMm) % 2 === 0;
+    const stroke = isProminent ? prominentStroke : subtleStroke;
+    graphics.setStrokeStyle(stroke);
+
+    const start = worldToScreen({ x: minX, y: yMm }, camera, viewport);
+    const end = worldToScreen({ x: maxX, y: yMm }, camera, viewport);
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+  }
 }
 
 function getViewportWorldBounds(

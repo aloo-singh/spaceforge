@@ -12,7 +12,7 @@ import {
 import { FeedbackTrendChart } from "@/components/admin/FeedbackTrendChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Table,
   TableBody,
@@ -493,7 +493,7 @@ export function FeedbackInboxTable({
                           <MarkReadButton />
                           {isRowFocused ? (
                             <span className="ml-2 inline-flex align-middle">
-                              <Keycap aria-hidden="true">R</Keycap>
+                              <Kbd aria-hidden="true">R</Kbd>
                             </span>
                           ) : null}
                         </form>

@@ -209,7 +209,7 @@ export async function setAuthenticatedSessionCookie(session: SupabaseAuthSession
   const maxAge =
     typeof session.expires_in === "number" && Number.isFinite(session.expires_in)
       ? Math.max(60, Math.floor(session.expires_in))
-      : 60 * 60;
+      : 24 * 60 * 60;
 
   cookieStore.set(getSupabaseAuthCookieName(), JSON.stringify(session), {
     httpOnly: true,

@@ -107,6 +107,7 @@ export function AssetsPanel({
       aria-label="Add furniture"
       title={isDisabled ? disabledReason : "Add furniture"}
       className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+      suppressHydrationWarning
     >
       <Plus className="size-4" />
     </Button>

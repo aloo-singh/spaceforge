@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Trash2 } from "@/components/ui/icons";
+import { Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
-import { Keycap } from "@/components/ui/keycap";
+import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
@@ -14,6 +14,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { getPolygonBounds } from "@/lib/editor/roomGeometry";
+import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -38,6 +41,30 @@ function InspectorIconTooltip({
         {content}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function RoomDimensionsDisplay({ room }: { room: Room }) {
+  const bounds = getPolygonBounds(room.points);
+  if (!bounds) return null;
+
+  const width = bounds.maxX - bounds.minX;
+  const length = bounds.maxY - bounds.minY;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">Dimensions</p>
+      <div className="space-y-2">
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure2 className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(length)}</span>
+        </div>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(width)}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -245,57 +272,46 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               id="room-name-input-hint"
               className="mt-1.5 flex items-center justify-end gap-1 text-[11px] text-muted-foreground/80 [@media(max-height:540px)_and_(orientation:landscape)]:mt-1"
             >
-              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true">
                 Enter
-              </Keycap>
+              </Kbd>
               <span>save</span>
               <span aria-hidden="true">·</span>
-              <Keycap aria-hidden="true" className="h-4 min-w-0 rounded-sm border-border/70 bg-transparent px-1 text-[9px] shadow-none">
+              <Kbd aria-hidden="true">
                 Esc
-              </Keycap>
+              </Kbd>
               <span>cancel</span>
             </p>
           ) : null}
-          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 [@media(max-height:540px)_and_(orientation:landscape)]:mt-3 [@media(max-height:540px)_and_(orientation:landscape)]:p-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Delete selected room</p>
-                <p
-                  id="delete-room-hint"
-                  className="mt-1 text-[11px] leading-relaxed text-muted-foreground [@media(max-height:540px)_and_(orientation:landscape)]:text-[10px]"
-                >
-                  Removes this room from the layout. Undo restores it immediately.
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <ImmediateTooltipProvider>
-                <InspectorIconTooltip
-                  content={shouldHideKeyboardHints ? "Delete room" : (
-                    <span className="inline-flex items-center gap-2">
-                      <span>Delete room</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Keycap aria-hidden="true" className="shadow-none">Del</Keycap>
-                        <span aria-hidden="true" className="text-muted-foreground/70">/</span>
-                        <Keycap aria-hidden="true" className="shadow-none">⌫</Keycap>
-                      </span>
+          <div className="mt-4">
+            <RoomDimensionsDisplay room={selectedRoom} />
+          </div>
+          <div className="mt-4">
+            <ImmediateTooltipProvider>
+              <InspectorIconTooltip
+                content={shouldHideKeyboardHints ? "Delete room" : (
+                  <span className="inline-flex items-center gap-2">
+                    <span>Delete room</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Kbd aria-hidden="true" className="shadow-none">Del</Kbd>
+                      <span aria-hidden="true" className="text-muted-foreground/70">/</span>
+                      <Kbd aria-hidden="true" className="shadow-none">⌫</Kbd>
                     </span>
-                  )}
+                  </span>
+                )}
+              >
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  onClick={deleteSelectedRoom}
+                  disabled={!canDeleteSelectedRoom}
+                  aria-label={`Delete ${selectedRoom.name}`}
                 >
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon-sm"
-                    onClick={deleteSelectedRoom}
-                    disabled={!canDeleteSelectedRoom}
-                    aria-label={`Delete ${selectedRoom.name}`}
-                    aria-describedby="delete-room-hint"
-                  >
-                    <Trash2 />
-                  </Button>
-                </InspectorIconTooltip>
-              </ImmediateTooltipProvider>
-            </div>
+                  <Trash2 />
+                </Button>
+              </InspectorIconTooltip>
+            </ImmediateTooltipProvider>
           </div>
         </aside>
       </EditorInspectorSection>

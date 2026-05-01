@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Slider as SliderPrimitive } from "radix-ui"
 
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion"
 import { cn } from "@/lib/utils"
 
 function Slider({
@@ -13,6 +14,7 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -49,7 +51,10 @@ function Slider({
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
-          className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          className={cn(
+            "block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50",
+            !prefersReducedMotion && "transition-[color,box-shadow]"
+          )}
         />
       ))}
     </SliderPrimitive.Root>

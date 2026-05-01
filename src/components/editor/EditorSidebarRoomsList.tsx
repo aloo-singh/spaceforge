@@ -9,6 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   ChevronRight,
   IconCaretDownFilled,
@@ -41,6 +42,18 @@ type SidebarWallEntry = {
   wall: RoomWall;
   segmentIndex: number;
 };
+
+function ShortcutKbdGroup({ keys }: { keys: string[] }) {
+  return (
+    <KbdGroup className="ml-auto">
+      {keys.map((key, index) => (
+        <Kbd key={`${key}-${index}`}>
+          {key}
+        </Kbd>
+      ))}
+    </KbdGroup>
+  );
+}
 
 const RECTANGULAR_WALLS: RoomWall[] = ["top", "right", "bottom", "left"];
 const SIDEBAR_CHEVRON_BUTTON_CLASS =
@@ -360,7 +373,7 @@ export function EditorSidebarRoomsList() {
         ) : (
           <div className="flex flex-col gap-1">
             {displayedFloors.map((floor, floorIndex) => {
-                const floorNumber = displayedFloors.length - 1 - floorIndex;
+                const floorNumber = displayedFloors.length - floorIndex;
                 const isRenaming = floorRenameSession?.floorId === floor.id && sidebarRenameFloorId === floor.id;
                 const floorRooms = getRoomsForFloor(document, floor.id);
                 const floorAreaSquareMillimetres = floorRooms.reduce(
@@ -812,7 +825,10 @@ export function EditorSidebarRoomsList() {
                                                 </button>
                                               </ContextMenuTrigger>
                                               <ContextMenuContent 
-                                                className="w-48"
+                                                className={cn(
+                                                  "w-48",
+                                                  isAltPressed && opening.type === "door" && "w-52"
+                                                )}
                                                 onKeyDownCapture={(event) => {
                                                   if (event.key === "Alt" || event.altKey) {
                                                     setIsAltPressed(true);
@@ -826,23 +842,33 @@ export function EditorSidebarRoomsList() {
                                               >
                                                 <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); cutSelection(); }}>
                                                   Cut
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘X" : "Ctrl+X"}</span>
+                                                  <ShortcutKbdGroup keys={isMacPlatform ? ["⌘", "X"] : ["Ctrl", "X"]} />
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => { selectOpeningById(room.id, opening.id); copySelection(); }}>
                                                   Copy
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘C" : "Ctrl+C"}</span>
+                                                  <ShortcutKbdGroup keys={isMacPlatform ? ["⌘", "C"] : ["Ctrl", "C"]} />
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => pasteSelection()}>
                                                   Paste
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌘V" : "Ctrl+V"}</span>
+                                                  <ShortcutKbdGroup keys={isMacPlatform ? ["⌘", "V"] : ["Ctrl", "V"]} />
                                                 </ContextMenuItem>
                                                 <ContextMenuItem 
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); duplicateSelection(isAltPressed && opening.type === "door" ? { isMirror: true } : undefined); }}
                                                 >
-                                                  {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">
-                                                    {isAltPressed && opening.type === "door" ? (isMacPlatform ? "⌥⌘D" : "Ctrl+Alt+D") : (isMacPlatform ? "⌘D" : "Ctrl+D")}
+                                                  <span className="whitespace-nowrap">
+                                                    {isAltPressed && opening.type === "door" ? "Mirror duplicate" : "Duplicate"}
                                                   </span>
+                                                  <ShortcutKbdGroup
+                                                    keys={
+                                                      isAltPressed && opening.type === "door"
+                                                        ? isMacPlatform
+                                                          ? ["⌥", "⌘", "D"]
+                                                          : ["Ctrl", "Alt", "D"]
+                                                        : isMacPlatform
+                                                          ? ["⌘", "D"]
+                                                          : ["Ctrl", "D"]
+                                                    }
+                                                  />
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
                                                 <ContextMenuItem 
@@ -850,7 +876,7 @@ export function EditorSidebarRoomsList() {
                                                   onSelect={() => { selectOpeningById(room.id, opening.id); bulkDeleteSelection(); }}
                                                 >
                                                   Delete
-                                                  <span className="ml-auto text-[11px] text-muted-foreground">{isMacPlatform ? "⌫" : "Del"}</span>
+                                                  <ShortcutKbdGroup keys={[isMacPlatform ? "⌫" : "Del"]} />
                                                 </ContextMenuItem>
                                               </ContextMenuContent>
                                             </ContextMenu>
