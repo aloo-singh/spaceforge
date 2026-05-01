@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.68.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project limit gating: Free tier limited to 2 projects, Pro/Studio/Education unlimited.</li>
+                <li>Calm, benefit-focused upsell dialog when Free users reach project limit.</li>
+                <li>Subtle blue upsell banner in projects grid for Free users at limit (bottom-most position).</li>
+                <li>Central `SUBSCRIPTION_FEATURES` config now includes project limits alongside floors.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Dialog messaging no longer shows redundant &quot;up to unlimited&quot; phrasing&mdash;paid tiers show &quot;unlimited projects&quot; cleanly.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.67.20</h2>
             <span className="text-sm text-muted-foreground">2026-05-01</span>
           </div>
