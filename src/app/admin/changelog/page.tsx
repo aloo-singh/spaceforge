@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.70.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hi-res PNG export option (4x resolution = 5120px width, 16x total pixels) for crisp prints and presentations.</li>
+                <li>Normal / Hi-res segmented control in export dialog with session persistence.</li>
+                <li>Subscription gating: Free users see calm upsell dialog emphasizing benefits (&quot;4x resolution = 16x total pixels for prints that stay sharp at any size&quot;); Pro/Studio/Education tiers unlock Hi-res directly.</li>
+                <li>High-quality image smoothing for crisp vector rendering at 4x scale—lines, text, labels remain sharp.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export pipeline now standardizes all normal exports to 1280px width with proportional height, ensuring consistency across all export features (headers, legends, scale bars, signatures).</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.69.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-01</span>
           </div>

@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.70.0",
+    date: "2026-05-01",
+    title: "Hi-res exports for premium plans",
+    items: [
+      "Export plans in 4x resolution (5120px) for crisp, sharp prints and presentations at any size.",
+      "Hi-res option is visible to all users but gated to Pro, Studio, and Education plans.",
+      "Free users see a calm upgrade prompt with clear benefits—4x resolution means 16x total pixels for maximum crispness.",
+    ],
+  },
+  {
     version: "v0.68.0",
     date: "2026-05-01",
     title: "Free tier project limits (with calm upsell)",
