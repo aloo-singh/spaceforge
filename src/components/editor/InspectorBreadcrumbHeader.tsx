@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,24 +53,28 @@ export function InspectorBreadcrumbHeader({
   return (
     <div className={cn("flex items-center min-w-0", className)}>
       <Breadcrumb>
-        <BreadcrumbList className="text-xs">
+        <BreadcrumbList className="text-xs gap-1">
           {breadcrumbs[0] && (
-            <BreadcrumbItem>
-              <BreadcrumbLink
-                onClick={breadcrumbs[0].onClick}
-                className={breadcrumbs[0].onClick ? "cursor-pointer" : ""}
-              >
-                {breadcrumbs[0].label}
-              </BreadcrumbLink>
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  onClick={breadcrumbs[0].onClick}
+                  className={breadcrumbs[0].onClick ? "cursor-pointer" : ""}
+                >
+                  {breadcrumbs[0].label}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
               {breadcrumbs.length > 1 && <BreadcrumbSeparator />}
-            </BreadcrumbItem>
+            </>
           )}
 
           {showEllipsis && (
-            <BreadcrumbItem>
-              <BreadcrumbEllipsis />
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbEllipsis />
+              </BreadcrumbItem>
               <BreadcrumbSeparator />
-            </BreadcrumbItem>
+            </>
           )}
 
           {showEllipsis
@@ -77,45 +82,45 @@ export function InspectorBreadcrumbHeader({
                 const isLast = index === 1;
                 const originalIndex = breadcrumbs.length - (2 - index);
                 return (
-                  <BreadcrumbItem key={originalIndex}>
-                    {isLast ? (
-                      <BreadcrumbPage className="font-medium text-foreground">
-                        {item.label}
-                      </BreadcrumbPage>
-                    ) : (
-                      <>
+                  <React.Fragment key={originalIndex}>
+                    <BreadcrumbItem>
+                      {isLast ? (
+                        <BreadcrumbPage className="font-medium text-foreground">
+                          {item.label}
+                        </BreadcrumbPage>
+                      ) : (
                         <BreadcrumbLink
                           onClick={item.onClick}
                           className={item.onClick ? "cursor-pointer" : ""}
                         >
                           {item.label}
                         </BreadcrumbLink>
-                        <BreadcrumbSeparator />
-                      </>
-                    )}
-                  </BreadcrumbItem>
+                      )}
+                    </BreadcrumbItem>
+                    {!isLast && <BreadcrumbSeparator />}
+                  </React.Fragment>
                 );
               })
             : breadcrumbs.slice(1).map((item, index) => {
                 const isLast = index === breadcrumbs.length - 2;
                 return (
-                  <BreadcrumbItem key={index + 1}>
-                    {isLast ? (
-                      <BreadcrumbPage className="font-medium text-foreground">
-                        {item.label}
-                      </BreadcrumbPage>
-                    ) : (
-                      <>
+                  <React.Fragment key={index + 1}>
+                    <BreadcrumbItem>
+                      {isLast ? (
+                        <BreadcrumbPage className="font-medium text-foreground">
+                          {item.label}
+                        </BreadcrumbPage>
+                      ) : (
                         <BreadcrumbLink
                           onClick={item.onClick}
                           className={item.onClick ? "cursor-pointer" : ""}
                         >
                           {item.label}
                         </BreadcrumbLink>
-                        <BreadcrumbSeparator />
-                      </>
-                    )}
-                  </BreadcrumbItem>
+                      )}
+                    </BreadcrumbItem>
+                    {!isLast && <BreadcrumbSeparator />}
+                  </React.Fragment>
                 );
               })}
         </BreadcrumbList>
