@@ -32,6 +32,7 @@ import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ProjectDeleteDialog } from "@/components/projects/ProjectDeleteDialog";
 import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { getEffectiveMaxProjects } from "@/lib/subscription/features";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
@@ -115,12 +116,15 @@ export function ProjectsPageClient() {
     renamingProjectId === null &&
     deletingProjectId === null;
 
+  const maxProjects = getEffectiveMaxProjects(currentTier);
+  const isAtProjectLimit = projects.length >= maxProjects;
+  const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
+
   const handleCreateProject = () => {
     if (!canCreateProject) return;
 
     // Check project limit
-    const maxProjects = getEffectiveMaxProjects(currentTier);
-    if (projects.length >= maxProjects) {
+    if (isAtProjectLimit) {
       setIsProjectLimitDialogOpen(true);
       return;
     }
@@ -385,6 +389,41 @@ export function ProjectsPageClient() {
                 }
               />
             ))}
+            {shouldShowProjectLimitBanner ? (
+              <Card
+                onClick={() => setIsProjectLimitDialogOpen(true)}
+                className="border-border/70 bg-gradient-to-br from-blue-50/50 to-blue-50/30 transition-colors hover:border-blue-200/70 hover:bg-blue-50/60 cursor-pointer dark:from-blue-950/20 dark:to-blue-950/10 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    setIsProjectLimitDialogOpen(true);
+                  }
+                }}
+              >
+                <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                  <div className="space-y-2">
+                    <p className="text-base font-semibold tracking-tight text-foreground">
+                      Unlock unlimited projects
+                    </p>
+                    <p className="text-sm leading-5 text-muted-foreground">
+                      Upgrade to Pro to create as many projects as you need.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsProjectLimitDialogOpen(true);
+                    }}
+                    className="mt-1"
+                  >
+                    Learn more
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         ) : null}
 

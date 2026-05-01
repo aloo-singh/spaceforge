@@ -93,7 +93,7 @@ export function TierLimitUpsellDialog({
         {nextTier && nextLimitText && (
           <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              <strong>{nextTier}</strong> tier offers up to <strong>{nextLimitText}</strong>.
+              <strong>{nextTier}</strong> tier offers {nextConfig?.limit === Infinity ? "" : "up to "}<strong>{nextLimitText}</strong>.
             </p>
           </div>
         )}
