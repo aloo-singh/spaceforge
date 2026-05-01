@@ -12,6 +12,7 @@ import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
 import type {
   EditorExportLegendPosition,
   EditorExportScaleBarPosition,
+  EditorExportResolution,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -37,6 +38,7 @@ export type ExportPngRequest = {
   showGrid: boolean;
   showDimensions: boolean;
   theme: ExportPngThemeOption;
+  exportResolution: EditorExportResolution;
 };
 
 type ExportPngDialogProps = {
@@ -59,6 +61,7 @@ type ExportPngDialogProps = {
   theme: ExportPngThemeOption;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
+  exportResolution: EditorExportResolution;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
@@ -71,6 +74,7 @@ type ExportPngDialogProps = {
   onThemeChange: (value: ExportPngThemeOption) => void;
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
+  onExportResolutionChange: (value: EditorExportResolution) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -95,6 +99,7 @@ export function ExportPngDialog({
   theme,
   legendPosition,
   scaleBarPosition,
+  exportResolution,
   onTitleChange,
   onDescriptionChange,
   onTitlePositionChange,
@@ -107,6 +112,7 @@ export function ExportPngDialog({
   onThemeChange,
   onLegendPositionChange,
   onScaleBarPositionChange,
+  onExportResolutionChange,
   currentThemeLabel,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
@@ -150,6 +156,7 @@ export function ExportPngDialog({
         showGrid,
         showDimensions,
         theme,
+        exportResolution,
       })
         .then((nextPreviewSrc) => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -191,6 +198,7 @@ export function ExportPngDialog({
     showGrid,
     showDimensions,
     theme,
+    exportResolution,
   ]);
 
   const handleExport = () => {
@@ -211,6 +219,7 @@ export function ExportPngDialog({
       showGrid,
       showDimensions,
       theme,
+      exportResolution,
     });
   };
 
@@ -234,16 +243,43 @@ export function ExportPngDialog({
       stickyFooter
       contentScrollable={false}
       footer={
-        <Button
-          type="button"
-          onClick={handleExport}
-          disabled={isExportButtonDisabled}
-          title={isExportButtonDisabled ? exportDisabledReason : undefined}
-          className="w-full sm:w-auto"
-        >
-          <Download />
-          {isExporting ? "Exporting..." : "Export PNG"}
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="grid w-full gap-1 rounded-lg border border-border/70 bg-background/90 p-1 sm:w-auto"
+            style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+            role="group"
+            aria-label="Export resolution"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={exportResolution === "normal" ? "secondary" : "ghost"}
+              aria-pressed={exportResolution === "normal"}
+              onClick={() => onExportResolutionChange("normal")}
+            >
+              Normal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportResolution === "hi-res" ? "secondary" : "ghost"}
+              aria-pressed={exportResolution === "hi-res"}
+              onClick={() => onExportResolutionChange("hi-res")}
+            >
+              Hi-res
+            </Button>
+          </div>
+          <Button
+            type="button"
+            onClick={handleExport}
+            disabled={isExportButtonDisabled}
+            title={isExportButtonDisabled ? exportDisabledReason : undefined}
+            className="w-full sm:w-auto"
+          >
+            <Download />
+            {isExporting ? "Exporting..." : "Export PNG"}
+          </Button>
+        </div>
       }
     >
       <div className="grid min-h-0 gap-3 sm:gap-4 lg:h-full lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,23.5rem)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:overflow-hidden xl:grid-cols-[minmax(0,1.08fr)_minmax(23rem,24.5rem)] xl:gap-5">
