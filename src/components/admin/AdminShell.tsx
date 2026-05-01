@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronRight, Inbox, LogOut, Mail, RulerMeasure } from "@/components/ui/icons";
+import { BarChart3, ChevronRight, Inbox, LogOut, Mail, Stars } from "@/components/ui/icons";
 
 import { logoutAdminAction } from "@/app/admin/actions";
 import { BrandWordmark } from "@/components/brand-wordmark";
@@ -47,7 +47,7 @@ const adminNavItems = [
     href: "/admin/features",
     label: "Feature Gates",
     description: "Subscription limits and tiers",
-    icon: RulerMeasure,
+    icon: Stars,
   },
 ] as const;
 

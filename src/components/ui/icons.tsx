@@ -53,6 +53,7 @@ export {
   IconSend as Send,
   IconSofa as Sofa,
   IconStairs as Construction,
+  IconStars as Stars,
   IconThumbDown as ThumbsDown,
   IconThumbUp as ThumbsUp,
   IconToolsKitchen2Filled as ToolsKitchen2Filled,
