@@ -108,10 +108,20 @@ export function buildSelectionBreadcrumbs(
     const room = rooms.find((r) => r.id === selectedItem.roomId);
     if (room) {
       const opening = room.openings.find((o) => o.id === selectedItem.openingId);
-      const label = opening?.type === "door" ? "Door" : "Window";
-      breadcrumbs.push({
-        label: label,
-      });
+      if (opening) {
+        // Add wall breadcrumb
+        const wall = typeof opening.wall === "number" 
+          ? `Wall ${opening.wall + 1}`
+          : opening.wall.charAt(0).toUpperCase() + opening.wall.slice(1);
+        breadcrumbs.push({
+          label: wall,
+        });
+        // Add opening label
+        const label = opening.type === "door" ? "Door" : "Window";
+        breadcrumbs.push({
+          label: label,
+        });
+      }
     }
   } else if (selectedItem.type === "asset") {
     const room = rooms.find((r) => r.id === selectedItem.roomId);
