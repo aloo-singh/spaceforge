@@ -24,6 +24,7 @@ export {
   IconChevronRight as ChevronRight,
   IconCircleCheck as CheckCircle2,
   IconClock as Clock3,
+  IconCopy as Copy,
   IconDoor as DoorOpen,
   IconDownload as Download,
   IconFocus2 as LocateFixed,

@@ -1,3 +1,4 @@
+import { FeaturesPageActions } from "@/components/admin/FeaturesPageActions";
 import { FeaturesTable } from "@/components/admin/FeaturesTable";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -22,6 +23,12 @@ export default function AdminFeaturesPage() {
               .
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="w-full border-border/70 bg-card/95 shadow-sm">
+        <CardContent className="p-6">
+          <FeaturesPageActions />
         </CardContent>
       </Card>
 
