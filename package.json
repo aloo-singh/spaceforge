@@ -1,6 +1,6 @@
 {
   "name": "spaceforge",
-  "version": "0.67.17",
+  "version": "0.67.18",
   "private": true,
   "scripts": {
     "dev": "next dev",
