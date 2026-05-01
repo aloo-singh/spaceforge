@@ -174,6 +174,7 @@ import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspect
 import { HistoryControls } from "@/components/editor/HistoryControls";
 import { OnboardingHintCard } from "@/components/editor/OnboardingHintCard";
 import { EditorInspectorEmptyState } from "@/components/editor/EditorInspectorEmptyState";
+import { InspectorBreadcrumbHeader } from "@/components/editor/InspectorBreadcrumbHeader";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import {
   Minus,
@@ -975,6 +976,8 @@ export default function EditorCanvas({
   const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
   const is45DegreeDrawingEnabled = useEditorStore((state) => state.is45DegreeDrawingEnabled);
   const setIs45DegreeDrawingEnabled = useEditorStore((state) => state.setIs45DegreeDrawingEnabled);
+  const selection = useEditorStore((state) => state.selection);
+  const selectRoomById = useEditorStore((state) => state.selectRoomById);
 
   const handleToggle45DegreeDrawing = useCallback(
     (pressed: boolean) => {
@@ -3315,6 +3318,13 @@ export default function EditorCanvas({
                 </TooltipContent>
               </Tooltip>
             </ImmediateTooltipProvider>
+            <InspectorBreadcrumbHeader
+              selection={selection}
+              floors={floors}
+              rooms={rooms}
+              onSelectFloor={selectFloorById}
+              onSelectRoom={selectRoomById}
+            />
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",

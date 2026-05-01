@@ -1,25 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
-
-type BreadcrumbItem_ = {
-  label: string;
-  onClick?: () => void;
-};
 
 type EditorInspectorSectionProps = {
   title: string;
   description?: string;
-  breadcrumbs?: BreadcrumbItem_[];
   className?: string;
   bodyClassName?: string;
   children?: ReactNode;
@@ -28,7 +14,6 @@ type EditorInspectorSectionProps = {
 export function EditorInspectorSection({
   title,
   description,
-  breadcrumbs,
   className,
   bodyClassName,
   children,
@@ -40,36 +25,6 @@ export function EditorInspectorSection({
         className
       )}
     >
-      {breadcrumbs && breadcrumbs.length > 0 ? (
-        <div className="mb-3 pb-3 border-b border-border/60">
-          <Breadcrumb>
-            <BreadcrumbList className="text-[11px]">
-              {breadcrumbs.map((item, index) => {
-                const isLast = index === breadcrumbs.length - 1;
-                return (
-                  <div key={index} className="flex items-center gap-1.5">
-                    {isLast ? (
-                      <BreadcrumbPage className="font-medium text-foreground">
-                        {item.label}
-                      </BreadcrumbPage>
-                    ) : (
-                      <>
-                        <BreadcrumbLink
-                          onClick={item.onClick}
-                          className={item.onClick ? "cursor-pointer" : ""}
-                        >
-                          {item.label}
-                        </BreadcrumbLink>
-                        <BreadcrumbSeparator />
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-      ) : null}
       <header className="space-y-1 border-b border-border/60 pb-3 [@media(max-height:540px)_and_(orientation:landscape)]:pb-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground [@media(max-height:540px)_and_(orientation:landscape)]:text-[10px]">
           {title}
