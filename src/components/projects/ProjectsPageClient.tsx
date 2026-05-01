@@ -37,6 +37,26 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { getEffectiveMaxProjects } from "@/lib/subscription/features";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
+const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
+const DEV_MODE_ENABLED = process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true";
+
+function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
+  if (!DEV_MODE_ENABLED || typeof window === "undefined") {
+    return "Free";
+  }
+
+  try {
+    const stored = window.localStorage.getItem(DEV_SUBSCRIPTION_TIER_STORAGE_KEY);
+    if (stored && ["Free", "Pro", "Studio", "Education"].includes(stored)) {
+      return stored as SubscriptionTier;
+    }
+  } catch {
+    // localStorage may be unavailable in some environments
+  }
+
+  return "Free";
+}
+
 export function ProjectsPageClient() {
   const router = useRouter();
   const interactionSectionRef = useRef<HTMLElement | null>(null);
@@ -49,11 +69,25 @@ export function ProjectsPageClient() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
+  const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
+
+  // Load dev tier from localStorage on mount
+  useEffect(() => {
+    setDevTier(loadDevSubscriptionTierFromStorage());
+
+    // Listen for storage changes (e.g., dev tier changed in editor)
+    const handleStorageChange = () => {
+      setDevTier(loadDevSubscriptionTierFromStorage());
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
   
-  // Current subscription tier (all free-tier users by default)
-  const currentTier: SubscriptionTier = "Free";
+  // Current subscription tier (respects dev mode when enabled)
+  const currentTier: SubscriptionTier = DEV_MODE_ENABLED ? devTier : "Free";
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
