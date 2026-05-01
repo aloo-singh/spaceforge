@@ -169,6 +169,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
 import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel";
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
+import { SelectedWallInspector } from "@/components/editor/SelectedWallInspector";
 import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
@@ -2623,13 +2624,13 @@ export default function EditorCanvas({
           <SelectedRoomNamePanel className="h-full" />
         );
       } else if (selectedItem.type === "wall") {
-        // Wall doesn't have its own card, show parent room
+        // Show wall inspector
         const room = rooms.find((r) => r.id === selectedItem.roomId);
         if (room) {
           return isCompact ? (
-            <SelectedRoomNamePanel />
+            <SelectedWallInspector room={room} wall={selectedItem.wall} />
           ) : (
-            <SelectedRoomNamePanel className="h-full" />
+            <SelectedWallInspector room={room} wall={selectedItem.wall} className="h-full" />
           );
         }
       } else if (selectedItem.type === "opening") {

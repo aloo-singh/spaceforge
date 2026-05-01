@@ -10,7 +10,7 @@ export type BreadcrumbItem = {
  * Converts a wall value to its display label.
  * Handles both numeric indices and cardinal directions.
  */
-function getWallLabel(room: Room, wall: RoomWall): string {
+export function getWallLabel(room: Room, wall: RoomWall): string {
   if (typeof wall === "number") {
     return `Wall ${wall + 1}`;
   }
