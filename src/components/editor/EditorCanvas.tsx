@@ -3292,39 +3292,41 @@ export default function EditorCanvas({
           }}
         >
           <div className="relative flex h-full w-full overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] dark:border-border/70 dark:bg-zinc-900/70 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <ImmediateTooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
-                      onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
-                      className={cn(
-                        "absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
-                        useCompactMobileControls && "size-9 rounded-xl"
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                        onClick={() => setIsDesktopInspectorCollapsed((current) => !current)}
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground [@media(max-height:540px)_and_(orientation:landscape)]:top-1.5 [@media(max-height:540px)_and_(orientation:landscape)]:left-1.5",
+                          useCompactMobileControls && "size-9 rounded-xl"
+                        )}
+                      >
+                      {isDesktopInspectorCollapsed ? (
+                        <PanelRightExpand className="size-4" />
+                      ) : (
+                        <PanelRightCollapse className="size-4" />
                       )}
-                    >
-                    {isDesktopInspectorCollapsed ? (
-                      <PanelRightExpand className="size-4" />
-                    ) : (
-                      <PanelRightCollapse className="size-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left" align="start">
-                  {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
-                </TooltipContent>
-              </Tooltip>
-            </ImmediateTooltipProvider>
-            <InspectorBreadcrumbHeader
-              selection={selection}
-              floors={floors}
-              rooms={rooms}
-              onSelectFloor={selectFloorById}
-              onSelectRoom={selectRoomById}
-            />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" align="start">
+                    {isDesktopInspectorCollapsed ? "Expand inspector" : "Collapse inspector"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+              <InspectorBreadcrumbHeader
+                selection={selection}
+                floors={floors}
+                rooms={rooms}
+                onSelectFloor={selectFloorById}
+                onSelectRoom={selectRoomById}
+              />
+            </div>
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-hidden px-2 pt-11 pb-2 transition-[opacity,transform] duration-200 ease-out [@media(max-height:540px)_and_(orientation:landscape)]:pt-10",

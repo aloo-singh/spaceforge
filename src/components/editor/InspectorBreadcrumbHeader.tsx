@@ -42,7 +42,7 @@ export function InspectorBreadcrumbHeader({
   }
 
   return (
-    <div className={cn("absolute top-2 left-12 z-10 flex items-center", className)}>
+    <div className={cn("flex items-center", className)}>
       <Breadcrumb>
         <BreadcrumbList className="text-xs">
           {breadcrumbs.map((item, index) => {
