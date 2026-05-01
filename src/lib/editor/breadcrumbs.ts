@@ -10,15 +10,29 @@ export type BreadcrumbItem = {
  * The hierarchy is: Floor > Room > Wall > Opening/Asset
  * 
  * Returns breadcrumb items representing the path to the currently selected item.
+ * If selection is empty but activeFloorId is provided, shows just the floor breadcrumb.
  */
 export function buildSelectionBreadcrumbs(
   selection: SharedSelectionItem[],
   floors: Floor[],
   rooms: Room[],
   onSelectFloor?: (floorId: string) => void,
-  onSelectRoom?: (roomId: string) => void
+  onSelectRoom?: (roomId: string) => void,
+  activeFloorId?: string
 ): BreadcrumbItem[] {
+  // If no explicit selection, but we have an active floor, show just the floor
   if (selection.length === 0) {
+    if (activeFloorId) {
+      const floor = floors.find((f) => f.id === activeFloorId);
+      if (floor) {
+        return [
+          {
+            label: floor.name,
+            onClick: onSelectFloor ? () => onSelectFloor(activeFloorId) : undefined,
+          },
+        ];
+      }
+    }
     return [];
   }
 

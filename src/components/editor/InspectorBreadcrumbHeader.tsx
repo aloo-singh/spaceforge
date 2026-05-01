@@ -18,6 +18,7 @@ type InspectorBreadcrumbHeaderProps = {
   rooms: Room[];
   onSelectFloor?: (floorId: string) => void;
   onSelectRoom?: (roomId: string) => void;
+  activeFloorId?: string;
   className?: string;
 };
 
@@ -27,6 +28,7 @@ export function InspectorBreadcrumbHeader({
   rooms,
   onSelectFloor,
   onSelectRoom,
+  activeFloorId,
   className,
 }: InspectorBreadcrumbHeaderProps) {
   const breadcrumbs = buildSelectionBreadcrumbs(
@@ -34,7 +36,8 @@ export function InspectorBreadcrumbHeader({
     floors,
     rooms,
     onSelectFloor,
-    onSelectRoom
+    onSelectRoom,
+    activeFloorId
   );
 
   if (breadcrumbs.length === 0) {

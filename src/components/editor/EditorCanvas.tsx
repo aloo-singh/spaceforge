@@ -3325,6 +3325,7 @@ export default function EditorCanvas({
                 rooms={rooms}
                 onSelectFloor={selectFloorById}
                 onSelectRoom={selectRoomById}
+                activeFloorId={selectedFloorId ?? undefined}
               />
             </div>
             <div
