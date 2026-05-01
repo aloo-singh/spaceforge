@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { buildSelectionBreadcrumbs } from "@/lib/editor/breadcrumbs";
 import { 
   getRotatedInteriorAssetForRoom,
   getStairRunLengthMm,
@@ -68,6 +69,9 @@ function FurnitureInspector({
   asset,
   className,
 }: SelectedInteriorAssetInspectorProps) {
+  const floors = useEditorStore((state) => state.document.floors);
+  const rooms = useEditorStore((state) => state.document.rooms);
+  const selection = useEditorStore((state) => state.selection);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
@@ -92,9 +96,14 @@ function FurnitureInspector({
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
   const { title, description } = assetInspectorMeta(asset.type);
+  const breadcrumbs = buildSelectionBreadcrumbs(
+    selection,
+    floors,
+    rooms
+  );
 
   return (
-    <EditorInspectorSection title={title} description={description} className={className}>
+    <EditorInspectorSection title={title} description={description} className={className} breadcrumbs={breadcrumbs}>
       <div className="space-y-4">
         <div className="space-y-1.5">
           <label htmlFor="asset-name-input" className="text-sm font-medium">

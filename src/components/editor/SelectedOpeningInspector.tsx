@@ -13,6 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { buildSelectionBreadcrumbs } from "@/lib/editor/breadcrumbs";
 import type { RoomOpening } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -56,6 +57,9 @@ export function SelectedOpeningInspector({
   opening,
   className,
 }: SelectedOpeningInspectorProps) {
+  const floors = useEditorStore((state) => state.document.floors);
+  const rooms = useEditorStore((state) => state.document.rooms);
+  const selection = useEditorStore((state) => state.selection);
   const updateSelectedOpeningWidth = useEditorStore((state) => state.updateSelectedOpeningWidth);
   const updateSelectedDoorOpeningSide = useEditorStore(
     (state) => state.updateSelectedDoorOpeningSide
@@ -78,11 +82,18 @@ export function SelectedOpeningInspector({
     updateSelectedDoorHingeSide(opening.hingeSide === "start" ? "end" : "start");
   };
 
+  const breadcrumbs = buildSelectionBreadcrumbs(
+    selection,
+    floors,
+    rooms
+  );
+
   return (
     <EditorInspectorSection
       title="Selected opening"
       description="Adjust the current opening using canonical wall-relative controls."
       className={className}
+      breadcrumbs={breadcrumbs}
     >
       <div className="space-y-4">
         <div className="space-y-1.5">

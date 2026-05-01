@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatMetricWallDimension } from "@/lib/editor/measurements";
 import { getPolygonBounds } from "@/lib/editor/roomGeometry";
+import { buildSelectionBreadcrumbs } from "@/lib/editor/breadcrumbs";
 import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
@@ -77,6 +78,8 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
     (state) => state.shouldFocusSelectedRoomNameInput
   );
   const rooms = useEditorStore((state) => state.document.rooms);
+  const floors = useEditorStore((state) => state.document.floors);
+  const selection = useEditorStore((state) => state.selection);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
@@ -86,6 +89,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
+  const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
     (state) => state.consumeSelectedRoomNameInputFocusRequest
@@ -219,11 +223,20 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
 
   if (!selectedRoom) return null;
 
+  const breadcrumbs = buildSelectionBreadcrumbs(
+    selection,
+    floors,
+    rooms,
+    selectFloorById,
+    selectRoomById
+  );
+
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1", className)}>
       <EditorInspectorSection
         title="Selected room"
         description="Review the current room name and quick actions."
+        breadcrumbs={breadcrumbs}
       >
         <aside ref={panelRef}>
           <label htmlFor="room-name-input" className="mb-1 block text-sm font-medium">

@@ -12,6 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { buildSelectionBreadcrumbs } from "@/lib/editor/breadcrumbs";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,8 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
   const { isMobile } = useMobile();
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const floors = useEditorStore((state) => state.document.floors);
+  const rooms = useEditorStore((state) => state.document.rooms);
+  const selection = useEditorStore((state) => state.selection);
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -110,11 +113,19 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
 
   if (!selectedFloor) return null;
 
+  const breadcrumbs = buildSelectionBreadcrumbs(
+    selection,
+    floors,
+    rooms,
+    selectFloorById
+  );
+
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1", className)}>
       <EditorInspectorSection
         title="Selected floor"
         description="Review the current floor name and quick actions."
+        breadcrumbs={breadcrumbs}
       >
         <aside ref={panelRef}>
           <label htmlFor="floor-name-input" className="mb-1 block text-sm font-medium">
