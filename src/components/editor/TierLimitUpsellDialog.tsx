@@ -40,11 +40,13 @@ export function TierLimitUpsellDialog({
   );
 
   const nextLimitText = nextConfig
-    ? formatWithLabel(
-        nextConfig.limit,
-        nextConfig.singularLabel,
-        nextConfig.pluralLabel
-      )
+    ? nextConfig.limit === Infinity
+      ? `unlimited ${nextConfig.pluralLabel}`
+      : formatWithLabel(
+          nextConfig.limit,
+          nextConfig.singularLabel,
+          nextConfig.pluralLabel
+        )
     : null;
 
   const upsellText = nextTier && nextConfig ? currentConfig.upsellMessage(nextTier, nextConfig.limit) : null;
