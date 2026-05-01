@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.69.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-01</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Admin feature gates overview page at <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">/admin/features</code> with dynamic sticky table.</li>
+                <li>Subscription feature config now includes <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">label</code> and <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">description</code> fields for all gated features.</li>
+                <li>&lsquo;Test as [Tier]&rsquo; tier selector buttons on feature gates page to switch dev subscription tier (Free | Pro | Studio | Education).</li>
+                <li>&lsquo;Copy as JSON&rsquo; button to export full feature config to clipboard with calm toast confirmation.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Sticky table headers and columns for easy reference while scrolling through feature limits.</li>
+                <li>Feature limit rows highlight with subtle amber background when feature is limited in Free tier.</li>
+                <li>Tier selector uses same tab-based UI component as frontend dev subscription mode for consistency.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.68.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-01</span>
           </div>
