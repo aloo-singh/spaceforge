@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.68.0",
+    date: "2026-05-01",
+    title: "Free tier project limits (with calm upsell)",
+    items: [
+      "Free tier is now limited to 2 projects; Pro, Studio, and Education tiers offer unlimited projects.",
+      "When you reach your project limit, a calm, benefit-focused dialog and on-page banner invite you to upgrade.",
+      "Creating a new project is still straightforward—the 'New project' button shows the upgrade option rather than disabling.",
+    ],
+  },
+  {
     version: "v0.67.0",
     date: "2026-04-29",
     title: "Smarter door and window editing",

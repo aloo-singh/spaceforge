@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     localPatterns: [
       {
         pathname: "/images/home/editor-hero.png",
-        search: "?v=20260318",
+        search: "?v=20260501",
       },
     ],
   },
