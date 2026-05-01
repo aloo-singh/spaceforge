@@ -1,9 +1,28 @@
-import type { SharedSelectionItem, Floor, Room } from "@/lib/editor/types";
+import type { SharedSelectionItem, Floor, Room, RoomWall } from "@/lib/editor/types";
+import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
 
 export type BreadcrumbItem = {
   label: string;
   onClick?: () => void;
 };
+
+/**
+ * Converts a wall value to its display label.
+ * Handles both numeric indices and cardinal directions.
+ */
+function getWallLabel(room: Room, wall: RoomWall): string {
+  if (typeof wall === "number") {
+    return `Wall ${wall + 1}`;
+  }
+  
+  // For cardinal directions, resolve to segment index
+  const segmentIndex = resolveRoomWallSegmentIndex(room, wall);
+  if (segmentIndex !== null) {
+    return `Wall ${segmentIndex + 1}`;
+  }
+  
+  return `Wall`;
+}
 
 /**
  * Builds a breadcrumb trail from a selection hierarchy.
@@ -98,23 +117,20 @@ export function buildSelectionBreadcrumbs(
 
   // Add the selected item's specific identifier
   if (selectedItem.type === "wall") {
-    const wall = typeof selectedItem.wall === "number" 
-      ? `Wall ${selectedItem.wall + 1}`
-      : selectedItem.wall.charAt(0).toUpperCase() + selectedItem.wall.slice(1);
-    breadcrumbs.push({
-      label: wall,
-    });
+    const room = rooms.find((r) => r.id === selectedItem.roomId);
+    if (room) {
+      breadcrumbs.push({
+        label: getWallLabel(room, selectedItem.wall as RoomWall),
+      });
+    }
   } else if (selectedItem.type === "opening") {
     const room = rooms.find((r) => r.id === selectedItem.roomId);
     if (room) {
       const opening = room.openings.find((o) => o.id === selectedItem.openingId);
       if (opening) {
         // Add wall breadcrumb
-        const wall = typeof opening.wall === "number" 
-          ? `Wall ${opening.wall + 1}`
-          : opening.wall.charAt(0).toUpperCase() + opening.wall.slice(1);
         breadcrumbs.push({
-          label: wall,
+          label: getWallLabel(room, opening.wall as RoomWall),
         });
         // Add opening label
         const label = opening.type === "door" ? "Door" : "Window";
