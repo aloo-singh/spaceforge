@@ -21,11 +21,11 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
-import type { SubscriptionTier } from "@/lib/subscription/tiers";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
+type ExportFormatOption = "png-normal" | "png-hi-res" | "svg" | "pdf";
 
 export type ExportPngRequest = {
   title: string;
@@ -116,7 +116,6 @@ export function ExportPngDialog({
   onLegendPositionChange,
   onScaleBarPositionChange,
   onExportResolutionChange,
-  currentThemeLabel,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
@@ -125,6 +124,9 @@ export function ExportPngDialog({
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
+  const [exportFormatOption, setExportFormatOption] = useState<ExportFormatOption>(
+    exportResolution === "hi-res" ? "png-hi-res" : "png-normal"
+  );
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
@@ -255,33 +257,55 @@ export function ExportPngDialog({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div
             className="grid w-full gap-1 rounded-lg border border-border/70 bg-background/90 p-1 sm:w-auto"
-            style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+            style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
             role="group"
-            aria-label="Export resolution"
+            aria-label="Export format"
           >
             <Button
               type="button"
               size="sm"
-              variant={exportResolution === "normal" ? "secondary" : "ghost"}
-              aria-pressed={exportResolution === "normal"}
-              onClick={() => onExportResolutionChange("normal")}
+              variant={exportFormatOption === "png-normal" ? "secondary" : "ghost"}
+              aria-pressed={exportFormatOption === "png-normal"}
+              onClick={() => {
+                setExportFormatOption("png-normal");
+                onExportResolutionChange("normal");
+              }}
             >
-              Normal
+              PNG (Normal)
             </Button>
             <Button
               type="button"
               size="sm"
-              variant={exportResolution === "hi-res" ? "secondary" : "ghost"}
-              aria-pressed={exportResolution === "hi-res"}
+              variant={exportFormatOption === "png-hi-res" ? "secondary" : "ghost"}
+              aria-pressed={exportFormatOption === "png-hi-res"}
               onClick={() => {
                 if (devSubscriptionTier === "Free") {
                   setShowHiResUpsellDialog(true);
                 } else {
+                  setExportFormatOption("png-hi-res");
                   onExportResolutionChange("hi-res");
                 }
               }}
             >
-              Hi-res
+              PNG (Hi-res)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportFormatOption === "svg" ? "secondary" : "ghost"}
+              aria-pressed={exportFormatOption === "svg"}
+              onClick={() => setExportFormatOption("svg")}
+            >
+              SVG
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportFormatOption === "pdf" ? "secondary" : "ghost"}
+              aria-pressed={exportFormatOption === "pdf"}
+              onClick={() => setExportFormatOption("pdf")}
+            >
+              PDF
             </Button>
           </div>
           <Button
@@ -589,6 +613,7 @@ export function ExportPngDialog({
               if (isDevSubscriptionModeEnabled) {
                 setDevSubscriptionTier("Pro");
                 setShowHiResUpsellDialog(false);
+                setExportFormatOption("png-hi-res");
                 onExportResolutionChange("hi-res");
               } else {
                 window.open("/upgrade", "_blank");
