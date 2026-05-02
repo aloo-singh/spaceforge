@@ -11,6 +11,7 @@ import {
   LocateFixed,
   Redo2,
   Restore,
+  Ruler2,
   Settings2,
   Undo2,
   WindowIcon,
@@ -515,6 +516,17 @@ export function HistoryControls({
                   className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                 >
                   <Restore />
+                </Button>
+              </EditorChromeTooltip>
+              <EditorChromeTooltip content="Ruler tool">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Ruler tool"
+                  className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                >
+                  <Ruler2 className="size-4" />
                 </Button>
               </EditorChromeTooltip>
             </div>
