@@ -42,6 +42,7 @@ export type ExportPngRequest = {
   showDimensions: boolean;
   theme: ExportPngThemeOption;
   exportResolution: EditorExportResolution;
+  exportFormat: EditorExportFormat;
 };
 
 type ExportPngDialogProps = {
@@ -168,6 +169,7 @@ export function ExportPngDialog({
         showDimensions,
         theme,
         exportResolution,
+        exportFormat,
       })
         .then((nextPreviewSrc) => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -210,6 +212,7 @@ export function ExportPngDialog({
     showDimensions,
     theme,
     exportResolution,
+    exportFormat,
   ]);
 
   const handleExport = () => {
@@ -231,6 +234,7 @@ export function ExportPngDialog({
       showDimensions,
       theme,
       exportResolution,
+      exportFormat,
     });
   };
 
@@ -317,7 +321,13 @@ export function ExportPngDialog({
             className="w-full sm:w-auto"
           >
             <Download />
-            {isExporting ? "Exporting..." : "Export PNG"}
+            {isExporting
+              ? "Exporting..."
+              : exportFormat === "svg"
+                ? "Export SVG"
+                : exportFormat === "pdf"
+                  ? "Export PDF"
+                  : "Export PNG"}
           </Button>
         </div>
       }

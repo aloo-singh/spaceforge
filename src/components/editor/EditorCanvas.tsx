@@ -67,7 +67,7 @@ import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
-import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
+import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl, exportToSVG } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
@@ -1664,11 +1664,50 @@ export default function EditorCanvas({
 
   const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
     if (isExportingPng) return;
+    if (request.exportFormat === "pdf") {
+      console.info("PDF export is not implemented yet.");
+      return;
+    }
 
     track(ANALYTICS_EVENTS.exportStarted, {
-      exportType: "png",
+      exportType: request.exportFormat === "svg" ? "svg" : "png",
     });
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
+
+    if (request.exportFormat === "svg") {
+      setIsExportingPng(true);
+
+      try {
+        const state = useEditorStore.getState();
+        const exportTitle =
+          request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+        const svg = exportToSVG({
+          rooms: getRoomsForActiveFloor(state.document),
+          title: exportTitle || undefined,
+        });
+        const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `spaceforge-editor-${timestamp}.svg`;
+        link.click();
+        track(ANALYTICS_EVENTS.exportCompleted, {
+          exportType: "svg",
+        });
+        trackFirstSuccess(ANALYTICS_EVENTS.exportCompleted);
+        if (activeHintIdRef.current === "export-as-png") {
+          completeHint("export-as-png");
+        }
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      } catch (error) {
+        console.error("SVG export failed.", error);
+      } finally {
+        setIsExportingPng(false);
+      }
+
+      return;
+    }
 
     const exportSnapshot = createPngExportSnapshotFromRequest(request);
     if (!exportSnapshot) {

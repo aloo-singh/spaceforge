@@ -2,6 +2,10 @@ import type { Container, ICanvas, Renderer } from "pixi.js";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type { EditorExportResolution } from "@/lib/editor/exportPreferences";
+import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
+import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
+import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
+import type { Point, Room } from "@/lib/editor/types";
 
 export type PixiPngExportSource =
   | Renderer
@@ -60,6 +64,10 @@ const DEFAULT_EXPORT_PADDING_PX = 48;
 const DEFAULT_EDGE_CROP_PX = 1;
 const EXPORT_TEXT_FONT_FAMILY = "system-ui, sans-serif";
 const STANDARD_EXPORT_WIDTH_PX = 1280;
+const SVG_EXPORT_PADDING_PX = 64;
+const SVG_ROOM_FILL = "#f8fafc";
+const SVG_ROOM_STROKE = "#0f172a";
+const SVG_MUTED_STROKE = "#64748b";
 
 type ExportTextLine = {
   text: string;
@@ -90,6 +98,117 @@ type ExportNorthIndicatorBlock = {
   width: number;
   height: number;
 };
+
+export type SvgExportOptions = {
+  rooms: Room[];
+  title?: string;
+};
+
+export function exportToSVG({ rooms, title }: SvgExportOptions): string {
+  const bounds = getLayoutBoundsFromRooms(rooms);
+  const drawableWidth = STANDARD_EXPORT_WIDTH_PX - SVG_EXPORT_PADDING_PX * 2;
+  const layoutWidthMm = Math.max(bounds?.width ?? 1, 1);
+  const layoutHeightMm = Math.max(bounds?.height ?? 1, 1);
+  const scale = drawableWidth / layoutWidthMm;
+  const exportWidth = STANDARD_EXPORT_WIDTH_PX;
+  const exportHeight = Math.max(1, Math.ceil(layoutHeightMm * scale + SVG_EXPORT_PADDING_PX * 2));
+  const originX = bounds?.minX ?? 0;
+  const originY = bounds?.minY ?? 0;
+  const svgTitle = normalizeSvgText(title || "spaceforge export");
+
+  const projectPoint = (point: Point): Point => ({
+    x: SVG_EXPORT_PADDING_PX + (point.x - originX) * scale,
+    y: SVG_EXPORT_PADDING_PX + (point.y - originY) * scale,
+  });
+
+  const formatNumber = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
+
+  const pointToString = (point: Point) => {
+    const projectedPoint = projectPoint(point);
+    return `${formatNumber(projectedPoint.x)},${formatNumber(projectedPoint.y)}`;
+  };
+
+  const elements: string[] = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}" role="img" aria-labelledby="title">`,
+    `<title id="title">${svgTitle}</title>`,
+    `<rect width="100%" height="100%" fill="#ffffff" />`,
+  ];
+
+  for (const room of rooms) {
+    if (room.points.length < 3) continue;
+
+    const polygonPoints = room.points.map(pointToString).join(" ");
+    elements.push(
+      `<polygon points="${polygonPoints}" fill="${SVG_ROOM_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
+    );
+
+    for (let index = 0; index < room.points.length; index += 1) {
+      const start = projectPoint(room.points[index]);
+      const end = projectPoint(room.points[(index + 1) % room.points.length]);
+      elements.push(
+        `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`
+      );
+    }
+
+    for (const opening of room.openings) {
+      const layout = getResolvedRoomOpeningLayout(room, opening);
+      if (!layout) continue;
+
+      const start = projectPoint(layout.start);
+      const end = projectPoint(layout.end);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.hypot(dx, dy);
+      const normalX = length > 0 ? -dy / length : 0;
+      const normalY = length > 0 ? dx / length : 0;
+      const markerOffset = opening.type === "window" ? 4 : 10;
+
+      elements.push(
+        `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />`
+      );
+
+      if (opening.type === "window") {
+        elements.push(
+          `<line x1="${formatNumber(start.x + normalX * markerOffset)}" y1="${formatNumber(start.y + normalY * markerOffset)}" x2="${formatNumber(end.x + normalX * markerOffset)}" y2="${formatNumber(end.y + normalY * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+          `<line x1="${formatNumber(start.x - normalX * markerOffset)}" y1="${formatNumber(start.y - normalY * markerOffset)}" x2="${formatNumber(end.x - normalX * markerOffset)}" y2="${formatNumber(end.y - normalY * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
+        );
+      } else {
+        const hinge = opening.hingeSide === "end" ? end : start;
+        const openEnd = opening.hingeSide === "end" ? start : end;
+        const radius = Math.min(length, 42);
+        const swingEnd = {
+          x: hinge.x + normalX * radius,
+          y: hinge.y + normalY * radius,
+        };
+        elements.push(
+          `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(swingEnd.x)}" y2="${formatNumber(swingEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+          `<path d="M ${formatNumber(swingEnd.x)} ${formatNumber(swingEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 1 ${formatNumber(openEnd.x)} ${formatNumber(openEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
+        );
+      }
+    }
+
+    const labelAnchor = getPolygonLabelAnchor(room.points);
+    if (labelAnchor) {
+      const labelPoint = projectPoint(labelAnchor);
+      elements.push(
+        `<text x="${formatNumber(labelPoint.x)}" y="${formatNumber(labelPoint.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${normalizeSvgText(room.name || "Room")}</text>`
+      );
+    }
+  }
+
+  elements.push("</svg>");
+  return elements.join("\n");
+}
+
+function normalizeSvgText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 function resolveRenderer(source: PixiPngExportSource): Renderer {
   if ("extract" in source) return source;
