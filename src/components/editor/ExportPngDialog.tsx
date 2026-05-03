@@ -669,7 +669,7 @@ export function ExportPngDialog({
       open={showSvgUpsellDialog}
       onOpenChange={setShowSvgUpsellDialog}
       title="SVG export for Studio plans"
-      description="Editable vector plans are built for professional handoff, print workflows, and design tools that expect clean geometry."
+      description="Keep your plan sharp, flexible, and ready for the next design step."
       footer={
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
@@ -699,11 +699,11 @@ export function ExportPngDialog({
       <div className="space-y-3 py-4">
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
           <p className="text-sm text-blue-900 dark:text-blue-100">
-            <strong>SVG keeps your plan editable</strong> for Illustrator, Figma, print shops, and client-ready documentation.
+            <strong>SVG gives you a professional editable vector file</strong> instead of a flattened image.
           </p>
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Studio and Education tiers unlock professional vector exports without flattening your drawing into pixels.
+          Open it in Illustrator, Inkscape, Figma, or other vector tools for further editing, annotation, and client-ready refinement.
         </p>
       </div>
     </ResponsiveAlertDialog>
@@ -712,7 +712,7 @@ export function ExportPngDialog({
       open={showPdfUpsellDialog}
       onOpenChange={setShowPdfUpsellDialog}
       title="PDF export for Pro plans"
-      description="Print-ready PDFs are for the moments when a plan needs to leave the editor and still feel properly put together."
+      description="Turn a working sketch into something you can confidently send on."
       footer={
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
@@ -742,11 +742,11 @@ export function ExportPngDialog({
       <div className="space-y-3 py-4">
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
           <p className="text-sm text-blue-900 dark:text-blue-100">
-            <strong>PDF gives you a formal deliverable</strong> for sharing, printing, emailing, and keeping a clean record of the plan.
+            <strong>PDF gives you a print-ready formal deliverable</strong> for the moments that need a proper document.
           </p>
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Pro, Studio, and Education tiers unlock PDF exports for presentation-ready floor plans.
+          Share clean plans with contractors, clients, estate agents, or planning permission workflows without asking anyone to open the editor.
         </p>
       </div>
     </ResponsiveAlertDialog>
