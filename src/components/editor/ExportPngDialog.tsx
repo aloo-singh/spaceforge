@@ -130,6 +130,7 @@ export function ExportPngDialog({
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
   const [showSvgUpsellDialog, setShowSvgUpsellDialog] = useState(false);
+  const [showPdfUpsellDialog, setShowPdfUpsellDialog] = useState(false);
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
@@ -142,6 +143,7 @@ export function ExportPngDialog({
   const effectiveScaleBarPosition: EditorExportScaleBarPosition =
     showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
   const canExportSvg = devSubscriptionTier === "Studio" || devSubscriptionTier === "Education";
+  const canExportPdf = devSubscriptionTier !== "Free";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -316,7 +318,13 @@ export function ExportPngDialog({
               size="sm"
               variant={exportFormat === "pdf" ? "secondary" : "ghost"}
               aria-pressed={exportFormat === "pdf"}
-              onClick={() => onExportFormatChange("pdf")}
+              onClick={() => {
+                if (canExportPdf) {
+                  onExportFormatChange("pdf");
+                } else {
+                  setShowPdfUpsellDialog(true);
+                }
+              }}
             >
               PDF
             </Button>
@@ -696,6 +704,49 @@ export function ExportPngDialog({
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Studio and Education tiers unlock professional vector exports without flattening your drawing into pixels.
+        </p>
+      </div>
+    </ResponsiveAlertDialog>
+
+    <ResponsiveAlertDialog
+      open={showPdfUpsellDialog}
+      onOpenChange={setShowPdfUpsellDialog}
+      title="PDF export for Pro plans"
+      description="Print-ready PDFs are for the moments when a plan needs to leave the editor and still feel properly put together."
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowPdfUpsellDialog(false)}
+            className="w-full sm:w-auto"
+          >
+            Stay with PNG
+          </Button>
+          <Button
+            onClick={() => {
+              if (isDevSubscriptionModeEnabled) {
+                setDevSubscriptionTier("Pro");
+                setShowPdfUpsellDialog(false);
+                onExportFormatChange("pdf");
+              } else {
+                window.open("/upgrade", "_blank");
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            Upgrade to Pro
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 py-4">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>PDF gives you a formal deliverable</strong> for sharing, printing, emailing, and keeping a clean record of the plan.
+          </p>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Pro, Studio, and Education tiers unlock PDF exports for presentation-ready floor plans.
         </p>
       </div>
     </ResponsiveAlertDialog>
