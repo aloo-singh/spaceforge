@@ -1,11 +1,19 @@
 import type { Container, ICanvas, Renderer } from "pixi.js";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
+import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
+import {
+  DEFAULT_STAIR_ARROW_DIRECTION,
+  DEFAULT_STAIR_ARROW_ENABLED,
+  DEFAULT_STAIR_TREAD_SPACING_MM,
+  getInteriorAssetDisplayName,
+  getStairRunLengthMm,
+} from "@/lib/editor/interiorAssets";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type { EditorExportResolution } from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
-import type { Point, Room } from "@/lib/editor/types";
+import type { Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
 
 export type PixiPngExportSource =
   | Renderer
@@ -68,6 +76,9 @@ const SVG_EXPORT_PADDING_PX = 64;
 const SVG_ROOM_FILL = "#f8fafc";
 const SVG_ROOM_STROKE = "#0f172a";
 const SVG_MUTED_STROKE = "#64748b";
+const SVG_ASSET_FILL = "#eef2f7";
+const SVG_ASSET_DETAIL_FILL = "#dbe4ee";
+const SVG_SCALE_BAR_HEIGHT_PX = 72;
 
 type ExportTextLine = {
   text: string;
@@ -111,7 +122,10 @@ export function exportToSVG({ rooms, title }: SvgExportOptions): string {
   const layoutHeightMm = Math.max(bounds?.height ?? 1, 1);
   const scale = drawableWidth / layoutWidthMm;
   const exportWidth = STANDARD_EXPORT_WIDTH_PX;
-  const exportHeight = Math.max(1, Math.ceil(layoutHeightMm * scale + SVG_EXPORT_PADDING_PX * 2));
+  const exportHeight = Math.max(
+    1,
+    Math.ceil(layoutHeightMm * scale + SVG_EXPORT_PADDING_PX * 2 + SVG_SCALE_BAR_HEIGHT_PX)
+  );
   const originX = bounds?.minX ?? 0;
   const originY = bounds?.minY ?? 0;
   const svgTitle = normalizeSvgText(title || "spaceforge export");
@@ -195,10 +209,174 @@ export function exportToSVG({ rooms, title }: SvgExportOptions): string {
         `<text x="${formatNumber(labelPoint.x)}" y="${formatNumber(labelPoint.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${normalizeSvgText(room.name || "Room")}</text>`
       );
     }
+
+    for (const asset of room.interiorAssets) {
+      elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, scale, formatNumber));
+    }
+  }
+
+  const scaleBar = buildSvgScaleBar(scale, exportHeight, formatNumber);
+  if (scaleBar) {
+    elements.push(scaleBar);
   }
 
   elements.push("</svg>");
   return elements.join("\n");
+}
+
+function buildSvgInteriorAssetElements(
+  asset: RoomInteriorAsset,
+  projectPoint: (point: Point) => Point,
+  scale: number,
+  formatNumber: (value: number) => string
+): string[] {
+  const center = projectPoint({ x: asset.xMm, y: asset.yMm });
+  const widthPx = Math.max(asset.widthMm * scale, 1);
+  const depthPx = Math.max(asset.depthMm * scale, 1);
+  const halfWidthPx = widthPx / 2;
+  const halfDepthPx = depthPx / 2;
+  const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+  const label = normalizeSvgText(asset.name || getInteriorAssetDisplayName(asset.type));
+  const elements: string[] = [
+    `<g transform="translate(${formatNumber(center.x)} ${formatNumber(center.y)}) rotate(${formatNumber(rotation)})">`,
+  ];
+
+  const rect = (options?: { fill?: string; stroke?: string; strokeWidth?: number }) =>
+    `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(depthPx)}" rx="4" fill="${options?.fill ?? SVG_ASSET_FILL}" stroke="${options?.stroke ?? SVG_ROOM_STROKE}" stroke-width="${formatNumber(options?.strokeWidth ?? 1.5)}" />`;
+  const line = (x1: number, y1: number, x2: number, y2: number, width = 1.25) =>
+    `<line x1="${formatNumber(x1)}" y1="${formatNumber(y1)}" x2="${formatNumber(x2)}" y2="${formatNumber(y2)}" stroke="${SVG_MUTED_STROKE}" stroke-width="${formatNumber(width)}" stroke-linecap="round" />`;
+
+  if (asset.type === "dining-table" && asset.shape === "round") {
+    elements.push(
+      `<ellipse cx="0" cy="0" rx="${formatNumber(halfWidthPx)}" ry="${formatNumber(halfDepthPx)}" fill="${SVG_ASSET_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.5" />`,
+      line(-halfWidthPx * 0.58, 0, halfWidthPx * 0.58, 0),
+      line(0, -halfDepthPx * 0.58, 0, halfDepthPx * 0.58)
+    );
+  } else {
+    elements.push(rect());
+  }
+
+  if (asset.type === "bed") {
+    const headboardHeight = depthPx * 0.14;
+    elements.push(
+      `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(headboardHeight)}" rx="3" fill="${SVG_ASSET_DETAIL_FILL}" />`,
+      line(-halfWidthPx * 0.5, -halfDepthPx + headboardHeight, -halfWidthPx * 0.5, halfDepthPx),
+      line(halfWidthPx * 0.5, -halfDepthPx + headboardHeight, halfWidthPx * 0.5, halfDepthPx)
+    );
+  }
+
+  if (asset.type === "sofa") {
+    const backRestDepth = depthPx * 0.3;
+    elements.push(
+      `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(backRestDepth)}" rx="3" fill="${SVG_ASSET_DETAIL_FILL}" />`,
+      line(-halfWidthPx / 3, -halfDepthPx + backRestDepth, -halfWidthPx / 3, halfDepthPx),
+      line(halfWidthPx / 3, -halfDepthPx + backRestDepth, halfWidthPx / 3, halfDepthPx)
+    );
+  }
+
+  if (asset.type === "wardrobe") {
+    if (asset.doorType === "sliding") {
+      elements.push(
+        line(-halfWidthPx, -halfDepthPx - 5, 0, -halfDepthPx - 5),
+        line(0, -halfDepthPx - 8, halfWidthPx, -halfDepthPx - 8)
+      );
+    } else {
+      const leafLength = Math.min(widthPx * 0.4, depthPx * 0.6);
+      elements.push(
+        line(-halfWidthPx, -halfDepthPx, -halfWidthPx, -halfDepthPx - leafLength),
+        line(halfWidthPx, -halfDepthPx, halfWidthPx, -halfDepthPx - leafLength)
+      );
+    }
+  }
+
+  if (asset.type === "dining-table" && asset.shape !== "round") {
+    elements.push(
+      line(-halfWidthPx * 0.62, 0, halfWidthPx * 0.62, 0),
+      line(0, -halfDepthPx * 0.62, 0, halfDepthPx * 0.62)
+    );
+  }
+
+  if (asset.type === "stairs") {
+    const stairRunLengthMm = Math.max(getStairRunLengthMm(asset), 1);
+    const isSidewaysStairRun = Math.abs(normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0)) === 90;
+    const treadCount = Math.max(0, Math.floor(stairRunLengthMm / DEFAULT_STAIR_TREAD_SPACING_MM) - 1);
+    for (let index = 1; index <= treadCount; index += 1) {
+      const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / stairRunLengthMm;
+      if (progress <= 0 || progress >= 1) continue;
+      if (isSidewaysStairRun) {
+        const x = -halfWidthPx + widthPx * progress;
+        elements.push(line(x, -halfDepthPx, x, halfDepthPx, 1));
+      } else {
+        const y = -halfDepthPx + depthPx * progress;
+        elements.push(line(-halfWidthPx, y, halfWidthPx, y, 1));
+      }
+    }
+
+    if ((asset.arrowEnabled ?? DEFAULT_STAIR_ARROW_ENABLED) !== false) {
+      const direction = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
+      const arrowDirection = direction === "reverse" ? -1 : 1;
+      const runLengthPx = isSidewaysStairRun ? widthPx : depthPx;
+      const arrowLength = Math.max(28, Math.min(runLengthPx * 0.58, runLengthPx - 22));
+      const tailY = isSidewaysStairRun ? 0 : (arrowLength / 2) * arrowDirection;
+      const headY = isSidewaysStairRun ? 0 : (-arrowLength / 2) * arrowDirection;
+      const tailX = isSidewaysStairRun ? (-arrowLength / 2) * arrowDirection : 0;
+      const headX = isSidewaysStairRun ? (arrowLength / 2) * arrowDirection : 0;
+      const headSign = arrowDirection;
+      elements.push(
+        line(tailX, tailY, headX, headY, 1.4),
+        isSidewaysStairRun
+          ? line(headX, headY, headX - 9 * headSign, headY - 5, 1.4)
+          : line(headX, headY, headX - 5, headY + 9 * headSign, 1.4),
+        isSidewaysStairRun
+          ? line(headX, headY, headX - 9 * headSign, headY + 5, 1.4)
+          : line(headX, headY, headX + 5, headY + 9 * headSign, 1.4)
+      );
+      const arrowLabel = normalizeSvgText(asset.arrowLabel?.trim() || "");
+      if (arrowLabel) {
+        elements.push(
+          `<text x="${formatNumber(isSidewaysStairRun ? headX + 16 * headSign : 0)}" y="${formatNumber(isSidewaysStairRun ? 0 : headY - 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="600">${arrowLabel}</text>`
+        );
+      }
+    }
+  }
+
+  elements.push("</g>");
+
+  if (asset.type !== "stairs") {
+    elements.push(
+      `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y + halfDepthPx + 16)}" text-anchor="middle" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="500">${label}</text>`
+    );
+  }
+
+  return elements;
+}
+
+function buildSvgScaleBar(
+  scale: number,
+  exportHeight: number,
+  formatNumber: (value: number) => string
+): string | null {
+  const niceLengthsMm = [100, 250, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000];
+  const targetLengthMm = 180 / scale;
+  let lengthMm = niceLengthsMm[0];
+  for (const candidate of niceLengthsMm) {
+    if (candidate <= targetLengthMm) {
+      lengthMm = candidate;
+    }
+  }
+  const widthPx = lengthMm * scale;
+  const x = SVG_EXPORT_PADDING_PX;
+  const y = exportHeight - SVG_EXPORT_PADDING_PX + 14;
+  const label = lengthMm >= 1_000 ? `${formatNumber(lengthMm / 1_000)} m` : `${lengthMm} mm`;
+
+  return [
+    `<g aria-label="Scale bar">`,
+    `<line x1="${formatNumber(x)}" y1="${formatNumber(y)}" x2="${formatNumber(x + widthPx)}" y2="${formatNumber(y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
+    `<line x1="${formatNumber(x)}" y1="${formatNumber(y - 6)}" x2="${formatNumber(x)}" y2="${formatNumber(y + 6)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
+    `<line x1="${formatNumber(x + widthPx)}" y1="${formatNumber(y - 6)}" x2="${formatNumber(x + widthPx)}" y2="${formatNumber(y + 6)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
+    `<text x="${formatNumber(x)}" y="${formatNumber(y + 24)}" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="500">${label}</text>`,
+    `</g>`,
+  ].join("\n");
 }
 
 function normalizeSvgText(value: string): string {
