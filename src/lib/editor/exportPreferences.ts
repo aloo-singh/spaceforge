@@ -2,6 +2,7 @@ export type EditorExportThemePreference = "light" | "dark" | "system";
 export type EditorExportLegendPosition = "bottom" | "right-side" | "none";
 export type EditorExportScaleBarPosition = "bottom-left" | "none";
 export type EditorExportResolution = "normal" | "hi-res";
+export type EditorExportFormat = "png-normal" | "png-hi-res" | "svg" | "pdf";
 
 export type EditorExportPreferences = {
   showLegend: boolean;
@@ -12,6 +13,7 @@ export type EditorExportPreferences = {
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
   exportResolution: EditorExportResolution;
+  exportFormat: EditorExportFormat;
 };
 
 export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
@@ -23,7 +25,33 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   legendPosition: "bottom",
   scaleBarPosition: "bottom-left",
   exportResolution: "normal",
+  exportFormat: "png-normal",
 };
+
+function normalizeEditorExportResolution(value: unknown): EditorExportResolution {
+  return value === "hi-res" || value === "normal"
+    ? value
+    : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportResolution;
+}
+
+function getExportFormatFromResolution(resolution: EditorExportResolution): EditorExportFormat {
+  return resolution === "hi-res" ? "png-hi-res" : "png-normal";
+}
+
+function normalizeEditorExportFormat(
+  value: unknown,
+  fallbackResolution: EditorExportResolution
+): EditorExportFormat {
+  if (value === "png-normal" || value === "png-hi-res" || value === "svg" || value === "pdf") {
+    return value;
+  }
+
+  if (value === "normal" || value === "hi-res") {
+    return getExportFormatFromResolution(value);
+  }
+
+  return getExportFormatFromResolution(fallbackResolution);
+}
 
 export function cloneEditorExportPreferences(
   preferences: EditorExportPreferences
@@ -37,6 +65,7 @@ export function cloneEditorExportPreferences(
     legendPosition: preferences.legendPosition,
     scaleBarPosition: preferences.scaleBarPosition,
     exportResolution: preferences.exportResolution,
+    exportFormat: preferences.exportFormat,
   };
 }
 
@@ -52,7 +81,8 @@ export function areEditorExportPreferencesEqual(
     a.theme === b.theme &&
     a.legendPosition === b.legendPosition &&
     a.scaleBarPosition === b.scaleBarPosition &&
-    a.exportResolution === b.exportResolution
+    a.exportResolution === b.exportResolution &&
+    a.exportFormat === b.exportFormat
   );
 }
 
@@ -60,6 +90,11 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
   if (typeof value !== "object" || value === null) {
     return cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES);
   }
+
+  const exportResolution =
+    "exportResolution" in value
+      ? normalizeEditorExportResolution(value.exportResolution)
+      : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportResolution;
 
   return {
     showLegend:
@@ -95,10 +130,10 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       (value.scaleBarPosition === "bottom-left" || value.scaleBarPosition === "none")
         ? value.scaleBarPosition
         : DEFAULT_EDITOR_EXPORT_PREFERENCES.scaleBarPosition,
-    exportResolution:
-      "exportResolution" in value &&
-      (value.exportResolution === "normal" || value.exportResolution === "hi-res")
-        ? value.exportResolution
-        : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportResolution,
+    exportResolution,
+    exportFormat:
+      "exportFormat" in value
+        ? normalizeEditorExportFormat(value.exportFormat, exportResolution)
+        : getExportFormatFromResolution(exportResolution),
   };
 }

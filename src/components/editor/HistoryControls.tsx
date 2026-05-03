@@ -806,6 +806,7 @@ export function HistoryControls({
         legendPosition={exportPreferences.legendPosition}
         scaleBarPosition={exportPreferences.scaleBarPosition}
         exportResolution={exportPreferences.exportResolution}
+        exportFormat={exportPreferences.exportFormat}
         onTitleChange={(value) => updateProjectExportConfig({ title: value })}
         onDescriptionChange={(value) => updateProjectExportConfig({ description: value })}
         onTitlePositionChange={(value) => updateProjectExportConfig({ titlePosition: value })}
@@ -823,6 +824,7 @@ export function HistoryControls({
         onLegendPositionChange={(value) => updateExportPreferences({ legendPosition: value })}
         onScaleBarPositionChange={(value) => updateExportPreferences({ scaleBarPosition: value })}
         onExportResolutionChange={(value) => updateExportPreferences({ exportResolution: value })}
+        onExportFormatChange={(value) => updateExportPreferences({ exportFormat: value })}
         currentThemeLabel={currentThemeLabel}
         defaultDesignedBy={defaultDesignedBy}
       />

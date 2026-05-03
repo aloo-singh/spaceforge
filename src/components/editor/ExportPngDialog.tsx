@@ -14,6 +14,7 @@ import type {
   EditorExportLegendPosition,
   EditorExportScaleBarPosition,
   EditorExportResolution,
+  EditorExportFormat,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -25,7 +26,6 @@ import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
-type ExportFormatOption = "png-normal" | "png-hi-res" | "svg" | "pdf";
 
 export type ExportPngRequest = {
   title: string;
@@ -65,6 +65,7 @@ type ExportPngDialogProps = {
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
   exportResolution: EditorExportResolution;
+  exportFormat: EditorExportFormat;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
@@ -78,6 +79,7 @@ type ExportPngDialogProps = {
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
   onExportResolutionChange: (value: EditorExportResolution) => void;
+  onExportFormatChange: (value: EditorExportFormat) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -103,6 +105,7 @@ export function ExportPngDialog({
   legendPosition,
   scaleBarPosition,
   exportResolution,
+  exportFormat,
   onTitleChange,
   onDescriptionChange,
   onTitlePositionChange,
@@ -116,6 +119,7 @@ export function ExportPngDialog({
   onLegendPositionChange,
   onScaleBarPositionChange,
   onExportResolutionChange,
+  onExportFormatChange,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
@@ -124,9 +128,6 @@ export function ExportPngDialog({
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
-  const [exportFormatOption, setExportFormatOption] = useState<ExportFormatOption>(
-    exportResolution === "hi-res" ? "png-hi-res" : "png-normal"
-  );
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
@@ -264,10 +265,10 @@ export function ExportPngDialog({
             <Button
               type="button"
               size="sm"
-              variant={exportFormatOption === "png-normal" ? "secondary" : "ghost"}
-              aria-pressed={exportFormatOption === "png-normal"}
+              variant={exportFormat === "png-normal" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "png-normal"}
               onClick={() => {
-                setExportFormatOption("png-normal");
+                onExportFormatChange("png-normal");
                 onExportResolutionChange("normal");
               }}
             >
@@ -276,13 +277,13 @@ export function ExportPngDialog({
             <Button
               type="button"
               size="sm"
-              variant={exportFormatOption === "png-hi-res" ? "secondary" : "ghost"}
-              aria-pressed={exportFormatOption === "png-hi-res"}
+              variant={exportFormat === "png-hi-res" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "png-hi-res"}
               onClick={() => {
                 if (devSubscriptionTier === "Free") {
                   setShowHiResUpsellDialog(true);
                 } else {
-                  setExportFormatOption("png-hi-res");
+                  onExportFormatChange("png-hi-res");
                   onExportResolutionChange("hi-res");
                 }
               }}
@@ -292,18 +293,18 @@ export function ExportPngDialog({
             <Button
               type="button"
               size="sm"
-              variant={exportFormatOption === "svg" ? "secondary" : "ghost"}
-              aria-pressed={exportFormatOption === "svg"}
-              onClick={() => setExportFormatOption("svg")}
+              variant={exportFormat === "svg" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "svg"}
+              onClick={() => onExportFormatChange("svg")}
             >
               SVG
             </Button>
             <Button
               type="button"
               size="sm"
-              variant={exportFormatOption === "pdf" ? "secondary" : "ghost"}
-              aria-pressed={exportFormatOption === "pdf"}
-              onClick={() => setExportFormatOption("pdf")}
+              variant={exportFormat === "pdf" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "pdf"}
+              onClick={() => onExportFormatChange("pdf")}
             >
               PDF
             </Button>
@@ -613,7 +614,7 @@ export function ExportPngDialog({
               if (isDevSubscriptionModeEnabled) {
                 setDevSubscriptionTier("Pro");
                 setShowHiResUpsellDialog(false);
-                setExportFormatOption("png-hi-res");
+                onExportFormatChange("png-hi-res");
                 onExportResolutionChange("hi-res");
               } else {
                 window.open("/upgrade", "_blank");
