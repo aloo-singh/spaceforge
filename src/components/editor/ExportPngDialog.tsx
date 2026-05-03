@@ -129,6 +129,7 @@ export function ExportPngDialog({
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
+  const [showSvgUpsellDialog, setShowSvgUpsellDialog] = useState(false);
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
@@ -140,6 +141,7 @@ export function ExportPngDialog({
     showLegend && legendPosition !== "none" ? legendPosition : "none";
   const effectiveScaleBarPosition: EditorExportScaleBarPosition =
     showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
+  const canExportSvg = devSubscriptionTier === "Studio" || devSubscriptionTier === "Education";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -299,7 +301,13 @@ export function ExportPngDialog({
               size="sm"
               variant={exportFormat === "svg" ? "secondary" : "ghost"}
               aria-pressed={exportFormat === "svg"}
-              onClick={() => onExportFormatChange("svg")}
+              onClick={() => {
+                if (canExportSvg) {
+                  onExportFormatChange("svg");
+                } else {
+                  setShowSvgUpsellDialog(true);
+                }
+              }}
             >
               SVG
             </Button>
@@ -645,6 +653,49 @@ export function ExportPngDialog({
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Pro and Studio tiers unlock premium export options to scale your presentations.
+        </p>
+      </div>
+    </ResponsiveAlertDialog>
+
+    <ResponsiveAlertDialog
+      open={showSvgUpsellDialog}
+      onOpenChange={setShowSvgUpsellDialog}
+      title="SVG export for Studio plans"
+      description="Editable vector plans are built for professional handoff, print workflows, and design tools that expect clean geometry."
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowSvgUpsellDialog(false)}
+            className="w-full sm:w-auto"
+          >
+            Stay with PNG
+          </Button>
+          <Button
+            onClick={() => {
+              if (isDevSubscriptionModeEnabled) {
+                setDevSubscriptionTier("Studio");
+                setShowSvgUpsellDialog(false);
+                onExportFormatChange("svg");
+              } else {
+                window.open("/upgrade", "_blank");
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            Upgrade to Studio
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 py-4">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>SVG keeps your plan editable</strong> for Illustrator, Figma, print shops, and client-ready documentation.
+          </p>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Studio and Education tiers unlock professional vector exports without flattening your drawing into pixels.
         </p>
       </div>
     </ResponsiveAlertDialog>
