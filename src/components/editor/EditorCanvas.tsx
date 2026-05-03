@@ -68,6 +68,7 @@ import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
+  buildEditorExportFilename,
   exportPixiCanvasToPngBlob,
   exportPixiCanvasToPngDataUrl,
   exportSvgToPdfBlob,
@@ -1682,6 +1683,14 @@ export default function EditorCanvas({
         const state = useEditorStore.getState();
         const exportTitle =
           request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+        const activeFloorName =
+          state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
+          "Floor 1";
+        const filename = buildEditorExportFilename({
+          projectName: exportTitle,
+          floorName: activeFloorName,
+          format: request.exportFormat,
+        });
         const svg = exportToSVG({
           rooms: getRoomsForActiveFloor(state.document),
           title: exportTitle || undefined,
@@ -1696,10 +1705,9 @@ export default function EditorCanvas({
               })
             : new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
         const downloadUrl = URL.createObjectURL(blob);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const link = document.createElement("a");
         link.href = downloadUrl;
-        link.download = `spaceforge-editor-${timestamp}.${request.exportFormat}`;
+        link.download = filename;
         link.click();
         track(ANALYTICS_EVENTS.exportCompleted, {
           exportType: request.exportFormat,
@@ -1730,11 +1738,20 @@ export default function EditorCanvas({
         renderer: exportSnapshot.renderer,
         stage: exportSnapshot.stage,
       }, exportSnapshot.options);
+      const state = useEditorStore.getState();
+      const exportTitle =
+        request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+      const activeFloorName =
+        state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
+        "Floor 1";
       const downloadUrl = URL.createObjectURL(blob);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `spaceforge-editor-${timestamp}.png`;
+      link.download = buildEditorExportFilename({
+        projectName: exportTitle,
+        floorName: activeFloorName,
+        format: request.exportFormat,
+      });
       link.click();
       track(ANALYTICS_EVENTS.exportCompleted, {
         exportType: "png",

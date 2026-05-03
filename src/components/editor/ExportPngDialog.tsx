@@ -22,6 +22,7 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
+import { buildEditorExportFilename } from "@/lib/editor/exportPng";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +137,10 @@ export function ExportPngDialog({
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
   const isDevSubscriptionModeEnabled = useEditorStore((state) => state.isDevSubscriptionModeEnabled);
+  const activeFloorName = useEditorStore((state) => {
+    const activeFloor = state.document.floors.find((floor) => floor.id === state.document.activeFloorId);
+    return activeFloor?.name ?? "Floor 1";
+  });
 
   const isExportButtonDisabled = exportDisabled || isExporting;
   const effectiveLegendPosition: EditorExportLegendPosition =
@@ -144,6 +149,11 @@ export function ExportPngDialog({
     showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
   const canExportSvg = devSubscriptionTier === "Studio" || devSubscriptionTier === "Education";
   const canExportPdf = devSubscriptionTier !== "Free";
+  const previewFilename = buildEditorExportFilename({
+    projectName: title,
+    floorName: activeFloorName,
+    format: exportFormat,
+  });
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -352,10 +362,17 @@ export function ExportPngDialog({
         <section className="min-h-0 lg:h-full">
           <div className="flex h-full min-h-[15.5rem] flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/25">
             <div className="border-b border-border/60 px-4 py-3">
-              <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Updates automatically as export settings change.
-              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    Updates automatically as export settings change.
+                  </p>
+                </div>
+                <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 font-measurement text-[11px] text-muted-foreground">
+                  {previewFilename}
+                </div>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4 lg:p-4">
               <div className="relative flex h-full max-h-full min-h-[16.5rem] w-full items-center justify-center overflow-hidden rounded-[1rem] border border-border/70 bg-background/95 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[18rem] sm:p-4">

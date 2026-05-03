@@ -9,7 +9,7 @@ import {
   getStairRunLengthMm,
 } from "@/lib/editor/interiorAssets";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { EditorExportResolution } from "@/lib/editor/exportPreferences";
+import type { EditorExportFormat, EditorExportResolution } from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
@@ -79,6 +79,7 @@ const SVG_MUTED_STROKE = "#64748b";
 const SVG_ASSET_FILL = "#eef2f7";
 const SVG_ASSET_DETAIL_FILL = "#dbe4ee";
 const SVG_SCALE_BAR_HEIGHT_PX = 72;
+const PDF_EXPORT_FLOAT_PRECISION = 3;
 
 type ExportTextLine = {
   text: string;
@@ -121,6 +122,26 @@ export type SvgPdfExportMetadata = {
   subject?: string;
   creator?: string;
 };
+
+export function getEditorExportFileExtension(format: EditorExportFormat): "png" | "svg" | "pdf" {
+  if (format === "svg") return "svg";
+  if (format === "pdf") return "pdf";
+  return "png";
+}
+
+export function buildEditorExportFilename({
+  projectName,
+  floorName,
+  format,
+}: {
+  projectName?: string;
+  floorName?: string;
+  format: EditorExportFormat;
+}): string {
+  const safeProjectName = sanitizeExportFilenamePart(projectName) || "Untitled project";
+  const safeFloorName = sanitizeExportFilenamePart(floorName) || "Floor 1";
+  return `${safeProjectName} - ${safeFloorName}.${getEditorExportFileExtension(format)}`;
+}
 
 export function exportToSVG({ rooms, title }: SvgExportOptions): string {
   const bounds = getLayoutBoundsFromRooms(rooms);
@@ -253,6 +274,8 @@ export async function exportSvgToPdfBlob(
     unit: "pt",
     format: [pageSize.width, pageSize.height],
     compress: true,
+    floatPrecision: PDF_EXPORT_FLOAT_PRECISION,
+    putOnlyUsedFonts: true,
   });
 
   pdf.setProperties({
@@ -297,6 +320,15 @@ function parseSvgNumber(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function sanitizeExportFilenamePart(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\.+$/g, "")
+    .slice(0, 80);
 }
 
 function buildSvgInteriorAssetElements(
