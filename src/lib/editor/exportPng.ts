@@ -115,6 +115,13 @@ export type SvgExportOptions = {
   title?: string;
 };
 
+export type SvgPdfExportMetadata = {
+  title?: string;
+  author?: string;
+  subject?: string;
+  creator?: string;
+};
+
 export function exportToSVG({ rooms, title }: SvgExportOptions): string {
   const bounds = getLayoutBoundsFromRooms(rooms);
   const drawableWidth = STANDARD_EXPORT_WIDTH_PX - SVG_EXPORT_PADDING_PX * 2;
@@ -222,6 +229,74 @@ export function exportToSVG({ rooms, title }: SvgExportOptions): string {
 
   elements.push("</svg>");
   return elements.join("\n");
+}
+
+export async function exportSvgToPdfBlob(
+  svg: string,
+  metadata: SvgPdfExportMetadata = {}
+): Promise<Blob> {
+  const [{ jsPDF }, { svg2pdf }] = await Promise.all([
+    import("jspdf"),
+    import("svg2pdf.js"),
+  ]);
+  const parser = new DOMParser();
+  const document = parser.parseFromString(svg, "image/svg+xml");
+  const parserError = document.querySelector("parsererror");
+  if (parserError) {
+    throw new Error("PDF export failed: generated SVG is invalid.");
+  }
+
+  const svgElement = document.documentElement as unknown as SVGSVGElement;
+  const pageSize = getSvgPageSize(svgElement);
+  const pdf = new jsPDF({
+    orientation: pageSize.width >= pageSize.height ? "landscape" : "portrait",
+    unit: "pt",
+    format: [pageSize.width, pageSize.height],
+    compress: true,
+  });
+
+  pdf.setProperties({
+    title: metadata.title || "spaceforge export",
+    author: metadata.author || "[s]paceforge",
+    subject: metadata.subject || "Floor plan export",
+    creator: metadata.creator || "spaceforge.app",
+  });
+
+  await svg2pdf(svgElement, pdf, {
+    x: 0,
+    y: 0,
+    width: pageSize.width,
+    height: pageSize.height,
+  });
+
+  return pdf.output("blob");
+}
+
+function getSvgPageSize(svgElement: SVGSVGElement): { width: number; height: number } {
+  const width = parseSvgNumber(svgElement.getAttribute("width"));
+  const height = parseSvgNumber(svgElement.getAttribute("height"));
+  if (width && height) {
+    return { width, height };
+  }
+
+  const viewBox = svgElement.getAttribute("viewBox")?.trim().split(/\s+/).map(Number);
+  if (viewBox && viewBox.length === 4 && viewBox.every(Number.isFinite)) {
+    return {
+      width: Math.max(1, viewBox[2]),
+      height: Math.max(1, viewBox[3]),
+    };
+  }
+
+  return {
+    width: STANDARD_EXPORT_WIDTH_PX,
+    height: STANDARD_EXPORT_WIDTH_PX,
+  };
+}
+
+function parseSvgNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function buildSvgInteriorAssetElements(

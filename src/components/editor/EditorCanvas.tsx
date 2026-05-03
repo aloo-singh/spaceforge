@@ -67,7 +67,12 @@ import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
-import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl, exportToSVG } from "@/lib/editor/exportPng";
+import {
+  exportPixiCanvasToPngBlob,
+  exportPixiCanvasToPngDataUrl,
+  exportSvgToPdfBlob,
+  exportToSVG,
+} from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
@@ -1664,17 +1669,13 @@ export default function EditorCanvas({
 
   const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
     if (isExportingPng) return;
-    if (request.exportFormat === "pdf") {
-      console.info("PDF export is not implemented yet.");
-      return;
-    }
 
     track(ANALYTICS_EVENTS.exportStarted, {
-      exportType: request.exportFormat === "svg" ? "svg" : "png",
+      exportType: request.exportFormat === "pdf" ? "pdf" : request.exportFormat === "svg" ? "svg" : "png",
     });
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
 
-    if (request.exportFormat === "svg") {
+    if (request.exportFormat === "svg" || request.exportFormat === "pdf") {
       setIsExportingPng(true);
 
       try {
@@ -1685,15 +1686,23 @@ export default function EditorCanvas({
           rooms: getRoomsForActiveFloor(state.document),
           title: exportTitle || undefined,
         });
-        const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        const blob =
+          request.exportFormat === "pdf"
+            ? await exportSvgToPdfBlob(svg, {
+                title: exportTitle || "spaceforge export",
+                author: "[s]paceforge",
+                subject: "Floor plan export",
+                creator: "spaceforge.app",
+              })
+            : new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
         const downloadUrl = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const link = document.createElement("a");
         link.href = downloadUrl;
-        link.download = `spaceforge-editor-${timestamp}.svg`;
+        link.download = `spaceforge-editor-${timestamp}.${request.exportFormat}`;
         link.click();
         track(ANALYTICS_EVENTS.exportCompleted, {
-          exportType: "svg",
+          exportType: request.exportFormat,
         });
         trackFirstSuccess(ANALYTICS_EVENTS.exportCompleted);
         if (activeHintIdRef.current === "export-as-png") {
