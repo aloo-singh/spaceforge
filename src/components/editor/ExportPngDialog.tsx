@@ -154,6 +154,8 @@ export function ExportPngDialog({
     floorName: activeFloorName,
     format: exportFormat,
   });
+  const exportFormatLabel =
+    exportFormat === "svg" ? "SVG" : exportFormat === "pdf" ? "PDF" : "PNG";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -193,7 +195,7 @@ export function ExportPngDialog({
         })
         .catch((error) => {
           if (previewRequestIdRef.current !== requestId) return;
-          console.error("PNG preview render failed.", error);
+          console.error("Export preview render failed.", error);
         })
         .finally(() => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -265,8 +267,8 @@ export function ExportPngDialog({
       <ResponsiveDialog
         open={open}
         onOpenChange={handleOpenChange}
-        title="Export PNG"
-        description="Adjust a few export details without changing the live editor."
+        title="Export plan"
+        description="Choose a format and adjust export details without changing the live editor."
         className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
         contentClassName="min-h-0 pr-0 overflow-y-auto lg:overflow-hidden"
         footerClassName="px-0"
@@ -347,13 +349,7 @@ export function ExportPngDialog({
             className="w-full sm:w-auto"
           >
             <Download />
-            {isExporting
-              ? "Exporting..."
-              : exportFormat === "svg"
-                ? "Export SVG"
-                : exportFormat === "pdf"
-                  ? "Export PDF"
-                  : "Export PNG"}
+            {isExporting ? `Exporting ${exportFormatLabel}...` : `Export ${exportFormatLabel}`}
           </Button>
         </div>
       }
@@ -380,7 +376,7 @@ export function ExportPngDialog({
                   <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[0.875rem] border border-border/60 bg-background/80">
                     <Image
                       src={previewSrc}
-                      alt="Live PNG export preview"
+                      alt="Live export preview"
                       width={previewDimensions.width}
                       height={previewDimensions.height}
                       unoptimized

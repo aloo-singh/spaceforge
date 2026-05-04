@@ -1718,7 +1718,7 @@ export default function EditorCanvas({
         }
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
       } catch (error) {
-        console.error("SVG export failed.", error);
+        console.error(`${request.exportFormat.toUpperCase()} export failed.`, error);
       } finally {
         setIsExportingPng(false);
       }
