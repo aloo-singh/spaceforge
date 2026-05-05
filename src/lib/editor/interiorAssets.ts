@@ -637,25 +637,46 @@ function getConstrainedResizedStair(
   asset: RoomInteriorAsset,
   resizedBounds: RoomRectBounds
 ): RoomInteriorAsset | null {
+  const originalBounds = getInteriorAssetBoundsAsRectBounds(asset);
   const normalizedBounds = normalizeInteriorAssetResizeBounds(resizedBounds);
   const snappedBounds = { ...normalizedBounds };
 
   if (asset.type === "stairs") {
     // Stairs snap the run length to tread-depth multiples.
     if (isStairRunHorizontal(asset)) {
-      snappedBounds.maxX =
-        snappedBounds.minX + snapStairRunMm(normalizedBounds.maxX - normalizedBounds.minX);
+      const snappedRunMm = snapStairRunMm(normalizedBounds.maxX - normalizedBounds.minX);
+      if (didResizeMinEdge(originalBounds.minX, normalizedBounds.minX, originalBounds.maxX, normalizedBounds.maxX)) {
+        snappedBounds.minX = normalizedBounds.maxX - snappedRunMm;
+        snappedBounds.maxX = normalizedBounds.maxX;
+      } else {
+        snappedBounds.minX = normalizedBounds.minX;
+        snappedBounds.maxX = normalizedBounds.minX + snappedRunMm;
+      }
     } else {
-      snappedBounds.maxY =
-        snappedBounds.minY + snapStairRunMm(normalizedBounds.maxY - normalizedBounds.minY);
+      const snappedRunMm = snapStairRunMm(normalizedBounds.maxY - normalizedBounds.minY);
+      if (didResizeMinEdge(originalBounds.minY, normalizedBounds.minY, originalBounds.maxY, normalizedBounds.maxY)) {
+        snappedBounds.minY = normalizedBounds.maxY - snappedRunMm;
+        snappedBounds.maxY = normalizedBounds.maxY;
+      } else {
+        snappedBounds.minY = normalizedBounds.minY;
+        snappedBounds.maxY = normalizedBounds.minY + snappedRunMm;
+      }
     }
     const minW = MIN_STAIR_WIDTH_MM;
     const minD = MIN_STAIR_DEPTH_MM;
     if (snappedBounds.maxY - snappedBounds.minY < minD) {
-      snappedBounds.maxY = snappedBounds.minY + minD;
+      if (didResizeMinEdge(originalBounds.minY, normalizedBounds.minY, originalBounds.maxY, normalizedBounds.maxY)) {
+        snappedBounds.minY = snappedBounds.maxY - minD;
+      } else {
+        snappedBounds.maxY = snappedBounds.minY + minD;
+      }
     }
     if (snappedBounds.maxX - snappedBounds.minX < minW) {
-      snappedBounds.maxX = snappedBounds.minX + minW;
+      if (didResizeMinEdge(originalBounds.minX, normalizedBounds.minX, originalBounds.maxX, normalizedBounds.maxX)) {
+        snappedBounds.minX = snappedBounds.maxX - minW;
+      } else {
+        snappedBounds.maxX = snappedBounds.minX + minW;
+      }
     }
   } else {
     // Furniture: free resize with a small practical minimum.
@@ -670,6 +691,15 @@ function getConstrainedResizedStair(
 
   const nextAsset = getInteriorAssetFromBounds(asset, snappedBounds);
   return isInteriorAssetWithinRoom(room, nextAsset) ? nextAsset : null;
+}
+
+function didResizeMinEdge(
+  originalMin: number,
+  resizedMin: number,
+  originalMax: number,
+  resizedMax: number
+) {
+  return Math.abs(resizedMin - originalMin) > Math.abs(resizedMax - originalMax);
 }
 
 function resizeInteriorAssetBoundsForWallDrag(
