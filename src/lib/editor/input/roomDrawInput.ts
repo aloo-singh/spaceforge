@@ -333,6 +333,20 @@ function getSelectedOpeningItems(selection: SharedSelectionItem[]) {
   );
 }
 
+function getSingleSelectedOpeningFromState(state: RoomDrawStoreState) {
+  const openingSelections = getSelectedOpeningItems(state.selection);
+  if (openingSelections.length === 1) {
+    return {
+      roomId: openingSelections[0].roomId,
+      openingId: openingSelections[0].openingId,
+    };
+  }
+  if (openingSelections.length > 1) return null;
+  if (state.selectedOpening) return state.selectedOpening;
+
+  return null;
+}
+
 function areSelectedAssetsInOneRoom(selection: SharedSelectionItem[]) {
   const assets = getSelectedAssetItems(selection);
   if (assets.length <= 1) return true;
@@ -1151,7 +1165,7 @@ export function attachRoomDrawInput(
             : null;
         hoveredOpeningWidthHandle = findSelectedOpeningWidthHandleAtScreenPoint(
           getRoomsForActiveFloor(state.document),
-          state.selectedOpening,
+          getSingleSelectedOpeningFromState(state),
           screenPoint,
           state.camera,
           state.viewport
@@ -1382,7 +1396,7 @@ export function attachRoomDrawInput(
 
     const openingWidthHandleHit = findSelectedOpeningWidthHandleAtScreenPoint(
       getRoomsForActiveFloor(state.document),
-      state.selectedOpening,
+      getSingleSelectedOpeningFromState(state),
       screenPoint,
       state.camera,
       state.viewport
@@ -1801,7 +1815,7 @@ export function attachRoomDrawInput(
         !isSpaceHeld && state.roomDraft.points.length === 0
           ? findSelectedOpeningWidthHandleAtScreenPoint(
               getRoomsForActiveFloor(state.document),
-              state.selectedOpening,
+              getSingleSelectedOpeningFromState(state),
               screenPoint,
               state.camera,
               state.viewport

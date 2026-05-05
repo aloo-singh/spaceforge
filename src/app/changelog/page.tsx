@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.71.15",
+    date: "2026-05-06",
+    title: "Smoother editing for openings, stairs, and selections",
+    items: [
+      "Moving several rooms, assets, or openings now feels more natural, with grouped moves and undo behaving as one clear step.",
+      "Selected items are easier to follow on the canvas, including multi-select highlights, live opening distance guides, and more reliable resize cursors.",
+      "Doors, windows, and stairs have had a round of precision fixes, including better floor-plan door symbols, steadier resizing, and linked stairs staying in sync between floors.",
+    ],
+  },
+  {
     version: "v0.71.0",
     date: "2026-05-05",
     title: "Editable SVG and PDF exports",

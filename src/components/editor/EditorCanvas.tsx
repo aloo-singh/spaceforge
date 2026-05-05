@@ -4230,6 +4230,23 @@ function isOpeningSelected(selection: SharedSelectionItem[], roomId: string, ope
   );
 }
 
+function getSingleOpeningSelectionForHandles(
+  selectedOpening: RoomOpeningSelection | null,
+  selection: SharedSelectionItem[]
+): RoomOpeningSelection | null {
+  const selectedOpenings = selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "opening" }> => item.type === "opening"
+  );
+  if (selectedOpenings.length === 1) {
+    return {
+      roomId: selectedOpenings[0].roomId,
+      openingId: selectedOpenings[0].openingId,
+    };
+  }
+  if (selectedOpenings.length > 1) return null;
+  return selectedOpening;
+}
+
 function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
@@ -4465,6 +4482,7 @@ function drawRoomOpenings(
   theme: EditorCanvasTheme
 ) {
   const selectedOpeningCount = selection.filter((item) => item.type === "opening").length;
+  const handleOpening = getSingleOpeningSelectionForHandles(selectedOpening, selection);
   for (const opening of room.openings) {
     const layout = getResolvedRoomOpeningLayout(room, opening);
     if (!layout) continue;
@@ -4602,7 +4620,9 @@ function drawRoomOpenings(
       }
     }
 
-    if (!isSelected || selectedOpeningCount > 1) continue;
+    const shouldDrawHandles =
+      handleOpening?.roomId === room.id && handleOpening.openingId === opening.id;
+    if (!isSelected || selectedOpeningCount > 1 || !shouldDrawHandles) continue;
 
     drawOpeningWidthHandle(graphics, start, selectionColor, theme);
     drawOpeningWidthHandle(graphics, end, selectionColor, theme);
