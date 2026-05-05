@@ -10,7 +10,7 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-2xl font-semibold">v0.71.17</h2>
+            <h2 className="text-2xl font-semibold">v0.72.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>
 

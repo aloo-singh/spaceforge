@@ -7,7 +7,7 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
-    version: "v0.71.17",
+    version: "v0.72.0",
     date: "2026-05-06",
     title: "Focus the canvas on one room",
     items: [
