@@ -208,11 +208,24 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
 
       const start = projectPoint(layout.start);
       const end = projectPoint(layout.end);
+      const center = projectPoint(layout.center);
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const length = Math.hypot(dx, dy);
-      const normalX = length > 0 ? -dy / length : 0;
-      const normalY = length > 0 ? dx / length : 0;
+      const tangent = {
+        x: length > 0 ? dx / length : 1,
+        y: length > 0 ? dy / length : 0,
+      };
+      const interiorNormalTarget = projectPoint({
+        x: layout.center.x + layout.interiorNormal.x * 100,
+        y: layout.center.y + layout.interiorNormal.y * 100,
+      });
+      const interiorNormalLength =
+        Math.hypot(interiorNormalTarget.x - center.x, interiorNormalTarget.y - center.y) || 1;
+      const interiorNormal = {
+        x: (interiorNormalTarget.x - center.x) / interiorNormalLength,
+        y: (interiorNormalTarget.y - center.y) / interiorNormalLength,
+      };
       const markerOffset = opening.type === "window" ? 4 : 10;
 
       elements.push(
@@ -221,20 +234,32 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
 
       if (opening.type === "window") {
         elements.push(
-          `<line x1="${formatNumber(start.x + normalX * markerOffset)}" y1="${formatNumber(start.y + normalY * markerOffset)}" x2="${formatNumber(end.x + normalX * markerOffset)}" y2="${formatNumber(end.y + normalY * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
-          `<line x1="${formatNumber(start.x - normalX * markerOffset)}" y1="${formatNumber(start.y - normalY * markerOffset)}" x2="${formatNumber(end.x - normalX * markerOffset)}" y2="${formatNumber(end.y - normalY * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
+          `<line x1="${formatNumber(start.x + interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y + interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x + interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y + interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+          `<line x1="${formatNumber(start.x - interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y - interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x - interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y - interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
         );
       } else {
         const hinge = opening.hingeSide === "end" ? end : start;
-        const openEnd = opening.hingeSide === "end" ? start : end;
-        const radius = Math.min(length, 42);
-        const swingEnd = {
-          x: hinge.x + normalX * radius,
-          y: hinge.y + normalY * radius,
+        const hingeTangent =
+          opening.hingeSide === "end"
+            ? { x: -tangent.x, y: -tangent.y }
+            : tangent;
+        const swingNormal =
+          opening.openingSide === "exterior"
+            ? { x: -interiorNormal.x, y: -interiorNormal.y }
+            : interiorNormal;
+        const radius = Math.max(length, 1);
+        const closedEnd = {
+          x: hinge.x + hingeTangent.x * radius,
+          y: hinge.y + hingeTangent.y * radius,
         };
+        const openLeafEnd = {
+          x: hinge.x + swingNormal.x * radius,
+          y: hinge.y + swingNormal.y * radius,
+        };
+        const sweepFlag = hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x > 0 ? 1 : 0;
         elements.push(
-          `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(swingEnd.x)}" y2="${formatNumber(swingEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
-          `<path d="M ${formatNumber(swingEnd.x)} ${formatNumber(swingEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 1 ${formatNumber(openEnd.x)} ${formatNumber(openEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
+          `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(openLeafEnd.x)}" y2="${formatNumber(openLeafEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+          `<path d="M ${formatNumber(closedEnd.x)} ${formatNumber(closedEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 ${sweepFlag} ${formatNumber(openLeafEnd.x)} ${formatNumber(openLeafEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
         );
       }
     }
