@@ -1,11 +1,15 @@
 import type { Container, ICanvas, Renderer } from "pixi.js";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
-import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
+import {
+  normalizeCanvasRotationDegrees,
+  snapToCardinalRotationDegrees,
+} from "@/lib/editor/canvasRotation";
 import {
   DEFAULT_STAIR_ARROW_DIRECTION,
   DEFAULT_STAIR_ARROW_ENABLED,
   DEFAULT_STAIR_TREAD_SPACING_MM,
   getInteriorAssetDisplayName,
+  getRoomInteriorAssetBounds,
   getStairRunLengthMm,
 } from "@/lib/editor/interiorAssets";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
@@ -246,7 +250,7 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
     if (exportAssetMode !== "none") {
       for (const asset of room.interiorAssets) {
         if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
-        elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, scale, formatNumber));
+        elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, formatNumber));
       }
     }
   }
@@ -342,73 +346,124 @@ function sanitizeExportFilenamePart(value: string | undefined): string {
 function buildSvgInteriorAssetElements(
   asset: RoomInteriorAsset,
   projectPoint: (point: Point) => Point,
-  scale: number,
   formatNumber: (value: number) => string
 ): string[] {
-  const center = projectPoint({ x: asset.xMm, y: asset.yMm });
-  const widthPx = Math.max(asset.widthMm * scale, 1);
-  const depthPx = Math.max(asset.depthMm * scale, 1);
+  const bounds = getRoomInteriorAssetBounds(asset);
+  const topLeft = projectPoint({ x: bounds.left, y: bounds.top });
+  const bottomRight = projectPoint({ x: bounds.right, y: bounds.bottom });
+  const left = Math.min(topLeft.x, bottomRight.x);
+  const right = Math.max(topLeft.x, bottomRight.x);
+  const top = Math.min(topLeft.y, bottomRight.y);
+  const bottom = Math.max(topLeft.y, bottomRight.y);
+  const widthPx = Math.max(right - left, 1);
+  const depthPx = Math.max(bottom - top, 1);
+  const center = {
+    x: left + widthPx / 2,
+    y: top + depthPx / 2,
+  };
   const halfWidthPx = widthPx / 2;
   const halfDepthPx = depthPx / 2;
-  const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+  const rotation = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
   const label = normalizeSvgText(asset.name || getInteriorAssetDisplayName(asset.type));
-  const elements: string[] = [
-    `<g transform="translate(${formatNumber(center.x)} ${formatNumber(center.y)}) rotate(${formatNumber(rotation)})">`,
-  ];
+  const elements: string[] = [`<g>`];
 
-  const rect = (options?: { fill?: string; stroke?: string; strokeWidth?: number }) =>
-    `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(depthPx)}" rx="4" fill="${options?.fill ?? SVG_ASSET_FILL}" stroke="${options?.stroke ?? SVG_ROOM_STROKE}" stroke-width="${formatNumber(options?.strokeWidth ?? 1.5)}" />`;
+  const rect = (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    options?: { fill?: string; stroke?: string; strokeWidth?: number; rx?: number }
+  ) =>
+    `<rect x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(width)}" height="${formatNumber(height)}" rx="${formatNumber(options?.rx ?? 4)}" fill="${options?.fill ?? SVG_ASSET_FILL}" stroke="${options?.stroke ?? SVG_ROOM_STROKE}" stroke-width="${formatNumber(options?.strokeWidth ?? 1.5)}" />`;
   const line = (x1: number, y1: number, x2: number, y2: number, width = 1.25) =>
     `<line x1="${formatNumber(x1)}" y1="${formatNumber(y1)}" x2="${formatNumber(x2)}" y2="${formatNumber(y2)}" stroke="${SVG_MUTED_STROKE}" stroke-width="${formatNumber(width)}" stroke-linecap="round" />`;
+  const polygon = (points: Point[], fill: string) =>
+    `<polygon points="${points.map((point) => `${formatNumber(point.x)},${formatNumber(point.y)}`).join(" ")}" fill="${fill}" />`;
 
   if (asset.type === "dining-table" && asset.shape === "round") {
     elements.push(
-      `<ellipse cx="0" cy="0" rx="${formatNumber(halfWidthPx)}" ry="${formatNumber(halfDepthPx)}" fill="${SVG_ASSET_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.5" />`,
-      line(-halfWidthPx * 0.58, 0, halfWidthPx * 0.58, 0),
-      line(0, -halfDepthPx * 0.58, 0, halfDepthPx * 0.58)
+      `<ellipse cx="${formatNumber(center.x)}" cy="${formatNumber(center.y)}" rx="${formatNumber(halfWidthPx)}" ry="${formatNumber(halfDepthPx)}" fill="${SVG_ASSET_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.5" />`
     );
   } else {
-    elements.push(rect());
+    elements.push(rect(left, top, widthPx, depthPx));
   }
 
+  const cornerTopLeft = { x: left, y: top };
+  const cornerTopRight = { x: right, y: top };
+  const cornerBottomRight = { x: right, y: bottom };
+  const cornerBottomLeft = { x: left, y: bottom };
+  const [frontC1, frontC2, backC1, backC2] =
+    rotation === 0
+      ? [cornerTopLeft, cornerTopRight, cornerBottomLeft, cornerBottomRight]
+      : rotation === 90
+        ? [cornerTopRight, cornerBottomRight, cornerTopLeft, cornerBottomLeft]
+        : rotation === -180
+          ? [cornerBottomLeft, cornerBottomRight, cornerTopLeft, cornerTopRight]
+          : [cornerTopLeft, cornerBottomLeft, cornerTopRight, cornerBottomRight];
+  const pointBetween = (start: Point, end: Point, amount: number): Point => ({
+    x: start.x + (end.x - start.x) * amount,
+    y: start.y + (end.y - start.y) * amount,
+  });
+  const lineBetweenEdges = (edgeStart1: Point, edgeStart2: Point, edgeEnd1: Point, edgeEnd2: Point, amount: number) => {
+    const start = pointBetween(edgeStart1, edgeStart2, amount);
+    const end = pointBetween(edgeEnd1, edgeEnd2, amount);
+    return line(start.x, start.y, end.x, end.y);
+  };
+
   if (asset.type === "bed") {
-    const headboardHeight = depthPx * 0.14;
+    const headboardBackC1 = pointBetween(frontC1, backC1, 0.14);
+    const headboardBackC2 = pointBetween(frontC2, backC2, 0.14);
     elements.push(
-      `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(headboardHeight)}" rx="3" fill="${SVG_ASSET_DETAIL_FILL}" />`,
-      line(-halfWidthPx * 0.5, -halfDepthPx + headboardHeight, -halfWidthPx * 0.5, halfDepthPx),
-      line(halfWidthPx * 0.5, -halfDepthPx + headboardHeight, halfWidthPx * 0.5, halfDepthPx)
+      polygon([frontC1, frontC2, headboardBackC2, headboardBackC1], SVG_ASSET_DETAIL_FILL),
+      lineBetweenEdges(headboardBackC1, headboardBackC2, backC1, backC2, 1 / 3),
+      lineBetweenEdges(headboardBackC1, headboardBackC2, backC1, backC2, 2 / 3)
     );
   }
 
   if (asset.type === "sofa") {
-    const backRestDepth = depthPx * 0.3;
+    const backRestC1 = pointBetween(frontC1, backC1, 0.3);
+    const backRestC2 = pointBetween(frontC2, backC2, 0.3);
     elements.push(
-      `<rect x="${formatNumber(-halfWidthPx)}" y="${formatNumber(-halfDepthPx)}" width="${formatNumber(widthPx)}" height="${formatNumber(backRestDepth)}" rx="3" fill="${SVG_ASSET_DETAIL_FILL}" />`,
-      line(-halfWidthPx / 3, -halfDepthPx + backRestDepth, -halfWidthPx / 3, halfDepthPx),
-      line(halfWidthPx / 3, -halfDepthPx + backRestDepth, halfWidthPx / 3, halfDepthPx)
+      polygon([frontC1, frontC2, backRestC2, backRestC1], SVG_ASSET_DETAIL_FILL),
+      lineBetweenEdges(backRestC1, backRestC2, backC1, backC2, 1 / 3),
+      lineBetweenEdges(backRestC1, backRestC2, backC1, backC2, 2 / 3)
     );
   }
 
   if (asset.type === "wardrobe") {
+    const depthVector = {
+      x: backC1.x - frontC1.x,
+      y: backC1.y - frontC1.y,
+    };
+    const depthLength = Math.hypot(depthVector.x, depthVector.y);
+    const outward = depthLength > 0
+      ? { x: -depthVector.x / depthLength, y: -depthVector.y / depthLength }
+      : { x: 0, y: -1 };
     if (asset.doorType === "sliding") {
+      const midFront = pointBetween(frontC1, frontC2, 0.5);
+      const offsetA = Math.max(4, depthLength * 0.08);
+      const offsetB = Math.max(5, depthLength * 0.1);
       elements.push(
-        line(-halfWidthPx, -halfDepthPx - 5, 0, -halfDepthPx - 5),
-        line(0, -halfDepthPx - 8, halfWidthPx, -halfDepthPx - 8)
+        line(
+          frontC1.x + outward.x * offsetA,
+          frontC1.y + outward.y * offsetA,
+          midFront.x + outward.x * offsetA,
+          midFront.y + outward.y * offsetA
+        ),
+        line(
+          midFront.x + outward.x * offsetB,
+          midFront.y + outward.y * offsetB,
+          frontC2.x + outward.x * offsetB,
+          frontC2.y + outward.y * offsetB
+        )
       );
     } else {
       const leafLength = Math.min(widthPx * 0.4, depthPx * 0.6);
       elements.push(
-        line(-halfWidthPx, -halfDepthPx, -halfWidthPx, -halfDepthPx - leafLength),
-        line(halfWidthPx, -halfDepthPx, halfWidthPx, -halfDepthPx - leafLength)
+        line(frontC1.x, frontC1.y, frontC1.x + outward.x * leafLength, frontC1.y + outward.y * leafLength),
+        line(frontC2.x, frontC2.y, frontC2.x + outward.x * leafLength, frontC2.y + outward.y * leafLength)
       );
     }
-  }
-
-  if (asset.type === "dining-table" && asset.shape !== "round") {
-    elements.push(
-      line(-halfWidthPx * 0.62, 0, halfWidthPx * 0.62, 0),
-      line(0, -halfDepthPx * 0.62, 0, halfDepthPx * 0.62)
-    );
   }
 
   if (asset.type === "stairs") {
@@ -419,11 +474,11 @@ function buildSvgInteriorAssetElements(
       const progress = (index * DEFAULT_STAIR_TREAD_SPACING_MM) / stairRunLengthMm;
       if (progress <= 0 || progress >= 1) continue;
       if (isSidewaysStairRun) {
-        const x = -halfWidthPx + widthPx * progress;
-        elements.push(line(x, -halfDepthPx, x, halfDepthPx, 1));
+        const x = left + widthPx * progress;
+        elements.push(line(x, top, x, bottom, 1));
       } else {
-        const y = -halfDepthPx + depthPx * progress;
-        elements.push(line(-halfWidthPx, y, halfWidthPx, y, 1));
+        const y = top + depthPx * progress;
+        elements.push(line(left, y, right, y, 1));
       }
     }
 
@@ -432,10 +487,10 @@ function buildSvgInteriorAssetElements(
       const arrowDirection = direction === "reverse" ? -1 : 1;
       const runLengthPx = isSidewaysStairRun ? widthPx : depthPx;
       const arrowLength = Math.max(28, Math.min(runLengthPx * 0.58, runLengthPx - 22));
-      const tailY = isSidewaysStairRun ? 0 : (arrowLength / 2) * arrowDirection;
-      const headY = isSidewaysStairRun ? 0 : (-arrowLength / 2) * arrowDirection;
-      const tailX = isSidewaysStairRun ? (-arrowLength / 2) * arrowDirection : 0;
-      const headX = isSidewaysStairRun ? (arrowLength / 2) * arrowDirection : 0;
+      const tailY = isSidewaysStairRun ? center.y : center.y + (arrowLength / 2) * arrowDirection;
+      const headY = isSidewaysStairRun ? center.y : center.y - (arrowLength / 2) * arrowDirection;
+      const tailX = isSidewaysStairRun ? center.x - (arrowLength / 2) * arrowDirection : center.x;
+      const headX = isSidewaysStairRun ? center.x + (arrowLength / 2) * arrowDirection : center.x;
       const headSign = arrowDirection;
       elements.push(
         line(tailX, tailY, headX, headY, 1.4),
@@ -449,7 +504,7 @@ function buildSvgInteriorAssetElements(
       const arrowLabel = normalizeSvgText(asset.arrowLabel?.trim() || "");
       if (arrowLabel) {
         elements.push(
-          `<text x="${formatNumber(isSidewaysStairRun ? headX + 16 * headSign : 0)}" y="${formatNumber(isSidewaysStairRun ? 0 : headY - 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="600">${arrowLabel}</text>`
+          `<text x="${formatNumber(isSidewaysStairRun ? headX + 16 * headSign : center.x)}" y="${formatNumber(isSidewaysStairRun ? center.y : headY - 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="600">${arrowLabel}</text>`
         );
       }
     }
