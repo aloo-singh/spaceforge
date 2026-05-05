@@ -114,6 +114,7 @@ type ExportNorthIndicatorBlock = {
 export type SvgExportOptions = {
   rooms: Room[];
   title?: string;
+  includeAssets?: boolean;
 };
 
 export type SvgPdfExportMetadata = {
@@ -143,7 +144,7 @@ export function buildEditorExportFilename({
   return `${safeProjectName} - ${safeFloorName}.${getEditorExportFileExtension(format)}`;
 }
 
-export function exportToSVG({ rooms, title }: SvgExportOptions): string {
+export function exportToSVG({ rooms, title, includeAssets = true }: SvgExportOptions): string {
   const bounds = getLayoutBoundsFromRooms(rooms);
   const drawableWidth = STANDARD_EXPORT_WIDTH_PX - SVG_EXPORT_PADDING_PX * 2;
   const layoutWidthMm = Math.max(bounds?.width ?? 1, 1);
@@ -238,8 +239,10 @@ export function exportToSVG({ rooms, title }: SvgExportOptions): string {
       );
     }
 
-    for (const asset of room.interiorAssets) {
-      elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, scale, formatNumber));
+    if (includeAssets) {
+      for (const asset of room.interiorAssets) {
+        elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, scale, formatNumber));
+      }
     }
   }
 

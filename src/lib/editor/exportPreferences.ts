@@ -9,6 +9,7 @@ export type EditorExportPreferences = {
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
+  includeAssets: boolean;
   theme: EditorExportThemePreference;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
@@ -21,6 +22,7 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   showScaleBar: false,
   showGrid: true,
   showDimensions: true,
+  includeAssets: true,
   theme: "system",
   legendPosition: "bottom",
   scaleBarPosition: "bottom-left",
@@ -61,6 +63,7 @@ export function cloneEditorExportPreferences(
     showScaleBar: preferences.showScaleBar,
     showGrid: preferences.showGrid,
     showDimensions: preferences.showDimensions,
+    includeAssets: preferences.includeAssets,
     theme: preferences.theme,
     legendPosition: preferences.legendPosition,
     scaleBarPosition: preferences.scaleBarPosition,
@@ -78,6 +81,7 @@ export function areEditorExportPreferencesEqual(
     a.showScaleBar === b.showScaleBar &&
     a.showGrid === b.showGrid &&
     a.showDimensions === b.showDimensions &&
+    a.includeAssets === b.includeAssets &&
     a.theme === b.theme &&
     a.legendPosition === b.legendPosition &&
     a.scaleBarPosition === b.scaleBarPosition &&
@@ -113,6 +117,10 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       "showDimensions" in value && typeof value.showDimensions === "boolean"
         ? value.showDimensions
         : DEFAULT_EDITOR_EXPORT_PREFERENCES.showDimensions,
+    includeAssets:
+      "includeAssets" in value && typeof value.includeAssets === "boolean"
+        ? value.includeAssets
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.includeAssets,
     theme:
       "theme" in value &&
       (value.theme === "light" || value.theme === "dark" || value.theme === "system")

@@ -41,6 +41,7 @@ export type ExportPngRequest = {
   designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
+  includeAssets: boolean;
   theme: ExportPngThemeOption;
   exportResolution: EditorExportResolution;
   exportFormat: EditorExportFormat;
@@ -63,6 +64,7 @@ type ExportPngDialogProps = {
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
+  includeAssets: boolean;
   theme: ExportPngThemeOption;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
@@ -77,6 +79,7 @@ type ExportPngDialogProps = {
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
   onShowDimensionsChange: (value: boolean) => void;
+  onIncludeAssetsChange: (value: boolean) => void;
   onThemeChange: (value: ExportPngThemeOption) => void;
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
@@ -103,6 +106,7 @@ export function ExportPngDialog({
   showScaleBar,
   showGrid,
   showDimensions,
+  includeAssets,
   theme,
   legendPosition,
   scaleBarPosition,
@@ -117,6 +121,7 @@ export function ExportPngDialog({
   onShowScaleBarChange,
   onShowGridChange,
   onShowDimensionsChange,
+  onIncludeAssetsChange,
   onThemeChange,
   onLegendPositionChange,
   onScaleBarPositionChange,
@@ -183,6 +188,7 @@ export function ExportPngDialog({
         designedBy,
         showGrid,
         showDimensions,
+        includeAssets,
         theme,
         exportResolution,
         exportFormat,
@@ -226,6 +232,7 @@ export function ExportPngDialog({
     designedBy,
     showGrid,
     showDimensions,
+    includeAssets,
     theme,
     exportResolution,
     exportFormat,
@@ -248,6 +255,7 @@ export function ExportPngDialog({
       designedBy,
       showGrid,
       showDimensions,
+      includeAssets,
       theme,
       exportResolution,
       exportFormat,
@@ -545,7 +553,7 @@ export function ExportPngDialog({
 
             <ExportToggleCard
               title="Include north indicator"
-              description="Include a traditional north arrow in the exported PNG without affecting the live editor."
+              description="Include a traditional north arrow in the exported file without affecting the live editor."
               value={includeNorthIndicator ? "On" : "Off"}
             >
               <BinaryChoice
@@ -571,7 +579,7 @@ export function ExportPngDialog({
 
             <ExportToggleCard
               title="Show dimensions"
-              description="Include room measurement text in the PNG without affecting the canvas."
+              description="Include room measurement text in the exported file without affecting the canvas."
               value={showDimensions ? "On" : "Off"}
             >
               <BinaryChoice
@@ -579,6 +587,19 @@ export function ExportPngDialog({
                 enabled={showDimensions}
                 onEnable={() => onShowDimensionsChange(true)}
                 onDisable={() => onShowDimensionsChange(false)}
+              />
+            </ExportToggleCard>
+
+            <ExportToggleCard
+              title="Include assets"
+              description="Include furniture, stairs, and other interior objects in the exported file."
+              value={includeAssets ? "On" : "Off"}
+            >
+              <BinaryChoice
+                ariaLabel="Include assets"
+                enabled={includeAssets}
+                onEnable={() => onIncludeAssetsChange(true)}
+                onDisable={() => onIncludeAssetsChange(false)}
               />
             </ExportToggleCard>
 

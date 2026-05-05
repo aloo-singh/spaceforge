@@ -1432,6 +1432,7 @@ export default function EditorCanvas({
       paddingPx,
       showDimensions,
       showGrid,
+      includeAssets,
       showScaleBar,
       legendPosition,
       signatureText,
@@ -1447,6 +1448,7 @@ export default function EditorCanvas({
       paddingPx: number;
       showDimensions: boolean;
       showGrid: boolean;
+      includeAssets?: boolean;
       showScaleBar: boolean;
       legendPosition?: "bottom" | "right-side";
       signatureText?: string;
@@ -1461,6 +1463,11 @@ export default function EditorCanvas({
 
       const state = useEditorStore.getState();
       const exportTheme = getEditorCanvasTheme(themeMode);
+      const activeFloorRooms = getRoomsForActiveFloor(state.document);
+      const exportRooms =
+        includeAssets === false
+          ? activeFloorRooms.map((room) => ({ ...room, interiorAssets: [] }))
+          : activeFloorRooms;
       const layoutBounds = getLayoutBoundsFromDocument(state.document);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
@@ -1492,7 +1499,7 @@ export default function EditorCanvas({
 
       drawRooms(
         exportRoomGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
@@ -1503,7 +1510,7 @@ export default function EditorCanvas({
       );
       drawOpenings(
         exportOpeningGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         [],
         exportCamera,
@@ -1514,7 +1521,7 @@ export default function EditorCanvas({
       );
       drawWallInteractionOverlay(
         exportWallOverlayGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         null,
         EMPTY_ROOM_RESIZE_UI,
@@ -1526,7 +1533,7 @@ export default function EditorCanvas({
       );
       drawRoomLabels(
         exportRoomLabels,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         null,
         exportCamera,
@@ -1537,7 +1544,7 @@ export default function EditorCanvas({
         exportTheme,
         [],
         state.settings.showRoomNames,
-        state.settings.showAssets,
+        includeAssets !== false && state.settings.showAssets,
         state.settings.showAssetLabels,
         { includeStairDirectionLabels: false }
       );
@@ -1657,6 +1664,7 @@ export default function EditorCanvas({
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
+      includeAssets: request.includeAssets,
       showScaleBar: shouldShowScaleBar,
       legendPosition: hasRightLegend ? "right-side" : hasBottomLegend ? "bottom" : undefined,
       titleText: exportTitle || undefined,
@@ -1694,6 +1702,7 @@ export default function EditorCanvas({
         const svg = exportToSVG({
           rooms: getRoomsForActiveFloor(state.document),
           title: exportTitle || undefined,
+          includeAssets: request.includeAssets,
         });
         const blob =
           request.exportFormat === "pdf"
@@ -1793,6 +1802,7 @@ export default function EditorCanvas({
       paddingPx: 24,
       showDimensions: false,
       showGrid: false,
+      includeAssets: true,
       showScaleBar: false,
       themeMode: editorThemeMode,
     });

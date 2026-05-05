@@ -802,6 +802,7 @@ export function HistoryControls({
         showScaleBar={exportPreferences.showScaleBar}
         showGrid={exportPreferences.showGrid}
         showDimensions={exportPreferences.showDimensions}
+        includeAssets={exportPreferences.includeAssets}
         theme={exportPreferences.theme}
         legendPosition={exportPreferences.legendPosition}
         scaleBarPosition={exportPreferences.scaleBarPosition}
@@ -820,6 +821,7 @@ export function HistoryControls({
         onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}
         onShowGridChange={(value) => updateExportPreferences({ showGrid: value })}
         onShowDimensionsChange={(value) => updateExportPreferences({ showDimensions: value })}
+        onIncludeAssetsChange={(value) => updateExportPreferences({ includeAssets: value })}
         onThemeChange={(value) => updateExportPreferences({ theme: value })}
         onLegendPositionChange={(value) => updateExportPreferences({ legendPosition: value })}
         onScaleBarPositionChange={(value) => updateExportPreferences({ scaleBarPosition: value })}
