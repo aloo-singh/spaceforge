@@ -2784,7 +2784,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (
         state.selectedRoomId === roomId &&
         state.selectedOpening?.roomId === roomId &&
-        state.selectedOpening.openingId === openingId
+        state.selectedOpening.openingId === openingId &&
+        state.selection.some(
+          (item) =>
+            item.type === "opening" &&
+            item.roomId === roomId &&
+            item.openingId === openingId
+        )
       ) {
         return state;
       }
