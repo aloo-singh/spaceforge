@@ -4589,24 +4589,6 @@ function drawRoomInteriorAssets(
       (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
-    const selectionHaloStrokePx = Math.max(
-      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
-      selectionStrokePx + 2
-    );
-
-    if (isSelected) {
-      graphics.setStrokeStyle({
-        width: selectionHaloStrokePx,
-        color: theme.wallSelectionAccent,
-        alpha: 0.18,
-      });
-      graphics.moveTo(corners[0].x, corners[0].y);
-      for (let i = 1; i < corners.length; i += 1) {
-        graphics.lineTo(corners[i].x, corners[i].y);
-      }
-      graphics.closePath();
-      graphics.stroke();
-    }
 
     // Skip rectangular bounding box for unselected round dining tables
     const isRoundDiningTable =
