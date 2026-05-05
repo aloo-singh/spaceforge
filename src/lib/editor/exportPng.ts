@@ -414,9 +414,7 @@ function buildSvgInteriorAssetElements(
     const headboardBackC1 = pointBetween(frontC1, backC1, 0.14);
     const headboardBackC2 = pointBetween(frontC2, backC2, 0.14);
     elements.push(
-      polygon([frontC1, frontC2, headboardBackC2, headboardBackC1], SVG_ASSET_DETAIL_FILL),
-      lineBetweenEdges(headboardBackC1, headboardBackC2, backC1, backC2, 1 / 3),
-      lineBetweenEdges(headboardBackC1, headboardBackC2, backC1, backC2, 2 / 3)
+      polygon([frontC1, frontC2, headboardBackC2, headboardBackC1], SVG_ASSET_DETAIL_FILL)
     );
   }
 
