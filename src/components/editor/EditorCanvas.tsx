@@ -278,8 +278,6 @@ const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
 const OPENING_CUTOUT_WORLD_MM = 64;
 const OPENING_SYMBOL_WORLD_MM = 18;
-const DOOR_LEAF_LENGTH_SCALE = 0.72;
-const DOOR_LEAF_DEPTH_SCALE = 0.72;
 const WINDOW_LINE_INSET_WORLD_MM = 44;
 const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
 const OPENING_SELECTION_HALO_WORLD_MM = 120;
@@ -4473,8 +4471,6 @@ function drawRoomOpenings(
     }
 
     if (opening.type === "door") {
-      const leafLengthPx = openingWidthPx * DOOR_LEAF_LENGTH_SCALE;
-      const leafDepthPx = openingWidthPx * DOOR_LEAF_DEPTH_SCALE;
       const hingePoint = opening.hingeSide === "end" ? end : start;
       const hingeTangent =
         opening.hingeSide === "end"
@@ -4484,6 +4480,19 @@ function drawRoomOpenings(
         opening.openingSide === "exterior"
           ? { x: -interiorNormal.x, y: -interiorNormal.y }
           : interiorNormal;
+      const leafLengthPx = Math.max(openingWidthPx, 1);
+      const closedLeafEnd = {
+        x: hingePoint.x + hingeTangent.x * leafLengthPx,
+        y: hingePoint.y + hingeTangent.y * leafLengthPx,
+      };
+      const openLeafEnd = {
+        x: hingePoint.x + swingNormal.x * leafLengthPx,
+        y: hingePoint.y + swingNormal.y * leafLengthPx,
+      };
+      const closedAngle = Math.atan2(closedLeafEnd.y - hingePoint.y, closedLeafEnd.x - hingePoint.x);
+      const openAngle = Math.atan2(openLeafEnd.y - hingePoint.y, openLeafEnd.x - hingePoint.x);
+      const shouldDrawArcAnticlockwise =
+        hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x < 0;
 
       graphics.setStrokeStyle({
         width: isSelected ? selectionStrokePx : symbolStrokePx,
@@ -4492,9 +4501,15 @@ function drawRoomOpenings(
         cap: "round",
       });
       graphics.moveTo(hingePoint.x, hingePoint.y);
-      graphics.lineTo(
-        hingePoint.x + hingeTangent.x * leafLengthPx + swingNormal.x * leafDepthPx,
-        hingePoint.y + hingeTangent.y * leafLengthPx + swingNormal.y * leafDepthPx
+      graphics.lineTo(openLeafEnd.x, openLeafEnd.y);
+      graphics.moveTo(closedLeafEnd.x, closedLeafEnd.y);
+      graphics.arc(
+        hingePoint.x,
+        hingePoint.y,
+        leafLengthPx,
+        closedAngle,
+        openAngle,
+        shouldDrawArcAnticlockwise
       );
       graphics.stroke();
     } else {
