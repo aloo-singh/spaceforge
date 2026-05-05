@@ -1696,21 +1696,48 @@ export default function EditorCanvas({
         const state = useEditorStore.getState();
         const exportTitle =
           request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+        const exportDescription =
+          request.descriptionPosition === "below-title"
+            ? normalizeExportMultilineText(request.description)
+            : "";
         const activeFloorName =
           state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
           "Floor 1";
+        const activeFloorRooms = getRoomsForActiveFloor(state.document);
+        const exportSignatureText = normalizeEditorExportSignature(
+          request.designedBy || state.settings.exportSignatureText
+        );
+        const exportSignatureLines = exportSignatureText
+          ? [`Designed by ${exportSignatureText}`, "Designed with [s]paceforge", "spaceforge.app"]
+          : ["Designed with [s]paceforge", "spaceforge.app"];
+        const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
+        const exportLegendItems =
+          effectiveLegendPosition !== "none"
+            ? activeFloorRooms.map((room, index) => ({
+                name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
+                area: formatMetricRoomAreaForRoom(room),
+              }))
+            : undefined;
         const filename = buildEditorExportFilename({
           projectName: exportTitle,
           floorName: activeFloorName,
           format: request.exportFormat,
         });
         const svg = exportToSVG({
-          rooms: getRoomsForActiveFloor(state.document),
+          rooms: activeFloorRooms,
           title: exportTitle || undefined,
+          description: exportDescription || undefined,
           exportAssetMode: request.exportAssetMode,
           northBearingDegrees: request.includeNorthIndicator
             ? state.document.northBearingDegrees
             : undefined,
+          legendItems: exportLegendItems,
+          legendPosition:
+            effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
+              ? effectiveLegendPosition
+              : undefined,
+          signatureText: exportSignatureText || undefined,
+          signatureLines: exportSignatureLines,
         });
         const blob =
           request.exportFormat === "pdf"
