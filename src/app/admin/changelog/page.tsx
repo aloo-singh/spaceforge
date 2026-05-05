@@ -149,7 +149,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Inspector now shows only the selected item's card—no duplicate parent cards (e.g., selecting a window shows only the opening inspector, not also the room card).</li>
+                <li>Inspector now shows only the selected item&apos;s card—no duplicate parent cards (e.g., selecting a window shows only the opening inspector, not also the room card).</li>
                 <li>Items without their own inspector cards (e.g., walls) automatically show their parent room inspector for context.</li>
               </ul>
             </div>

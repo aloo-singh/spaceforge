@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorStore } from "@/stores/editorStore";
 import { AVAILABLE_TIERS, type SubscriptionTier } from "@/lib/subscription/tiers";
@@ -10,10 +10,18 @@ type DevSubscriptionTierSelectorProps = {
   className?: string;
 };
 
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
+
 export function DevSubscriptionTierSelector({
   className,
 }: DevSubscriptionTierSelectorProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot
+  );
   const isDevSubscriptionModeEnabled = useEditorStore(
     (state) => state.isDevSubscriptionModeEnabled
   );
@@ -23,11 +31,6 @@ export function DevSubscriptionTierSelector({
   const setDevSubscriptionTier = useEditorStore(
     (state) => state.setDevSubscriptionTier
   );
-
-  // Only render after client hydration to prevent SSR/client mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Don't render if dev mode is not enabled or not yet mounted
   if (!isDevSubscriptionModeEnabled || !mounted) {
