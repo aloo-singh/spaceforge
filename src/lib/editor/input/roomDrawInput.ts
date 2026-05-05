@@ -146,6 +146,7 @@ type RoomDrawInputCallbacks = {
   onCursorWorldChange: (cursorWorld: Point | null) => void;
   onHoveredRoomLabelChange: (roomId: string | null) => void;
   onHoveredSelectableWallChange?: (wallSelection: { roomId: string; wall: RoomWall } | null) => void;
+  onOpeningMoveUiChange?: (openingMoveUi: { roomId: string; openingId: string } | null) => void;
   onTransformFeedbackChange?: (feedback: TransformFeedback | null) => void;
   onSnapGuidesChange?: (guides: SnapGuides | null) => void;
   onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
@@ -664,6 +665,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningDragSession = null;
+    callbacks.onOpeningMoveUiChange?.(null);
     store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
@@ -675,6 +677,7 @@ export function attachRoomDrawInput(
       canvas.releasePointerCapture(pointerId);
     }
     activeOpeningResizeSession = null;
+    callbacks.onOpeningMoveUiChange?.(null);
     store.getState().setCanvasInteractionActive(false);
     updateCursor();
   };
@@ -817,6 +820,10 @@ export function attachRoomDrawInput(
       store.getState().setCanvasInteractionActive(true);
       session.latestOffsetMm = moveTarget.nextOffsetMm;
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
+      callbacks.onOpeningMoveUiChange?.({
+        roomId: session.roomId,
+        openingId: session.openingId,
+      });
       setSnapGuides(
         state.settings.showGuidelines
           ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
@@ -860,6 +867,10 @@ export function attachRoomDrawInput(
       store
         .getState()
         .previewOpeningResize(session.roomId, session.openingId, resizeTarget.nextWidthMm, resizeTarget.nextOffsetMm);
+      callbacks.onOpeningMoveUiChange?.({
+        roomId: session.roomId,
+        openingId: session.openingId,
+      });
       setSnapGuides(
         state.settings.showGuidelines
           ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera)
@@ -1073,6 +1084,7 @@ export function attachRoomDrawInput(
       hoveredOpeningWidthHandle = null;
       hoveredOpening = null;
       hoveredInteriorAsset = null;
+      callbacks.onOpeningMoveUiChange?.(null);
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
     }
@@ -1805,7 +1817,8 @@ export function attachRoomDrawInput(
           .previewOpeningResize(
             activeOpeningResizeSession.roomId,
             activeOpeningResizeSession.openingId,
-            activeOpeningResizeSession.startWidthMm
+            activeOpeningResizeSession.startWidthMm,
+            activeOpeningResizeSession.startOffsetMm
           );
       }
 
@@ -2025,7 +2038,8 @@ export function attachRoomDrawInput(
         .previewOpeningResize(
           activeOpeningResizeSession.roomId,
           activeOpeningResizeSession.openingId,
-          activeOpeningResizeSession.startWidthMm
+          activeOpeningResizeSession.startWidthMm,
+          activeOpeningResizeSession.startOffsetMm
         );
     }
     if (activeInteriorAssetDragSession?.didDrag) {

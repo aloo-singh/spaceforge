@@ -164,6 +164,7 @@ import type {
   Point,
   Room,
   RoomInteriorAssetSelection,
+  RoomOpening,
   RoomOpeningSelection,
   SharedSelectionItem,
   RoomWall,
@@ -236,6 +237,10 @@ const EMPTY_HOVERED_SELECTABLE_WALL = null as {
   roomId: string;
   wall: RoomWall;
 } | null;
+const EMPTY_OPENING_MOVE_UI = null as {
+  roomId: string;
+  openingId: string;
+} | null;
 const PROJECT_NAME_HINT_ANCHOR_SELECTOR = "[data-editor-project-name-anchor]";
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
@@ -276,6 +281,9 @@ const RESIZE_DIMENSION_HANDLE_CLEARANCE_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+const OPENING_MOVE_DIMENSION_WALL_OFFSET_PX = 22;
+const OPENING_MOVE_DIMENSION_NEIGHBOR_OFFSET_PX = 48;
+const OPENING_MOVE_DIMENSION_MIN_LENGTH_PX = 34;
 const OPENING_CUTOUT_WORLD_MM = 64;
 const OPENING_SYMBOL_WORLD_MM = 18;
 const WINDOW_LINE_INSET_WORLD_MM = 44;
@@ -856,6 +864,10 @@ export default function EditorCanvas({
     roomId: string;
     wall: RoomWall;
   } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
+  const openingMoveUiRef = useRef<{
+    roomId: string;
+    openingId: string;
+  } | null>(EMPTY_OPENING_MOVE_UI);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -1057,6 +1069,7 @@ export default function EditorCanvas({
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
       hoveredSelectableWallRef.current,
+      openingMoveUiRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
@@ -2601,6 +2614,9 @@ export default function EditorCanvas({
         onHoveredSelectableWallChange: (wallSelection) => {
           hoveredSelectableWallRef.current = wallSelection;
         },
+        onOpeningMoveUiChange: (openingMoveUi) => {
+          openingMoveUiRef.current = openingMoveUi;
+        },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
         },
@@ -3636,6 +3652,10 @@ function drawScene(
     roomId: string;
     wall: RoomWall;
   } | null,
+  openingMoveUi: {
+    roomId: string;
+    openingId: string;
+  } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -3810,6 +3830,15 @@ function drawScene(
     { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
+  drawOpeningMoveDimensions(
+    dimensionOverlayContainer,
+    renderedRooms,
+    openingMoveUi,
+    state.camera,
+    state.viewport,
+    state.settings,
+    theme
+  );
   if (showDimensions) {
     drawSelectedRoomDimensions(
       dimensionOverlayContainer,
@@ -5488,6 +5517,8 @@ type ResizeDimensionLabelLayout = {
   outwardDirection: ScreenPoint;
   tangentDirection: ScreenPoint;
   avoidanceDirection: ScreenPoint;
+  strokeColor?: number;
+  strokeAlpha?: number;
   width: number;
   height: number;
 };
@@ -5498,6 +5529,266 @@ type OverlayAvoidRect = {
   top: number;
   bottom: number;
 };
+
+type OpeningMoveDimensionSpan = {
+  start: Point;
+  end: Point;
+  lengthMillimetres: number;
+  offsetPx: number;
+};
+
+function drawOpeningMoveDimensions(
+  labelContainer: Container,
+  rooms: Room[],
+  openingMoveUi: { roomId: string; openingId: string } | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  if (!openingMoveUi) return;
+
+  const room = rooms.find((candidate) => candidate.id === openingMoveUi.roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingMoveUi.openingId);
+  if (!room || !opening) return;
+
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return;
+
+  const currentRange = getOpeningWallOffsetRange(opening, segment.lengthMm);
+  if (!currentRange) return;
+
+  const sameWallRanges = room.openings
+    .filter(
+      (candidate) =>
+        candidate.id !== opening.id &&
+        candidate.wall === opening.wall
+    )
+    .map((candidate) => getOpeningWallOffsetRange(candidate, segment.lengthMm))
+    .filter((range): range is { startOffsetMm: number; endOffsetMm: number } => range !== null)
+    .sort((a, b) => a.startOffsetMm - b.startOffsetMm);
+
+  const previousOpening = [...sameWallRanges]
+    .reverse()
+    .find((range) => range.endOffsetMm <= currentRange.startOffsetMm);
+  const nextOpening = sameWallRanges.find((range) => range.startOffsetMm >= currentRange.endOffsetMm);
+
+  const wallOffsetPx = getScaledMeasurementPx(OPENING_MOVE_DIMENSION_WALL_OFFSET_PX, settings);
+  const neighborOffsetPx = getScaledMeasurementPx(OPENING_MOVE_DIMENSION_NEIGHBOR_OFFSET_PX, settings);
+  const spans: OpeningMoveDimensionSpan[] = [
+    {
+      start: getWallPointAtOffsetForCanvas(segment, 0),
+      end: getWallPointAtOffsetForCanvas(segment, currentRange.startOffsetMm),
+      lengthMillimetres: currentRange.startOffsetMm,
+      offsetPx: wallOffsetPx,
+    },
+    {
+      start: getWallPointAtOffsetForCanvas(segment, currentRange.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, segment.lengthMm),
+      lengthMillimetres: segment.lengthMm - currentRange.endOffsetMm,
+      offsetPx: wallOffsetPx,
+    },
+  ];
+
+  if (previousOpening) {
+    spans.push({
+      start: getWallPointAtOffsetForCanvas(segment, previousOpening.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, currentRange.startOffsetMm),
+      lengthMillimetres: currentRange.startOffsetMm - previousOpening.endOffsetMm,
+      offsetPx: neighborOffsetPx,
+    });
+  }
+
+  if (nextOpening) {
+    spans.push({
+      start: getWallPointAtOffsetForCanvas(segment, currentRange.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, nextOpening.startOffsetMm),
+      lengthMillimetres: nextOpening.startOffsetMm - currentRange.endOffsetMm,
+      offsetPx: neighborOffsetPx,
+    });
+  }
+
+  const arrowGraphics = new Graphics();
+  const labelLayouts: ResizeDimensionLabelLayout[] = [];
+
+  for (const span of spans) {
+    const start = worldToScreen(span.start, camera, viewport);
+    const end = worldToScreen(span.end, camera, viewport);
+    const lengthPx = Math.hypot(end.x - start.x, end.y - start.y);
+    if (span.lengthMillimetres <= 0 || lengthPx < OPENING_MOVE_DIMENSION_MIN_LENGTH_PX) continue;
+
+    const midpointWorld = {
+      x: (span.start.x + span.end.x) / 2,
+      y: (span.start.y + span.end.y) / 2,
+    };
+    const midpoint = worldToScreen(midpointWorld, camera, viewport);
+    const normalTarget = worldToScreen(
+      {
+        x: midpointWorld.x + segment.interiorNormal.x * 100,
+        y: midpointWorld.y + segment.interiorNormal.y * 100,
+      },
+      camera,
+      viewport
+    );
+    const normal = normalizeScreenDirection({
+      x: normalTarget.x - midpoint.x,
+      y: normalTarget.y - midpoint.y,
+    });
+    const tangent = normalizeScreenDirection({
+      x: end.x - start.x,
+      y: end.y - start.y,
+    });
+    const arrowStart = {
+      x: start.x + normal.x * span.offsetPx,
+      y: start.y + normal.y * span.offsetPx,
+    };
+    const arrowEnd = {
+      x: end.x + normal.x * span.offsetPx,
+      y: end.y + normal.y * span.offsetPx,
+    };
+
+    drawDoubleEndedDimensionArrow(arrowGraphics, arrowStart, arrowEnd, tangent, settings, theme);
+    labelLayouts.push(
+      createOpeningMoveDimensionLabelLayout(
+        formatMetricWallDimension(span.lengthMillimetres),
+        {
+          x: (arrowStart.x + arrowEnd.x) / 2,
+          y: (arrowStart.y + arrowEnd.y) / 2,
+        },
+        normal,
+        tangent,
+        viewport,
+        settings,
+        theme
+      )
+    );
+  }
+
+  if (labelLayouts.length === 0) {
+    arrowGraphics.destroy();
+    return;
+  }
+
+  labelContainer.addChild(arrowGraphics);
+  drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
+}
+
+function getOpeningWallOffsetRange(
+  opening: RoomOpening,
+  wallLengthMm: number
+): { startOffsetMm: number; endOffsetMm: number } | null {
+  const centerOffsetMm = clampValue(opening.offsetMm, 0, wallLengthMm);
+  const halfWidthMm = opening.widthMm / 2;
+  const startOffsetMm = Math.max(0, centerOffsetMm - halfWidthMm);
+  const endOffsetMm = Math.min(wallLengthMm, centerOffsetMm + halfWidthMm);
+  if (endOffsetMm <= startOffsetMm) return null;
+
+  return { startOffsetMm, endOffsetMm };
+}
+
+function getWallPointAtOffsetForCanvas(
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  offsetMm: number
+): Point {
+  const safeLengthMm = Math.max(segment.lengthMm, 0.001);
+  const t = clampValue(offsetMm / safeLengthMm, 0, 1);
+
+  return {
+    x: segment.start.x + (segment.end.x - segment.start.x) * t,
+    y: segment.start.y + (segment.end.y - segment.start.y) * t,
+  };
+}
+
+function drawDoubleEndedDimensionArrow(
+  graphics: Graphics,
+  start: ScreenPoint,
+  end: ScreenPoint,
+  tangent: ScreenPoint,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const widthPx = Math.max(1, 1.25 * measurementTextScale);
+  const arrowSizePx = getScaledMeasurementPx(6, settings);
+  const arrowSpreadPx = getScaledMeasurementPx(4, settings);
+  const normal = { x: -tangent.y, y: tangent.x };
+
+  graphics.setStrokeStyle({
+    width: widthPx,
+    color: theme.wallSelectionAccent,
+    alpha: 0.78,
+    cap: "round",
+    join: "round",
+  });
+  graphics.moveTo(start.x, start.y);
+  graphics.lineTo(end.x, end.y);
+
+  for (const [point, direction] of [
+    [start, { x: tangent.x, y: tangent.y }],
+    [end, { x: -tangent.x, y: -tangent.y }],
+  ] as const) {
+    graphics.moveTo(point.x, point.y);
+    graphics.lineTo(
+      point.x + direction.x * arrowSizePx + normal.x * arrowSpreadPx,
+      point.y + direction.y * arrowSizePx + normal.y * arrowSpreadPx
+    );
+    graphics.moveTo(point.x, point.y);
+    graphics.lineTo(
+      point.x + direction.x * arrowSizePx - normal.x * arrowSpreadPx,
+      point.y + direction.y * arrowSizePx - normal.y * arrowSpreadPx
+    );
+  }
+  graphics.stroke();
+}
+
+function createOpeningMoveDimensionLabelLayout(
+  text: string,
+  center: ScreenPoint,
+  outwardDirection: ScreenPoint,
+  tangentDirection: ScreenPoint,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+): ResizeDimensionLabelLayout {
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const dimensionFontSizePx = getScaledMeasurementPx(RESIZE_DIMENSION_FONT_SIZE_PX, settings);
+  const dimensionPaddingXPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_X_PX, settings);
+  const dimensionPaddingYPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_Y_PX, settings);
+  const labelGapPx = getScaledMeasurementPx(RESIZE_DIMENSION_LABEL_GAP_PX, settings);
+  const measurementText = new Text({
+    text,
+    resolution: getTextResolution(),
+    style: {
+      fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
+      fontSize: dimensionFontSizePx,
+      fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
+      letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX * measurementTextScale,
+    },
+  });
+  const width = measurementText.width + dimensionPaddingXPx * 2;
+  const height = measurementText.height + dimensionPaddingYPx * 2;
+  measurementText.destroy();
+
+  return {
+    text,
+    center: clampResizeDimensionLabelCenter(
+      {
+        x: center.x + outwardDirection.x * labelGapPx,
+        y: center.y + outwardDirection.y * labelGapPx,
+      },
+      width,
+      height,
+      viewport
+    ),
+    outwardDirection,
+    tangentDirection,
+    avoidanceDirection: outwardDirection,
+    strokeColor: theme.wallSelectionAccent,
+    strokeAlpha: 0.82,
+    width,
+    height,
+  };
+}
 
 function drawActiveResizeDimensions(
   labelContainer: Container,
@@ -5707,8 +5998,8 @@ function drawDimensionLabels(
     pill.fill();
     pill.setStrokeStyle({
       width: 1.1 * measurementTextScale,
-      color: theme.roomLabelPillSelectedStroke,
-      alpha: RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
+      color: labelLayout.strokeColor ?? theme.roomLabelPillSelectedStroke,
+      alpha: labelLayout.strokeAlpha ?? RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
     });
     pill.roundRect(left, top, width, height, dimensionRadiusPx);
     pill.stroke();
