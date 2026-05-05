@@ -297,7 +297,7 @@ function FurnitureInspector({
           </div>
         ) : null}
 
-        <div className="space-y-1.5">
+        <div className="flex justify-end">
           <ImmediateTooltipProvider>
             <InspectorIconTooltip content="Delete this asset">
               <Button

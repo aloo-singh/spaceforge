@@ -174,7 +174,7 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
               <span>cancel</span>
             </p>
           ) : null}
-          <div className="mt-4">
+          <div className="mt-4 flex justify-end">
             <ImmediateTooltipProvider>
               <InspectorIconTooltip
                 content={
