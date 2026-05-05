@@ -320,37 +320,36 @@ export function getHandleAnchoredOpeningWidthAndOffsetForWorldPoint(
   const centerOffsetMm = clamp(opening.offsetMm, 0, segment.lengthMm);
   const halfWidthMm = opening.widthMm / 2;
   const pointerOffsetMm = getWallOffsetForWorldPoint(segment, worldPoint);
-  
-  let nextWidthMm: number;
-  let nextOffsetMm: number;
-  
+  const minWidthMm = Math.min(MIN_OPENING_WIDTH_MM, segment.lengthMm);
+
   if (draggedEdge === "start") {
-    // Dragging start edge, end is anchored at (centerOffset + halfWidth)
     const fixedEndOffsetMm = centerOffsetMm + halfWidthMm;
-    nextWidthMm = Math.max(0, fixedEndOffsetMm - pointerOffsetMm);
-    // New center = fixedEnd - (width / 2)
-    nextOffsetMm = fixedEndOffsetMm - nextWidthMm / 2;
-  } else {
-    // Dragging end edge, start is anchored at (centerOffset - halfWidth)
-    const fixedStartOffsetMm = centerOffsetMm - halfWidthMm;
-    nextWidthMm = Math.max(0, pointerOffsetMm - fixedStartOffsetMm);
-    // New center = fixedStart + (width / 2)
-    nextOffsetMm = fixedStartOffsetMm + nextWidthMm / 2;
+    const maxWidthMm = Math.max(minWidthMm, fixedEndOffsetMm);
+    const rawWidthMm = Math.max(0, fixedEndOffsetMm - pointerOffsetMm);
+    const snappedWidthMm =
+      options?.gridSizeMm && options.gridSizeMm > 0
+        ? snapToGrid(rawWidthMm, options.gridSizeMm)
+        : rawWidthMm;
+    const widthMm = clamp(snappedWidthMm, minWidthMm, maxWidthMm);
+
+    return {
+      widthMm,
+      offsetMm: fixedEndOffsetMm - widthMm / 2,
+    };
   }
 
+  const fixedStartOffsetMm = centerOffsetMm - halfWidthMm;
+  const maxWidthMm = Math.max(minWidthMm, segment.lengthMm - fixedStartOffsetMm);
+  const rawWidthMm = Math.max(0, pointerOffsetMm - fixedStartOffsetMm);
   const snappedWidthMm =
     options?.gridSizeMm && options.gridSizeMm > 0
-      ? snapToGrid(nextWidthMm, options.gridSizeMm)
-      : nextWidthMm;
-
-  // Ensure width and offset don't exceed bounds
-  const maxWidthMm = segment.lengthMm;
-  const clampedWidthMm = clamp(snappedWidthMm, Math.min(MIN_OPENING_WIDTH_MM, maxWidthMm), maxWidthMm);
-  const clampedOffsetMm = clamp(nextOffsetMm, 0, segment.lengthMm - clampedWidthMm);
+      ? snapToGrid(rawWidthMm, options.gridSizeMm)
+      : rawWidthMm;
+  const widthMm = clamp(snappedWidthMm, minWidthMm, maxWidthMm);
 
   return {
-    widthMm: clampedWidthMm,
-    offsetMm: clampedOffsetMm,
+    widthMm,
+    offsetMm: fixedStartOffsetMm + widthMm / 2,
   };
 }
 

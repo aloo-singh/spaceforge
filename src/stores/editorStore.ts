@@ -1266,6 +1266,34 @@ function updateRoomOpeningWidthInDocument(
   };
 }
 
+function updateRoomOpeningWidthAndOffsetInDocument(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  nextWidthMm: number,
+  nextOffsetMm: number
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            openings: room.openings.map((opening) =>
+              opening.id === openingId
+                ? {
+                    ...cloneRoomOpening(opening),
+                    widthMm: nextWidthMm,
+                    offsetMm: nextOffsetMm,
+                  }
+                : opening
+            ),
+          }
+        : room
+    ),
+  };
+}
+
 function arePointListsEqual(a: Point[], b: Point[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
@@ -5022,18 +5050,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (opening.widthMm === nextWidthMm && nextOffsetMm === undefined) return state;
       if (opening.widthMm === nextWidthMm && opening.offsetMm === nextOffsetMm) return state;
 
-      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
-      
-      // If offset changed (for handle-anchored resizing), also update the offset
-      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
-        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
-        if (updatedRoom) {
-          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
-          if (updatedOpening) {
-            updatedOpening.offsetMm = nextOffsetMm;
-          }
-        }
-      }
+      const updatedDocument =
+        nextOffsetMm !== undefined
+          ? updateRoomOpeningWidthAndOffsetInDocument(
+              state.document,
+              roomId,
+              openingId,
+              nextWidthMm,
+              nextOffsetMm
+            )
+          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
 
       return {
         document: updatedDocument,
@@ -5061,18 +5087,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       };
 
-      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
-      
-      // If offset changed, also update the offset
-      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
-        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
-        if (updatedRoom) {
-          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
-          if (updatedOpening) {
-            updatedOpening.offsetMm = nextOffsetMm;
-          }
-        }
-      }
+      const updatedDocument =
+        nextOffsetMm !== undefined
+          ? updateRoomOpeningWidthAndOffsetInDocument(
+              state.document,
+              roomId,
+              openingId,
+              nextWidthMm,
+              nextOffsetMm
+            )
+          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
 
       return {
         document: updatedDocument,
