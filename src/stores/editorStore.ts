@@ -6056,6 +6056,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedWall: null,
     selectedOpening: null,
     selectedInteriorAsset: null,
+    selection: [{ type: "room" as const, id: room.id }],
     shouldFocusSelectedRoomNameInput: true,
     renameSession: null,
     history: {
