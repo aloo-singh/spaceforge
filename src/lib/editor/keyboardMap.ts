@@ -375,6 +375,11 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "room move";
   }
 
+  if (command.type === "bulk-move-rooms") {
+    const count = command.movedRooms.length;
+    return count === 1 ? "room move" : `${count} rooms move`;
+  }
+
   if (command.type === "add-opening") {
     const openingType = command.opening.type === "door" ? "door" : "window";
     const action = command.source === "paste" ? "pasted" : "created";
@@ -389,6 +394,17 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   if (command.type === "move-opening") {
     const openingType = command.openingType === "door" ? "door" : "window";
     return `${openingType} moved`;
+  }
+
+  if (command.type === "bulk-move-openings") {
+    const count = command.movedOpenings.length;
+    if (count === 0) return "action";
+    const firstType = command.movedOpenings[0]?.openingType;
+    if (command.movedOpenings.every((opening) => opening.openingType === firstType)) {
+      const openingType = firstType === "door" ? "door" : "window";
+      return count === 1 ? `${openingType} moved` : `${count} ${openingType}s move`;
+    }
+    return `${count} openings move`;
   }
 
   if (command.type === "update-opening") {

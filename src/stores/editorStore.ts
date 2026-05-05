@@ -350,6 +350,14 @@ type EditorState = {
     previousOffsetMm: number,
     nextOffsetMm: number
   ) => void;
+  commitBulkOpeningMove: (
+    moves: Array<{
+      roomId: string;
+      openingId: string;
+      previousOffsetMm: number;
+      nextOffsetMm: number;
+    }>
+  ) => void;
   previewInteriorAssetMove: (roomId: string, assetId: string, nextCenter: Point) => void;
   commitInteriorAssetMove: (
     roomId: string,
@@ -381,6 +389,9 @@ type EditorState = {
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitBulkRoomMove: (
+    moves: Array<{ roomId: string; previousPoints: Point[]; nextPoints: Point[] }>
+  ) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   resetCamera: () => void;
@@ -5124,6 +5135,53 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  commitBulkOpeningMove: (moves) =>
+    set((state) => {
+      const validMoves = moves.filter((move) => move.previousOffsetMm !== move.nextOffsetMm);
+      if (validMoves.length === 0) return state;
+
+      let previousDocument = state.document;
+      const movedOpenings: Extract<EditorCommand, { type: "bulk-move-openings" }>["movedOpenings"] = [];
+
+      for (const move of validMoves) {
+        const room = state.document.rooms.find((candidate) => candidate.id === move.roomId);
+        const opening = room?.openings.find((candidate) => candidate.id === move.openingId);
+        if (!room || !opening) continue;
+
+        previousDocument = updateRoomOpeningOffsetInDocument(
+          previousDocument,
+          move.roomId,
+          move.openingId,
+          move.previousOffsetMm
+        );
+        movedOpenings.push({
+          roomId: move.roomId,
+          openingId: move.openingId,
+          openingType: opening.type,
+          previousOffsetMm: move.previousOffsetMm,
+          nextOffsetMm: move.nextOffsetMm,
+        });
+      }
+
+      if (movedOpenings.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-move-openings",
+        previousDocument: cloneDocumentState(previousDocument),
+        nextDocument: cloneDocumentState(state.document),
+        movedOpenings,
+      };
+
+      return {
+        document: state.document,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   previewInteriorAssetMove: (roomId, assetId, nextCenter) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -5490,6 +5548,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: updateMovedRoomInDocument(state.document, roomId, previousPoints, nextPoints),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  commitBulkRoomMove: (moves) =>
+    set((state) => {
+      const validMoves = moves.filter(
+        (move) => !arePointListsEqual(move.previousPoints, move.nextPoints)
+      );
+      if (validMoves.length === 0) return state;
+
+      let previousDocument = state.document;
+      const movedRooms: Extract<EditorCommand, { type: "bulk-move-rooms" }>["movedRooms"] = [];
+
+      for (const move of validMoves) {
+        const room = state.document.rooms.find((candidate) => candidate.id === move.roomId);
+        if (!room) continue;
+
+        previousDocument = updateMovedRoomInDocument(
+          previousDocument,
+          move.roomId,
+          move.nextPoints,
+          move.previousPoints
+        );
+        movedRooms.push({
+          roomId: move.roomId,
+          previousPoints: move.previousPoints.map((point) => ({ ...point })),
+          nextPoints: move.nextPoints.map((point) => ({ ...point })),
+        });
+      }
+
+      if (movedRooms.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-move-rooms",
+        previousDocument: cloneDocumentState(previousDocument),
+        nextDocument: cloneDocumentState(state.document),
+        movedRooms,
+      };
+
+      return {
+        document: state.document,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

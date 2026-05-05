@@ -2,12 +2,13 @@ import {
   findInteriorAssetAtScreenPoint,
   getInteriorAssetBoundsAsRectBounds,
 } from "@/lib/editor/interiorAssets";
-import { findOpeningAtScreenPoint } from "@/lib/editor/openings";
+import { findOpeningAtScreenPoint, getRoomWallSegment } from "@/lib/editor/openings";
 import { findRoomWallAtScreenPoint } from "@/lib/editor/openings";
 import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openings";
 import { screenToWorld } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { toast } from "sonner";
 import { findRoomLabelAtScreenPoint } from "@/lib/editor/roomLabel";
 import {
   getActiveSnapStepMm,
@@ -97,6 +98,14 @@ type RoomDrawStoreState = {
     previousOffsetMm: number,
     nextOffsetMm: number
   ) => void;
+  commitBulkOpeningMove: (
+    moves: Array<{
+      roomId: string;
+      openingId: string;
+      previousOffsetMm: number;
+      nextOffsetMm: number;
+    }>
+  ) => void;
   commitOpeningResize: (
     roomId: string,
     openingId: string,
@@ -135,6 +144,9 @@ type RoomDrawStoreState = {
   ) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitBulkRoomMove: (
+    moves: Array<{ roomId: string; previousPoints: Point[]; nextPoints: Point[] }>
+  ) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
 };
 
@@ -163,6 +175,7 @@ type LabelDragSession = {
   startPoints: Point[];
   latestPoints: Point[] | null;
   didDrag: boolean;
+  multiRoomStartPoints?: Map<string, Point[]>;
 };
 
 type OpeningDragSession = {
@@ -173,6 +186,7 @@ type OpeningDragSession = {
   startOffsetMm: number;
   latestOffsetMm: number | null;
   didDrag: boolean;
+  multiOpeningStartOffsets?: Map<string, { roomId: string; openingId: string; offsetMm: number; widthMm: number }>;
 };
 
 type OpeningResizeSession = {
@@ -293,6 +307,71 @@ function isItemSelected(
   });
 }
 
+function showGroupedMoveParentToast() {
+  toast("A group move needs one shared context.", {
+    description:
+      "Select rooms together, assets in one room, or openings on one wall. The constraint is the feature.",
+    duration: 3000,
+  });
+}
+
+function getSelectedRoomItems(selection: SharedSelectionItem[]) {
+  return selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "room" }> => item.type === "room"
+  );
+}
+
+function getSelectedAssetItems(selection: SharedSelectionItem[]) {
+  return selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
+  );
+}
+
+function getSelectedOpeningItems(selection: SharedSelectionItem[]) {
+  return selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "opening" }> => item.type === "opening"
+  );
+}
+
+function areSelectedAssetsInOneRoom(selection: SharedSelectionItem[]) {
+  const assets = getSelectedAssetItems(selection);
+  if (assets.length <= 1) return true;
+  return new Set(assets.map((item) => item.roomId)).size === 1;
+}
+
+function getSelectedOpeningsSharedWall(
+  rooms: Room[],
+  selection: SharedSelectionItem[]
+): { roomId: string; wall: RoomWall } | null {
+  const openings = getSelectedOpeningItems(selection);
+  if (openings.length <= 1) return null;
+
+  let shared: { roomId: string; wall: RoomWall } | null = null;
+  for (const item of openings) {
+    const room = rooms.find((candidate) => candidate.id === item.roomId) ?? null;
+    const opening = room?.openings.find((candidate) => candidate.id === item.openingId) ?? null;
+    if (!opening) return null;
+    if (!shared) {
+      shared = { roomId: item.roomId, wall: opening.wall };
+      continue;
+    }
+    if (shared.roomId !== item.roomId || shared.wall !== opening.wall) return null;
+  }
+
+  return shared;
+}
+
+function clampOpeningOffsetForWidth(room: Room, wall: RoomWall, widthMm: number, offsetMm: number) {
+  const segment = getRoomWallSegment(room, wall);
+  if (!segment) return offsetMm;
+  const wallLengthMm = Math.hypot(
+    segment.end.x - segment.start.x,
+    segment.end.y - segment.start.y
+  );
+  const halfWidthMm = widthMm / 2;
+  return Math.min(Math.max(offsetMm, halfWidthMm), Math.max(halfWidthMm, wallLengthMm - halfWidthMm));
+}
+
 /**
  * Handles room drawing interactions:
  * - left click places points while drafting
@@ -341,7 +420,9 @@ export function attachRoomDrawInput(
   let activeInteriorAssetDragSession: InteriorAssetDragSession | null = null;
   let activeInteriorAssetResizeSession: InteriorAssetResizeSession | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
+  const commitBulkRoomMove = store.getState().commitBulkRoomMove;
   const commitOpeningMove = store.getState().commitOpeningMove;
+  const commitBulkOpeningMove = store.getState().commitBulkOpeningMove;
   const commitOpeningResize = store.getState().commitOpeningResize;
   const commitInteriorAssetMove = store.getState().commitInteriorAssetMove;
   const commitInteriorAssetResize = store.getState().commitInteriorAssetResize;
@@ -769,8 +850,11 @@ export function attachRoomDrawInput(
       }
 
       const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+      const excludedRoomIds = session.multiRoomStartPoints
+        ? new Set(Array.from(session.multiRoomStartPoints.keys()))
+        : new Set([session.roomId]);
       const visibleGuides = getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
-        excludeRoomIds: new Set([session.roomId]),
+        excludeRoomIds: excludedRoomIds,
       });
       const magneticGuides = getMagneticSnapGuidesForSettings(
         getRoomsForActiveFloor(state.document),
@@ -778,7 +862,7 @@ export function attachRoomDrawInput(
         state.camera,
         state.settings,
         {
-          excludeRoomIds: new Set([session.roomId]),
+          excludeRoomIds: excludedRoomIds,
         }
       );
       const resolvedCursorWorld = getSnappedPointFromGuides(
@@ -790,6 +874,12 @@ export function attachRoomDrawInput(
 
       const nextPoints = translateRoomPointsOnGrid(session.startPoints, delta, activeSnapStepMm);
       session.latestPoints = nextPoints;
+      if (session.multiRoomStartPoints) {
+        for (const [roomId, startPoints] of session.multiRoomStartPoints) {
+          if (roomId === session.roomId) continue;
+          store.getState().previewRoomMove(roomId, translateRoomPointsOnGrid(startPoints, delta, activeSnapStepMm));
+        }
+      }
       setTransformFeedback(
         getMoveTransformFeedback(session.roomId, session.startPoints, nextPoints, nextPoints)
       );
@@ -820,6 +910,21 @@ export function attachRoomDrawInput(
       store.getState().setCanvasInteractionActive(true);
       session.latestOffsetMm = moveTarget.nextOffsetMm;
       store.getState().previewOpeningMove(session.roomId, session.openingId, moveTarget.nextOffsetMm);
+      if (session.multiOpeningStartOffsets) {
+        const offsetDeltaMm = moveTarget.nextOffsetMm - session.startOffsetMm;
+        const rooms = getRoomsForActiveFloor(store.getState().document);
+        for (const [key, openingStart] of session.multiOpeningStartOffsets) {
+          if (key === `${session.roomId}:${session.openingId}`) continue;
+          const room = rooms.find((candidate) => candidate.id === openingStart.roomId) ?? null;
+          const opening = room?.openings.find((candidate) => candidate.id === openingStart.openingId) ?? null;
+          if (!room || !opening) continue;
+          store.getState().previewOpeningMove(
+            openingStart.roomId,
+            openingStart.openingId,
+            clampOpeningOffsetForWidth(room, opening.wall, openingStart.widthMm, openingStart.offsetMm + offsetDeltaMm)
+          );
+        }
+      }
       callbacks.onOpeningMoveUiChange?.({
         roomId: session.roomId,
         openingId: session.openingId,
@@ -949,29 +1054,36 @@ export function attachRoomDrawInput(
       const isMultiAssetSelection = assetSelections.length > 1;
 
       if (isMultiAssetSelection) {
-        // For multi-asset drag, apply snapping and boundary constraints to each asset
+        const primaryMoveTarget = getInteriorAssetMoveCenterForCursor(
+          session.roomId,
+          session.assetId,
+          cursorWorld,
+          {
+            x: session.startCenter.x - session.startWorldPoint.x,
+            y: session.startCenter.y - session.startWorldPoint.y,
+          }
+        );
+        if (!primaryMoveTarget) {
+          setSnapGuides(null);
+          callbacks.requestRender();
+          return;
+        }
+
         session.didDrag = true;
         store.getState().setCanvasInteractionActive(true);
-        
-        // Preview movement for all selected assets using snapping/constraints
+        session.latestCenter = primaryMoveTarget.nextCenter;
+
         if (session.multiSelectStartPositions) {
+          const delta = {
+            x: primaryMoveTarget.nextCenter.x - session.startCenter.x,
+            y: primaryMoveTarget.nextCenter.y - session.startCenter.y,
+          };
           for (const [key, startPosition] of session.multiSelectStartPositions) {
             const assetId = key.split(":")[1];
-            // Calculate offset for this asset from where drag started
-            const assetOffset = {
-              x: startPosition.center.x - session.startWorldPoint.x,
-              y: startPosition.center.y - session.startWorldPoint.y,
-            };
-            // Apply snapping and boundary constraints like single-select does
-            const moveTarget = getInteriorAssetMoveCenterForCursor(
-              startPosition.roomId,
-              assetId,
-              cursorWorld,
-              assetOffset
-            );
-            if (moveTarget) {
-              store.getState().previewInteriorAssetMove(startPosition.roomId, assetId, moveTarget.nextCenter);
-            }
+            store.getState().previewInteriorAssetMove(startPosition.roomId, assetId, {
+              x: startPosition.center.x + delta.x,
+              y: startPosition.center.y + delta.y,
+            });
           }
         }
       } else {
@@ -1219,6 +1331,7 @@ export function attachRoomDrawInput(
         )
       );
 
+      const clickedSelectedRoom = isItemSelected(state.selection, "room", undefined, labelHitRoom.id);
       const didChangeSelection = state.selectedRoomId !== labelHitRoom.id;
       
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
@@ -1230,9 +1343,24 @@ export function attachRoomDrawInput(
           state.addToSelection(roomItem);
         }
       } else {
-        // Normal mode: replace selection and clear multi-selection
-        state.clearSelection();
-        state.selectRoomById(labelHitRoom.id);
+        // Normal mode: preserve an existing selected room group when dragging one item in it.
+        if (!clickedSelectedRoom || getSelectedRoomItems(state.selection).length <= 1) {
+          state.clearSelection();
+          state.selectRoomById(labelHitRoom.id);
+        }
+      }
+      const nextSelection = store.getState().selection;
+      const selectedRoomItems = getSelectedRoomItems(nextSelection);
+      const isMultiRoomSelection = selectedRoomItems.length > 1 && clickedSelectedRoom;
+      const multiRoomStartPoints = new Map<string, Point[]>();
+      if (isMultiRoomSelection) {
+        for (const selection of selectedRoomItems) {
+          const selectedRoom =
+            getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === selection.id) ?? null;
+          if (selectedRoom) {
+            multiRoomStartPoints.set(selection.id, selectedRoom.points.map((point) => ({ ...point })));
+          }
+        }
       }
       activeLabelDragSession = {
         pointerId: event.pointerId,
@@ -1242,6 +1370,7 @@ export function attachRoomDrawInput(
         startPoints: labelHitRoom.points.map((point) => ({ ...point })),
         latestPoints: null,
         didDrag: false,
+        multiRoomStartPoints: isMultiRoomSelection ? multiRoomStartPoints : undefined,
       };
       setHoveredRoomLabelId(labelHitRoom.id);
       updateCursor();
@@ -1361,6 +1490,7 @@ export function attachRoomDrawInput(
     );
     if (openingHit) {
       event.preventDefault();
+      const clickedSelectedOpening = isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId);
       if (isMultiSelectActive(event, state.settings.multiSelectModeEnabled)) {
         const openingItem: SharedSelectionItem = { type: "opening", roomId: openingHit.roomId, openingId: openingHit.openingId };
         if (isItemSelected(state.selection, "opening", openingHit.roomId, openingHit.openingId)) {
@@ -1369,8 +1499,10 @@ export function attachRoomDrawInput(
           state.addToSelection(openingItem);
         }
       } else {
-        state.clearSelection();
-        state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+        if (!clickedSelectedOpening || getSelectedOpeningItems(state.selection).length <= 1) {
+          state.clearSelection();
+          state.selectOpeningById(openingHit.roomId, openingHit.openingId);
+        }
       }
       hoveredOpening = openingHit;
       setHoveredSelectableWall(null);
@@ -1378,6 +1510,34 @@ export function attachRoomDrawInput(
       const room = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === openingHit.roomId) ?? null;
       const opening = room?.openings.find((candidate) => candidate.id === openingHit.openingId) ?? null;
       if (room && opening) {
+        const nextSelection = store.getState().selection;
+        const selectedOpenings = getSelectedOpeningItems(nextSelection);
+        const isMultiOpeningSelection = selectedOpenings.length > 1 && clickedSelectedOpening;
+        const sharedWall = getSelectedOpeningsSharedWall(getRoomsForActiveFloor(state.document), nextSelection);
+        if (isMultiOpeningSelection && !sharedWall) {
+          showGroupedMoveParentToast();
+          updateCursor();
+          return;
+        }
+        const multiOpeningStartOffsets = new Map<
+          string,
+          { roomId: string; openingId: string; offsetMm: number; widthMm: number }
+        >();
+        if (isMultiOpeningSelection) {
+          for (const selection of selectedOpenings) {
+            const selectedRoom = getRoomsForActiveFloor(state.document).find((candidate) => candidate.id === selection.roomId) ?? null;
+            const selectedOpening =
+              selectedRoom?.openings.find((candidate) => candidate.id === selection.openingId) ?? null;
+            if (selectedRoom && selectedOpening) {
+              multiOpeningStartOffsets.set(`${selection.roomId}:${selection.openingId}`, {
+                roomId: selection.roomId,
+                openingId: selection.openingId,
+                offsetMm: selectedOpening.offsetMm,
+                widthMm: selectedOpening.widthMm,
+              });
+            }
+          }
+        }
         canvas.setPointerCapture(event.pointerId);
         activeOpeningDragSession = {
           pointerId: event.pointerId,
@@ -1387,6 +1547,7 @@ export function attachRoomDrawInput(
           startOffsetMm: opening.offsetMm,
           latestOffsetMm: null,
           didDrag: false,
+          multiOpeningStartOffsets: isMultiOpeningSelection ? multiOpeningStartOffsets : undefined,
         };
       }
       updateCursor();
@@ -1428,6 +1589,11 @@ export function attachRoomDrawInput(
           (item): item is Extract<SharedSelectionItem, { type: "asset" }> => item.type === "asset"
         );
         const isMultiAssetSelection = assetSelections.length > 1;
+        if (isMultiAssetSelection && !areSelectedAssetsInOneRoom(state.selection)) {
+          showGroupedMoveParentToast();
+          updateCursor();
+          return;
+        }
         
         const multiSelectStartPositions = new Map<string, { roomId: string; center: Point }>();
         if (isMultiAssetSelection) {
@@ -1547,12 +1713,51 @@ export function attachRoomDrawInput(
       if (session.didDrag) {
         const nextOffsetMm = session.latestOffsetMm ?? session.startOffsetMm;
         if (nextOffsetMm !== session.startOffsetMm) {
-          commitOpeningMove(
-            session.roomId,
-            session.openingId,
-            session.startOffsetMm,
-            nextOffsetMm
-          );
+          if (session.multiOpeningStartOffsets) {
+            const offsetDeltaMm = nextOffsetMm - session.startOffsetMm;
+            const rooms = getRoomsForActiveFloor(store.getState().document);
+            const openingMoves: Array<{
+              roomId: string;
+              openingId: string;
+              previousOffsetMm: number;
+              nextOffsetMm: number;
+            }> = [
+              {
+                roomId: session.roomId,
+                openingId: session.openingId,
+                previousOffsetMm: session.startOffsetMm,
+                nextOffsetMm,
+              },
+            ];
+            for (const [key, openingStart] of session.multiOpeningStartOffsets) {
+              if (key === `${session.roomId}:${session.openingId}`) continue;
+              const room = rooms.find((candidate) => candidate.id === openingStart.roomId) ?? null;
+              const opening = room?.openings.find((candidate) => candidate.id === openingStart.openingId) ?? null;
+              if (!room || !opening) continue;
+              const nextOpeningOffsetMm = clampOpeningOffsetForWidth(
+                room,
+                opening.wall,
+                openingStart.widthMm,
+                openingStart.offsetMm + offsetDeltaMm
+              );
+              if (nextOpeningOffsetMm !== openingStart.offsetMm) {
+                openingMoves.push({
+                  roomId: openingStart.roomId,
+                  openingId: openingStart.openingId,
+                  previousOffsetMm: openingStart.offsetMm,
+                  nextOffsetMm: nextOpeningOffsetMm,
+                });
+              }
+            }
+            commitBulkOpeningMove(openingMoves);
+          } else {
+            commitOpeningMove(
+              session.roomId,
+              session.openingId,
+              session.startOffsetMm,
+              nextOffsetMm
+            );
+          }
         }
       }
       stopOpeningDragSession();
@@ -1622,33 +1827,26 @@ export function attachRoomDrawInput(
         const isMultiAssetSelection = assetSelections.length > 1;
 
         if (isMultiAssetSelection) {
-          // Commit move for all selected assets with snapping/boundary constraints
-          const state = store.getState();
-          const endCursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
-
           if (session.multiSelectStartPositions) {
             const bulkMoves: Array<{ roomId: string; assetId: string; previousCenter: Point; nextCenter: Point }> = [];
+            const nextPrimaryCenter = session.latestCenter ?? session.startCenter;
+            const delta = {
+              x: nextPrimaryCenter.x - session.startCenter.x,
+              y: nextPrimaryCenter.y - session.startCenter.y,
+            };
 
             for (const [key, startPosition] of session.multiSelectStartPositions) {
               const assetId = key.split(":")[1];
-              // Calculate offset for this asset from where drag started
-              const assetOffset = {
-                x: startPosition.center.x - session.startWorldPoint.x,
-                y: startPosition.center.y - session.startWorldPoint.y,
+              const nextCenter = {
+                x: startPosition.center.x + delta.x,
+                y: startPosition.center.y + delta.y,
               };
-              // Apply snapping and boundary constraints like single-select does
-              const moveTarget = getInteriorAssetMoveCenterForCursor(
-                startPosition.roomId,
-                assetId,
-                endCursorWorld,
-                assetOffset
-              );
-              if (moveTarget && (moveTarget.nextCenter.x !== startPosition.center.x || moveTarget.nextCenter.y !== startPosition.center.y)) {
+              if (nextCenter.x !== startPosition.center.x || nextCenter.y !== startPosition.center.y) {
                 bulkMoves.push({
                   roomId: startPosition.roomId,
                   assetId,
                   previousCenter: startPosition.center,
-                  nextCenter: moveTarget.nextCenter,
+                  nextCenter,
                 });
               }
             }
@@ -1759,7 +1957,23 @@ export function attachRoomDrawInput(
             "settling"
           )
         );
-        commitRoomMove(session.roomId, session.startPoints, nextPoints);
+        if (session.multiRoomStartPoints) {
+          const delta = getRoomTranslationDelta(session.startPoints[0], nextPoints[0]);
+          const roomMoves: Array<{ roomId: string; previousPoints: Point[]; nextPoints: Point[] }> = [
+            { roomId: session.roomId, previousPoints: session.startPoints, nextPoints },
+          ];
+          for (const [roomId, startPoints] of session.multiRoomStartPoints) {
+            if (roomId === session.roomId) continue;
+            const translatedPoints = startPoints.map((point) => ({
+              x: point.x + delta.x,
+              y: point.y + delta.y,
+            }));
+            roomMoves.push({ roomId, previousPoints: startPoints, nextPoints: translatedPoints });
+          }
+          commitBulkRoomMove(roomMoves);
+        } else {
+          commitRoomMove(session.roomId, session.startPoints, nextPoints);
+        }
         scheduleTransformFeedbackClear();
       }
     } else {
@@ -1794,6 +2008,16 @@ export function attachRoomDrawInput(
             activeOpeningDragSession.openingId,
             activeOpeningDragSession.startOffsetMm
           );
+        if (activeOpeningDragSession.multiOpeningStartOffsets) {
+          for (const [key, openingStart] of activeOpeningDragSession.multiOpeningStartOffsets) {
+            if (key === `${activeOpeningDragSession.roomId}:${activeOpeningDragSession.openingId}`) continue;
+            store.getState().previewOpeningMove(
+              openingStart.roomId,
+              openingStart.openingId,
+              openingStart.offsetMm
+            );
+          }
+        }
       }
 
       stopOpeningDragSession();
@@ -1838,13 +2062,20 @@ export function attachRoomDrawInput(
 
     if (activeInteriorAssetDragSession && event.pointerId === activeInteriorAssetDragSession.pointerId) {
       if (activeInteriorAssetDragSession.didDrag) {
-        store
-          .getState()
-          .previewInteriorAssetMove(
-            activeInteriorAssetDragSession.roomId,
-            activeInteriorAssetDragSession.assetId,
-            activeInteriorAssetDragSession.startCenter
-          );
+        if (activeInteriorAssetDragSession.multiSelectStartPositions) {
+          for (const [key, startPosition] of activeInteriorAssetDragSession.multiSelectStartPositions) {
+            const assetId = key.split(":")[1];
+            store.getState().previewInteriorAssetMove(startPosition.roomId, assetId, startPosition.center);
+          }
+        } else {
+          store
+            .getState()
+            .previewInteriorAssetMove(
+              activeInteriorAssetDragSession.roomId,
+              activeInteriorAssetDragSession.assetId,
+              activeInteriorAssetDragSession.startCenter
+            );
+        }
       }
 
       stopInteriorAssetDragSession();
@@ -2021,6 +2252,12 @@ export function attachRoomDrawInput(
     latestCursorWorld = null;
     syncDraftConstraintMode();
     if (activeLabelDragSession?.didDrag) {
+      if (activeLabelDragSession.multiRoomStartPoints) {
+        for (const [roomId, startPoints] of activeLabelDragSession.multiRoomStartPoints) {
+          if (roomId === activeLabelDragSession.roomId) continue;
+          store.getState().previewRoomMove(roomId, startPoints);
+        }
+      }
       clearPendingTransformFeedbackTimeout();
     }
     if (activeOpeningDragSession?.didDrag) {
@@ -2031,6 +2268,16 @@ export function attachRoomDrawInput(
           activeOpeningDragSession.openingId,
           activeOpeningDragSession.startOffsetMm
         );
+      if (activeOpeningDragSession.multiOpeningStartOffsets) {
+        for (const [key, openingStart] of activeOpeningDragSession.multiOpeningStartOffsets) {
+          if (key === `${activeOpeningDragSession.roomId}:${activeOpeningDragSession.openingId}`) continue;
+          store.getState().previewOpeningMove(
+            openingStart.roomId,
+            openingStart.openingId,
+            openingStart.offsetMm
+          );
+        }
+      }
     }
     if (activeOpeningResizeSession?.didDrag) {
       store
@@ -2043,13 +2290,20 @@ export function attachRoomDrawInput(
         );
     }
     if (activeInteriorAssetDragSession?.didDrag) {
-      store
-        .getState()
-        .previewInteriorAssetMove(
-          activeInteriorAssetDragSession.roomId,
-          activeInteriorAssetDragSession.assetId,
-          activeInteriorAssetDragSession.startCenter
-        );
+      if (activeInteriorAssetDragSession.multiSelectStartPositions) {
+        for (const [key, startPosition] of activeInteriorAssetDragSession.multiSelectStartPositions) {
+          const assetId = key.split(":")[1];
+          store.getState().previewInteriorAssetMove(startPosition.roomId, assetId, startPosition.center);
+        }
+      } else {
+        store
+          .getState()
+          .previewInteriorAssetMove(
+            activeInteriorAssetDragSession.roomId,
+            activeInteriorAssetDragSession.assetId,
+            activeInteriorAssetDragSession.startCenter
+          );
+      }
     }
     if (activeInteriorAssetResizeSession?.didDrag) {
       store.getState().previewInteriorAssetResize(
