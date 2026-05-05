@@ -192,15 +192,17 @@ export function HistoryControls({
   const exportPreferences = useEditorStore((state) => state.exportPreferences);
   const updateExportPreferences = useEditorStore((state) => state.updateExportPreferences);
   const updateProjectExportConfig = useEditorStore((state) => state.updateProjectExportConfig);
+  const fitAllRoomsLabel = "Fit all rooms into view";
+  const fitSelectedRoomLabel = "Fit selected room into view";
   const resetCameraTitle = !hasHydrated
     ? "Fit view is unavailable until the editor finishes loading"
     : hasRooms
-      ? "Fit all rooms into view"
+      ? fitAllRoomsLabel
       : "Add a room to enable fit view";
   const resetCameraAriaLabel = !hasHydrated
     ? "Fit view unavailable"
     : hasRooms
-      ? "Fit all rooms into view"
+      ? fitAllRoomsLabel
       : "Fit view unavailable";
   const undoShortcut = isMacPlatform ? ["⌘", "Z"] : ["Ctrl", "Z"];
   const redoShortcut = isMacPlatform ? ["⇧", "⌘", "Z"] : ["Ctrl", "Y"];
@@ -513,7 +515,7 @@ export function HistoryControls({
                       "Select a single room first"
                     ) : (
                       <span className="inline-flex items-center gap-2">
-                        <span>Fit selected room into view</span>
+                        <span>{fitSelectedRoomLabel}</span>
                         <ShortcutKbdGroup keys={fitSelectedShortcut} />
                       </span>
                     )
@@ -528,7 +530,7 @@ export function HistoryControls({
                     aria-label={
                       isFitSelectedRoomDisabled
                         ? "Fit selected room unavailable"
-                        : "Fit selected room into view"
+                        : fitSelectedRoomLabel
                     }
                     className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                   >
