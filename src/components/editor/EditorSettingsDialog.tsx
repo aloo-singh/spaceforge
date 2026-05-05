@@ -83,12 +83,6 @@ export function EditorSettingsDialog({
                 Choose how the editor and app shell should look.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-                <dt className="sr-only">Appearance mode</dt>
-                <dd>{selectedAppearance}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -139,12 +133,6 @@ export function EditorSettingsDialog({
                 Show or hide room area and live dimension overlays while keeping the editor calm.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Dimensions visibility</dt>
-                <dd>{dimensionsVisible ? "Shown" : "Hidden"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -233,12 +221,6 @@ export function EditorSettingsDialog({
                 broader editor typography.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Measurement text size</dt>
-                <dd>{isLargeMeasurementText ? "Large" : "Normal"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -292,12 +274,6 @@ export function EditorSettingsDialog({
                 Keep the scale and north instruments visible on the canvas as a calm orientation aid.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Canvas HUD status</dt>
-                <dd>{isCanvasHudVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -341,12 +317,6 @@ export function EditorSettingsDialog({
                 Keep the overview map visible in the canvas corner for quick spatial navigation.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Mini-map status</dt>
-                <dd>{isMiniMapVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -390,12 +360,6 @@ export function EditorSettingsDialog({
                 Display room labels in the canvas for quick spatial identification.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Room names status</dt>
-                <dd>{areRoomNamesVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -439,12 +403,6 @@ export function EditorSettingsDialog({
                 Display furniture and fixtures on the canvas, or hide them for a clean floorplan view.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Assets status</dt>
-                <dd>{areAssetsVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -531,12 +489,6 @@ export function EditorSettingsDialog({
                 Show predictive muted guides from nearby room edges while moving, drawing, and resizing.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Guidelines status</dt>
-                <dd>{areGuidelinesVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -585,12 +537,6 @@ export function EditorSettingsDialog({
                 Magnetically snap active edits to the current grid and nearby predictive guides.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Snapping status</dt>
-                <dd>{isSnappingEnabled ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -634,12 +580,6 @@ export function EditorSettingsDialog({
                 Display a faint outline of the floor below when viewing a multi-floor layout.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Floor footprint status</dt>
-                <dd>{isFloorFootprintVisible ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -701,12 +641,6 @@ export function EditorSettingsDialog({
                 Choose between a spacious tree and a compact, higher-density layout.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Sidebar density</dt>
-                <dd>{isCompactSidebarDensity ? "Compact" : "Comfortable"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -760,12 +694,6 @@ export function EditorSettingsDialog({
                 snapping.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Keyboard shortcut feedback status</dt>
-                <dd>{keyboardShortcutFeedbackEnabled ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div
@@ -814,12 +742,6 @@ export function EditorSettingsDialog({
                 toolbar.
               </p>
             </div>
-            <dl className="shrink-0 self-start">
-              <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                <dt className="sr-only">Export signature status</dt>
-                <dd>{normalizedExportSignature ? "On" : "Off"}</dd>
-              </div>
-            </dl>
           </div>
 
           <div className="mt-3 space-y-2.5">

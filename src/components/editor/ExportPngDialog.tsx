@@ -510,13 +510,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Legend"
               description="Add a simple room list with names and areas beneath the plan."
-              value={
-                effectiveLegendPosition === "bottom"
-                  ? "Bottom"
-                  : effectiveLegendPosition === "right-side"
-                    ? "Right side"
-                    : "None"
-              }
             >
               <PositionChoice
                 ariaLabel="Legend position"
@@ -536,7 +529,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Scale bar"
               description="Add the current plan scale using the same measurement treatment as the canvas."
-              value={effectiveScaleBarPosition === "bottom-left" ? "Bottom-left" : "None"}
             >
               <PositionChoice
                 ariaLabel="Scale bar position"
@@ -555,7 +547,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Include north indicator"
               description="Include a traditional north arrow in the exported file without affecting the live editor."
-              value={includeNorthIndicator ? "On" : "Off"}
             >
               <BinaryChoice
                 ariaLabel="Include north indicator"
@@ -568,7 +559,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Show grid"
               description="Keep the calm layout grid in the exported image."
-              value={showGrid ? "On" : "Off"}
             >
               <BinaryChoice
                 ariaLabel="Show grid"
@@ -581,7 +571,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Show dimensions"
               description="Include room measurement text in the exported file without affecting the canvas."
-              value={showDimensions ? "On" : "Off"}
             >
               <BinaryChoice
                 ariaLabel="Show dimensions"
@@ -594,13 +583,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Include assets"
               description="Include furniture, stairs, and other interior objects in the exported file."
-              value={
-                exportAssetMode === "all"
-                  ? "All"
-                  : exportAssetMode === "stairs-only"
-                    ? "Stairs only"
-                    : "None"
-              }
             >
               <PositionChoice
                 ariaLabel="Included assets"
@@ -617,7 +599,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Appearance"
               description="Choose the appearance of the exported file."
-              value={theme === "system" ? "System" : theme === "light" ? "Light" : "Dark"}
             >
               <div
                 className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
@@ -802,11 +783,10 @@ export function ExportPngDialog({
 type ExportToggleCardProps = {
   title: string;
   description: string;
-  value: string;
   children: ReactNode;
 };
 
-function ExportToggleCard({ title, description, value, children }: ExportToggleCardProps) {
+function ExportToggleCard({ title, description, children }: ExportToggleCardProps) {
   return (
     <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -814,12 +794,6 @@ function ExportToggleCard({ title, description, value, children }: ExportToggleC
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <dl className="shrink-0 self-start">
-          <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            <dt className="sr-only">{title}</dt>
-            <dd>{value}</dd>
-          </div>
-        </dl>
       </div>
       {children}
     </div>
