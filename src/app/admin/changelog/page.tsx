@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.72.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a two-button camera fit group in the editor toolbar for fitting all rooms or the single selected room.</li>
+                <li>Added <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px]">F</kbd> for fit all and <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px]">Shift</kbd> + <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px]">F</kbd> for fit selected room.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Single-room fit reuses the existing smooth camera animation path with tighter padding for focused room editing.</li>
+                <li>The selected-room fit button now stays disabled with a clear tooltip until exactly one room is selected.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.71.16</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>
@@ -18,7 +43,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Admin login now creates a signed 24-hour admin session cookie instead of relying on Supabase's short-lived access token for every protected admin visit.</li>
+                <li>Admin login now creates a signed 24-hour admin session cookie instead of relying on Supabase&apos;s short-lived access token for every protected admin visit.</li>
               </ul>
             </div>
           </div>
