@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.71.0",
+    date: "2026-05-05",
+    title: "Editable SVG and PDF exports",
+    items: [
+      "Export plans as SVG for editable vector work in tools like Illustrator and Inkscape.",
+      "Create print-ready PDF exports for sharing with contractors, clients, and planning conversations.",
+      "Vector exports now include rooms, openings, furniture, labels, scale bar, legend, north arrow, title, description, and designed-by footer.",
+    ],
+  },
+  {
     version: "v0.70.0",
     date: "2026-05-01",
     title: "Hi-res exports for premium plans",

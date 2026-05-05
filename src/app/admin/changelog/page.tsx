@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>SVG export support using the current floor plan data model, including rooms, walls, openings, interior assets, room labels, asset labels, scale bar, legend, north arrow, title, description, and designed-by footer.</li>
+                <li>PDF export support through the SVG export path with export metadata for title, author, subject, and creator.</li>
+                <li>Export format preference covering Normal PNG, Hi-res PNG, SVG, and PDF, with format-aware filenames and preview labels.</li>
+                <li>Export asset inclusion preference for All, Stairs only, and None, wired into PNG, SVG, and PDF outputs.</li>
+                <li>Subscription gating for vector exports: SVG is available to Studio and Education; PDF is available to Pro, Studio, and Education.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>SVG furniture rendering now respects asset rotation and visual footprint for beds, sofas, wardrobes, tables, desks, bookshelves, bedside tables, and stairs.</li>
+                <li>SVG asset labels now render after all asset shapes so overlapping furniture does not hide label text.</li>
+                <li>SVG openings now use 90-degree door swing arcs with better exterior clearance so outward-swinging doors are not clipped.</li>
+                <li>SVG overlays now match PNG export placement more closely, including right/bottom legend positioning, top-right north arrow spacing, and bottom-right signature placement.</li>
+                <li>Export settings cards no longer show redundant top-right value pills when the selected value is already visible in the control below.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed SVG legend character encoding for bullet points and metric square symbols.</li>
+                <li>Fixed SVG designed-by footer output so custom studio names match PNG exports.</li>
+                <li>Removed unwanted SVG table crosshairs and extra internal bed guide lines.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.70.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-01</span>
           </div>
