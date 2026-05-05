@@ -802,10 +802,12 @@ export function HistoryControls({
         showScaleBar={exportPreferences.showScaleBar}
         showGrid={exportPreferences.showGrid}
         showDimensions={exportPreferences.showDimensions}
+        exportAssetMode={exportPreferences.exportAssetMode}
         theme={exportPreferences.theme}
         legendPosition={exportPreferences.legendPosition}
         scaleBarPosition={exportPreferences.scaleBarPosition}
         exportResolution={exportPreferences.exportResolution}
+        exportFormat={exportPreferences.exportFormat}
         onTitleChange={(value) => updateProjectExportConfig({ title: value })}
         onDescriptionChange={(value) => updateProjectExportConfig({ description: value })}
         onTitlePositionChange={(value) => updateProjectExportConfig({ titlePosition: value })}
@@ -819,10 +821,12 @@ export function HistoryControls({
         onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}
         onShowGridChange={(value) => updateExportPreferences({ showGrid: value })}
         onShowDimensionsChange={(value) => updateExportPreferences({ showDimensions: value })}
+        onExportAssetModeChange={(value) => updateExportPreferences({ exportAssetMode: value })}
         onThemeChange={(value) => updateExportPreferences({ theme: value })}
         onLegendPositionChange={(value) => updateExportPreferences({ legendPosition: value })}
         onScaleBarPositionChange={(value) => updateExportPreferences({ scaleBarPosition: value })}
         onExportResolutionChange={(value) => updateExportPreferences({ exportResolution: value })}
+        onExportFormatChange={(value) => updateExportPreferences({ exportFormat: value })}
         currentThemeLabel={currentThemeLabel}
         defaultDesignedBy={defaultDesignedBy}
       />

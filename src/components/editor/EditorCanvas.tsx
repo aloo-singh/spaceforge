@@ -67,7 +67,13 @@ import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
-import { exportPixiCanvasToPngBlob, exportPixiCanvasToPngDataUrl } from "@/lib/editor/exportPng";
+import {
+  buildEditorExportFilename,
+  exportPixiCanvasToPngBlob,
+  exportPixiCanvasToPngDataUrl,
+  exportSvgToPdfBlob,
+  exportToSVG,
+} from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
 import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
@@ -1426,6 +1432,7 @@ export default function EditorCanvas({
       paddingPx,
       showDimensions,
       showGrid,
+      exportAssetMode,
       showScaleBar,
       legendPosition,
       signatureText,
@@ -1441,6 +1448,7 @@ export default function EditorCanvas({
       paddingPx: number;
       showDimensions: boolean;
       showGrid: boolean;
+      exportAssetMode?: ExportPngRequest["exportAssetMode"];
       showScaleBar: boolean;
       legendPosition?: "bottom" | "right-side";
       signatureText?: string;
@@ -1455,6 +1463,16 @@ export default function EditorCanvas({
 
       const state = useEditorStore.getState();
       const exportTheme = getEditorCanvasTheme(themeMode);
+      const activeFloorRooms = getRoomsForActiveFloor(state.document);
+      const exportRooms = activeFloorRooms.map((room) => ({
+        ...room,
+        interiorAssets:
+          exportAssetMode === "none"
+            ? []
+            : exportAssetMode === "stairs-only"
+              ? room.interiorAssets.filter((asset) => asset.type === "stairs")
+              : room.interiorAssets,
+      }));
       const layoutBounds = getLayoutBoundsFromDocument(state.document);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
@@ -1486,7 +1504,7 @@ export default function EditorCanvas({
 
       drawRooms(
         exportRoomGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
@@ -1497,7 +1515,7 @@ export default function EditorCanvas({
       );
       drawOpenings(
         exportOpeningGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         [],
         exportCamera,
@@ -1508,7 +1526,7 @@ export default function EditorCanvas({
       );
       drawWallInteractionOverlay(
         exportWallOverlayGraphics,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         null,
         EMPTY_ROOM_RESIZE_UI,
@@ -1520,7 +1538,7 @@ export default function EditorCanvas({
       );
       drawRoomLabels(
         exportRoomLabels,
-        getRoomsForActiveFloor(state.document),
+        exportRooms,
         null,
         null,
         exportCamera,
@@ -1531,7 +1549,7 @@ export default function EditorCanvas({
         exportTheme,
         [],
         state.settings.showRoomNames,
-        state.settings.showAssets,
+        exportAssetMode !== "none",
         state.settings.showAssetLabels,
         { includeStairDirectionLabels: false }
       );
@@ -1651,6 +1669,7 @@ export default function EditorCanvas({
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
+      exportAssetMode: request.exportAssetMode,
       showScaleBar: shouldShowScaleBar,
       legendPosition: hasRightLegend ? "right-side" : hasBottomLegend ? "bottom" : undefined,
       titleText: exportTitle || undefined,
@@ -1666,9 +1685,90 @@ export default function EditorCanvas({
     if (isExportingPng) return;
 
     track(ANALYTICS_EVENTS.exportStarted, {
-      exportType: "png",
+      exportType: request.exportFormat === "pdf" ? "pdf" : request.exportFormat === "svg" ? "svg" : "png",
     });
     trackFirstAction(ANALYTICS_EVENTS.exportStarted);
+
+    if (request.exportFormat === "svg" || request.exportFormat === "pdf") {
+      setIsExportingPng(true);
+
+      try {
+        const state = useEditorStore.getState();
+        const exportTitle =
+          request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+        const exportDescription =
+          request.descriptionPosition === "below-title"
+            ? normalizeExportMultilineText(request.description)
+            : "";
+        const activeFloorName =
+          state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
+          "Floor 1";
+        const activeFloorRooms = getRoomsForActiveFloor(state.document);
+        const exportSignatureText = normalizeEditorExportSignature(
+          request.designedBy || state.settings.exportSignatureText
+        );
+        const exportSignatureLines = exportSignatureText
+          ? [`Designed by ${exportSignatureText}`, "Designed with [s]paceforge", "spaceforge.app"]
+          : ["Designed with [s]paceforge", "spaceforge.app"];
+        const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
+        const exportLegendItems =
+          effectiveLegendPosition !== "none"
+            ? activeFloorRooms.map((room, index) => ({
+                name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
+                area: formatMetricRoomAreaForRoom(room),
+              }))
+            : undefined;
+        const filename = buildEditorExportFilename({
+          projectName: exportTitle,
+          floorName: activeFloorName,
+          format: request.exportFormat,
+        });
+        const svg = exportToSVG({
+          rooms: activeFloorRooms,
+          title: exportTitle || undefined,
+          description: exportDescription || undefined,
+          exportAssetMode: request.exportAssetMode,
+          northBearingDegrees: request.includeNorthIndicator
+            ? state.document.northBearingDegrees
+            : undefined,
+          legendItems: exportLegendItems,
+          legendPosition:
+            effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
+              ? effectiveLegendPosition
+              : undefined,
+          signatureText: exportSignatureText || undefined,
+          signatureLines: exportSignatureLines,
+        });
+        const blob =
+          request.exportFormat === "pdf"
+            ? await exportSvgToPdfBlob(svg, {
+                title: exportTitle || "spaceforge export",
+                author: "[s]paceforge",
+                subject: "Floor plan export",
+                creator: "spaceforge.app",
+              })
+            : new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        link.click();
+        track(ANALYTICS_EVENTS.exportCompleted, {
+          exportType: request.exportFormat,
+        });
+        trackFirstSuccess(ANALYTICS_EVENTS.exportCompleted);
+        if (activeHintIdRef.current === "export-as-png") {
+          completeHint("export-as-png");
+        }
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      } catch (error) {
+        console.error(`${request.exportFormat.toUpperCase()} export failed.`, error);
+      } finally {
+        setIsExportingPng(false);
+      }
+
+      return;
+    }
 
     const exportSnapshot = createPngExportSnapshotFromRequest(request);
     if (!exportSnapshot) {
@@ -1682,11 +1782,20 @@ export default function EditorCanvas({
         renderer: exportSnapshot.renderer,
         stage: exportSnapshot.stage,
       }, exportSnapshot.options);
+      const state = useEditorStore.getState();
+      const exportTitle =
+        request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+      const activeFloorName =
+        state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
+        "Floor 1";
       const downloadUrl = URL.createObjectURL(blob);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `spaceforge-editor-${timestamp}.png`;
+      link.download = buildEditorExportFilename({
+        projectName: exportTitle,
+        floorName: activeFloorName,
+        format: request.exportFormat,
+      });
       link.click();
       track(ANALYTICS_EVENTS.exportCompleted, {
         exportType: "png",
@@ -1728,6 +1837,7 @@ export default function EditorCanvas({
       paddingPx: 24,
       showDimensions: false,
       showGrid: false,
+      exportAssetMode: "all",
       showScaleBar: false,
       themeMode: editorThemeMode,
     });

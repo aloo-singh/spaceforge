@@ -14,6 +14,8 @@ import type {
   EditorExportLegendPosition,
   EditorExportScaleBarPosition,
   EditorExportResolution,
+  EditorExportFormat,
+  EditorExportAssetMode,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -21,7 +23,7 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
-import type { SubscriptionTier } from "@/lib/subscription/tiers";
+import { buildEditorExportFilename } from "@/lib/editor/exportPng";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +42,10 @@ export type ExportPngRequest = {
   designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
+  exportAssetMode: EditorExportAssetMode;
   theme: ExportPngThemeOption;
   exportResolution: EditorExportResolution;
+  exportFormat: EditorExportFormat;
 };
 
 type ExportPngDialogProps = {
@@ -61,10 +65,12 @@ type ExportPngDialogProps = {
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
+  exportAssetMode: EditorExportAssetMode;
   theme: ExportPngThemeOption;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
   exportResolution: EditorExportResolution;
+  exportFormat: EditorExportFormat;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
@@ -74,10 +80,12 @@ type ExportPngDialogProps = {
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
   onShowDimensionsChange: (value: boolean) => void;
+  onExportAssetModeChange: (value: EditorExportAssetMode) => void;
   onThemeChange: (value: ExportPngThemeOption) => void;
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
   onExportResolutionChange: (value: EditorExportResolution) => void;
+  onExportFormatChange: (value: EditorExportFormat) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -99,10 +107,12 @@ export function ExportPngDialog({
   showScaleBar,
   showGrid,
   showDimensions,
+  exportAssetMode,
   theme,
   legendPosition,
   scaleBarPosition,
   exportResolution,
+  exportFormat,
   onTitleChange,
   onDescriptionChange,
   onTitlePositionChange,
@@ -112,11 +122,12 @@ export function ExportPngDialog({
   onShowScaleBarChange,
   onShowGridChange,
   onShowDimensionsChange,
+  onExportAssetModeChange,
   onThemeChange,
   onLegendPositionChange,
   onScaleBarPositionChange,
   onExportResolutionChange,
-  currentThemeLabel,
+  onExportFormatChange,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
@@ -125,17 +136,32 @@ export function ExportPngDialog({
   const [isPreviewRefreshing, setIsPreviewRefreshing] = useState(false);
   const [isPreviewRefreshVisible, setIsPreviewRefreshVisible] = useState(false);
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
+  const [showSvgUpsellDialog, setShowSvgUpsellDialog] = useState(false);
+  const [showPdfUpsellDialog, setShowPdfUpsellDialog] = useState(false);
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
   const isDevSubscriptionModeEnabled = useEditorStore((state) => state.isDevSubscriptionModeEnabled);
+  const activeFloorName = useEditorStore((state) => {
+    const activeFloor = state.document.floors.find((floor) => floor.id === state.document.activeFloorId);
+    return activeFloor?.name ?? "Floor 1";
+  });
 
   const isExportButtonDisabled = exportDisabled || isExporting;
   const effectiveLegendPosition: EditorExportLegendPosition =
     showLegend && legendPosition !== "none" ? legendPosition : "none";
   const effectiveScaleBarPosition: EditorExportScaleBarPosition =
     showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
+  const canExportSvg = devSubscriptionTier === "Studio" || devSubscriptionTier === "Education";
+  const canExportPdf = devSubscriptionTier !== "Free";
+  const previewFilename = buildEditorExportFilename({
+    projectName: title,
+    floorName: activeFloorName,
+    format: exportFormat,
+  });
+  const exportFormatLabel =
+    exportFormat === "svg" ? "SVG" : exportFormat === "pdf" ? "PDF" : "PNG";
 
   useEffect(() => {
     if (!open || !onPreviewRequest) return;
@@ -163,8 +189,10 @@ export function ExportPngDialog({
         designedBy,
         showGrid,
         showDimensions,
+        exportAssetMode,
         theme,
         exportResolution,
+        exportFormat,
       })
         .then((nextPreviewSrc) => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -174,7 +202,7 @@ export function ExportPngDialog({
         })
         .catch((error) => {
           if (previewRequestIdRef.current !== requestId) return;
-          console.error("PNG preview render failed.", error);
+          console.error("Export preview render failed.", error);
         })
         .finally(() => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -205,8 +233,10 @@ export function ExportPngDialog({
     designedBy,
     showGrid,
     showDimensions,
+    exportAssetMode,
     theme,
     exportResolution,
+    exportFormat,
   ]);
 
   const handleExport = () => {
@@ -226,8 +256,10 @@ export function ExportPngDialog({
       designedBy,
       showGrid,
       showDimensions,
+      exportAssetMode,
       theme,
       exportResolution,
+      exportFormat,
     });
   };
 
@@ -244,8 +276,8 @@ export function ExportPngDialog({
       <ResponsiveDialog
         open={open}
         onOpenChange={handleOpenChange}
-        title="Export PNG"
-        description="Adjust a few export details without changing the live editor."
+        title="Export plan"
+        description="Choose a format and adjust export details without changing the live editor."
         className="sm:h-[min(100vh-2rem,48rem)] sm:w-[min(100%,72rem)] sm:max-w-[72rem] sm:p-3.5"
         contentClassName="min-h-0 pr-0 overflow-y-auto lg:overflow-hidden"
         footerClassName="px-0"
@@ -255,33 +287,67 @@ export function ExportPngDialog({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div
             className="grid w-full gap-1 rounded-lg border border-border/70 bg-background/90 p-1 sm:w-auto"
-            style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+            style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
             role="group"
-            aria-label="Export resolution"
+            aria-label="Export format"
           >
             <Button
               type="button"
               size="sm"
-              variant={exportResolution === "normal" ? "secondary" : "ghost"}
-              aria-pressed={exportResolution === "normal"}
-              onClick={() => onExportResolutionChange("normal")}
+              variant={exportFormat === "png-normal" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "png-normal"}
+              onClick={() => {
+                onExportFormatChange("png-normal");
+                onExportResolutionChange("normal");
+              }}
             >
-              Normal
+              PNG (Normal)
             </Button>
             <Button
               type="button"
               size="sm"
-              variant={exportResolution === "hi-res" ? "secondary" : "ghost"}
-              aria-pressed={exportResolution === "hi-res"}
+              variant={exportFormat === "png-hi-res" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "png-hi-res"}
               onClick={() => {
                 if (devSubscriptionTier === "Free") {
                   setShowHiResUpsellDialog(true);
                 } else {
+                  onExportFormatChange("png-hi-res");
                   onExportResolutionChange("hi-res");
                 }
               }}
             >
-              Hi-res
+              PNG (Hi-res)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportFormat === "svg" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "svg"}
+              onClick={() => {
+                if (canExportSvg) {
+                  onExportFormatChange("svg");
+                } else {
+                  setShowSvgUpsellDialog(true);
+                }
+              }}
+            >
+              SVG
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={exportFormat === "pdf" ? "secondary" : "ghost"}
+              aria-pressed={exportFormat === "pdf"}
+              onClick={() => {
+                if (canExportPdf) {
+                  onExportFormatChange("pdf");
+                } else {
+                  setShowPdfUpsellDialog(true);
+                }
+              }}
+            >
+              PDF
             </Button>
           </div>
           <Button
@@ -292,7 +358,7 @@ export function ExportPngDialog({
             className="w-full sm:w-auto"
           >
             <Download />
-            {isExporting ? "Exporting..." : "Export PNG"}
+            {isExporting ? `Exporting ${exportFormatLabel}...` : `Export ${exportFormatLabel}`}
           </Button>
         </div>
       }
@@ -301,10 +367,17 @@ export function ExportPngDialog({
         <section className="min-h-0 lg:h-full">
           <div className="flex h-full min-h-[15.5rem] flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/25">
             <div className="border-b border-border/60 px-4 py-3">
-              <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Updates automatically as export settings change.
-              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-medium tracking-[-0.01em] text-foreground">Live preview</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    Updates automatically as export settings change.
+                  </p>
+                </div>
+                <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 font-measurement text-[11px] text-muted-foreground">
+                  {previewFilename}
+                </div>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4 lg:p-4">
               <div className="relative flex h-full max-h-full min-h-[16.5rem] w-full items-center justify-center overflow-hidden rounded-[1rem] border border-border/70 bg-background/95 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[18rem] sm:p-4">
@@ -312,7 +385,7 @@ export function ExportPngDialog({
                   <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[0.875rem] border border-border/60 bg-background/80">
                     <Image
                       src={previewSrc}
-                      alt="Live PNG export preview"
+                      alt="Live export preview"
                       width={previewDimensions.width}
                       height={previewDimensions.height}
                       unoptimized
@@ -437,13 +510,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Legend"
               description="Add a simple room list with names and areas beneath the plan."
-              value={
-                effectiveLegendPosition === "bottom"
-                  ? "Bottom"
-                  : effectiveLegendPosition === "right-side"
-                    ? "Right side"
-                    : "None"
-              }
             >
               <PositionChoice
                 ariaLabel="Legend position"
@@ -463,7 +529,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Scale bar"
               description="Add the current plan scale using the same measurement treatment as the canvas."
-              value={effectiveScaleBarPosition === "bottom-left" ? "Bottom-left" : "None"}
             >
               <PositionChoice
                 ariaLabel="Scale bar position"
@@ -481,8 +546,7 @@ export function ExportPngDialog({
 
             <ExportToggleCard
               title="Include north indicator"
-              description="Include a traditional north arrow in the exported PNG without affecting the live editor."
-              value={includeNorthIndicator ? "On" : "Off"}
+              description="Include a traditional north arrow in the exported file without affecting the live editor."
             >
               <BinaryChoice
                 ariaLabel="Include north indicator"
@@ -495,7 +559,6 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Show grid"
               description="Keep the calm layout grid in the exported image."
-              value={showGrid ? "On" : "Off"}
             >
               <BinaryChoice
                 ariaLabel="Show grid"
@@ -507,8 +570,7 @@ export function ExportPngDialog({
 
             <ExportToggleCard
               title="Show dimensions"
-              description="Include room measurement text in the PNG without affecting the canvas."
-              value={showDimensions ? "On" : "Off"}
+              description="Include room measurement text in the exported file without affecting the canvas."
             >
               <BinaryChoice
                 ariaLabel="Show dimensions"
@@ -519,9 +581,24 @@ export function ExportPngDialog({
             </ExportToggleCard>
 
             <ExportToggleCard
+              title="Include assets"
+              description="Include furniture, stairs, and other interior objects in the exported file."
+            >
+              <PositionChoice
+                ariaLabel="Included assets"
+                value={exportAssetMode}
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Stairs only", value: "stairs-only" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={onExportAssetModeChange}
+              />
+            </ExportToggleCard>
+
+            <ExportToggleCard
               title="Appearance"
               description="Choose the appearance of the exported file."
-              value={theme === "system" ? "System" : theme === "light" ? "Light" : "Dark"}
             >
               <div
                 className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
@@ -589,6 +666,7 @@ export function ExportPngDialog({
               if (isDevSubscriptionModeEnabled) {
                 setDevSubscriptionTier("Pro");
                 setShowHiResUpsellDialog(false);
+                onExportFormatChange("png-hi-res");
                 onExportResolutionChange("hi-res");
               } else {
                 window.open("/upgrade", "_blank");
@@ -612,6 +690,92 @@ export function ExportPngDialog({
         </p>
       </div>
     </ResponsiveAlertDialog>
+
+    <ResponsiveAlertDialog
+      open={showSvgUpsellDialog}
+      onOpenChange={setShowSvgUpsellDialog}
+      title="SVG export for Studio plans"
+      description="Keep your plan sharp, flexible, and ready for the next design step."
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowSvgUpsellDialog(false)}
+            className="w-full sm:w-auto"
+          >
+            Stay with PNG
+          </Button>
+          <Button
+            onClick={() => {
+              if (isDevSubscriptionModeEnabled) {
+                setDevSubscriptionTier("Studio");
+                setShowSvgUpsellDialog(false);
+                onExportFormatChange("svg");
+              } else {
+                window.open("/upgrade", "_blank");
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            Upgrade to Studio
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 py-4">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>SVG gives you a professional editable vector file</strong> instead of a flattened image.
+          </p>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Open it in Illustrator, Inkscape, Figma, or other vector tools for further editing, annotation, and client-ready refinement.
+        </p>
+      </div>
+    </ResponsiveAlertDialog>
+
+    <ResponsiveAlertDialog
+      open={showPdfUpsellDialog}
+      onOpenChange={setShowPdfUpsellDialog}
+      title="PDF export for Pro plans"
+      description="Turn a working sketch into something you can confidently send on."
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowPdfUpsellDialog(false)}
+            className="w-full sm:w-auto"
+          >
+            Stay with PNG
+          </Button>
+          <Button
+            onClick={() => {
+              if (isDevSubscriptionModeEnabled) {
+                setDevSubscriptionTier("Pro");
+                setShowPdfUpsellDialog(false);
+                onExportFormatChange("pdf");
+              } else {
+                window.open("/upgrade", "_blank");
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            Upgrade to Pro
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 py-4">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>PDF gives you a print-ready formal deliverable</strong> for the moments that need a proper document.
+          </p>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Share clean plans with contractors, clients, estate agents, or planning permission workflows without asking anyone to open the editor.
+        </p>
+      </div>
+    </ResponsiveAlertDialog>
     </>
   );
 }
@@ -619,11 +783,10 @@ export function ExportPngDialog({
 type ExportToggleCardProps = {
   title: string;
   description: string;
-  value: string;
   children: ReactNode;
 };
 
-function ExportToggleCard({ title, description, value, children }: ExportToggleCardProps) {
+function ExportToggleCard({ title, description, children }: ExportToggleCardProps) {
   return (
     <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -631,12 +794,6 @@ function ExportToggleCard({ title, description, value, children }: ExportToggleC
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <dl className="shrink-0 self-start">
-          <div className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            <dt className="sr-only">{title}</dt>
-            <dd>{value}</dd>
-          </div>
-        </dl>
       </div>
       {children}
     </div>
