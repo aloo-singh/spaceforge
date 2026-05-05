@@ -185,21 +185,32 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
     `<title id="title">${svgTitle}</title>`,
     `<rect width="100%" height="100%" fill="#ffffff" />`,
   ];
+  const roomElements: string[] = [];
+  const assetElements: string[] = [];
+  const openingElements: string[] = [];
+  const labelElements: string[] = [];
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
 
     const polygonPoints = room.points.map(pointToString).join(" ");
-    elements.push(
+    roomElements.push(
       `<polygon points="${polygonPoints}" fill="${SVG_ROOM_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
     );
 
     for (let index = 0; index < room.points.length; index += 1) {
       const start = projectPoint(room.points[index]);
       const end = projectPoint(room.points[(index + 1) % room.points.length]);
-      elements.push(
+      roomElements.push(
         `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`
       );
+    }
+
+    if (exportAssetMode !== "none") {
+      for (const asset of room.interiorAssets) {
+        if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
+        assetElements.push(...buildSvgInteriorAssetElements(asset, projectPoint, formatNumber));
+      }
     }
 
     for (const opening of room.openings) {
@@ -228,12 +239,12 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
       };
       const markerOffset = opening.type === "window" ? 4 : 10;
 
-      elements.push(
+      openingElements.push(
         `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />`
       );
 
       if (opening.type === "window") {
-        elements.push(
+        openingElements.push(
           `<line x1="${formatNumber(start.x + interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y + interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x + interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y + interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
           `<line x1="${formatNumber(start.x - interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y - interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x - interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y - interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
         );
@@ -257,7 +268,7 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
           y: hinge.y + swingNormal.y * radius,
         };
         const sweepFlag = hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x > 0 ? 1 : 0;
-        elements.push(
+        openingElements.push(
           `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(openLeafEnd.x)}" y2="${formatNumber(openLeafEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
           `<path d="M ${formatNumber(closedEnd.x)} ${formatNumber(closedEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 ${sweepFlag} ${formatNumber(openLeafEnd.x)} ${formatNumber(openLeafEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
         );
@@ -267,18 +278,13 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
     const labelAnchor = getPolygonLabelAnchor(room.points);
     if (labelAnchor) {
       const labelPoint = projectPoint(labelAnchor);
-      elements.push(
+      labelElements.push(
         `<text x="${formatNumber(labelPoint.x)}" y="${formatNumber(labelPoint.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${normalizeSvgText(room.name || "Room")}</text>`
       );
     }
-
-    if (exportAssetMode !== "none") {
-      for (const asset of room.interiorAssets) {
-        if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
-        elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, formatNumber));
-      }
-    }
   }
+
+  elements.push(...roomElements, ...assetElements, ...openingElements, ...labelElements);
 
   const scaleBar = buildSvgScaleBar(scale, exportHeight, formatNumber);
   if (scaleBar) {
