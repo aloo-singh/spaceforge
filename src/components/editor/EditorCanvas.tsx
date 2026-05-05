@@ -280,7 +280,6 @@ const OPENING_CUTOUT_WORLD_MM = 64;
 const OPENING_SYMBOL_WORLD_MM = 18;
 const WINDOW_LINE_INSET_WORLD_MM = 44;
 const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
-const OPENING_SELECTION_HALO_WORLD_MM = 120;
 const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
@@ -4430,23 +4429,7 @@ function drawRoomOpenings(
     const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
     const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
-    const selectionHaloStrokePx = Math.max(
-      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
-      selectionStrokePx + 2
-    );
     const selectionColor = theme.wallSelectionAccent;
-
-    if (isSelected) {
-      graphics.setStrokeStyle({
-        width: selectionHaloStrokePx,
-        color: selectionColor,
-        alpha: 0.18,
-        cap: "round",
-      });
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
-    }
 
     graphics.setStrokeStyle({
       width: cutoutStrokePx,
