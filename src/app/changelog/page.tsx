@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.71.17",
+    date: "2026-05-06",
+    title: "Focus the canvas on one room",
+    items: [
+      "The toolbar now has separate controls for fitting every room or just the selected room into view.",
+      "Press F to fit the full plan, or Shift+F to zoom neatly to a single selected room.",
+      "The selected-room fit keeps the same smooth camera movement while using tighter framing for focused layout work.",
+    ],
+  },
+  {
     version: "v0.71.15",
     date: "2026-05-06",
     title: "Smoother editing for openings, stairs, and selections",
