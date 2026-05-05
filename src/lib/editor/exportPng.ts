@@ -508,13 +508,13 @@ function buildSvgInteriorAssetElements(
     }
   }
 
-  elements.push("</g>");
-
   if (asset.type !== "stairs") {
     elements.push(
-      `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y + halfDepthPx + 16)}" text-anchor="middle" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="500">${label}</text>`
+      `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="500">${label}</text>`
     );
   }
+
+  elements.push("</g>");
 
   return elements;
 }
