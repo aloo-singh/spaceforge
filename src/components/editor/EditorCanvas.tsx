@@ -1517,6 +1517,7 @@ export default function EditorCanvas({
         exportRoomGraphics,
         exportRooms,
         null,
+        [],
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
         exportCamera,
@@ -1539,6 +1540,7 @@ export default function EditorCanvas({
         exportWallOverlayGraphics,
         exportRooms,
         null,
+        [],
         null,
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
@@ -3768,6 +3770,7 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
+    state.selection,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -3805,6 +3808,7 @@ function drawScene(
     wallOverlayGraphics,
     renderedRooms,
     state.selectedWall,
+    state.selection,
     hoveredSelectableWall,
     roomResizeUi,
     state.roomDraft.points.length > 0,
@@ -3962,6 +3966,7 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
+  selection: SharedSelectionItem[],
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -3982,6 +3987,7 @@ function drawRooms(
   assetDragTargetRoomId: string | null = null
 ) {
   graphics.clear();
+  const selectedRoomCount = selection.filter((item) => item.type === "room").length;
   const transformSettlingProgress =
     transformFeedback?.phase === "settling"
       ? getTransformSettlingProgress(transformFeedback, performance.now())
@@ -4016,7 +4022,7 @@ function drawRooms(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
-    const isSelected = room.id === selectedRoomId;
+    const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
@@ -4061,7 +4067,12 @@ function drawRooms(
       );
     }
 
-    if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
+    if (
+      !isSelected ||
+      selectedRoomCount > 1 ||
+      isDraftingRoom ||
+      isActiveTransformRoom
+    ) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
     const { vertexHandles, wallSegmentHandles } = getCachedRoomSelectionHandles(
@@ -4203,6 +4214,22 @@ function drawRooms(
   }
 }
 
+function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {
+  return selection.some((item) => item.type === "room" && item.id === roomId);
+}
+
+function isWallSelected(selection: SharedSelectionItem[], roomId: string, wall: RoomWall) {
+  return selection.some(
+    (item) => item.type === "wall" && item.roomId === roomId && item.wall === wall
+  );
+}
+
+function isOpeningSelected(selection: SharedSelectionItem[], roomId: string, openingId: string) {
+  return selection.some(
+    (item) => item.type === "opening" && item.roomId === roomId && item.openingId === openingId
+  );
+}
+
 function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
@@ -4221,7 +4248,7 @@ function drawOpenings(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
-    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
+    drawRoomOpenings(graphics, room, selectedOpening, selection, camera, viewport, theme);
     drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations, showAssets);
   }
 }
@@ -4230,6 +4257,7 @@ function drawWallInteractionOverlay(
   graphics: Graphics,
   rooms: Room[],
   selectedWall: RoomWallSelection | null,
+  selection: SharedSelectionItem[],
   hoveredSelectableWall: {
     roomId: string;
     wall: RoomWall;
@@ -4279,18 +4307,26 @@ function drawWallInteractionOverlay(
 
   const isSelectedWallAlsoHovered =
     hoveredWall !== null &&
-    selectedWall?.roomId === hoveredRoomId &&
-    selectedWall.wall === hoveredWall;
+    (selectedWall?.roomId === hoveredRoomId && selectedWall.wall === hoveredWall ||
+      (hoveredRoomId !== null && isWallSelected(selection, hoveredRoomId, hoveredWall)));
 
   if (hoveredRoom && hoveredWall !== null && !isSelectedWallAlsoHovered) {
     drawHoveredWallHighlight(graphics, hoveredRoom, hoveredWall, camera, viewport, theme);
   }
 
-  if (!selectedWall) return;
-  const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
-  if (!selectedRoom) return;
-  if (transformFeedback?.roomId === selectedRoom.id) return;
-  drawSelectedWallHighlight(graphics, selectedRoom, selectedWall.wall, camera, viewport, theme);
+  const selectedWalls = selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "wall" }> => item.type === "wall"
+  );
+  if (selectedWall && !isWallSelected(selectedWalls, selectedWall.roomId, selectedWall.wall)) {
+    selectedWalls.push({ type: "wall", roomId: selectedWall.roomId, wall: selectedWall.wall });
+  }
+
+  for (const wallSelection of selectedWalls) {
+    const selectedRoom = rooms.find((room) => room.id === wallSelection.roomId);
+    if (!selectedRoom) continue;
+    if (transformFeedback?.roomId === selectedRoom.id) continue;
+    drawSelectedWallHighlight(graphics, selectedRoom, wallSelection.wall, camera, viewport, theme);
+  }
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
@@ -4423,10 +4459,12 @@ function drawRoomOpenings(
   graphics: Graphics,
   room: Room,
   selectedOpening: RoomOpeningSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
+  const selectedOpeningCount = selection.filter((item) => item.type === "opening").length;
   for (const opening of room.openings) {
     const layout = getResolvedRoomOpeningLayout(room, opening);
     if (!layout) continue;
@@ -4455,7 +4493,8 @@ function drawRoomOpenings(
     };
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
     const isSelected =
-      selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id;
+      (selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id) ||
+      isOpeningSelected(selection, room.id, opening.id);
     const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
     const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
@@ -4563,7 +4602,7 @@ function drawRoomOpenings(
       }
     }
 
-    if (!isSelected) continue;
+    if (!isSelected || selectedOpeningCount > 1) continue;
 
     drawOpeningWidthHandle(graphics, start, selectionColor, theme);
     drawOpeningWidthHandle(graphics, end, selectionColor, theme);
@@ -5410,7 +5449,7 @@ function drawRoomLabels(
     const areaCenterY =
       layout.areaCenterY === null ? null : snapToPixel(layout.areaCenterY, textResolution);
 
-    const isSelected = selectedRoomId === room.id;
+    const isSelected = selectedRoomId === room.id || isRoomSelected(selection, room.id);
     const isHovered = hoveredRoomLabelId === room.id;
     const isActiveResizeRoom =
       transformFeedback?.roomId === room.id &&
