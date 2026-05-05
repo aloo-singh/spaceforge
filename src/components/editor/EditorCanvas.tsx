@@ -2027,8 +2027,12 @@ export default function EditorCanvas({
         "toggle-guidelines",
         "toggle-canvas-hud",
         "toggle-snapping",
+        "fit-selected-room",
+        "fit-all-rooms",
       ]);
       if (!shortcut) return;
+
+      event.preventDefault();
 
       if (shortcut.id === "toggle-guidelines") {
         const nextShowGuidelines = !store.settings.showGuidelines;
@@ -2056,6 +2060,27 @@ export default function EditorCanvas({
         showKeyboardShortcutFeedback(shortcut.id, {
           feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
           context: { isEnabled: nextSnappingEnabled },
+        });
+        return;
+      }
+
+      if (shortcut.id === "fit-selected-room") {
+        const selectedRoomItems = store.selection.filter((item) => item.type === "room");
+        if (store.selection.length !== 1 || selectedRoomItems.length !== 1) return;
+
+        store.fitCameraToSelectedRoom();
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+        });
+        return;
+      }
+
+      if (shortcut.id === "fit-all-rooms") {
+        if (store.document.rooms.length === 0) return;
+
+        store.resetCamera();
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
         });
       }
     };

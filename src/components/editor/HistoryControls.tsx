@@ -8,6 +8,7 @@ import {
   Construction,
   DoorOpen,
   Download,
+  Focus,
   LocateFixed,
   Redo2,
   Restore,
@@ -134,6 +135,10 @@ export function HistoryControls({
   const redoHistory = useEditorStore((state) => state.history.future);
   const hasRooms = useEditorStore((state) => state.document.rooms.length > 0);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const selectedRoomCount = useEditorStore(
+    (state) => state.selection.filter((item) => item.type === "room").length
+  );
+  const selectionCount = useEditorStore((state) => state.selection.length);
   const selectedRoom = useEditorStore((state) =>
     state.selectedRoomId
       ? state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null
@@ -149,6 +154,7 @@ export function HistoryControls({
   const redoBatch = useEditorStore((state) => state.redoBatch);
   const keyboardShortcutFeedbackEnabled = useEditorStore((state) => state.keyboardShortcutFeedbackEnabled);
   const resetCamera = useEditorStore((state) => state.resetCamera);
+  const fitCameraToSelectedRoom = useEditorStore((state) => state.fitCameraToSelectedRoom);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const insertDefaultDoorOnSelectedWall = useEditorStore(
     (state) => state.insertDefaultDoorOnSelectedWall
@@ -163,6 +169,8 @@ export function HistoryControls({
     (state) => state.placeAssetInSelectedRoom
   );
   const isResetCameraDisabled = !hasHydrated || !hasRooms;
+  const canFitSelectedRoom = hasHydrated && selectionCount === 1 && selectedRoomCount === 1;
+  const isFitSelectedRoomDisabled = !canFitSelectedRoom;
   const isResetDisabled = !hasHydrated || isCanvasEmpty;
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
@@ -196,6 +204,8 @@ export function HistoryControls({
       : "Fit view unavailable";
   const undoShortcut = isMacPlatform ? ["⌘", "Z"] : ["Ctrl", "Z"];
   const redoShortcut = isMacPlatform ? ["⇧", "⌘", "Z"] : ["Ctrl", "Y"];
+  const fitAllShortcut = ["F"];
+  const fitSelectedShortcut = ["Shift", "F"];
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -470,19 +480,62 @@ export function HistoryControls({
                   <Settings2 />
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content={resetCameraTitle}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={resetCamera}
-                  disabled={isResetCameraDisabled}
-                  aria-label={resetCameraAriaLabel}
-                  className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+              <ButtonGroup>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isResetCameraDisabled ? (
+                      resetCameraTitle
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>{resetCameraTitle}</span>
+                        <ShortcutKbdGroup keys={fitAllShortcut} />
+                      </span>
+                    )
+                  }
                 >
-                  <LocateFixed />
-                </Button>
-              </EditorChromeTooltip>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={resetCamera}
+                    disabled={isResetCameraDisabled}
+                    aria-label={resetCameraAriaLabel}
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <LocateFixed />
+                  </Button>
+                </EditorChromeTooltip>
+                <EditorChromeTooltip
+                  groupItem
+                  content={
+                    isFitSelectedRoomDisabled ? (
+                      "Select a single room first"
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span>Fit selected room into view</span>
+                        <ShortcutKbdGroup keys={fitSelectedShortcut} />
+                      </span>
+                    )
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={fitCameraToSelectedRoom}
+                    disabled={isFitSelectedRoomDisabled}
+                    aria-label={
+                      isFitSelectedRoomDisabled
+                        ? "Fit selected room unavailable"
+                        : "Fit selected room into view"
+                    }
+                    className="size-9 sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  >
+                    <Focus />
+                  </Button>
+                </EditorChromeTooltip>
+              </ButtonGroup>
               <EditorChromeTooltip
                 content={isExportButtonDisabled ? exportButtonTitle ?? "Export PNG unavailable" : "Export PNG"}
               >

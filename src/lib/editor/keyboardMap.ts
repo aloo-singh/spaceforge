@@ -6,6 +6,8 @@ export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
   | "toggle-guidelines"
   | "toggle-snapping"
+  | "fit-all-rooms"
+  | "fit-selected-room"
   | "multi-select-toggle"
   | "undo"
   | "redo"
@@ -81,6 +83,28 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "toggle",
     bindings: [{ key: "s", code: "KeyS" }],
     sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
+  },
+  {
+    id: "fit-all-rooms",
+    section: "View",
+    keyCombination: "F",
+    description: "Fit all rooms into view",
+    macKeys: "F",
+    windowsKeys: "F",
+    type: "action",
+    bindings: [{ key: "f", code: "KeyF", altKey: false, shiftKey: false }],
+    sonnerMessage: "Fit all rooms",
+  },
+  {
+    id: "fit-selected-room",
+    section: "View",
+    keyCombination: "Shift+F",
+    description: "Fit the selected room into view",
+    macKeys: "Shift+F",
+    windowsKeys: "Shift+F",
+    type: "action",
+    bindings: [{ key: "f", code: "KeyF", altKey: false, shiftKey: true }],
+    sonnerMessage: "Fit selected room",
   },
   {
     id: "multi-select-toggle",

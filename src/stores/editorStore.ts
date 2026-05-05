@@ -395,6 +395,7 @@ type EditorState = {
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   resetCamera: () => void;
+  fitCameraToSelectedRoom: () => void;
   resetCanvas: () => void;
   undo: () => void;
   redo: () => void;
@@ -2081,6 +2082,56 @@ function hasActiveResetCameraAnimationTarget(targetCamera: CameraState): boolean
     activeResetCameraAnimation !== null &&
     areCamerasEqual(activeResetCameraAnimation.targetCamera, targetCamera)
   );
+}
+
+function animateCameraToTarget(
+  startCamera: CameraState,
+  targetCamera: CameraState,
+  setCamera: (camera: CameraState) => void
+) {
+  if (areCamerasEqual(startCamera, targetCamera)) return;
+  if (hasActiveResetCameraAnimationTarget(targetCamera)) return;
+
+  stopResetCameraAnimation();
+
+  if (typeof window === "undefined") {
+    setCamera(targetCamera);
+    return;
+  }
+
+  const startTime = window.performance.now();
+  const sequence = nextResetCameraAnimationSequence;
+
+  const step = (now: number) => {
+    if (activeResetCameraAnimation?.sequence !== sequence) return;
+
+    const elapsedMs = now - startTime;
+    const progress = Math.min(1, elapsedMs / RESET_CAMERA_TRANSITION_DURATION_MS);
+    const easedProgress = easeResetCameraTransition(progress);
+    const nextCamera =
+      progress >= 1
+        ? targetCamera
+        : interpolateCamera(startCamera, targetCamera, easedProgress);
+
+    setCamera(nextCamera);
+
+    if (progress >= 1) {
+      activeResetCameraAnimation = null;
+      return;
+    }
+
+    activeResetCameraAnimation = {
+      frameId: window.requestAnimationFrame(step),
+      sequence,
+      targetCamera,
+    };
+  };
+
+  activeResetCameraAnimation = {
+    frameId: window.requestAnimationFrame(step),
+    sequence,
+    targetCamera,
+  };
 }
 
 function getEffectiveSnapStepMm(
@@ -5667,50 +5718,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       paddingPx,
     }).camera;
 
-    if (areCamerasEqual(state.camera, targetCamera)) return;
-    if (hasActiveResetCameraAnimationTarget(targetCamera)) return;
+    animateCameraToTarget(state.camera, targetCamera, (camera) => set({ camera }));
+  },
+  fitCameraToSelectedRoom: () => {
+    const state = get();
+    const selectedRoomItems = state.selection.filter((item) => item.type === "room");
+    if (state.selection.length !== 1 || selectedRoomItems.length !== 1) return;
 
-    stopResetCameraAnimation();
+    const room = getRoomsForActiveFloor(state.document).find(
+      (candidate) => candidate.id === selectedRoomItems[0].id
+    );
+    if (!room) return;
 
-    if (typeof window === "undefined") {
-      set({ camera: targetCamera });
-      return;
-    }
+    const targetCamera = getCameraFitTarget({
+      rooms: [room],
+      viewport: state.viewport,
+      emptyLayoutCamera: syncCameraRotationToDocument(DEFAULT_CAMERA_STATE, state.document),
+      paddingPx: 40,
+    }).camera;
 
-    const startCamera = state.camera;
-    const startTime = window.performance.now();
-    const sequence = nextResetCameraAnimationSequence;
-
-    const step = (now: number) => {
-      if (activeResetCameraAnimation?.sequence !== sequence) return;
-
-      const elapsedMs = now - startTime;
-      const progress = Math.min(1, elapsedMs / RESET_CAMERA_TRANSITION_DURATION_MS);
-      const easedProgress = easeResetCameraTransition(progress);
-      const nextCamera =
-        progress >= 1
-          ? targetCamera
-          : interpolateCamera(startCamera, targetCamera, easedProgress);
-
-      set({ camera: nextCamera });
-
-      if (progress >= 1) {
-        activeResetCameraAnimation = null;
-        return;
-      }
-
-      activeResetCameraAnimation = {
-        frameId: window.requestAnimationFrame(step),
-        sequence,
-        targetCamera,
-      };
-    };
-
-    activeResetCameraAnimation = {
-      frameId: window.requestAnimationFrame(step),
-      sequence,
-      targetCamera,
-    };
+    animateCameraToTarget(state.camera, targetCamera, (camera) => set({ camera }));
   },
   resetCanvas: () => {
     stopResetCameraAnimation();
