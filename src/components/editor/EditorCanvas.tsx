@@ -1708,6 +1708,9 @@ export default function EditorCanvas({
           rooms: getRoomsForActiveFloor(state.document),
           title: exportTitle || undefined,
           exportAssetMode: request.exportAssetMode,
+          northBearingDegrees: request.includeNorthIndicator
+            ? state.document.northBearingDegrees
+            : undefined,
         });
         const blob =
           request.exportFormat === "pdf"

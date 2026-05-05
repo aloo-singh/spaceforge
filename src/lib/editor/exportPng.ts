@@ -87,6 +87,9 @@ const SVG_MUTED_STROKE = "#64748b";
 const SVG_ASSET_FILL = "#eef2f7";
 const SVG_ASSET_DETAIL_FILL = "#dbe4ee";
 const SVG_SCALE_BAR_HEIGHT_PX = 72;
+const SVG_NORTH_INDICATOR_WIDTH_PX = 72;
+const SVG_NORTH_INDICATOR_HEIGHT_PX = 96;
+const SVG_NORTH_INDICATOR_GAP_PX = 24;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
 
 type ExportTextLine = {
@@ -123,6 +126,7 @@ export type SvgExportOptions = {
   rooms: Room[];
   title?: string;
   exportAssetMode?: EditorExportAssetMode;
+  northBearingDegrees?: number;
 };
 
 export type SvgPdfExportMetadata = {
@@ -152,24 +156,40 @@ export function buildEditorExportFilename({
   return `${safeProjectName} - ${safeFloorName}.${getEditorExportFileExtension(format)}`;
 }
 
-export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExportOptions): string {
+export function exportToSVG({
+  rooms,
+  title,
+  exportAssetMode = "all",
+  northBearingDegrees,
+}: SvgExportOptions): string {
   const bounds = getLayoutBoundsFromRooms(rooms);
-  const drawableWidth = STANDARD_EXPORT_WIDTH_PX - SVG_EXPORT_PADDING_PX * 2;
-  const layoutWidthMm = Math.max(bounds?.width ?? 1, 1);
-  const layoutHeightMm = Math.max(bounds?.height ?? 1, 1);
+  const includeNorthIndicator =
+    northBearingDegrees !== undefined && Number.isFinite(northBearingDegrees);
+  const maxDoorSwingMm = getMaxSvgDoorSwingClearanceMm(rooms);
+  const leftPaddingPx = SVG_EXPORT_PADDING_PX;
+  const rightPaddingPx = includeNorthIndicator
+    ? SVG_EXPORT_PADDING_PX + SVG_NORTH_INDICATOR_WIDTH_PX + SVG_NORTH_INDICATOR_GAP_PX
+    : SVG_EXPORT_PADDING_PX;
+  const topPaddingPx = includeNorthIndicator
+    ? SVG_EXPORT_PADDING_PX + SVG_NORTH_INDICATOR_HEIGHT_PX + SVG_NORTH_INDICATOR_GAP_PX
+    : SVG_EXPORT_PADDING_PX;
+  const bottomPaddingPx = SVG_EXPORT_PADDING_PX;
+  const drawableWidth = STANDARD_EXPORT_WIDTH_PX - leftPaddingPx - rightPaddingPx;
+  const layoutWidthMm = Math.max((bounds?.width ?? 1) + maxDoorSwingMm * 2, 1);
+  const layoutHeightMm = Math.max((bounds?.height ?? 1) + maxDoorSwingMm * 2, 1);
   const scale = drawableWidth / layoutWidthMm;
   const exportWidth = STANDARD_EXPORT_WIDTH_PX;
   const exportHeight = Math.max(
     1,
-    Math.ceil(layoutHeightMm * scale + SVG_EXPORT_PADDING_PX * 2 + SVG_SCALE_BAR_HEIGHT_PX)
+    Math.ceil(layoutHeightMm * scale + topPaddingPx + bottomPaddingPx + SVG_SCALE_BAR_HEIGHT_PX)
   );
-  const originX = bounds?.minX ?? 0;
-  const originY = bounds?.minY ?? 0;
+  const originX = (bounds?.minX ?? 0) - maxDoorSwingMm;
+  const originY = (bounds?.minY ?? 0) - maxDoorSwingMm;
   const svgTitle = normalizeSvgText(title || "spaceforge export");
 
   const projectPoint = (point: Point): Point => ({
-    x: SVG_EXPORT_PADDING_PX + (point.x - originX) * scale,
-    y: SVG_EXPORT_PADDING_PX + (point.y - originY) * scale,
+    x: leftPaddingPx + (point.x - originX) * scale,
+    y: topPaddingPx + (point.y - originY) * scale,
   });
 
   const formatNumber = (value: number) =>
@@ -209,7 +229,9 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
     if (exportAssetMode !== "none") {
       for (const asset of room.interiorAssets) {
         if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
-        assetElements.push(...buildSvgInteriorAssetElements(asset, projectPoint, formatNumber));
+        const renderedAsset = buildSvgInteriorAssetElements(asset, projectPoint, formatNumber);
+        assetElements.push(...renderedAsset.elements);
+        labelElements.push(...renderedAsset.labelElements);
       }
     }
 
@@ -289,6 +311,11 @@ export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExport
   const scaleBar = buildSvgScaleBar(scale, exportHeight, formatNumber);
   if (scaleBar) {
     elements.push(scaleBar);
+  }
+
+  const northIndicator = buildSvgNorthIndicator(northBearingDegrees, exportWidth, formatNumber);
+  if (northIndicator) {
+    elements.push(northIndicator);
   }
 
   elements.push("</svg>");
@@ -378,7 +405,7 @@ function buildSvgInteriorAssetElements(
   asset: RoomInteriorAsset,
   projectPoint: (point: Point) => Point,
   formatNumber: (value: number) => string
-): string[] {
+): { elements: string[]; labelElements: string[] } {
   const bounds = getRoomInteriorAssetBounds(asset);
   const topLeft = projectPoint({ x: bounds.left, y: bounds.top });
   const bottomRight = projectPoint({ x: bounds.right, y: bounds.bottom });
@@ -397,6 +424,7 @@ function buildSvgInteriorAssetElements(
   const rotation = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
   const label = normalizeSvgText(asset.name || getInteriorAssetDisplayName(asset.type));
   const elements: string[] = [`<g>`];
+  const labelElements: string[] = [];
 
   const rect = (
     x: number,
@@ -532,7 +560,7 @@ function buildSvgInteriorAssetElements(
       );
       const arrowLabel = normalizeSvgText(asset.arrowLabel?.trim() || "");
       if (arrowLabel) {
-        elements.push(
+        labelElements.push(
           `<text x="${formatNumber(isSidewaysStairRun ? headX + 16 * headSign : center.x)}" y="${formatNumber(isSidewaysStairRun ? center.y : headY - 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="600">${arrowLabel}</text>`
         );
       }
@@ -540,14 +568,14 @@ function buildSvgInteriorAssetElements(
   }
 
   if (asset.type !== "stairs") {
-    elements.push(
+    labelElements.push(
       `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="500">${label}</text>`
     );
   }
 
   elements.push("</g>");
 
-  return elements;
+  return { elements, labelElements };
 }
 
 function buildSvgScaleBar(
@@ -576,6 +604,51 @@ function buildSvgScaleBar(
     `<text x="${formatNumber(x)}" y="${formatNumber(y + 24)}" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="500">${label}</text>`,
     `</g>`,
   ].join("\n");
+}
+
+function buildSvgNorthIndicator(
+  bearingDegrees: number | undefined,
+  exportWidth: number,
+  formatNumber: (value: number) => string
+): string | null {
+  if (bearingDegrees === undefined || !Number.isFinite(bearingDegrees)) return null;
+
+  const width = SVG_NORTH_INDICATOR_WIDTH_PX;
+  const height = SVG_NORTH_INDICATOR_HEIGHT_PX;
+  const x = exportWidth - SVG_EXPORT_PADDING_PX - width;
+  const y = SVG_EXPORT_PADDING_PX;
+  const centerX = x + width / 2;
+  const labelY = y + 1;
+  const shaftBottomY = y + height - 18;
+  const shaftLengthPx = 52;
+  const shaftTopY = shaftBottomY - shaftLengthPx;
+  const shaftMidY = shaftTopY + shaftLengthPx / 2;
+  const rotationCenterY = shaftMidY;
+  const bearing = normalizeNorthBearingDegrees(bearingDegrees);
+
+  return [
+    `<g aria-label="North indicator">`,
+    `<g transform="rotate(${formatNumber(bearing)} ${formatNumber(centerX)} ${formatNumber(rotationCenterY)})" stroke="${SVG_ROOM_STROKE}" fill="${SVG_ROOM_STROKE}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.94">`,
+    `<line x1="${formatNumber(centerX)}" y1="${formatNumber(shaftBottomY)}" x2="${formatNumber(centerX)}" y2="${formatNumber(shaftTopY + 12)}" />`,
+    `<line x1="${formatNumber(centerX - 10)}" y1="${formatNumber(shaftMidY)}" x2="${formatNumber(centerX + 10)}" y2="${formatNumber(shaftMidY)}" />`,
+    `<polygon points="${formatNumber(centerX)},${formatNumber(shaftTopY)} ${formatNumber(centerX - 7)},${formatNumber(shaftTopY + 13)} ${formatNumber(centerX + 7)},${formatNumber(shaftTopY + 13)}" />`,
+    `</g>`,
+    `<text x="${formatNumber(centerX)}" y="${formatNumber(labelY)}" text-anchor="middle" fill="${SVG_ROOM_STROKE}" opacity="0.94" font-family="JetBrains Mono, ui-monospace, monospace" font-size="22" font-weight="700">N</text>`,
+    `</g>`,
+  ].join("\n");
+}
+
+function getMaxSvgDoorSwingClearanceMm(rooms: Room[]): number {
+  let maxDoorWidthMm = 0;
+
+  for (const room of rooms) {
+    for (const opening of room.openings) {
+      if (opening.type !== "door") continue;
+      maxDoorWidthMm = Math.max(maxDoorWidthMm, opening.widthMm);
+    }
+  }
+
+  return maxDoorWidthMm;
 }
 
 function normalizeSvgText(value: string): string {
