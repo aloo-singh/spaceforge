@@ -3,13 +3,14 @@ export type EditorExportLegendPosition = "bottom" | "right-side" | "none";
 export type EditorExportScaleBarPosition = "bottom-left" | "none";
 export type EditorExportResolution = "normal" | "hi-res";
 export type EditorExportFormat = "png-normal" | "png-hi-res" | "svg" | "pdf";
+export type EditorExportAssetMode = "all" | "stairs-only" | "none";
 
 export type EditorExportPreferences = {
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
-  includeAssets: boolean;
+  exportAssetMode: EditorExportAssetMode;
   theme: EditorExportThemePreference;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
@@ -22,7 +23,7 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   showScaleBar: false,
   showGrid: true,
   showDimensions: true,
-  includeAssets: true,
+  exportAssetMode: "all",
   theme: "system",
   legendPosition: "bottom",
   scaleBarPosition: "bottom-left",
@@ -55,6 +56,18 @@ function normalizeEditorExportFormat(
   return getExportFormatFromResolution(fallbackResolution);
 }
 
+function normalizeEditorExportAssetMode(value: unknown): EditorExportAssetMode {
+  if (value === "all" || value === "stairs-only" || value === "none") {
+    return value;
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "all" : "none";
+  }
+
+  return DEFAULT_EDITOR_EXPORT_PREFERENCES.exportAssetMode;
+}
+
 export function cloneEditorExportPreferences(
   preferences: EditorExportPreferences
 ): EditorExportPreferences {
@@ -63,7 +76,7 @@ export function cloneEditorExportPreferences(
     showScaleBar: preferences.showScaleBar,
     showGrid: preferences.showGrid,
     showDimensions: preferences.showDimensions,
-    includeAssets: preferences.includeAssets,
+    exportAssetMode: preferences.exportAssetMode,
     theme: preferences.theme,
     legendPosition: preferences.legendPosition,
     scaleBarPosition: preferences.scaleBarPosition,
@@ -81,7 +94,7 @@ export function areEditorExportPreferencesEqual(
     a.showScaleBar === b.showScaleBar &&
     a.showGrid === b.showGrid &&
     a.showDimensions === b.showDimensions &&
-    a.includeAssets === b.includeAssets &&
+    a.exportAssetMode === b.exportAssetMode &&
     a.theme === b.theme &&
     a.legendPosition === b.legendPosition &&
     a.scaleBarPosition === b.scaleBarPosition &&
@@ -117,10 +130,12 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       "showDimensions" in value && typeof value.showDimensions === "boolean"
         ? value.showDimensions
         : DEFAULT_EDITOR_EXPORT_PREFERENCES.showDimensions,
-    includeAssets:
-      "includeAssets" in value && typeof value.includeAssets === "boolean"
-        ? value.includeAssets
-        : DEFAULT_EDITOR_EXPORT_PREFERENCES.includeAssets,
+    exportAssetMode:
+      "exportAssetMode" in value
+        ? normalizeEditorExportAssetMode(value.exportAssetMode)
+        : "includeAssets" in value
+          ? normalizeEditorExportAssetMode(value.includeAssets)
+          : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportAssetMode,
     theme:
       "theme" in value &&
       (value.theme === "light" || value.theme === "dark" || value.theme === "system")

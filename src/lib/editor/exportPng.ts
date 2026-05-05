@@ -9,7 +9,11 @@ import {
   getStairRunLengthMm,
 } from "@/lib/editor/interiorAssets";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { EditorExportFormat, EditorExportResolution } from "@/lib/editor/exportPreferences";
+import type {
+  EditorExportAssetMode,
+  EditorExportFormat,
+  EditorExportResolution,
+} from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
@@ -114,7 +118,7 @@ type ExportNorthIndicatorBlock = {
 export type SvgExportOptions = {
   rooms: Room[];
   title?: string;
-  includeAssets?: boolean;
+  exportAssetMode?: EditorExportAssetMode;
 };
 
 export type SvgPdfExportMetadata = {
@@ -144,7 +148,7 @@ export function buildEditorExportFilename({
   return `${safeProjectName} - ${safeFloorName}.${getEditorExportFileExtension(format)}`;
 }
 
-export function exportToSVG({ rooms, title, includeAssets = true }: SvgExportOptions): string {
+export function exportToSVG({ rooms, title, exportAssetMode = "all" }: SvgExportOptions): string {
   const bounds = getLayoutBoundsFromRooms(rooms);
   const drawableWidth = STANDARD_EXPORT_WIDTH_PX - SVG_EXPORT_PADDING_PX * 2;
   const layoutWidthMm = Math.max(bounds?.width ?? 1, 1);
@@ -239,8 +243,9 @@ export function exportToSVG({ rooms, title, includeAssets = true }: SvgExportOpt
       );
     }
 
-    if (includeAssets) {
+    if (exportAssetMode !== "none") {
       for (const asset of room.interiorAssets) {
+        if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
         elements.push(...buildSvgInteriorAssetElements(asset, projectPoint, scale, formatNumber));
       }
     }

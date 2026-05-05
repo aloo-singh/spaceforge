@@ -15,6 +15,7 @@ import type {
   EditorExportScaleBarPosition,
   EditorExportResolution,
   EditorExportFormat,
+  EditorExportAssetMode,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -41,7 +42,7 @@ export type ExportPngRequest = {
   designedBy: string;
   showGrid: boolean;
   showDimensions: boolean;
-  includeAssets: boolean;
+  exportAssetMode: EditorExportAssetMode;
   theme: ExportPngThemeOption;
   exportResolution: EditorExportResolution;
   exportFormat: EditorExportFormat;
@@ -64,7 +65,7 @@ type ExportPngDialogProps = {
   showScaleBar: boolean;
   showGrid: boolean;
   showDimensions: boolean;
-  includeAssets: boolean;
+  exportAssetMode: EditorExportAssetMode;
   theme: ExportPngThemeOption;
   legendPosition: EditorExportLegendPosition;
   scaleBarPosition: EditorExportScaleBarPosition;
@@ -79,7 +80,7 @@ type ExportPngDialogProps = {
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
   onShowDimensionsChange: (value: boolean) => void;
-  onIncludeAssetsChange: (value: boolean) => void;
+  onExportAssetModeChange: (value: EditorExportAssetMode) => void;
   onThemeChange: (value: ExportPngThemeOption) => void;
   onLegendPositionChange: (value: EditorExportLegendPosition) => void;
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
@@ -106,7 +107,7 @@ export function ExportPngDialog({
   showScaleBar,
   showGrid,
   showDimensions,
-  includeAssets,
+  exportAssetMode,
   theme,
   legendPosition,
   scaleBarPosition,
@@ -121,7 +122,7 @@ export function ExportPngDialog({
   onShowScaleBarChange,
   onShowGridChange,
   onShowDimensionsChange,
-  onIncludeAssetsChange,
+  onExportAssetModeChange,
   onThemeChange,
   onLegendPositionChange,
   onScaleBarPositionChange,
@@ -188,7 +189,7 @@ export function ExportPngDialog({
         designedBy,
         showGrid,
         showDimensions,
-        includeAssets,
+        exportAssetMode,
         theme,
         exportResolution,
         exportFormat,
@@ -232,7 +233,7 @@ export function ExportPngDialog({
     designedBy,
     showGrid,
     showDimensions,
-    includeAssets,
+    exportAssetMode,
     theme,
     exportResolution,
     exportFormat,
@@ -255,7 +256,7 @@ export function ExportPngDialog({
       designedBy,
       showGrid,
       showDimensions,
-      includeAssets,
+      exportAssetMode,
       theme,
       exportResolution,
       exportFormat,
@@ -593,13 +594,23 @@ export function ExportPngDialog({
             <ExportToggleCard
               title="Include assets"
               description="Include furniture, stairs, and other interior objects in the exported file."
-              value={includeAssets ? "On" : "Off"}
+              value={
+                exportAssetMode === "all"
+                  ? "All"
+                  : exportAssetMode === "stairs-only"
+                    ? "Stairs only"
+                    : "None"
+              }
             >
-              <BinaryChoice
-                ariaLabel="Include assets"
-                enabled={includeAssets}
-                onEnable={() => onIncludeAssetsChange(true)}
-                onDisable={() => onIncludeAssetsChange(false)}
+              <PositionChoice
+                ariaLabel="Included assets"
+                value={exportAssetMode}
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Stairs only", value: "stairs-only" },
+                  { label: "None", value: "none" },
+                ]}
+                onChange={onExportAssetModeChange}
               />
             </ExportToggleCard>
 

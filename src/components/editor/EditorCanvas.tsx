@@ -1432,7 +1432,7 @@ export default function EditorCanvas({
       paddingPx,
       showDimensions,
       showGrid,
-      includeAssets,
+      exportAssetMode,
       showScaleBar,
       legendPosition,
       signatureText,
@@ -1448,7 +1448,7 @@ export default function EditorCanvas({
       paddingPx: number;
       showDimensions: boolean;
       showGrid: boolean;
-      includeAssets?: boolean;
+      exportAssetMode?: ExportPngRequest["exportAssetMode"];
       showScaleBar: boolean;
       legendPosition?: "bottom" | "right-side";
       signatureText?: string;
@@ -1464,10 +1464,15 @@ export default function EditorCanvas({
       const state = useEditorStore.getState();
       const exportTheme = getEditorCanvasTheme(themeMode);
       const activeFloorRooms = getRoomsForActiveFloor(state.document);
-      const exportRooms =
-        includeAssets === false
-          ? activeFloorRooms.map((room) => ({ ...room, interiorAssets: [] }))
-          : activeFloorRooms;
+      const exportRooms = activeFloorRooms.map((room) => ({
+        ...room,
+        interiorAssets:
+          exportAssetMode === "none"
+            ? []
+            : exportAssetMode === "stairs-only"
+              ? room.interiorAssets.filter((asset) => asset.type === "stairs")
+              : room.interiorAssets,
+      }));
       const layoutBounds = getLayoutBoundsFromDocument(state.document);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
@@ -1544,7 +1549,7 @@ export default function EditorCanvas({
         exportTheme,
         [],
         state.settings.showRoomNames,
-        includeAssets !== false && state.settings.showAssets,
+        exportAssetMode !== "none",
         state.settings.showAssetLabels,
         { includeStairDirectionLabels: false }
       );
@@ -1664,7 +1669,7 @@ export default function EditorCanvas({
       paddingPx: 48,
       showDimensions: request.showDimensions,
       showGrid: request.showGrid,
-      includeAssets: request.includeAssets,
+      exportAssetMode: request.exportAssetMode,
       showScaleBar: shouldShowScaleBar,
       legendPosition: hasRightLegend ? "right-side" : hasBottomLegend ? "bottom" : undefined,
       titleText: exportTitle || undefined,
@@ -1702,7 +1707,7 @@ export default function EditorCanvas({
         const svg = exportToSVG({
           rooms: getRoomsForActiveFloor(state.document),
           title: exportTitle || undefined,
-          includeAssets: request.includeAssets,
+          exportAssetMode: request.exportAssetMode,
         });
         const blob =
           request.exportFormat === "pdf"
@@ -1802,7 +1807,7 @@ export default function EditorCanvas({
       paddingPx: 24,
       showDimensions: false,
       showGrid: false,
-      includeAssets: true,
+      exportAssetMode: "all",
       showScaleBar: false,
       themeMode: editorThemeMode,
     });
