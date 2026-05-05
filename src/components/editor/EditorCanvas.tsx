@@ -164,6 +164,7 @@ import type {
   Point,
   Room,
   RoomInteriorAssetSelection,
+  RoomOpening,
   RoomOpeningSelection,
   SharedSelectionItem,
   RoomWall,
@@ -236,6 +237,10 @@ const EMPTY_HOVERED_SELECTABLE_WALL = null as {
   roomId: string;
   wall: RoomWall;
 } | null;
+const EMPTY_OPENING_MOVE_UI = null as {
+  roomId: string;
+  openingId: string;
+} | null;
 const PROJECT_NAME_HINT_ANCHOR_SELECTOR = "[data-editor-project-name-anchor]";
 const HINT_TRANSITION_MS = 200;
 const HINT_HANDOFF_DELAY_MS = 150;
@@ -276,13 +281,14 @@ const RESIZE_DIMENSION_HANDLE_CLEARANCE_PX = 10;
 const RESIZE_DIMENSION_ACTIVE_FILL_ALPHA = 1;
 const RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA = 0.62;
 const RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA = 1;
+const OPENING_MOVE_DIMENSION_WALL_OFFSET_PX = 22;
+const OPENING_MOVE_DIMENSION_NEIGHBOR_OFFSET_PX = 48;
+const OPENING_MOVE_DIMENSION_MIN_LENGTH_PX = 34;
 const OPENING_CUTOUT_WORLD_MM = 64;
 const OPENING_SYMBOL_WORLD_MM = 18;
-const DOOR_LEAF_LENGTH_SCALE = 0.72;
-const DOOR_LEAF_DEPTH_SCALE = 0.72;
+const DOOR_SWING_ARC_WORLD_MM = 8;
 const WINDOW_LINE_INSET_WORLD_MM = 44;
 const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
-const OPENING_SELECTION_HALO_WORLD_MM = 120;
 const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
@@ -859,6 +865,10 @@ export default function EditorCanvas({
     roomId: string;
     wall: RoomWall;
   } | null>(EMPTY_HOVERED_SELECTABLE_WALL);
+  const openingMoveUiRef = useRef<{
+    roomId: string;
+    openingId: string;
+  } | null>(EMPTY_OPENING_MOVE_UI);
   const roomResizeUiRef = useRef<{
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -1060,6 +1070,7 @@ export default function EditorCanvas({
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
       hoveredSelectableWallRef.current,
+      openingMoveUiRef.current,
       roomResizeUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
@@ -1506,6 +1517,7 @@ export default function EditorCanvas({
         exportRoomGraphics,
         exportRooms,
         null,
+        [],
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
         exportCamera,
@@ -1528,6 +1540,7 @@ export default function EditorCanvas({
         exportWallOverlayGraphics,
         exportRooms,
         null,
+        [],
         null,
         EMPTY_ROOM_RESIZE_UI,
         state.roomDraft.points.length > 0,
@@ -2604,6 +2617,9 @@ export default function EditorCanvas({
         onHoveredSelectableWallChange: (wallSelection) => {
           hoveredSelectableWallRef.current = wallSelection;
         },
+        onOpeningMoveUiChange: (openingMoveUi) => {
+          openingMoveUiRef.current = openingMoveUi;
+        },
         onTransformFeedbackChange: (feedback) => {
           setTransformFeedback(feedback);
         },
@@ -3639,6 +3655,10 @@ function drawScene(
     roomId: string;
     wall: RoomWall;
   } | null,
+  openingMoveUi: {
+    roomId: string;
+    openingId: string;
+  } | null,
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -3750,6 +3770,7 @@ function drawScene(
     roomGraphics,
     renderedRooms,
     state.selectedRoomId,
+    state.selection,
     roomResizeUi,
     state.roomDraft.points.length > 0,
     state.camera,
@@ -3787,6 +3808,7 @@ function drawScene(
     wallOverlayGraphics,
     renderedRooms,
     state.selectedWall,
+    state.selection,
     hoveredSelectableWall,
     roomResizeUi,
     state.roomDraft.points.length > 0,
@@ -3813,6 +3835,15 @@ function drawScene(
     { includeStairDirectionLabels: true }
   );
   clearContainerChildren(dimensionOverlayContainer);
+  drawOpeningMoveDimensions(
+    dimensionOverlayContainer,
+    renderedRooms,
+    openingMoveUi,
+    state.camera,
+    state.viewport,
+    state.settings,
+    theme
+  );
   if (showDimensions) {
     drawSelectedRoomDimensions(
       dimensionOverlayContainer,
@@ -3935,6 +3966,7 @@ function drawRooms(
   graphics: Graphics,
   rooms: Room[],
   selectedRoomId: string | null,
+  selection: SharedSelectionItem[],
   roomResizeUi: {
     hoveredWall: RectWall | null;
     hoveredCorner: RectCorner | null;
@@ -3955,6 +3987,7 @@ function drawRooms(
   assetDragTargetRoomId: string | null = null
 ) {
   graphics.clear();
+  const selectedRoomCount = selection.filter((item) => item.type === "room").length;
   const transformSettlingProgress =
     transformFeedback?.phase === "settling"
       ? getTransformSettlingProgress(transformFeedback, performance.now())
@@ -3989,7 +4022,7 @@ function drawRooms(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
-    const isSelected = room.id === selectedRoomId;
+    const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
@@ -4034,7 +4067,12 @@ function drawRooms(
       );
     }
 
-    if (!isSelected || isDraftingRoom || isActiveTransformRoom) continue;
+    if (
+      !isSelected ||
+      selectedRoomCount > 1 ||
+      isDraftingRoom ||
+      isActiveTransformRoom
+    ) continue;
     const declutter = getRoomDeclutterState(room, camera, viewport);
     if (!declutter.showSelectionControls) continue;
     const { vertexHandles, wallSegmentHandles } = getCachedRoomSelectionHandles(
@@ -4176,6 +4214,39 @@ function drawRooms(
   }
 }
 
+function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {
+  return selection.some((item) => item.type === "room" && item.id === roomId);
+}
+
+function isWallSelected(selection: SharedSelectionItem[], roomId: string, wall: RoomWall) {
+  return selection.some(
+    (item) => item.type === "wall" && item.roomId === roomId && item.wall === wall
+  );
+}
+
+function isOpeningSelected(selection: SharedSelectionItem[], roomId: string, openingId: string) {
+  return selection.some(
+    (item) => item.type === "opening" && item.roomId === roomId && item.openingId === openingId
+  );
+}
+
+function getSingleOpeningSelectionForHandles(
+  selectedOpening: RoomOpeningSelection | null,
+  selection: SharedSelectionItem[]
+): RoomOpeningSelection | null {
+  const selectedOpenings = selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "opening" }> => item.type === "opening"
+  );
+  if (selectedOpenings.length === 1) {
+    return {
+      roomId: selectedOpenings[0].roomId,
+      openingId: selectedOpenings[0].openingId,
+    };
+  }
+  if (selectedOpenings.length > 1) return null;
+  return selectedOpening;
+}
+
 function drawOpenings(
   graphics: Graphics,
   rooms: Room[],
@@ -4194,7 +4265,7 @@ function drawOpenings(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
-    drawRoomOpenings(graphics, room, selectedOpening, camera, viewport, theme);
+    drawRoomOpenings(graphics, room, selectedOpening, selection, camera, viewport, theme);
     drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations, showAssets);
   }
 }
@@ -4203,6 +4274,7 @@ function drawWallInteractionOverlay(
   graphics: Graphics,
   rooms: Room[],
   selectedWall: RoomWallSelection | null,
+  selection: SharedSelectionItem[],
   hoveredSelectableWall: {
     roomId: string;
     wall: RoomWall;
@@ -4252,18 +4324,26 @@ function drawWallInteractionOverlay(
 
   const isSelectedWallAlsoHovered =
     hoveredWall !== null &&
-    selectedWall?.roomId === hoveredRoomId &&
-    selectedWall.wall === hoveredWall;
+    (selectedWall?.roomId === hoveredRoomId && selectedWall.wall === hoveredWall ||
+      (hoveredRoomId !== null && isWallSelected(selection, hoveredRoomId, hoveredWall)));
 
   if (hoveredRoom && hoveredWall !== null && !isSelectedWallAlsoHovered) {
     drawHoveredWallHighlight(graphics, hoveredRoom, hoveredWall, camera, viewport, theme);
   }
 
-  if (!selectedWall) return;
-  const selectedRoom = rooms.find((room) => room.id === selectedWall.roomId);
-  if (!selectedRoom) return;
-  if (transformFeedback?.roomId === selectedRoom.id) return;
-  drawSelectedWallHighlight(graphics, selectedRoom, selectedWall.wall, camera, viewport, theme);
+  const selectedWalls = selection.filter(
+    (item): item is Extract<SharedSelectionItem, { type: "wall" }> => item.type === "wall"
+  );
+  if (selectedWall && !isWallSelected(selectedWalls, selectedWall.roomId, selectedWall.wall)) {
+    selectedWalls.push({ type: "wall", roomId: selectedWall.roomId, wall: selectedWall.wall });
+  }
+
+  for (const wallSelection of selectedWalls) {
+    const selectedRoom = rooms.find((room) => room.id === wallSelection.roomId);
+    if (!selectedRoom) continue;
+    if (transformFeedback?.roomId === selectedRoom.id) continue;
+    drawSelectedWallHighlight(graphics, selectedRoom, wallSelection.wall, camera, viewport, theme);
+  }
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
@@ -4396,10 +4476,13 @@ function drawRoomOpenings(
   graphics: Graphics,
   room: Room,
   selectedOpening: RoomOpeningSelection | null,
+  selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
+  const selectedOpeningCount = selection.filter((item) => item.type === "opening").length;
+  const handleOpening = getSingleOpeningSelectionForHandles(selectedOpening, selection);
   for (const opening of room.openings) {
     const layout = getResolvedRoomOpeningLayout(room, opening);
     if (!layout) continue;
@@ -4428,27 +4511,12 @@ function drawRoomOpenings(
     };
     const openingWidthPx = Math.hypot(end.x - start.x, end.y - start.y);
     const isSelected =
-      selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id;
+      (selectedOpening?.roomId === room.id && selectedOpening.openingId === opening.id) ||
+      isOpeningSelected(selection, room.id, opening.id);
     const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
     const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
-    const selectionHaloStrokePx = Math.max(
-      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
-      selectionStrokePx + 2
-    );
     const selectionColor = theme.wallSelectionAccent;
-
-    if (isSelected) {
-      graphics.setStrokeStyle({
-        width: selectionHaloStrokePx,
-        color: selectionColor,
-        alpha: 0.18,
-        cap: "round",
-      });
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
-    }
 
     graphics.setStrokeStyle({
       width: cutoutStrokePx,
@@ -4473,8 +4541,6 @@ function drawRoomOpenings(
     }
 
     if (opening.type === "door") {
-      const leafLengthPx = openingWidthPx * DOOR_LEAF_LENGTH_SCALE;
-      const leafDepthPx = openingWidthPx * DOOR_LEAF_DEPTH_SCALE;
       const hingePoint = opening.hingeSide === "end" ? end : start;
       const hingeTangent =
         opening.hingeSide === "end"
@@ -4484,17 +4550,46 @@ function drawRoomOpenings(
         opening.openingSide === "exterior"
           ? { x: -interiorNormal.x, y: -interiorNormal.y }
           : interiorNormal;
+      const leafLengthPx = Math.max(openingWidthPx, 1);
+      const closedLeafEnd = {
+        x: hingePoint.x + hingeTangent.x * leafLengthPx,
+        y: hingePoint.y + hingeTangent.y * leafLengthPx,
+      };
+      const openLeafEnd = {
+        x: hingePoint.x + swingNormal.x * leafLengthPx,
+        y: hingePoint.y + swingNormal.y * leafLengthPx,
+      };
+      const closedAngle = Math.atan2(closedLeafEnd.y - hingePoint.y, closedLeafEnd.x - hingePoint.x);
+      const openAngle = Math.atan2(openLeafEnd.y - hingePoint.y, openLeafEnd.x - hingePoint.x);
+      const shouldDrawArcAnticlockwise =
+        hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x < 0;
 
+      const doorSymbolColor = isSelected ? selectionColor : theme.roomOutline;
       graphics.setStrokeStyle({
         width: isSelected ? selectionStrokePx : symbolStrokePx,
-        color: isSelected ? selectionColor : theme.roomOutline,
+        color: doorSymbolColor,
         alpha: isSelected ? 1 : 0.96,
         cap: "round",
       });
       graphics.moveTo(hingePoint.x, hingePoint.y);
-      graphics.lineTo(
-        hingePoint.x + hingeTangent.x * leafLengthPx + swingNormal.x * leafDepthPx,
-        hingePoint.y + hingeTangent.y * leafLengthPx + swingNormal.y * leafDepthPx
+      graphics.lineTo(openLeafEnd.x, openLeafEnd.y);
+      graphics.stroke();
+
+      graphics.setStrokeStyle({
+        width: Math.max(camera.pixelsPerMm * DOOR_SWING_ARC_WORLD_MM, 1),
+        color: doorSymbolColor,
+        alpha: isSelected ? 0.94 : 0.76,
+        cap: "round",
+        join: "round",
+      });
+      graphics.moveTo(closedLeafEnd.x, closedLeafEnd.y);
+      graphics.arc(
+        hingePoint.x,
+        hingePoint.y,
+        leafLengthPx,
+        closedAngle,
+        openAngle,
+        shouldDrawArcAnticlockwise
       );
       graphics.stroke();
     } else {
@@ -4525,7 +4620,9 @@ function drawRoomOpenings(
       }
     }
 
-    if (!isSelected) continue;
+    const shouldDrawHandles =
+      handleOpening?.roomId === room.id && handleOpening.openingId === opening.id;
+    if (!isSelected || selectedOpeningCount > 1 || !shouldDrawHandles) continue;
 
     drawOpeningWidthHandle(graphics, start, selectionColor, theme);
     drawOpeningWidthHandle(graphics, end, selectionColor, theme);
@@ -4589,24 +4686,6 @@ function drawRoomInteriorAssets(
       (item) => item.type === "asset" && item.roomId === room.id && item.id === asset.id
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
-    const selectionHaloStrokePx = Math.max(
-      camera.pixelsPerMm * OPENING_SELECTION_HALO_WORLD_MM,
-      selectionStrokePx + 2
-    );
-
-    if (isSelected) {
-      graphics.setStrokeStyle({
-        width: selectionHaloStrokePx,
-        color: theme.wallSelectionAccent,
-        alpha: 0.18,
-      });
-      graphics.moveTo(corners[0].x, corners[0].y);
-      for (let i = 1; i < corners.length; i += 1) {
-        graphics.lineTo(corners[i].x, corners[i].y);
-      }
-      graphics.closePath();
-      graphics.stroke();
-    }
 
     // Skip rectangular bounding box for unselected round dining tables
     const isRoundDiningTable =
@@ -5390,7 +5469,7 @@ function drawRoomLabels(
     const areaCenterY =
       layout.areaCenterY === null ? null : snapToPixel(layout.areaCenterY, textResolution);
 
-    const isSelected = selectedRoomId === room.id;
+    const isSelected = selectedRoomId === room.id || isRoomSelected(selection, room.id);
     const isHovered = hoveredRoomLabelId === room.id;
     const isActiveResizeRoom =
       transformFeedback?.roomId === room.id &&
@@ -5508,6 +5587,8 @@ type ResizeDimensionLabelLayout = {
   outwardDirection: ScreenPoint;
   tangentDirection: ScreenPoint;
   avoidanceDirection: ScreenPoint;
+  strokeColor?: number;
+  strokeAlpha?: number;
   width: number;
   height: number;
 };
@@ -5518,6 +5599,266 @@ type OverlayAvoidRect = {
   top: number;
   bottom: number;
 };
+
+type OpeningMoveDimensionSpan = {
+  start: Point;
+  end: Point;
+  lengthMillimetres: number;
+  offsetPx: number;
+};
+
+function drawOpeningMoveDimensions(
+  labelContainer: Container,
+  rooms: Room[],
+  openingMoveUi: { roomId: string; openingId: string } | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  if (!openingMoveUi) return;
+
+  const room = rooms.find((candidate) => candidate.id === openingMoveUi.roomId);
+  const opening = room?.openings.find((candidate) => candidate.id === openingMoveUi.openingId);
+  if (!room || !opening) return;
+
+  const segment = getRoomWallSegment(room, opening.wall);
+  if (!segment || segment.lengthMm <= 0) return;
+
+  const currentRange = getOpeningWallOffsetRange(opening, segment.lengthMm);
+  if (!currentRange) return;
+
+  const sameWallRanges = room.openings
+    .filter(
+      (candidate) =>
+        candidate.id !== opening.id &&
+        candidate.wall === opening.wall
+    )
+    .map((candidate) => getOpeningWallOffsetRange(candidate, segment.lengthMm))
+    .filter((range): range is { startOffsetMm: number; endOffsetMm: number } => range !== null)
+    .sort((a, b) => a.startOffsetMm - b.startOffsetMm);
+
+  const previousOpening = [...sameWallRanges]
+    .reverse()
+    .find((range) => range.endOffsetMm <= currentRange.startOffsetMm);
+  const nextOpening = sameWallRanges.find((range) => range.startOffsetMm >= currentRange.endOffsetMm);
+
+  const wallOffsetPx = getScaledMeasurementPx(OPENING_MOVE_DIMENSION_WALL_OFFSET_PX, settings);
+  const neighborOffsetPx = getScaledMeasurementPx(OPENING_MOVE_DIMENSION_NEIGHBOR_OFFSET_PX, settings);
+  const spans: OpeningMoveDimensionSpan[] = [
+    {
+      start: getWallPointAtOffsetForCanvas(segment, 0),
+      end: getWallPointAtOffsetForCanvas(segment, currentRange.startOffsetMm),
+      lengthMillimetres: currentRange.startOffsetMm,
+      offsetPx: wallOffsetPx,
+    },
+    {
+      start: getWallPointAtOffsetForCanvas(segment, currentRange.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, segment.lengthMm),
+      lengthMillimetres: segment.lengthMm - currentRange.endOffsetMm,
+      offsetPx: wallOffsetPx,
+    },
+  ];
+
+  if (previousOpening) {
+    spans.push({
+      start: getWallPointAtOffsetForCanvas(segment, previousOpening.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, currentRange.startOffsetMm),
+      lengthMillimetres: currentRange.startOffsetMm - previousOpening.endOffsetMm,
+      offsetPx: neighborOffsetPx,
+    });
+  }
+
+  if (nextOpening) {
+    spans.push({
+      start: getWallPointAtOffsetForCanvas(segment, currentRange.endOffsetMm),
+      end: getWallPointAtOffsetForCanvas(segment, nextOpening.startOffsetMm),
+      lengthMillimetres: nextOpening.startOffsetMm - currentRange.endOffsetMm,
+      offsetPx: neighborOffsetPx,
+    });
+  }
+
+  const arrowGraphics = new Graphics();
+  const labelLayouts: ResizeDimensionLabelLayout[] = [];
+
+  for (const span of spans) {
+    const start = worldToScreen(span.start, camera, viewport);
+    const end = worldToScreen(span.end, camera, viewport);
+    const lengthPx = Math.hypot(end.x - start.x, end.y - start.y);
+    if (span.lengthMillimetres <= 0 || lengthPx < OPENING_MOVE_DIMENSION_MIN_LENGTH_PX) continue;
+
+    const midpointWorld = {
+      x: (span.start.x + span.end.x) / 2,
+      y: (span.start.y + span.end.y) / 2,
+    };
+    const midpoint = worldToScreen(midpointWorld, camera, viewport);
+    const normalTarget = worldToScreen(
+      {
+        x: midpointWorld.x + segment.interiorNormal.x * 100,
+        y: midpointWorld.y + segment.interiorNormal.y * 100,
+      },
+      camera,
+      viewport
+    );
+    const normal = normalizeScreenDirection({
+      x: normalTarget.x - midpoint.x,
+      y: normalTarget.y - midpoint.y,
+    });
+    const tangent = normalizeScreenDirection({
+      x: end.x - start.x,
+      y: end.y - start.y,
+    });
+    const arrowStart = {
+      x: start.x + normal.x * span.offsetPx,
+      y: start.y + normal.y * span.offsetPx,
+    };
+    const arrowEnd = {
+      x: end.x + normal.x * span.offsetPx,
+      y: end.y + normal.y * span.offsetPx,
+    };
+
+    drawDoubleEndedDimensionArrow(arrowGraphics, arrowStart, arrowEnd, tangent, settings, theme);
+    labelLayouts.push(
+      createOpeningMoveDimensionLabelLayout(
+        formatMetricWallDimension(span.lengthMillimetres),
+        {
+          x: (arrowStart.x + arrowEnd.x) / 2,
+          y: (arrowStart.y + arrowEnd.y) / 2,
+        },
+        normal,
+        tangent,
+        viewport,
+        settings,
+        theme
+      )
+    );
+  }
+
+  if (labelLayouts.length === 0) {
+    arrowGraphics.destroy();
+    return;
+  }
+
+  labelContainer.addChild(arrowGraphics);
+  drawDimensionLabels(labelContainer, labelLayouts, settings, theme);
+}
+
+function getOpeningWallOffsetRange(
+  opening: RoomOpening,
+  wallLengthMm: number
+): { startOffsetMm: number; endOffsetMm: number } | null {
+  const centerOffsetMm = clampValue(opening.offsetMm, 0, wallLengthMm);
+  const halfWidthMm = opening.widthMm / 2;
+  const startOffsetMm = Math.max(0, centerOffsetMm - halfWidthMm);
+  const endOffsetMm = Math.min(wallLengthMm, centerOffsetMm + halfWidthMm);
+  if (endOffsetMm <= startOffsetMm) return null;
+
+  return { startOffsetMm, endOffsetMm };
+}
+
+function getWallPointAtOffsetForCanvas(
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  offsetMm: number
+): Point {
+  const safeLengthMm = Math.max(segment.lengthMm, 0.001);
+  const t = clampValue(offsetMm / safeLengthMm, 0, 1);
+
+  return {
+    x: segment.start.x + (segment.end.x - segment.start.x) * t,
+    y: segment.start.y + (segment.end.y - segment.start.y) * t,
+  };
+}
+
+function drawDoubleEndedDimensionArrow(
+  graphics: Graphics,
+  start: ScreenPoint,
+  end: ScreenPoint,
+  tangent: ScreenPoint,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const widthPx = Math.max(1, 1.25 * measurementTextScale);
+  const arrowSizePx = getScaledMeasurementPx(6, settings);
+  const arrowSpreadPx = getScaledMeasurementPx(4, settings);
+  const normal = { x: -tangent.y, y: tangent.x };
+
+  graphics.setStrokeStyle({
+    width: widthPx,
+    color: theme.wallSelectionAccent,
+    alpha: 0.78,
+    cap: "round",
+    join: "round",
+  });
+  graphics.moveTo(start.x, start.y);
+  graphics.lineTo(end.x, end.y);
+
+  for (const [point, direction] of [
+    [start, { x: tangent.x, y: tangent.y }],
+    [end, { x: -tangent.x, y: -tangent.y }],
+  ] as const) {
+    graphics.moveTo(point.x, point.y);
+    graphics.lineTo(
+      point.x + direction.x * arrowSizePx + normal.x * arrowSpreadPx,
+      point.y + direction.y * arrowSizePx + normal.y * arrowSpreadPx
+    );
+    graphics.moveTo(point.x, point.y);
+    graphics.lineTo(
+      point.x + direction.x * arrowSizePx - normal.x * arrowSpreadPx,
+      point.y + direction.y * arrowSizePx - normal.y * arrowSpreadPx
+    );
+  }
+  graphics.stroke();
+}
+
+function createOpeningMoveDimensionLabelLayout(
+  text: string,
+  center: ScreenPoint,
+  outwardDirection: ScreenPoint,
+  tangentDirection: ScreenPoint,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+): ResizeDimensionLabelLayout {
+  const measurementTextScale = getMeasurementTextScale(settings);
+  const dimensionFontSizePx = getScaledMeasurementPx(RESIZE_DIMENSION_FONT_SIZE_PX, settings);
+  const dimensionPaddingXPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_X_PX, settings);
+  const dimensionPaddingYPx = getScaledMeasurementPx(RESIZE_DIMENSION_PADDING_Y_PX, settings);
+  const labelGapPx = getScaledMeasurementPx(RESIZE_DIMENSION_LABEL_GAP_PX, settings);
+  const measurementText = new Text({
+    text,
+    resolution: getTextResolution(),
+    style: {
+      fontFamily: RESIZE_DIMENSION_FONT_FAMILY,
+      fontSize: dimensionFontSizePx,
+      fontWeight: RESIZE_DIMENSION_FONT_WEIGHT,
+      letterSpacing: RESIZE_DIMENSION_LETTER_SPACING_PX * measurementTextScale,
+    },
+  });
+  const width = measurementText.width + dimensionPaddingXPx * 2;
+  const height = measurementText.height + dimensionPaddingYPx * 2;
+  measurementText.destroy();
+
+  return {
+    text,
+    center: clampResizeDimensionLabelCenter(
+      {
+        x: center.x + outwardDirection.x * labelGapPx,
+        y: center.y + outwardDirection.y * labelGapPx,
+      },
+      width,
+      height,
+      viewport
+    ),
+    outwardDirection,
+    tangentDirection,
+    avoidanceDirection: outwardDirection,
+    strokeColor: theme.wallSelectionAccent,
+    strokeAlpha: 0.82,
+    width,
+    height,
+  };
+}
 
 function drawActiveResizeDimensions(
   labelContainer: Container,
@@ -5727,8 +6068,8 @@ function drawDimensionLabels(
     pill.fill();
     pill.setStrokeStyle({
       width: 1.1 * measurementTextScale,
-      color: theme.roomLabelPillSelectedStroke,
-      alpha: RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
+      color: labelLayout.strokeColor ?? theme.roomLabelPillSelectedStroke,
+      alpha: labelLayout.strokeAlpha ?? RESIZE_DIMENSION_ACTIVE_STROKE_ALPHA,
     });
     pill.roundRect(left, top, width, height, dimensionRadiusPx);
     pill.stroke();

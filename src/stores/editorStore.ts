@@ -350,6 +350,14 @@ type EditorState = {
     previousOffsetMm: number,
     nextOffsetMm: number
   ) => void;
+  commitBulkOpeningMove: (
+    moves: Array<{
+      roomId: string;
+      openingId: string;
+      previousOffsetMm: number;
+      nextOffsetMm: number;
+    }>
+  ) => void;
   previewInteriorAssetMove: (roomId: string, assetId: string, nextCenter: Point) => void;
   commitInteriorAssetMove: (
     roomId: string,
@@ -381,6 +389,9 @@ type EditorState = {
   moveRoomByDelta: (roomId: string, delta: Point) => void;
   previewRoomMove: (roomId: string, nextPoints: Point[]) => void;
   commitRoomMove: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitBulkRoomMove: (
+    moves: Array<{ roomId: string; previousPoints: Point[]; nextPoints: Point[] }>
+  ) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
   resetCamera: () => void;
@@ -1006,32 +1017,7 @@ function updateRoomInteriorAssetPositionInDocument(
     ),
   };
 
-  const room = nextDocument.rooms.find((candidate) => candidate.id === roomId) ?? null;
-  const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId) ?? null;
-  const connectedPeer = asset ? getConnectedStairPeer(nextDocument, asset) : null;
-  if (!connectedPeer) {
-    return nextDocument;
-  }
-
-  return {
-    ...nextDocument,
-    rooms: nextDocument.rooms.map((candidateRoom) =>
-      candidateRoom.id === connectedPeer.roomId
-        ? {
-            ...candidateRoom,
-            interiorAssets: candidateRoom.interiorAssets.map((candidateAsset) =>
-              candidateAsset.id === connectedPeer.asset.id
-                ? {
-                    ...cloneRoomInteriorAsset(candidateAsset),
-                    xMm: nextCenter.x,
-                    yMm: nextCenter.y,
-                  }
-                : candidateAsset
-            ),
-          }
-        : candidateRoom
-    ),
-  };
+  return syncConnectedStairTransformInDocument(nextDocument, roomId, assetId);
 }
 
 function moveInteriorAssetToRoomInDocument(
@@ -1157,7 +1143,7 @@ function syncConnectedStairTransformInDocument(
       ),
     };
   } else {
-    // Position/arrow sync: copy position and sync arrow direction (opposite) from primary to peer
+    // Position/size/arrow sync: copy geometry and keep stair arrows opposed.
     return {
       ...document,
       rooms: document.rooms.map((candidateRoom) =>
@@ -1168,6 +1154,8 @@ function syncConnectedStairTransformInDocument(
                 candidateAsset.id === connectedPeer.asset.id
                   ? {
                       ...cloneRoomInteriorAsset(candidateAsset),
+                      widthMm: asset.widthMm,
+                      depthMm: asset.depthMm,
                       xMm: asset.xMm,
                       yMm: asset.yMm,
                       arrowDirection: asset.arrowDirection === "forward" ? "reverse" : "forward",
@@ -1199,6 +1187,8 @@ function updateSelectedInteriorAsset(
     (asset.connectionId ?? null) !== null &&
     (asset.xMm !== nextAsset.xMm ||
       asset.yMm !== nextAsset.yMm ||
+      asset.widthMm !== nextAsset.widthMm ||
+      asset.depthMm !== nextAsset.depthMm ||
       asset.rotationDegrees !== nextAsset.rotationDegrees ||
       asset.arrowDirection !== nextAsset.arrowDirection);
 
@@ -1257,6 +1247,34 @@ function updateRoomOpeningWidthInDocument(
                 ? {
                     ...cloneRoomOpening(opening),
                     widthMm: nextWidthMm,
+                  }
+                : opening
+            ),
+          }
+        : room
+    ),
+  };
+}
+
+function updateRoomOpeningWidthAndOffsetInDocument(
+  document: DocumentState,
+  roomId: string,
+  openingId: string,
+  nextWidthMm: number,
+  nextOffsetMm: number
+): DocumentState {
+  return {
+    ...document,
+    rooms: document.rooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            openings: room.openings.map((opening) =>
+              opening.id === openingId
+                ? {
+                    ...cloneRoomOpening(opening),
+                    widthMm: nextWidthMm,
+                    offsetMm: nextOffsetMm,
                   }
                 : opening
             ),
@@ -2784,7 +2802,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (
         state.selectedRoomId === roomId &&
         state.selectedOpening?.roomId === roomId &&
-        state.selectedOpening.openingId === openingId
+        state.selectedOpening.openingId === openingId &&
+        state.selection.some(
+          (item) =>
+            item.type === "opening" &&
+            item.roomId === roomId &&
+            item.openingId === openingId
+        )
       ) {
         return state;
       }
@@ -5016,18 +5040,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (opening.widthMm === nextWidthMm && nextOffsetMm === undefined) return state;
       if (opening.widthMm === nextWidthMm && opening.offsetMm === nextOffsetMm) return state;
 
-      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
-      
-      // If offset changed (for handle-anchored resizing), also update the offset
-      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
-        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
-        if (updatedRoom) {
-          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
-          if (updatedOpening) {
-            updatedOpening.offsetMm = nextOffsetMm;
-          }
-        }
-      }
+      const updatedDocument =
+        nextOffsetMm !== undefined
+          ? updateRoomOpeningWidthAndOffsetInDocument(
+              state.document,
+              roomId,
+              openingId,
+              nextWidthMm,
+              nextOffsetMm
+            )
+          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
 
       return {
         document: updatedDocument,
@@ -5055,18 +5077,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       };
 
-      const updatedDocument = updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
-      
-      // If offset changed, also update the offset
-      if (nextOffsetMm !== undefined && nextOffsetMm !== opening.offsetMm) {
-        const updatedRoom = updatedDocument.rooms.find((r) => r.id === roomId);
-        if (updatedRoom) {
-          const updatedOpening = updatedRoom.openings.find((o) => o.id === openingId);
-          if (updatedOpening) {
-            updatedOpening.offsetMm = nextOffsetMm;
-          }
-        }
-      }
+      const updatedDocument =
+        nextOffsetMm !== undefined
+          ? updateRoomOpeningWidthAndOffsetInDocument(
+              state.document,
+              roomId,
+              openingId,
+              nextWidthMm,
+              nextOffsetMm
+            )
+          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
 
       return {
         document: updatedDocument,
@@ -5115,6 +5135,53 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  commitBulkOpeningMove: (moves) =>
+    set((state) => {
+      const validMoves = moves.filter((move) => move.previousOffsetMm !== move.nextOffsetMm);
+      if (validMoves.length === 0) return state;
+
+      let previousDocument = state.document;
+      const movedOpenings: Extract<EditorCommand, { type: "bulk-move-openings" }>["movedOpenings"] = [];
+
+      for (const move of validMoves) {
+        const room = state.document.rooms.find((candidate) => candidate.id === move.roomId);
+        const opening = room?.openings.find((candidate) => candidate.id === move.openingId);
+        if (!room || !opening) continue;
+
+        previousDocument = updateRoomOpeningOffsetInDocument(
+          previousDocument,
+          move.roomId,
+          move.openingId,
+          move.previousOffsetMm
+        );
+        movedOpenings.push({
+          roomId: move.roomId,
+          openingId: move.openingId,
+          openingType: opening.type,
+          previousOffsetMm: move.previousOffsetMm,
+          nextOffsetMm: move.nextOffsetMm,
+        });
+      }
+
+      if (movedOpenings.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-move-openings",
+        previousDocument: cloneDocumentState(previousDocument),
+        nextDocument: cloneDocumentState(state.document),
+        movedOpenings,
+      };
+
+      return {
+        document: state.document,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   previewInteriorAssetMove: (roomId, assetId, nextCenter) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
@@ -5134,16 +5201,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (previousCenter.x === nextCenter.x && previousCenter.y === nextCenter.y) return state;
 
       if ((asset.connectionId ?? null) !== null) {
-        const updatedDocument = updateRoomInteriorAssetPositionInDocument(
+        const previousDocument = updateRoomInteriorAssetPositionInDocument(
+          state.document,
+          roomId,
+          assetId,
+          previousCenter
+        );
+        const nextDocument = updateRoomInteriorAssetPositionInDocument(
           state.document,
           roomId,
           assetId,
           nextCenter
         );
-        const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, roomId, assetId);
         const command: EditorCommand = {
           type: "sync-connected-stairs",
-          previousDocument: cloneDocumentState(state.document),
+          previousDocument: cloneDocumentState(previousDocument),
           nextDocument: cloneDocumentState(nextDocument),
         };
 
@@ -5330,11 +5402,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
+      const updatedDocument = updateRoomInteriorAssetInDocument(state.document, roomId, {
+        ...nextAsset,
+        id: assetId,
+      });
+
       return {
-        document: updateRoomInteriorAssetInDocument(state.document, roomId, {
-          ...nextAsset,
-          id: assetId,
-        }),
+        document:
+          (asset.connectionId ?? null) !== null
+            ? syncConnectedStairTransformInDocument(updatedDocument, roomId, assetId)
+            : updatedDocument,
       };
     }),
   commitInteriorAssetResize: (roomId, assetId, previousAsset, nextAsset) =>
@@ -5349,6 +5426,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousAsset.yMm === nextAsset.yMm
       ) {
         return state;
+      }
+
+      if ((asset.connectionId ?? null) !== null) {
+        const previousDocument = syncConnectedStairTransformInDocument(
+          updateRoomInteriorAssetInDocument(state.document, roomId, {
+            ...previousAsset,
+            id: assetId,
+          }),
+          roomId,
+          assetId
+        );
+        const nextDocument = syncConnectedStairTransformInDocument(
+          updateRoomInteriorAssetInDocument(state.document, roomId, {
+            ...nextAsset,
+            id: assetId,
+          }),
+          roomId,
+          assetId
+        );
+        const command: EditorCommand = {
+          type: "sync-connected-stairs",
+          previousDocument: cloneDocumentState(previousDocument),
+          nextDocument: cloneDocumentState(nextDocument),
+        };
+
+        return {
+          document: nextDocument,
+          history: {
+            past: pushToPast(state.history.past, command),
+            future: [],
+          },
+          canUndo: true,
+          canRedo: false,
+        };
       }
 
       const command: EditorCommand = {
@@ -5437,6 +5548,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: updateMovedRoomInDocument(state.document, roomId, previousPoints, nextPoints),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  commitBulkRoomMove: (moves) =>
+    set((state) => {
+      const validMoves = moves.filter(
+        (move) => !arePointListsEqual(move.previousPoints, move.nextPoints)
+      );
+      if (validMoves.length === 0) return state;
+
+      let previousDocument = state.document;
+      const movedRooms: Extract<EditorCommand, { type: "bulk-move-rooms" }>["movedRooms"] = [];
+
+      for (const move of validMoves) {
+        const room = state.document.rooms.find((candidate) => candidate.id === move.roomId);
+        if (!room) continue;
+
+        previousDocument = updateMovedRoomInDocument(
+          previousDocument,
+          move.roomId,
+          move.nextPoints,
+          move.previousPoints
+        );
+        movedRooms.push({
+          roomId: move.roomId,
+          previousPoints: move.previousPoints.map((point) => ({ ...point })),
+          nextPoints: move.nextPoints.map((point) => ({ ...point })),
+        });
+      }
+
+      if (movedRooms.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-move-rooms",
+        previousDocument: cloneDocumentState(previousDocument),
+        nextDocument: cloneDocumentState(state.document),
+        movedRooms,
+      };
+
+      return {
+        document: state.document,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6056,6 +6213,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedWall: null,
     selectedOpening: null,
     selectedInteriorAsset: null,
+    selection: [{ type: "room" as const, id: room.id }],
     shouldFocusSelectedRoomNameInput: true,
     renameSession: null,
     history: {

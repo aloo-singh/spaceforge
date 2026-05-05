@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Trash2 } from "@/components/ui/icons";
+import { Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { getPolygonBounds } from "@/lib/editor/roomGeometry";
+import { getRoomsForFloor } from "@/lib/editor/history";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
-import type { SharedSelectionItem } from "@/lib/editor/types";
+import type { Room, SharedSelectionItem } from "@/lib/editor/types";
 
 type SelectedFloorInspectorProps = {
   className?: string;
@@ -40,11 +43,56 @@ function InspectorIconTooltip({
   );
 }
 
+function FloorDimensionsDisplay({ rooms }: { rooms: Room[] }) {
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const room of rooms) {
+    const bounds = getPolygonBounds(room.points);
+    if (!bounds) continue;
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
+  }
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxY)
+  ) {
+    return null;
+  }
+
+  const width = maxX - minX;
+  const length = maxY - minY;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">Dimensions</p>
+      <div className="space-y-2">
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure2 className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(length)}</span>
+        </div>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure className="size-4 shrink-0" />
+          <span>{formatMetricWallDimension(width)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SelectedFloorInspector({ className }: SelectedFloorInspectorProps) {
   const panelRef = useRef<HTMLElement | null>(null);
   const { isMobile } = useMobile();
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
-  const floors = useEditorStore((state) => state.document.floors);
+  const editorDocument = useEditorStore((state) => state.document);
+  const floors = editorDocument.floors;
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -64,6 +112,7 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
   const deleteFloor = useEditorStore((state) => state.deleteFloor);
 
   const selectedFloor = floors.find((floor) => floor.id === selectedFloorId) ?? null;
+  const selectedFloorRooms = selectedFloor ? getRoomsForFloor(editorDocument, selectedFloor.id) : [];
   const canDeleteSelectedFloor = selectedFloor !== null;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
   const shouldHideKeyboardHints = isMobile || isCompactLandscapeViewport;
@@ -174,7 +223,12 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
               <span>cancel</span>
             </p>
           ) : null}
-          <div className="mt-4">
+          {selectedFloorRooms.length > 0 ? (
+            <div className="mt-4">
+              <FloorDimensionsDisplay rooms={selectedFloorRooms} />
+            </div>
+          ) : null}
+          <div className="mt-4 flex justify-end">
             <ImmediateTooltipProvider>
               <InspectorIconTooltip
                 content={

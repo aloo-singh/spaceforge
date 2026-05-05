@@ -154,6 +154,16 @@ export type EditorCommand =
       nextPoints: Room["points"];
     }
   | {
+      type: "bulk-move-rooms";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+      movedRooms: Array<{
+        roomId: string;
+        previousPoints: Room["points"];
+        nextPoints: Room["points"];
+      }>;
+    }
+  | {
       type: "add-opening";
       roomId: string;
       opening: RoomOpening;
@@ -181,6 +191,18 @@ export type EditorCommand =
       openingType: "door" | "window";
       previousOffsetMm: number;
       nextOffsetMm: number;
+    }
+  | {
+      type: "bulk-move-openings";
+      previousDocument: EditorDocumentState;
+      nextDocument: EditorDocumentState;
+      movedOpenings: Array<{
+        roomId: string;
+        openingId: string;
+        openingType: "door" | "window";
+        previousOffsetMm: number;
+        nextOffsetMm: number;
+      }>;
     }
   | {
       type: "move-interior-asset";
@@ -330,6 +352,12 @@ export function applyEditorCommand(
   }
 
   if (command.type === "sync-connected-stairs") {
+    return cloneEditorDocumentState(
+      direction === "undo" ? command.previousDocument : command.nextDocument
+    );
+  }
+
+  if (command.type === "bulk-move-rooms" || command.type === "bulk-move-openings") {
     return cloneEditorDocumentState(
       direction === "undo" ? command.previousDocument : command.nextDocument
     );

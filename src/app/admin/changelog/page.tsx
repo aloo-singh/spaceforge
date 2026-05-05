@@ -10,6 +10,262 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.16</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Admin login now creates a signed 24-hour admin session cookie instead of relying on Supabase's short-lived access token for every protected admin visit.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.15</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Opening resize handle cursors now reliably match the visible handle state by deriving both drawing and hit testing from the same effective opening selection.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.14</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Grouped moves now work for selected rooms, same-room assets, and same-wall openings, with each grouped move stored as a single atomic undo event.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.13</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Multi-select highlights now appear on every selected room, wall, opening, and asset instead of only the first selected item.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.12</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Stair length resizing now keeps the opposite end anchored when snapping to tread increments.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.11</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Linked stairs now move and resize in sync across connected floors, including live previews and undoable history.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.10</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Door swing arcs on the canvas now use the lighter stair direction arrow styling while keeping door leaves prominent.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.9</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Opening move and resize interactions now show live amber-highlighted distance arrows to nearby wall ends and neighboring openings.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.8</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Door and window end-handle resizing now stays anchored to the opposite end instead of jumping along the wall, while Alt/Opt keeps center-anchored resizing.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.7</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Selected floor inspector now shows overall floor footprint dimensions with the same icon-backed rows used for room dimensions.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.6</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Inspector delete actions for floors, rooms, and interior assets are now right-aligned for a cleaner action layout.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.5</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Door and window inspectors now stay visible while resizing, with dimensions updating live instead of falling back to the floor inspector.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.4</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Selected openings now show only the orange selection stroke, without the extra low-opacity halo around the wall gap.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.3</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Newly completed rooms now immediately open the room inspector with the room name focused and selected for typing.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.2</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Canvas doors now use standard 90-degree floor plan symbols with an opening arc instead of the previous 45-degree leaf mark.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.71.1</h2>
+            <span className="text-sm text-muted-foreground">2026-05-05</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Selected interior assets now show only the orange outline, without the extra low-opacity selection halo around it.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.71.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-05</span>
           </div>

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -23,6 +24,14 @@ type SupabaseAuthSession = {
     id?: string;
     email?: string | null;
   } | null;
+};
+
+const ADMIN_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
+
+type AdminSessionCookie = {
+  userId: string;
+  email: string;
+  expiresAt: number;
 };
 
 function getSupabasePublicConfig(): SupabasePublicConfig | null {
@@ -52,6 +61,19 @@ function getAdminEmails(): Set<string> {
 
 function getSupabaseAuthCookieName() {
   return "sb-spaceforge-auth-token";
+}
+
+function getAdminSessionCookieName() {
+  return "spaceforge-admin-session";
+}
+
+function getAdminSessionSigningSecret() {
+  return (
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    ""
+  );
 }
 
 function decodeBase64Url(value: string) {
@@ -91,6 +113,91 @@ function parseAccessToken(rawValue: string): string | null {
   }
 
   return null;
+}
+
+function parseAccessTokenClaims(accessToken: string): { userId?: string; email?: string } {
+  const parts = accessToken.split(".");
+  if (parts.length !== 3 || !parts[1]) return {};
+
+  try {
+    const claims = JSON.parse(decodeBase64Url(parts[1])) as {
+      sub?: unknown;
+      email?: unknown;
+      user_metadata?: { email?: unknown };
+    };
+
+    return {
+      userId: typeof claims.sub === "string" ? claims.sub : undefined,
+      email:
+        typeof claims.email === "string"
+          ? claims.email
+          : typeof claims.user_metadata?.email === "string"
+            ? claims.user_metadata.email
+            : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function encodeBase64Url(value: string) {
+  return Buffer.from(value, "utf-8").toString("base64url");
+}
+
+function signAdminSessionPayload(payload: string) {
+  const secret = getAdminSessionSigningSecret();
+  if (!secret) return null;
+
+  return createHmac("sha256", secret).update(payload).digest("base64url");
+}
+
+function serializeAdminSessionCookie(session: AdminSessionCookie) {
+  const payload = encodeBase64Url(JSON.stringify(session));
+  const signature = signAdminSessionPayload(payload);
+  if (!signature) return null;
+
+  return `${payload}.${signature}`;
+}
+
+function parseAdminSessionCookie(rawValue: string): AdminSessionCookie | null {
+  const [payload, signature] = rawValue.split(".");
+  if (!payload || !signature) return null;
+
+  const expectedSignature = signAdminSessionPayload(payload);
+  if (!expectedSignature) return null;
+
+  const providedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8")) as Partial<AdminSessionCookie>;
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.email !== "string" ||
+      typeof parsed.expiresAt !== "number" ||
+      !Number.isFinite(parsed.expiresAt)
+    ) {
+      return null;
+    }
+
+    if (parsed.expiresAt <= Date.now()) {
+      return null;
+    }
+
+    return {
+      userId: parsed.userId,
+      email: parsed.email,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function getSupabaseAccessTokenFromCookies(): Promise<string | null> {
@@ -169,8 +276,29 @@ export async function getAuthenticatedSupabaseUser(): Promise<SupabaseAuthUser |
 }
 
 export async function getAuthenticatedAdminUser(): Promise<SupabaseAuthUser | null> {
+  const adminSession = await getAuthenticatedAdminSessionUser();
+  if (adminSession) {
+    return adminSession;
+  }
+
   const user = await getAuthenticatedSupabaseUser();
   return isAdminEmail(user?.email) ? user : null;
+}
+
+async function getAuthenticatedAdminSessionUser(): Promise<SupabaseAuthUser | null> {
+  const cookieStore = await cookies();
+  const rawCookie = cookieStore.get(getAdminSessionCookieName())?.value;
+  if (!rawCookie) return null;
+
+  const adminSession = parseAdminSessionCookie(rawCookie);
+  if (!adminSession || !isAdminEmail(adminSession.email)) {
+    return null;
+  }
+
+  return {
+    id: adminSession.userId,
+    email: adminSession.email,
+  };
 }
 
 export async function signInWithPassword(email: string, password: string) {
@@ -206,10 +334,7 @@ export async function signInWithPassword(email: string, password: string) {
 
 export async function setAuthenticatedSessionCookie(session: SupabaseAuthSession) {
   const cookieStore = await cookies();
-  const maxAge =
-    typeof session.expires_in === "number" && Number.isFinite(session.expires_in)
-      ? Math.max(60, Math.floor(session.expires_in))
-      : 24 * 60 * 60;
+  const maxAge = ADMIN_SESSION_MAX_AGE_SECONDS;
 
   cookieStore.set(getSupabaseAuthCookieName(), JSON.stringify(session), {
     httpOnly: true,
@@ -218,11 +343,38 @@ export async function setAuthenticatedSessionCookie(session: SupabaseAuthSession
     path: "/",
     maxAge,
   });
+
+  const tokenClaims = parseAccessTokenClaims(session.access_token);
+  const userId = session.user?.id ?? tokenClaims.userId;
+  const email = session.user?.email ?? tokenClaims.email;
+  if (typeof userId === "string" && typeof email === "string" && isAdminEmail(email)) {
+    const adminSessionCookie = serializeAdminSessionCookie({
+      userId,
+      email,
+      expiresAt: Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000,
+    });
+    if (adminSessionCookie) {
+      cookieStore.set(getAdminSessionCookieName(), adminSessionCookie, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge,
+      });
+    }
+  }
 }
 
 export async function clearAuthenticatedSessionCookie() {
   const cookieStore = await cookies();
   cookieStore.set(getSupabaseAuthCookieName(), "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  cookieStore.set(getAdminSessionCookieName(), "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -250,9 +402,9 @@ export async function signOutAuthenticatedUser() {
 }
 
 export async function requireAdminUser(): Promise<SupabaseAuthUser> {
-  const user = await getAuthenticatedSupabaseUser();
+  const user = await getAuthenticatedAdminUser();
 
-  if (!user || !isAdminEmail(user.email)) {
+  if (!user) {
     redirect("/admin/login");
   }
 
