@@ -286,6 +286,7 @@ const OPENING_MOVE_DIMENSION_NEIGHBOR_OFFSET_PX = 48;
 const OPENING_MOVE_DIMENSION_MIN_LENGTH_PX = 34;
 const OPENING_CUTOUT_WORLD_MM = 64;
 const OPENING_SYMBOL_WORLD_MM = 18;
+const DOOR_SWING_ARC_WORLD_MM = 8;
 const WINDOW_LINE_INSET_WORLD_MM = 44;
 const WINDOW_LINE_SEPARATION_WORLD_MM = 32;
 const OPENING_SELECTION_STROKE_WORLD_MM = 28;
@@ -4506,14 +4507,24 @@ function drawRoomOpenings(
       const shouldDrawArcAnticlockwise =
         hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x < 0;
 
+      const doorSymbolColor = isSelected ? selectionColor : theme.roomOutline;
       graphics.setStrokeStyle({
         width: isSelected ? selectionStrokePx : symbolStrokePx,
-        color: isSelected ? selectionColor : theme.roomOutline,
+        color: doorSymbolColor,
         alpha: isSelected ? 1 : 0.96,
         cap: "round",
       });
       graphics.moveTo(hingePoint.x, hingePoint.y);
       graphics.lineTo(openLeafEnd.x, openLeafEnd.y);
+      graphics.stroke();
+
+      graphics.setStrokeStyle({
+        width: Math.max(camera.pixelsPerMm * DOOR_SWING_ARC_WORLD_MM, 1),
+        color: doorSymbolColor,
+        alpha: isSelected ? 0.94 : 0.76,
+        cap: "round",
+        join: "round",
+      });
       graphics.moveTo(closedLeafEnd.x, closedLeafEnd.y);
       graphics.arc(
         hingePoint.x,
