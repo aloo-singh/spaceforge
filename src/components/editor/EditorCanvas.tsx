@@ -41,6 +41,11 @@ import {
   hitTestOrthogonalWallHandle,
 } from "@/lib/editor/orthogonalWallResize";
 import {
+  getWallSplitHandleLayout,
+  hitTestWallSplitHandle,
+  WALL_SPLIT_HANDLE_RADIUS_PX,
+} from "@/lib/editor/wallSplit";
+import {
   findOpeningAtScreenPoint,
   findSelectedOpeningWidthHandleAtScreenPoint,
   getResolvedRoomOpeningLayout,
@@ -296,16 +301,12 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
-const WALL_SPLIT_HANDLE_RADIUS_PX = 9;
-const WALL_SPLIT_HANDLE_HIT_RADIUS_PX = 16;
-const WALL_SPLIT_HANDLE_OFFSET_PX = 20;
 const WALL_SPLIT_HANDLE_PLUS_SIZE_PX = 8;
 const WALL_SPLIT_TOOLTIP_TEXT = "Split wall here";
 const WALL_SPLIT_TOOLTIP_FONT_SIZE_PX = 11;
 const WALL_SPLIT_TOOLTIP_PADDING_X_PX = 8;
 const WALL_SPLIT_TOOLTIP_PADDING_Y_PX = 5;
 const WALL_SPLIT_TOOLTIP_RADIUS_PX = 8;
-const WALL_SPLIT_TOOLTIP_GAP_PX = 8;
 const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
 const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
@@ -2777,9 +2778,7 @@ export default function EditorCanvas({
           );
           if (!layout) continue;
 
-          const distanceSquared =
-            (screenPoint.x - layout.center.x) ** 2 + (screenPoint.y - layout.center.y) ** 2;
-          if (distanceSquared > WALL_SPLIT_HANDLE_HIT_RADIUS_PX ** 2) continue;
+          if (!hitTestWallSplitHandle(layout.center, screenPoint)) continue;
 
           const tooltipVisible =
             wallSplitHoverUiRef.current?.roomId === targetRoomId &&
@@ -6356,58 +6355,6 @@ function getSingleSelectedRoomIdForSplitAffordance(
   if (item.type === "room" && item.id === selectedRoomId) return selectedRoomId;
   if (item.type === "wall" && item.roomId === selectedRoomId) return selectedRoomId;
   return null;
-}
-
-function getWallSplitHandleLayout(
-  room: Room,
-  wall: RoomWall,
-  camera: CameraState,
-  viewport: ViewportSize,
-  settings: Pick<EditorSettings, "wallMeasurementPosition">
-): { center: ScreenPoint; tooltipCenter: ScreenPoint } | null {
-  const segment = getRoomWallSegment(room, wall);
-  if (!segment) return null;
-
-  const midpointWorld = {
-    x: (segment.originalStart.x + segment.originalEnd.x) / 2,
-    y: (segment.originalStart.y + segment.originalEnd.y) / 2,
-  };
-  const midpoint = worldToScreen(midpointWorld, camera, viewport);
-  const normalAnchor = worldToScreen(
-    {
-      x: midpointWorld.x + segment.interiorNormal.x * 100,
-      y: midpointWorld.y + segment.interiorNormal.y * 100,
-    },
-    camera,
-    viewport
-  );
-  const normal = normalizeScreenDirection({
-    x: normalAnchor.x - midpoint.x,
-    y: normalAnchor.y - midpoint.y,
-  });
-  const placementDirection =
-    settings.wallMeasurementPosition === "inside"
-      ? {
-          x: -normal.x,
-          y: -normal.y,
-        }
-      : normal;
-  const center = {
-    x: midpoint.x + placementDirection.x * WALL_SPLIT_HANDLE_OFFSET_PX,
-    y: midpoint.y + placementDirection.y * WALL_SPLIT_HANDLE_OFFSET_PX,
-  };
-
-  return {
-    center,
-    tooltipCenter: {
-      x:
-        center.x +
-        placementDirection.x * (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_GAP_PX),
-      y:
-        center.y +
-        placementDirection.y * (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_GAP_PX),
-    },
-  };
 }
 
 function drawWallSplitHandle(

@@ -104,6 +104,10 @@ import {
   getSnappedPointFromGuides,
   type DrawConstraintMode,
 } from "@/lib/editor/snapping";
+import {
+  getWallSplitResult,
+  type WallSplitResult,
+} from "@/lib/editor/wallSplit";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
@@ -396,6 +400,7 @@ type EditorState = {
   ) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
   commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   resetCamera: () => void;
   fitCameraToSelectedRoom: () => void;
   resetCanvas: () => void;
@@ -5733,6 +5738,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  splitWallAtPoint: (roomId, worldPoint) => {
+    let splitResult: WallSplitResult | null = null;
+
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+
+      const result = getWallSplitResult(room, worldPoint);
+      if (!result) return state;
+      splitResult = result;
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, result.nextPoints),
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: roomId }],
+      };
+    });
+
+    return splitResult;
+  },
   resetCamera: () => {
     const state = get();
     const isLandscape = state.viewport.width > state.viewport.height;
