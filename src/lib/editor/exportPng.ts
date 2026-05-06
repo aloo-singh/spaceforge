@@ -23,6 +23,11 @@ import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
 
+export type EditorExportScope = {
+  type: "floor" | "room";
+  id: string;
+};
+
 export type PixiPngExportSource =
   | Renderer
   | {
@@ -31,6 +36,7 @@ export type PixiPngExportSource =
     };
 
 export type PixiPngExportOptions = {
+  exportScope?: EditorExportScope;
   backgroundColor?: string;
   paddingPx?: number;
   exportResolution?: EditorExportResolution;
@@ -133,6 +139,7 @@ type SvgLegendItem = {
 
 export type SvgExportOptions = {
   rooms: Room[];
+  exportScope?: EditorExportScope;
   title?: string;
   description?: string;
   exportAssetMode?: EditorExportAssetMode;

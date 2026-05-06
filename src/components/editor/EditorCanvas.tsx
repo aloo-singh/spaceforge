@@ -66,9 +66,10 @@ import { attachCopyPasteHotkeys } from "@/lib/editor/input/copyPasteHotkeys";
 import { isEditableTarget } from "@/lib/editor/input/editableTarget";
 import { attachHistoryHotkeys } from "@/lib/editor/input/historyHotkeys";
 import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
-import { getLayoutBoundsFromDocument, getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
+import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   buildEditorExportFilename,
+  type EditorExportScope,
   exportPixiCanvasToPngBlob,
   exportPixiCanvasToPngDataUrl,
   exportSvgToPdfBlob,
@@ -150,6 +151,7 @@ import {
   DEFAULT_FLOOR_ID,
   getRoomsForActiveFloor,
   getRoomsForFloor,
+  type EditorDocumentState,
 } from "@/lib/editor/history";
 import { usePersistentPanelState } from "@/lib/editor/usePersistentPanelState";
 import {
@@ -415,6 +417,38 @@ const MINI_MAP_INSET_PX = 10;
 const MINI_MAP_WORLD_PADDING_RATIO = 0.08;
 const MINI_MAP_WORLD_PADDING_MIN_MM = 320;
 const CANVAS_HUD_HIDE_TRANSITION_MS = 220;
+
+function getRoomsForExportScope(
+  document: EditorDocumentState,
+  exportScope: EditorExportScope | undefined
+): Room[] {
+  if (exportScope?.type === "room") {
+    const room = document.rooms.find((candidate) => candidate.id === exportScope.id);
+    return room ? [room] : getRoomsForActiveFloor(document);
+  }
+
+  if (exportScope?.type === "floor") {
+    return getRoomsForFloor(document, exportScope.id);
+  }
+
+  return getRoomsForActiveFloor(document);
+}
+
+function getFloorNameForExportScope(
+  document: EditorDocumentState,
+  exportScope: EditorExportScope | undefined
+): string {
+  if (exportScope?.type === "floor") {
+    return document.floors.find((floor) => floor.id === exportScope.id)?.name ?? "Floor 1";
+  }
+
+  if (exportScope?.type === "room") {
+    const room = document.rooms.find((candidate) => candidate.id === exportScope.id);
+    return document.floors.find((floor) => floor.id === room?.floorId)?.name ?? "Floor 1";
+  }
+
+  return document.floors.find((floor) => floor.id === document.activeFloorId)?.name ?? "Floor 1";
+}
 
 function CanvasMiniMap({
   rooms,
@@ -1452,6 +1486,7 @@ export default function EditorCanvas({
       legendItems,
       themeMode,
       exportResolution,
+      exportScope,
     }: {
       includeSignature: boolean;
       includeNorthIndicator?: boolean;
@@ -1468,14 +1503,15 @@ export default function EditorCanvas({
       legendItems?: { name: string; area: string }[];
       themeMode: "light" | "dark";
       exportResolution?: "normal" | "hi-res";
+      exportScope?: EditorExportScope;
     }) => {
       const app = appRef.current;
       if (!app) return null;
 
       const state = useEditorStore.getState();
       const exportTheme = getEditorCanvasTheme(themeMode);
-      const activeFloorRooms = getRoomsForActiveFloor(state.document);
-      const exportRooms = activeFloorRooms.map((room) => ({
+      const scopedRooms = getRoomsForExportScope(state.document, exportScope);
+      const exportRooms = scopedRooms.map((room) => ({
         ...room,
         interiorAssets:
           exportAssetMode === "none"
@@ -1484,7 +1520,7 @@ export default function EditorCanvas({
               ? room.interiorAssets.filter((asset) => asset.type === "stairs")
               : room.interiorAssets,
       }));
-      const layoutBounds = getLayoutBoundsFromDocument(state.document);
+      const layoutBounds = getLayoutBoundsFromRooms(scopedRooms);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
         viewport: state.viewport,
@@ -1585,6 +1621,7 @@ export default function EditorCanvas({
         stage: exportStage,
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
+          exportScope,
           paddingPx,
           exportResolution,
           header:
@@ -1660,9 +1697,10 @@ export default function EditorCanvas({
         : "";
     const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
     const effectiveScaleBarPosition = request.showScaleBar ? request.scaleBarPosition : "none";
+    const scopedRooms = getRoomsForExportScope(useEditorStore.getState().document, request.exportScope);
     const exportLegendItems =
       effectiveLegendPosition !== "none"
-        ? getRoomsForActiveFloor(useEditorStore.getState().document).map((room, index) => ({
+        ? scopedRooms.map((room, index) => ({
             name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
             area: formatMetricRoomAreaForRoom(room),
           }))
@@ -1691,6 +1729,7 @@ export default function EditorCanvas({
       signatureText: exportSignatureText || undefined,
       themeMode: resolvedThemeMode,
       exportResolution: request.exportResolution,
+      exportScope: request.exportScope,
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
 
@@ -1713,10 +1752,8 @@ export default function EditorCanvas({
           request.descriptionPosition === "below-title"
             ? normalizeExportMultilineText(request.description)
             : "";
-        const activeFloorName =
-          state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
-          "Floor 1";
-        const activeFloorRooms = getRoomsForActiveFloor(state.document);
+        const activeFloorName = getFloorNameForExportScope(state.document, request.exportScope);
+        const scopedRooms = getRoomsForExportScope(state.document, request.exportScope);
         const exportSignatureText = normalizeEditorExportSignature(
           request.designedBy || state.settings.exportSignatureText
         );
@@ -1726,7 +1763,7 @@ export default function EditorCanvas({
         const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
         const exportLegendItems =
           effectiveLegendPosition !== "none"
-            ? activeFloorRooms.map((room, index) => ({
+            ? scopedRooms.map((room, index) => ({
                 name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
                 area: formatMetricRoomAreaForRoom(room),
               }))
@@ -1737,7 +1774,8 @@ export default function EditorCanvas({
           format: request.exportFormat,
         });
         const svg = exportToSVG({
-          rooms: activeFloorRooms,
+          rooms: scopedRooms,
+          exportScope: request.exportScope,
           title: exportTitle || undefined,
           description: exportDescription || undefined,
           exportAssetMode: request.exportAssetMode,
@@ -1798,9 +1836,7 @@ export default function EditorCanvas({
       const state = useEditorStore.getState();
       const exportTitle =
         request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
-      const activeFloorName =
-        state.document.floors.find((floor) => floor.id === state.document.activeFloorId)?.name ??
-        "Floor 1";
+      const activeFloorName = getFloorNameForExportScope(state.document, request.exportScope);
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;

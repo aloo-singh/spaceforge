@@ -1,13 +1,23 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download } from "@/components/ui/icons";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
 import type {
@@ -23,13 +33,14 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
-import { buildEditorExportFilename } from "@/lib/editor/exportPng";
+import { buildEditorExportFilename, type EditorExportScope } from "@/lib/editor/exportPng";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
 
 export type ExportPngRequest = {
+  exportScope?: EditorExportScope;
   title: string;
   description: string;
   titlePosition: ProjectExportTitlePosition;
@@ -138,15 +149,35 @@ export function ExportPngDialog({
   const [showHiResUpsellDialog, setShowHiResUpsellDialog] = useState(false);
   const [showSvgUpsellDialog, setShowSvgUpsellDialog] = useState(false);
   const [showPdfUpsellDialog, setShowPdfUpsellDialog] = useState(false);
+  const [selectedScopeValue, setSelectedScopeValue] = useState("");
   const previewRequestIdRef = useRef(0);
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
   const isDevSubscriptionModeEnabled = useEditorStore((state) => state.isDevSubscriptionModeEnabled);
-  const activeFloorName = useEditorStore((state) => {
-    const activeFloor = state.document.floors.find((floor) => floor.id === state.document.activeFloorId);
-    return activeFloor?.name ?? "Floor 1";
-  });
+  const editorDocument = useEditorStore((state) => state.document);
+  const selection = useEditorStore((state) => state.selection);
+  const exportScopeOptions = useMemo(() => {
+    const activeFloorId = editorDocument.activeFloorId ?? editorDocument.floors[0]?.id ?? "floor-1";
+    const selectedRoomItems = selection.filter((item) => item.type === "room");
+    const selectedRoomId =
+      selection.length === 1 && selectedRoomItems.length === 1 ? selectedRoomItems[0].id : null;
+
+    return {
+      activeFloorId,
+      floors: editorDocument.floors.map((floor) => ({
+        id: floor.id,
+        name: floor.name,
+        rooms: editorDocument.rooms
+          .filter((room) => room.floorId === floor.id)
+          .map((room) => ({
+            id: room.id,
+            name: room.name,
+          })),
+      })),
+      selectedRoomId,
+    };
+  }, [editorDocument, selection]);
 
   const isExportButtonDisabled = exportDisabled || isExporting;
   const effectiveLegendPosition: EditorExportLegendPosition =
@@ -155,6 +186,25 @@ export function ExportPngDialog({
     showScaleBar && scaleBarPosition !== "none" ? scaleBarPosition : "none";
   const canExportSvg = devSubscriptionTier === "Studio" || devSubscriptionTier === "Education";
   const canExportPdf = devSubscriptionTier !== "Free";
+  const defaultScopeValue = exportScopeOptions.selectedRoomId
+    ? formatExportScopeValue({ type: "room", id: exportScopeOptions.selectedRoomId })
+    : formatExportScopeValue({ type: "floor", id: exportScopeOptions.activeFloorId });
+  const availableScopeValues = new Set([
+    ...exportScopeOptions.floors.map((floor) =>
+      formatExportScopeValue({ type: "floor", id: floor.id })
+    ),
+    ...exportScopeOptions.floors.flatMap((floor) =>
+      floor.rooms.map((room) => formatExportScopeValue({ type: "room", id: room.id }))
+    ),
+  ]);
+  const effectiveScopeValue =
+    selectedScopeValue && availableScopeValues.has(selectedScopeValue)
+      ? selectedScopeValue
+      : defaultScopeValue;
+  const exportScope = useMemo(() => parseExportScopeValue(effectiveScopeValue), [effectiveScopeValue]);
+  const activeFloorName =
+    exportScopeOptions.floors.find((floor) => floor.id === exportScopeOptions.activeFloorId)?.name ??
+    "Floor 1";
   const previewFilename = buildEditorExportFilename({
     projectName: title,
     floorName: activeFloorName,
@@ -177,6 +227,7 @@ export function ExportPngDialog({
       }, 160);
 
       void onPreviewRequest({
+        exportScope,
         title,
         description,
         titlePosition,
@@ -223,6 +274,7 @@ export function ExportPngDialog({
   }, [
     open,
     onPreviewRequest,
+    exportScope,
     title,
     description,
     titlePosition,
@@ -244,6 +296,7 @@ export function ExportPngDialog({
 
     handleOpenChange(false);
     void onExport({
+      exportScope,
       title,
       description,
       titlePosition,
@@ -267,6 +320,7 @@ export function ExportPngDialog({
     if (!nextOpen) {
       setIsPreviewRefreshing(false);
       setIsPreviewRefreshVisible(false);
+      setSelectedScopeValue("");
     }
     onOpenChange(nextOpen);
   };
@@ -425,6 +479,44 @@ export function ExportPngDialog({
 
         <section className="min-h-0 pr-1 lg:h-full lg:overflow-y-auto">
           <div className="space-y-2.5 pb-2 lg:pb-1">
+            <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
+              <div className="space-y-1">
+                <label
+                  htmlFor="export-png-scope"
+                  className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase"
+                >
+                  What to export
+                </label>
+                <Select value={effectiveScopeValue} onValueChange={setSelectedScopeValue}>
+                  <SelectTrigger id="export-png-scope" className="h-9 bg-background/90">
+                    <SelectValue placeholder="Choose export scope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {exportScopeOptions.floors.map((floor, index) => (
+                      <SelectGroup key={floor.id}>
+                        {index > 0 ? <SelectSeparator /> : null}
+                        <SelectLabel>{floor.name}</SelectLabel>
+                        <SelectItem value={formatExportScopeValue({ type: "floor", id: floor.id })}>
+                          {floor.id === exportScopeOptions.activeFloorId ? "Current floor" : floor.name}
+                        </SelectItem>
+                        {floor.rooms.map((room) => (
+                          <SelectItem
+                            key={room.id}
+                            value={formatExportScopeValue({ type: "room", id: room.id })}
+                            className="pl-5"
+                          >
+                            {room.id === exportScopeOptions.selectedRoomId
+                              ? `Selected room - ${room.name}`
+                              : room.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div>
@@ -785,6 +877,21 @@ type ExportToggleCardProps = {
   description: string;
   children: ReactNode;
 };
+
+function formatExportScopeValue(scope: EditorExportScope): string {
+  return `${scope.type}:${scope.id}`;
+}
+
+function parseExportScopeValue(value: string): EditorExportScope | undefined {
+  const separatorIndex = value.indexOf(":");
+  if (separatorIndex <= 0) return undefined;
+
+  const type = value.slice(0, separatorIndex);
+  const id = value.slice(separatorIndex + 1);
+  if (!id || (type !== "floor" && type !== "room")) return undefined;
+
+  return { type, id };
+}
 
 function ExportToggleCard({ title, description, children }: ExportToggleCardProps) {
   return (
