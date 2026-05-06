@@ -3820,7 +3820,11 @@ function drawScene(
   );
   
   // Draw linked staircase peer room as overlay (visible even when on different floor)
-  if (linkedStaircasePeerRoom && linkedStaircasePeerRoom.points.length >= 3) {
+  if (
+    !state.focusedRoomId &&
+    linkedStaircasePeerRoom &&
+    linkedStaircasePeerRoom.points.length >= 3
+  ) {
     drawDashedRoomOutline(
       roomGraphics,
       linkedStaircasePeerRoom.points,

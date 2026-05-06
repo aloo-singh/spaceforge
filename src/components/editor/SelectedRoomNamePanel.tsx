@@ -293,7 +293,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
           <div className="mt-4 flex justify-between gap-2">
             <ImmediateTooltipProvider>
               <InspectorIconTooltip
-                content={isFocusModeActive ? "Show all rooms" : "Focus this room"}
+                content={isFocusModeActive ? "Show all rooms" : "Focus on this room"}
               >
                 <Toggle
                   type="button"
@@ -305,10 +305,10 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
                   }}
                   aria-label={
                     isFocusModeActive
-                      ? `Show all rooms, currently focusing ${selectedRoom.name}`
-                      : `Focus ${selectedRoom.name}`
+                      ? "Show all rooms"
+                      : "Focus on this room"
                   }
-                  className="border-border/70 data-[state=on]:border-blue-500/70 data-[state=on]:bg-blue-500 data-[state=on]:text-white data-[state=on]:shadow-sm data-[state=on]:hover:bg-blue-600"
+                  className="border-border/70 data-[state=on]:border-brand/70 data-[state=on]:bg-brand data-[state=on]:text-white data-[state=on]:shadow-sm data-[state=on]:hover:bg-brand/90"
                 >
                   <IconEye />
                 </Toggle>
