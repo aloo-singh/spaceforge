@@ -50,6 +50,11 @@ import {
   type RoomRectBounds,
 } from "@/lib/editor/rectRoomResize";
 import {
+  getVertexDeletionResult,
+  getVertexDeleteHandleCenter,
+  hitTestVertexDeleteHandle,
+} from "@/lib/editor/vertexDeletion";
+import {
   createTransformFeedbackTargetFromPoints,
   createTransformFeedback,
   TRANSFORM_SETTLE_TOTAL_MS,
@@ -73,7 +78,7 @@ type RoomResizeStoreState = {
     roomId: string,
     previousPoints: Point[],
     nextPoints: Point[],
-    options?: { editKind?: "wall-split" }
+    options?: { editKind?: "wall-split" | "vertex-delete" }
   ) => void;
   splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   setCanvasInteractionActive: (isActive: boolean) => void;
@@ -498,6 +503,34 @@ export function attachRoomResizeInput(
       selected.state.viewport
     );
 
+  const commitVertexDeletion = (
+    selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>,
+    vertexIndex: number,
+    event: PointerEvent
+  ): boolean => {
+    const result = getVertexDeletionResult(selected.room, vertexIndex);
+    if (!result) return false;
+
+    const { previousPoints, nextPoints } = result;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    clearPendingTransformFeedbackTimeout();
+    setTransformFeedback(
+      getResizeTransformFeedback(selected.room.id, previousPoints, nextPoints, nextPoints, "settling")
+    );
+    selected.state.commitRoomResize(selected.room.id, previousPoints, nextPoints, {
+      editKind: "vertex-delete",
+    });
+    scheduleTransformFeedbackClear();
+
+    hoveredVertexIndex = null;
+    updateCursor();
+    publishHandleState();
+    callbacks.requestRender();
+    return true;
+  };
+
   const startWallSplitDrag = (
     selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>,
     splitPoint: Point,
@@ -906,6 +939,18 @@ export function attachRoomResizeInput(
     if (powerUserSplitPoint) {
       startWallSplitDrag(selected, powerUserSplitPoint, event, screenPoint);
       return;
+    }
+
+    if ((selected.isConstrainedVertexRoom || selected.isEightWayRoom) && hoveredVertexIndex !== null) {
+      const deleteHandleCenter = getVertexDeleteHandleCenter(
+        selected.room,
+        hoveredVertexIndex,
+        selected.state.camera,
+        selected.state.viewport
+      );
+      if (deleteHandleCenter && hitTestVertexDeleteHandle(deleteHandleCenter, screenPoint)) {
+        if (commitVertexDeletion(selected, hoveredVertexIndex, event)) return;
+      }
     }
 
     const hitVertexIndex = selected.isConstrainedVertexRoom || selected.isEightWayRoom

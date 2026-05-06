@@ -45,6 +45,7 @@ import {
   hitTestWallSplitHandle,
   WALL_SPLIT_HANDLE_RADIUS_PX,
 } from "@/lib/editor/wallSplit";
+import { VERTEX_DELETE_HANDLE_OFFSET_PX } from "@/lib/editor/vertexDeletion";
 import {
   findOpeningAtScreenPoint,
   findSelectedOpeningWidthHandleAtScreenPoint,
@@ -312,7 +313,6 @@ const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
 const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
 const VERTEX_DELETE_HANDLE_RADIUS_PX = 8;
 const VERTEX_DELETE_HANDLE_CROSS_SIZE_PX = 5;
-const VERTEX_DELETE_HANDLE_OFFSET_PX = 22;
 const VERTEX_DELETE_HANDLE_COLOR = 0xe53e3e;
 const VERTEX_DELETE_TOOLTIP_TEXT = "Remove corner";
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;

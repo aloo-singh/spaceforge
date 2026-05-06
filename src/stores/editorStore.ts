@@ -403,7 +403,7 @@ type EditorState = {
     roomId: string,
     previousPoints: Point[],
     nextPoints: Point[],
-    options?: { editKind?: "wall-split" }
+    options?: { editKind?: "wall-split" | "vertex-delete" }
   ) => void;
   splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   resetCamera: () => void;
@@ -425,6 +425,13 @@ let activeStairsAdjustedToast:
     }
   | null = null;
 let activeWallSplitToast:
+  | {
+      id: string | number;
+      roomId: string;
+      nextPoints: Point[];
+    }
+  | null = null;
+let activeVertexDeleteToast:
   | {
       id: string | number;
       roomId: string;
@@ -1454,6 +1461,64 @@ function dismissWallSplitToastForCommand(command: EditorCommand) {
 
   toast.dismiss(activeWallSplitToast.id);
   activeWallSplitToast = null;
+}
+
+function showVertexDeleteToast(roomId: string, roomName: string, nextPoints: Point[]) {
+  if (activeVertexDeleteToast) {
+    toast.dismiss(activeVertexDeleteToast.id);
+  }
+
+  const message = `${getRoomToastLabel(roomName)} corner removed`;
+  const id = toast(message, {
+    duration: 3200,
+    onDismiss: () => {
+      if (
+        activeVertexDeleteToast?.roomId === roomId &&
+        arePointListsEqual(activeVertexDeleteToast.nextPoints, nextPoints)
+      ) {
+        activeVertexDeleteToast = null;
+      }
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (
+          latestCommand?.type !== "resize-room" ||
+          latestCommand.editKind !== "vertex-delete" ||
+          latestCommand.roomId !== roomId ||
+          !arePointListsEqual(latestCommand.nextPoints, nextPoints)
+        ) {
+          return;
+        }
+
+        state.undo();
+        toast(`${getRoomToastLabel(latestCommand.roomName)} corner restored`, { duration: 3200 });
+      },
+    },
+  });
+
+  activeVertexDeleteToast = {
+    id,
+    roomId,
+    nextPoints: clonePoints(nextPoints),
+  };
+}
+
+function dismissVertexDeleteToastForCommand(command: EditorCommand) {
+  if (
+    command.type !== "resize-room" ||
+    command.editKind !== "vertex-delete" ||
+    !activeVertexDeleteToast ||
+    activeVertexDeleteToast.roomId !== command.roomId ||
+    !arePointListsEqual(activeVertexDeleteToast.nextPoints, command.nextPoints)
+  ) {
+    return;
+  }
+
+  toast.dismiss(activeVertexDeleteToast.id);
+  activeVertexDeleteToast = null;
 }
 
 function dismissStairsAdjustedToastForCommand(command: EditorCommand) {
@@ -5776,6 +5841,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!room) return state;
       if (arePointListsEqual(previousPoints, nextPoints)) return state;
       const isWallSplit = options?.editKind === "wall-split";
+      const isVertexDelete = options?.editKind === "vertex-delete";
       const { nextInteriorAssets, didAdjust } = getAdjustedInteriorAssetsForRoomResize(
         room,
         nextPoints
@@ -5787,6 +5853,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousPoints: previousPoints.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
         ...(isWallSplit ? { editKind: "wall-split" as const, roomName: room.name } : {}),
+        ...(isVertexDelete ? { editKind: "vertex-delete" as const, roomName: room.name } : {}),
         previousInteriorAssets: didAdjust ? cloneRoomInteriorAssets(room.interiorAssets) : undefined,
         nextInteriorAssets: didAdjust ? cloneRoomInteriorAssets(nextInteriorAssets) : undefined,
       };
@@ -5802,6 +5869,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       if (isWallSplit) {
         showWallSplitToast(roomId, room.name, nextPoints);
+      }
+      if (isVertexDelete) {
+        showVertexDeleteToast(roomId, room.name, nextPoints);
       }
 
       return {
@@ -5910,6 +5980,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!command) return state;
       dismissStairsAdjustedToastForCommand(command);
       dismissWallSplitToastForCommand(command);
+      dismissVertexDeleteToastForCommand(command);
       dismissFloorRenameToastForCommand(command);
       dismissDeleteFloorToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
@@ -6022,6 +6093,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       dismissStairsAdjustedToastForCommand(lastCommand);
       dismissWallSplitToastForCommand(lastCommand);
+      dismissVertexDeleteToastForCommand(lastCommand);
       dismissFloorRenameToastForCommand(lastCommand);
       dismissDeleteFloorToastForCommand(lastCommand);
 
