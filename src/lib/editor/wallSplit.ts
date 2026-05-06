@@ -13,6 +13,7 @@ export const WALL_SPLIT_HANDLE_OFFSET_PX = 20;
 export const WALL_SPLIT_TOOLTIP_GAP_PX = 8;
 
 const WALL_SPLIT_POINT_TOLERANCE_MM = 4;
+const WALL_SPLIT_SCREEN_HIT_PADDING_PX = 12;
 
 export type WallSplitResult = {
   wallIndex: number;
@@ -82,6 +83,38 @@ export function hitTestWallSplitHandle(center: ScreenPoint, screenPoint: ScreenP
   return distanceSquared <= WALL_SPLIT_HANDLE_HIT_RADIUS_PX ** 2;
 }
 
+export function getWallSplitPointAtScreenPoint(
+  room: Room,
+  screenPoint: ScreenPoint,
+  camera: CameraState,
+  viewport: ViewportSize
+): Point | null {
+  for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
+    const segment = getRoomWallSegment(room, wallIndex);
+    if (!segment || segment.axis === "diagonal" || segment.lengthMm <= WALL_SPLIT_GRID_SIZE_MM * 2) {
+      continue;
+    }
+
+    const start = worldToScreen(segment.originalStart, camera, viewport);
+    const end = worldToScreen(segment.originalEnd, camera, viewport);
+    const hit = getProjectedScreenPointOnSegment(screenPoint, start, end);
+    if (!hit || hit.distancePx > WALL_SPLIT_SCREEN_HIT_PADDING_PX) continue;
+    if (
+      hit.offsetRatio * segment.lengthMm < WALL_SPLIT_GRID_SIZE_MM ||
+      (1 - hit.offsetRatio) * segment.lengthMm < WALL_SPLIT_GRID_SIZE_MM
+    ) {
+      continue;
+    }
+
+    return {
+      x: segment.originalStart.x + (segment.originalEnd.x - segment.originalStart.x) * hit.offsetRatio,
+      y: segment.originalStart.y + (segment.originalEnd.y - segment.originalStart.y) * hit.offsetRatio,
+    };
+  }
+
+  return null;
+}
+
 export function getWallSplitResult(room: Room, worldPoint: Point): WallSplitResult | null {
   const target = getWallSplitTarget(room, worldPoint);
   if (!target) return null;
@@ -90,6 +123,30 @@ export function getWallSplitResult(room: Room, worldPoint: Point): WallSplitResu
     getWallSplitResultForOffset(room, target.wallIndex, target.splitOffsetMm, target.splitPoint, 1) ??
     getWallSplitResultForOffset(room, target.wallIndex, target.splitOffsetMm, target.splitPoint, -1)
   );
+}
+
+function getProjectedScreenPointOnSegment(
+  point: ScreenPoint,
+  start: ScreenPoint,
+  end: ScreenPoint
+): { distancePx: number; offsetRatio: number } | null {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared < 0.001) return null;
+
+  const rawT = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+  if (rawT < 0 || rawT > 1) return null;
+
+  const projected = {
+    x: start.x + dx * rawT,
+    y: start.y + dy * rawT,
+  };
+
+  return {
+    distancePx: Math.hypot(point.x - projected.x, point.y - projected.y),
+    offsetRatio: rawT,
+  };
 }
 
 export function getWallSplitDragPoints(

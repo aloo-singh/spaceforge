@@ -307,6 +307,7 @@ const WALL_SPLIT_TOOLTIP_FONT_SIZE_PX = 11;
 const WALL_SPLIT_TOOLTIP_PADDING_X_PX = 8;
 const WALL_SPLIT_TOOLTIP_PADDING_Y_PX = 5;
 const WALL_SPLIT_TOOLTIP_RADIUS_PX = 8;
+const WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX = 8;
 const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
 const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
@@ -2729,6 +2730,11 @@ export default function EditorCanvas({
         const rect = app.canvas.getBoundingClientRect();
         return { x: event.clientX - rect.left, y: event.clientY - rect.top };
       };
+      const setWallSplitCursor = (isHovered: boolean) => {
+        if (!isHovered) return;
+        app.canvas.style.cursor = "crosshair";
+        document.body.style.cursor = "crosshair";
+      };
       const onWallSplitPointerMove = (event: PointerEvent) => {
         if (event.buttons !== 0) {
           clearWallSplitHoverUi();
@@ -2780,6 +2786,7 @@ export default function EditorCanvas({
 
           if (!hitTestWallSplitHandle(layout.center, screenPoint)) continue;
 
+          setWallSplitCursor(true);
           const tooltipVisible =
             wallSplitHoverUiRef.current?.roomId === targetRoomId &&
             wallSplitHoverUiRef.current.wall === wall &&
@@ -6339,7 +6346,7 @@ function drawWallSplitHoverAffordance(
 
   drawWallSplitHandle(labelContainer, layout.center, theme);
   if (wallSplitHoverUi?.roomId === targetRoomId && wallSplitHoverUi.wall === wall && wallSplitHoverUi.tooltipVisible) {
-    drawWallSplitTooltip(labelContainer, layout.tooltipCenter, viewport, theme);
+    drawWallSplitTooltip(labelContainer, layout.center, viewport, theme);
   }
 }
 
@@ -6401,7 +6408,7 @@ function drawWallSplitHandle(
 
 function drawWallSplitTooltip(
   labelContainer: Container,
-  anchorCenter: ScreenPoint,
+  controlCenter: ScreenPoint,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
@@ -6419,24 +6426,7 @@ function drawWallSplitTooltip(
   });
   const width = text.width + WALL_SPLIT_TOOLTIP_PADDING_X_PX * 2;
   const height = text.height + WALL_SPLIT_TOOLTIP_PADDING_Y_PX * 2;
-  const center = {
-    x: clampValue(
-      anchorCenter.x,
-      WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + width / 2,
-      Math.max(
-        WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + width / 2,
-        viewport.width - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - width / 2
-      )
-    ),
-    y: clampValue(
-      anchorCenter.y,
-      WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + height / 2,
-      Math.max(
-        WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + height / 2,
-        viewport.height - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - height / 2
-      )
-    ),
-  };
+  const center = getWallSplitTooltipCenter(controlCenter, width, height, viewport);
   const left = snapToPixel(center.x - width / 2, resolution);
   const top = snapToPixel(center.y - height / 2, resolution);
   const tooltip = new Graphics();
@@ -6457,6 +6447,64 @@ function drawWallSplitTooltip(
   text.anchor.set(0.5);
   text.position.set(snapToPixel(center.x, resolution), snapToPixel(center.y, resolution));
   labelContainer.addChild(text);
+}
+
+function getWallSplitTooltipCenter(
+  controlCenter: ScreenPoint,
+  width: number,
+  height: number,
+  viewport: ViewportSize
+): ScreenPoint {
+  const directions = [
+    { x: 0, y: -1 },
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+  ];
+  const minX = WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + width / 2;
+  const maxX = Math.max(minX, viewport.width - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - width / 2);
+  const minY = WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + height / 2;
+  const maxY = Math.max(minY, viewport.height - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - height / 2);
+
+  let best: { center: ScreenPoint; overflow: number; distance: number } | null = null;
+
+  for (const direction of directions) {
+    const projectedHalfExtent =
+      (Math.abs(direction.x) * width) / 2 + (Math.abs(direction.y) * height) / 2;
+    const offset =
+      WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX + projectedHalfExtent;
+    const rawCenter = {
+      x: controlCenter.x + direction.x * offset,
+      y: controlCenter.y + direction.y * offset,
+    };
+    const clampedCenter = {
+      x: clampValue(rawCenter.x, minX, maxX),
+      y: clampValue(rawCenter.y, minY, maxY),
+    };
+    const rect = getCenteredRect(clampedCenter, width, height);
+    const controlRect = getCenteredRect(
+      controlCenter,
+      (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX / 2) * 2,
+      (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX / 2) * 2
+    );
+    const overlapsControl = rectsOverlap(rect, controlRect);
+    const overflow = Math.abs(clampedCenter.x - rawCenter.x) + Math.abs(clampedCenter.y - rawCenter.y);
+    const distance = Math.hypot(clampedCenter.x - controlCenter.x, clampedCenter.y - controlCenter.y);
+    const score = {
+      center: clampedCenter,
+      overflow: overlapsControl ? overflow + 10000 : overflow,
+      distance,
+    };
+
+    if (!best || score.overflow < best.overflow || (score.overflow === best.overflow && score.distance < best.distance)) {
+      best = score;
+    }
+  }
+
+  return best?.center ?? {
+    x: clampValue(controlCenter.x, minX, maxX),
+    y: clampValue(controlCenter.y, minY, maxY),
+  };
 }
 
 function getResizeDimensionLabelSpecs(
