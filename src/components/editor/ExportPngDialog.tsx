@@ -33,7 +33,11 @@ import {
   type ProjectExportDescriptionPosition,
   type ProjectExportTitlePosition,
 } from "@/lib/projects/exportConfig";
-import { buildEditorExportFilename, type EditorExportScope } from "@/lib/editor/exportPng";
+import {
+  buildEditorExportFilename,
+  getEditorExportScopeFilenameParts,
+  type EditorExportScope,
+} from "@/lib/editor/exportPng";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -202,12 +206,11 @@ export function ExportPngDialog({
       ? selectedScopeValue
       : defaultScopeValue;
   const exportScope = useMemo(() => parseExportScopeValue(effectiveScopeValue), [effectiveScopeValue]);
-  const activeFloorName =
-    exportScopeOptions.floors.find((floor) => floor.id === exportScopeOptions.activeFloorId)?.name ??
-    "Floor 1";
+  const previewFilenameParts = getEditorExportScopeFilenameParts(editorDocument, exportScope);
   const previewFilename = buildEditorExportFilename({
     projectName: title,
-    floorName: activeFloorName,
+    floorName: previewFilenameParts.floorName,
+    roomName: previewFilenameParts.roomName,
     format: exportFormat,
   });
   const exportFormatLabel =
