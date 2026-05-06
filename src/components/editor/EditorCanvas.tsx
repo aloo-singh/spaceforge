@@ -45,7 +45,7 @@ import {
   hitTestWallSplitHandle,
   WALL_SPLIT_HANDLE_RADIUS_PX,
 } from "@/lib/editor/wallSplit";
-import { VERTEX_DELETE_HANDLE_OFFSET_PX } from "@/lib/editor/vertexDeletion";
+import { getVertexDeleteHandleCenter } from "@/lib/editor/vertexDeletion";
 import {
   findOpeningAtScreenPoint,
   findSelectedOpeningWidthHandleAtScreenPoint,
@@ -423,6 +423,12 @@ type EditorCanvasProps = {
 type WallSplitHoverUi = {
   roomId: string;
   wall: RoomWall;
+  tooltipVisible: boolean;
+};
+
+type VertexDeleteHoverUi = {
+  roomId: string;
+  vertexIndex: number;
   tooltipVisible: boolean;
 };
 
@@ -911,6 +917,8 @@ export default function EditorCanvas({
   }>({ ...EMPTY_ROOM_RESIZE_UI });
   const wallSplitHoverUiRef = useRef<WallSplitHoverUi | null>(null);
   const wallSplitTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vertexDeleteHoverUiRef = useRef<VertexDeleteHoverUi | null>(null);
+  const vertexDeleteTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
   // Holds in-progress asset rotation animations keyed by assetId.
@@ -1103,6 +1111,7 @@ export default function EditorCanvas({
       openingMoveUiRef.current,
       roomResizeUiRef.current,
       wallSplitHoverUiRef.current,
+      vertexDeleteHoverUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
@@ -2817,12 +2826,89 @@ export default function EditorCanvas({
       app.canvas.addEventListener("pointerleave", onWallSplitPointerLeave);
       app.canvas.addEventListener("pointerdown", onWallSplitPointerLeave);
 
+      // --- Vertex delete handle tooltip (delayed, mirrors wall-split pattern) ---
+      const VERTEX_DELETE_TOOLTIP_DELAY_MS = 700;
+      const clearVertexDeleteTooltipTimeout = () => {
+        if (!vertexDeleteTooltipTimeoutRef.current) return;
+        clearTimeout(vertexDeleteTooltipTimeoutRef.current);
+        vertexDeleteTooltipTimeoutRef.current = null;
+      };
+      const setVertexDeleteHoverUi = (next: VertexDeleteHoverUi | null) => {
+        const current = vertexDeleteHoverUiRef.current;
+        if (
+          current?.roomId === next?.roomId &&
+          current?.vertexIndex === next?.vertexIndex &&
+          current?.tooltipVisible === next?.tooltipVisible
+        ) {
+          return;
+        }
+        vertexDeleteHoverUiRef.current = next;
+        drawCurrentScene();
+      };
+      const clearVertexDeleteHoverUi = () => {
+        clearVertexDeleteTooltipTimeout();
+        setVertexDeleteHoverUi(null);
+      };
+      const scheduleVertexDeleteTooltip = (roomId: string, vertexIndex: number) => {
+        if (vertexDeleteTooltipTimeoutRef.current) return;
+        vertexDeleteTooltipTimeoutRef.current = setTimeout(() => {
+          vertexDeleteTooltipTimeoutRef.current = null;
+          const current = vertexDeleteHoverUiRef.current;
+          if (!current || current.roomId !== roomId || current.vertexIndex !== vertexIndex) return;
+          setVertexDeleteHoverUi({ roomId, vertexIndex, tooltipVisible: true });
+        }, VERTEX_DELETE_TOOLTIP_DELAY_MS);
+      };
+      const onVertexDeletePointerMove = (event: PointerEvent) => {
+        if (event.buttons !== 0) {
+          clearVertexDeleteHoverUi();
+          return;
+        }
+
+        const state = useEditorStore.getState();
+        const roomResizeUi = roomResizeUiRef.current;
+        const targetRoomId = getSingleSelectedRoomIdForSplitAffordance(
+          state.selectedRoomId,
+          state.selection
+        );
+        if (!targetRoomId || state.roomDraft.points.length > 0 || roomResizeUi.activeRoomId) {
+          clearVertexDeleteHoverUi();
+          return;
+        }
+
+        const hoveredVertexIndex =
+          roomResizeUi.hoveredRoomId === targetRoomId ? roomResizeUi.hoveredVertexIndex : null;
+        if (hoveredVertexIndex === null) {
+          clearVertexDeleteHoverUi();
+          return;
+        }
+
+        const tooltipVisible =
+          vertexDeleteHoverUiRef.current?.roomId === targetRoomId &&
+          vertexDeleteHoverUiRef.current.vertexIndex === hoveredVertexIndex &&
+          vertexDeleteHoverUiRef.current.tooltipVisible;
+        setVertexDeleteHoverUi({ roomId: targetRoomId, vertexIndex: hoveredVertexIndex, tooltipVisible });
+        if (!tooltipVisible) {
+          scheduleVertexDeleteTooltip(targetRoomId, hoveredVertexIndex);
+        }
+      };
+      const onVertexDeletePointerLeave = () => {
+        clearVertexDeleteHoverUi();
+      };
+      app.canvas.addEventListener("pointermove", onVertexDeletePointerMove);
+      app.canvas.addEventListener("pointerleave", onVertexDeletePointerLeave);
+      app.canvas.addEventListener("pointerdown", onVertexDeletePointerLeave);
+
       return () => {
         app.canvas.removeEventListener("pointermove", onWallSplitPointerMove);
         app.canvas.removeEventListener("pointerleave", onWallSplitPointerLeave);
         app.canvas.removeEventListener("pointerdown", onWallSplitPointerLeave);
         clearWallSplitTooltipTimeout();
         wallSplitHoverUiRef.current = null;
+        app.canvas.removeEventListener("pointermove", onVertexDeletePointerMove);
+        app.canvas.removeEventListener("pointerleave", onVertexDeletePointerLeave);
+        app.canvas.removeEventListener("pointerdown", onVertexDeletePointerLeave);
+        clearVertexDeleteTooltipTimeout();
+        vertexDeleteHoverUiRef.current = null;
         detachPanZoomInput();
         detachRoomResizeInput();
         detachRoomDrawInput();
@@ -3857,6 +3943,7 @@ function drawScene(
     activeRoomId: string | null;
   },
   wallSplitHoverUi: WallSplitHoverUi | null,
+  vertexDeleteHoverUi: VertexDeleteHoverUi | null,
   transformFeedback: TransformFeedback | null,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
@@ -4087,6 +4174,7 @@ function drawScene(
     state.selectedRoomId,
     state.selection,
     roomResizeUi,
+    vertexDeleteHoverUi,
     state.camera,
     state.viewport,
     theme
@@ -6624,6 +6712,7 @@ function drawVertexDeleteHoverAffordance(
     activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
+  vertexDeleteHoverUi: VertexDeleteHoverUi | null,
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -6646,27 +6735,17 @@ function drawVertexDeleteHoverAffordance(
   const room = rooms.find((r) => r.id === targetRoomId);
   if (!room || hoveredVertexIndex >= room.points.length) return;
 
-  const vertexWorld = room.points[hoveredVertexIndex];
-  const vertexScreen = worldToScreen(vertexWorld, camera, viewport);
-
-  // Offset the delete handle outward from the room centroid so it never overlaps the drag handle.
-  const centroidWorld = room.points.reduce(
-    (acc, p) => ({ x: acc.x + p.x / room.points.length, y: acc.y + p.y / room.points.length }),
-    { x: 0, y: 0 }
-  );
-  const centroidScreen = worldToScreen(centroidWorld, camera, viewport);
-  const dx = vertexScreen.x - centroidScreen.x;
-  const dy = vertexScreen.y - centroidScreen.y;
-  const len = Math.hypot(dx, dy);
-  const dir = len > 1 ? { x: dx / len, y: dy / len } : { x: 0, y: -1 };
-
-  const handleCenter: ScreenPoint = {
-    x: vertexScreen.x + dir.x * VERTEX_DELETE_HANDLE_OFFSET_PX,
-    y: vertexScreen.y + dir.y * VERTEX_DELETE_HANDLE_OFFSET_PX,
-  };
+  const handleCenter = getVertexDeleteHandleCenter(room, hoveredVertexIndex, camera, viewport);
+  if (!handleCenter) return;
 
   drawVertexDeleteHandle(labelContainer, handleCenter, theme);
-  drawVertexDeleteTooltip(labelContainer, handleCenter, viewport, theme);
+  if (
+    vertexDeleteHoverUi?.roomId === targetRoomId &&
+    vertexDeleteHoverUi.vertexIndex === hoveredVertexIndex &&
+    vertexDeleteHoverUi.tooltipVisible
+  ) {
+    drawVertexDeleteTooltip(labelContainer, handleCenter, viewport, theme);
+  }
 }
 
 function getResizeDimensionLabelSpecs(

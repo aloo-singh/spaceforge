@@ -875,9 +875,24 @@ export function attachRoomResizeInput(
 
     if (selected.isConstrainedVertexRoom || selected.isEightWayRoom) {
       const { vertexHandles, wallHandles } = getSelectedRoomHandleLayouts(selected);
-      const hitVertexIndex = selected.isEightWayRoom
+      let hitVertexIndex = selected.isEightWayRoom
         ? hitTestFortyFiveVertexHandle(vertexHandles, screenPoint)
         : hitTestConstrainedVertexHandle(vertexHandles, screenPoint);
+      // Also keep hovering when the pointer is over the × delete handle (22px from vertex).
+      if (hitVertexIndex === null) {
+        for (let i = 0; i < selected.room.points.length; i++) {
+          const handleCenter = getVertexDeleteHandleCenter(
+            selected.room,
+            i,
+            selected.state.camera,
+            selected.state.viewport
+          );
+          if (handleCenter && hitTestVertexDeleteHandle(handleCenter, screenPoint)) {
+            hitVertexIndex = i;
+            break;
+          }
+        }
+      }
       const hitWallSegmentIndex =
         hitVertexIndex === null
           ? getHitOrthogonalWallSegment(
