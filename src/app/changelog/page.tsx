@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.74.0",
+    date: "2026-05-06",
+    title: "Focus on one room",
+    items: [
+      "The room inspector now has a calm eye toggle for focusing the canvas on the selected room.",
+      "Focus mode hides other rooms while keeping the selected room, its openings, assets, and labels visible.",
+      "Switch rooms or turn the toggle off to return instantly to the full plan.",
+    ],
+  },
+  {
     version: "v0.73.0",
     date: "2026-05-06",
     title: "Export a single room",

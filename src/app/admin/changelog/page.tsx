@@ -10,6 +10,32 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.74.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a shadcn Toggle with <code className="bg-muted px-1.5 py-0.5 rounded text-xs">IconEye</code> to the selected-room inspector for temporary room focus mode.</li>
+                <li>Added non-persisted editor store state for the focused room so focus mode remains local to the current editor session.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Focused rendering now reuses the existing room, opening, asset, label, and dimension render paths while filtering the active floor to the focused room.</li>
+                <li>The focus toggle uses the shared brand accent for a strong but calm active state, with accessible labels for focusing and showing all rooms.</li>
+                <li>Changing selection or turning the toggle off restores the full canvas without persisting focus state into projects or exports.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.73.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>
