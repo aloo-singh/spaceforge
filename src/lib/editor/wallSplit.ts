@@ -171,6 +171,30 @@ export function getWallSplitDragPoints(
   )?.points ?? null;
 }
 
+export function getCleanWallSplitCommitPoints(
+  split: WallSplitResult,
+  points: Point[]
+): Point[] {
+  if (!isSupportedDrawPointPath(points, { closed: true }) || !isSimplePolygon(points)) {
+    return split.previousPoints.map((point) => ({ ...point }));
+  }
+
+  if (hasShortSplitCornerSegment(split, points)) {
+    return split.previousPoints.map((point) => ({ ...point }));
+  }
+
+  const cleanedPoints = removeCollinearPoints(points);
+  if (
+    cleanedPoints.length >= 4 &&
+    isSupportedDrawPointPath(cleanedPoints, { closed: true }) &&
+    isSimplePolygon(cleanedPoints)
+  ) {
+    return cleanedPoints;
+  }
+
+  return points.map((point) => ({ ...point }));
+}
+
 function getWallSplitTarget(
   room: Room,
   worldPoint: Point
@@ -273,6 +297,57 @@ function getWallSplitPoints(
   if (!isSimplePolygon(nextPoints)) return null;
 
   return { points: nextPoints, cornerVertexIndex };
+}
+
+function hasShortSplitCornerSegment(split: WallSplitResult, points: Point[]): boolean {
+  if (points.length !== split.nextPoints.length) return false;
+
+  const cornerIndex = split.cornerVertexIndex;
+  const pointCount = points.length;
+  if (cornerIndex < 0 || cornerIndex >= pointCount) return true;
+
+  const previousIndex = (cornerIndex - 1 + pointCount) % pointCount;
+  const nextIndex = (cornerIndex + 1) % pointCount;
+
+  return (
+    getDistance(points[previousIndex], points[cornerIndex]) < WALL_SPLIT_GRID_SIZE_MM ||
+    getDistance(points[cornerIndex], points[nextIndex]) < WALL_SPLIT_GRID_SIZE_MM
+  );
+}
+
+function removeCollinearPoints(points: Point[]): Point[] {
+  const cleaned: Point[] = [];
+
+  for (const point of points) {
+    const previous = cleaned[cleaned.length - 1];
+    if (previous && previous.x === point.x && previous.y === point.y) continue;
+    cleaned.push({ ...point });
+  }
+
+  let changed = true;
+  while (changed && cleaned.length > 4) {
+    changed = false;
+    for (let index = 0; index < cleaned.length; index += 1) {
+      const previous = cleaned[(index - 1 + cleaned.length) % cleaned.length];
+      const current = cleaned[index];
+      const next = cleaned[(index + 1) % cleaned.length];
+
+      if (!arePointsCollinear(previous, current, next)) continue;
+      cleaned.splice(index, 1);
+      changed = true;
+      break;
+    }
+  }
+
+  return cleaned;
+}
+
+function arePointsCollinear(a: Point, b: Point, c: Point): boolean {
+  return (a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y);
+}
+
+function getDistance(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function getWallOffsetMm(start: Point, end: Point, point: Point): number {

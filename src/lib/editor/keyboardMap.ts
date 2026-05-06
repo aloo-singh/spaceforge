@@ -392,6 +392,10 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "resize-room") {
+    if (command.editKind === "wall-split") {
+      return `${getHistoryRoomLabel(command.roomName)} wall split`;
+    }
+
     return "room resize";
   }
 
@@ -613,6 +617,11 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   return "action";
+}
+
+function getHistoryRoomLabel(roomName: string | undefined): string {
+  const label = roomName?.trim();
+  return label ? label : "Room";
 }
 
 export function generateBatchHistoryFeedbackMessage(

@@ -20,6 +20,7 @@ import {
   isNonRectangularEightWayRoom,
 } from "@/lib/editor/orthogonalWallResize";
 import {
+  getCleanWallSplitCommitPoints,
   getWallSplitDragPoints,
   getWallSplitHandleLayout,
   getWallSplitPointAtScreenPoint,
@@ -68,7 +69,12 @@ type RoomResizeStoreState = {
   selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
-  commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitRoomResize: (
+    roomId: string,
+    previousPoints: Point[],
+    nextPoints: Point[],
+    options?: { editKind?: "wall-split" }
+  ) => void;
   splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   setCanvasInteractionActive: (isActive: boolean) => void;
 };
@@ -999,7 +1005,14 @@ export function attachRoomResizeInput(
     }
 
     const session = activeSession;
-    const nextPoints = session.latestSnappedPoints ?? session.startPoints;
+    const rawNextPoints = session.latestSnappedPoints ?? session.startPoints;
+    const nextPoints =
+      session.target.type === "split-wall-corner"
+        ? getCleanWallSplitCommitPoints(session.target.split, rawNextPoints)
+        : rawNextPoints;
+    if (!arePointListsEqual(rawNextPoints, nextPoints)) {
+      previewRoomResize(session.roomId, nextPoints);
+    }
     if (arePointListsEqual(session.startPoints, nextPoints)) {
       setTransformFeedback(null);
     } else {
@@ -1012,7 +1025,12 @@ export function attachRoomResizeInput(
           "settling"
         )
       );
-      commitRoomResize(session.roomId, session.startPoints, nextPoints);
+      commitRoomResize(
+        session.roomId,
+        session.startPoints,
+        nextPoints,
+        session.target.type === "split-wall-corner" ? { editKind: "wall-split" } : undefined
+      );
       scheduleTransformFeedbackClear();
       callbacks.onRoomResizeCommitted?.(session.roomId);
     }
