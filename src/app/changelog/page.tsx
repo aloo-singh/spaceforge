@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.73.0",
+    date: "2026-05-06",
+    title: "Export a single room",
+    items: [
+      "The export dialog now lets you choose exactly what to export: the current floor or one room.",
+      "Single-room exports keep the preview, room labels, assets, openings, and export details in sync across PNG, SVG, and PDF.",
+      "Exported filenames now include the floor and room name, so focused room files are easier to identify and share.",
+    ],
+  },
+  {
     version: "v0.72.0",
     date: "2026-05-06",
     title: "Focus the canvas on one room",

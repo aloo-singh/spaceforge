@@ -21,7 +21,18 @@ import type {
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
-import type { Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
+import type { Floor, Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
+
+export type EditorExportScope = {
+  type: "floor" | "room";
+  id: string;
+};
+
+export type EditorExportScopeDocument = {
+  floors: Floor[];
+  activeFloorId: string | null;
+  rooms: Room[];
+};
 
 export type PixiPngExportSource =
   | Renderer
@@ -31,6 +42,7 @@ export type PixiPngExportSource =
     };
 
 export type PixiPngExportOptions = {
+  exportScope?: EditorExportScope;
   backgroundColor?: string;
   paddingPx?: number;
   exportResolution?: EditorExportResolution;
@@ -133,6 +145,9 @@ type SvgLegendItem = {
 
 export type SvgExportOptions = {
   rooms: Room[];
+  floors?: Floor[];
+  activeFloorId?: string | null;
+  exportScope?: EditorExportScope;
   title?: string;
   description?: string;
   exportAssetMode?: EditorExportAssetMode;
@@ -159,19 +174,66 @@ export function getEditorExportFileExtension(format: EditorExportFormat): "png" 
 export function buildEditorExportFilename({
   projectName,
   floorName,
+  roomName,
   format,
 }: {
   projectName?: string;
   floorName?: string;
+  roomName?: string;
   format: EditorExportFormat;
 }): string {
   const safeProjectName = sanitizeExportFilenamePart(projectName) || "Untitled project";
   const safeFloorName = sanitizeExportFilenamePart(floorName) || "Floor 1";
-  return `${safeProjectName} - ${safeFloorName}.${getEditorExportFileExtension(format)}`;
+  const safeRoomName = sanitizeExportFilenamePart(roomName);
+  const scopeSuffix = safeRoomName ? ` - ${safeRoomName}` : "";
+  return `${safeProjectName} - ${safeFloorName}${scopeSuffix}.${getEditorExportFileExtension(format)}`;
+}
+
+export function getRoomsForEditorExportScope(
+  document: EditorExportScopeDocument,
+  exportScope: EditorExportScope | undefined
+): Room[] {
+  if (exportScope?.type === "room") {
+    const room = document.rooms.find((candidate) => candidate.id === exportScope.id);
+    return room ? [room] : getCurrentFloorExportRooms(document);
+  }
+
+  if (exportScope?.type === "floor") {
+    return document.rooms.filter((room) => room.floorId === exportScope.id);
+  }
+
+  return getCurrentFloorExportRooms(document);
+}
+
+export function getEditorExportScopeFilenameParts(
+  document: EditorExportScopeDocument,
+  exportScope: EditorExportScope | undefined
+): {
+  floorName: string;
+  roomName?: string;
+} {
+  if (exportScope?.type === "room") {
+    const room = document.rooms.find((candidate) => candidate.id === exportScope.id);
+    const floorName = getExportFloorName(document, room?.floorId);
+    return {
+      floorName,
+      roomName: room?.name,
+    };
+  }
+
+  return {
+    floorName: getExportFloorName(
+      document,
+      exportScope?.type === "floor" ? exportScope.id : document.activeFloorId
+    ),
+  };
 }
 
 export function exportToSVG({
   rooms,
+  floors = [],
+  activeFloorId = null,
+  exportScope,
   title,
   description,
   exportAssetMode = "all",
@@ -181,7 +243,10 @@ export function exportToSVG({
   signatureText,
   signatureLines,
 }: SvgExportOptions): string {
-  const bounds = getLayoutBoundsFromRooms(rooms);
+  const exportRooms = exportScope
+    ? getRoomsForEditorExportScope({ rooms, floors, activeFloorId }, exportScope)
+    : rooms;
+  const bounds = getLayoutBoundsFromRooms(exportRooms);
   const header = buildSvgHeader(title, description);
   const includeNorthIndicator =
     northBearingDegrees !== undefined && Number.isFinite(northBearingDegrees);
@@ -204,7 +269,7 @@ export function exportToSVG({
     header ? header.height : 0,
     includeNorthIndicator ? SVG_NORTH_INDICATOR_HEIGHT_PX : 0
   );
-  const maxDoorSwingMm = getMaxSvgDoorSwingClearanceMm(rooms);
+  const maxDoorSwingMm = getMaxSvgDoorSwingClearanceMm(exportRooms);
   const leftPaddingPx = SVG_EXPORT_PADDING_PX;
   const rightOverlayWidth = Math.max(
     includeNorthIndicator ? SVG_NORTH_INDICATOR_WIDTH_PX : 0,
@@ -253,7 +318,7 @@ export function exportToSVG({
   const openingElements: string[] = [];
   const labelElements: string[] = [];
 
-  for (const room of rooms) {
+  for (const room of exportRooms) {
     if (room.points.length < 3) continue;
 
     const polygonPoints = room.points.map(pointToString).join(" ");
@@ -476,6 +541,18 @@ function sanitizeExportFilenamePart(value: string | undefined): string {
     .replace(/\s+/g, " ")
     .replace(/\.+$/g, "")
     .slice(0, 80);
+}
+
+function getCurrentFloorExportRooms(document: EditorExportScopeDocument): Room[] {
+  const activeFloorId = document.activeFloorId ?? document.floors[0]?.id ?? null;
+  return document.rooms.filter((room) => room.floorId === activeFloorId);
+}
+
+function getExportFloorName(
+  document: EditorExportScopeDocument,
+  floorId: string | null | undefined
+): string {
+  return document.floors.find((floor) => floor.id === floorId)?.name ?? "Floor 1";
 }
 
 function buildSvgInteriorAssetElements(

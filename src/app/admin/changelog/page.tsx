@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.73.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a shadcn Select at the top of the export dialog labelled <code className="bg-muted px-1.5 py-0.5 rounded text-xs">What to export</code>.</li>
+                <li>Added hierarchical export scope options for floors and their rooms, matching the editor hierarchy order.</li>
+                <li>Added single-room export support across normal PNG, hi-res PNG, SVG, and PDF export paths.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Export preview now refreshes immediately when the selected export scope changes.</li>
+                <li>Export filenames now include the scoped room name when exporting one room, while full-floor filenames keep their existing floor-based shape.</li>
+                <li>Export scope filtering reuses the existing room, opening, asset, label, SVG, PDF, and PNG render paths instead of adding a parallel export pipeline.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.72.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>
