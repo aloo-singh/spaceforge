@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
+import { IconEye, Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
+import { Toggle } from "@/components/ui/toggle";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
@@ -73,6 +74,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const { isMobile } = useMobile();
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const focusedRoomId = useEditorStore((state) => state.focusedRoomId);
   const shouldFocusSelectedRoomNameInput = useEditorStore(
     (state) => state.shouldFocusSelectedRoomNameInput
   );
@@ -86,6 +88,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
+  const setFocusedRoomId = useEditorStore((state) => state.setFocusedRoomId);
   const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
     (state) => state.consumeSelectedRoomNameInputFocusRequest
@@ -105,6 +108,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
       ? selectedRoom?.interiorAssets.find((asset) => asset.id === selectedInteriorAssetId) ?? null
       : null;
   const canDeleteSelectedRoom = selectedRoom !== null;
+  const isFocusModeActive = focusedRoomId === selectedRoom?.id;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
   const shouldHideKeyboardHints = isMobile || isCompactLandscapeViewport;
 
@@ -286,8 +290,29 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
           <div className="mt-4">
             <RoomDimensionsDisplay room={selectedRoom} />
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-between gap-2">
             <ImmediateTooltipProvider>
+              <InspectorIconTooltip
+                content={isFocusModeActive ? "Show all rooms" : "Focus on this room"}
+              >
+                <Toggle
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  pressed={isFocusModeActive}
+                  onPressedChange={(pressed) => {
+                    setFocusedRoomId(pressed ? selectedRoom.id : null);
+                  }}
+                  aria-label={
+                    isFocusModeActive
+                      ? "Show all rooms"
+                      : "Focus on this room"
+                  }
+                  className="border-border/70 data-[state=on]:border-brand/70 data-[state=on]:bg-brand data-[state=on]:text-white data-[state=on]:shadow-sm data-[state=on]:hover:bg-brand/90"
+                >
+                  <IconEye />
+                </Toggle>
+              </InspectorIconTooltip>
               <InspectorIconTooltip
                 content={shouldHideKeyboardHints ? "Delete room" : (
                   <span className="inline-flex items-center gap-2">
