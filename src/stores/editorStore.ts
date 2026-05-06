@@ -104,6 +104,10 @@ import {
   getSnappedPointFromGuides,
   type DrawConstraintMode,
 } from "@/lib/editor/snapping";
+import {
+  getWallSplitResult,
+  type WallSplitResult,
+} from "@/lib/editor/wallSplit";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
@@ -395,7 +399,13 @@ type EditorState = {
     moves: Array<{ roomId: string; previousPoints: Point[]; nextPoints: Point[] }>
   ) => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
-  commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitRoomResize: (
+    roomId: string,
+    previousPoints: Point[],
+    nextPoints: Point[],
+    options?: { editKind?: "wall-split" }
+  ) => void;
+  splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   resetCamera: () => void;
   fitCameraToSelectedRoom: () => void;
   resetCanvas: () => void;
@@ -408,6 +418,13 @@ type EditorState = {
 };
 
 let activeStairsAdjustedToast:
+  | {
+      id: string | number;
+      roomId: string;
+      nextPoints: Point[];
+    }
+  | null = null;
+let activeWallSplitToast:
   | {
       id: string | number;
       roomId: string;
@@ -1374,6 +1391,69 @@ function showStairsAdjustedToast(roomId: string, nextPoints: Point[]) {
     roomId,
     nextPoints: clonePoints(nextPoints),
   };
+}
+
+function getRoomToastLabel(roomName: string | undefined): string {
+  const label = roomName?.trim();
+  return label ? label : "Room";
+}
+
+function showWallSplitToast(roomId: string, roomName: string, nextPoints: Point[]) {
+  if (activeWallSplitToast) {
+    toast.dismiss(activeWallSplitToast.id);
+  }
+
+  const message = `${getRoomToastLabel(roomName)} wall split`;
+  const id = toast(message, {
+    duration: 3200,
+    onDismiss: () => {
+      if (
+        activeWallSplitToast?.roomId === roomId &&
+        arePointListsEqual(activeWallSplitToast.nextPoints, nextPoints)
+      ) {
+        activeWallSplitToast = null;
+      }
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (
+          latestCommand?.type !== "resize-room" ||
+          latestCommand.editKind !== "wall-split" ||
+          latestCommand.roomId !== roomId ||
+          !arePointListsEqual(latestCommand.nextPoints, nextPoints)
+        ) {
+          return;
+        }
+
+        state.undo();
+        toast(`${getRoomToastLabel(latestCommand.roomName)} wall split undone`, { duration: 3200 });
+      },
+    },
+  });
+
+  activeWallSplitToast = {
+    id,
+    roomId,
+    nextPoints: clonePoints(nextPoints),
+  };
+}
+
+function dismissWallSplitToastForCommand(command: EditorCommand) {
+  if (
+    command.type !== "resize-room" ||
+    command.editKind !== "wall-split" ||
+    !activeWallSplitToast ||
+    activeWallSplitToast.roomId !== command.roomId ||
+    !arePointListsEqual(activeWallSplitToast.nextPoints, command.nextPoints)
+  ) {
+    return;
+  }
+
+  toast.dismiss(activeWallSplitToast.id);
+  activeWallSplitToast = null;
 }
 
 function dismissStairsAdjustedToastForCommand(command: EditorCommand) {
@@ -5690,11 +5770,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
       };
     }),
-  commitRoomResize: (roomId, previousPoints, nextPoints) =>
+  commitRoomResize: (roomId, previousPoints, nextPoints, options) =>
     set((state) => {
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (arePointListsEqual(previousPoints, nextPoints)) return state;
+      const isWallSplit = options?.editKind === "wall-split";
       const { nextInteriorAssets, didAdjust } = getAdjustedInteriorAssetsForRoomResize(
         room,
         nextPoints
@@ -5705,6 +5786,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
+        ...(isWallSplit ? { editKind: "wall-split" as const, roomName: room.name } : {}),
         previousInteriorAssets: didAdjust ? cloneRoomInteriorAssets(room.interiorAssets) : undefined,
         nextInteriorAssets: didAdjust ? cloneRoomInteriorAssets(nextInteriorAssets) : undefined,
       };
@@ -5717,6 +5799,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (didAdjust) {
         showStairsAdjustedToast(roomId, nextPoints);
+      }
+      if (isWallSplit) {
+        showWallSplitToast(roomId, room.name, nextPoints);
       }
 
       return {
@@ -5733,6 +5818,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  splitWallAtPoint: (roomId, worldPoint) => {
+    let splitResult: WallSplitResult | null = null;
+
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+
+      const result = getWallSplitResult(room, worldPoint);
+      if (!result) return state;
+      splitResult = result;
+
+      return {
+        document: updateRoomPointsInDocument(state.document, roomId, result.nextPoints),
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: roomId }],
+      };
+    });
+
+    return splitResult;
+  },
   resetCamera: () => {
     const state = get();
     const isLandscape = state.viewport.width > state.viewport.height;
@@ -5801,6 +5909,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command = state.history.past[state.history.past.length - 1];
       if (!command) return state;
       dismissStairsAdjustedToastForCommand(command);
+      dismissWallSplitToastForCommand(command);
       dismissFloorRenameToastForCommand(command);
       dismissDeleteFloorToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
@@ -5912,6 +6021,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!lastCommand) return state;
 
       dismissStairsAdjustedToastForCommand(lastCommand);
+      dismissWallSplitToastForCommand(lastCommand);
       dismissFloorRenameToastForCommand(lastCommand);
       dismissDeleteFloorToastForCommand(lastCommand);
 

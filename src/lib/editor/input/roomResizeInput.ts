@@ -19,6 +19,14 @@ import {
   hitTestOrthogonalWallHandle,
   isNonRectangularEightWayRoom,
 } from "@/lib/editor/orthogonalWallResize";
+import {
+  getCleanWallSplitCommitPoints,
+  getWallSplitDragPoints,
+  getWallSplitHandleLayout,
+  getWallSplitPointAtScreenPoint,
+  hitTestWallSplitHandle,
+  type WallSplitResult,
+} from "@/lib/editor/wallSplit";
 import { getRoomDeclutterState } from "@/lib/editor/roomDeclutter";
 import {
   getActiveSnapStepMm,
@@ -53,7 +61,7 @@ import type { Point, Room, RoomWall } from "@/lib/editor/types";
 type RoomResizeStoreState = {
   camera: { xMm: number; yMm: number; pixelsPerMm: number; rotationDegrees: number };
   viewport: { width: number; height: number };
-  settings: { showGuidelines: boolean; snappingEnabled: boolean };
+  settings: { showGuidelines: boolean; snappingEnabled: boolean; wallMeasurementPosition: "inside" | "outside" };
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -61,7 +69,13 @@ type RoomResizeStoreState = {
   selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   clearSelectedWall: () => void;
   previewRoomResize: (roomId: string, nextPoints: Point[]) => void;
-  commitRoomResize: (roomId: string, previousPoints: Point[], nextPoints: Point[]) => void;
+  commitRoomResize: (
+    roomId: string,
+    previousPoints: Point[],
+    nextPoints: Point[],
+    options?: { editKind?: "wall-split" }
+  ) => void;
+  splitWallAtPoint: (roomId: string, worldPoint: Point) => WallSplitResult | null;
   setCanvasInteractionActive: (isActive: boolean) => void;
 };
 
@@ -97,7 +111,8 @@ type ResizeSession = {
     | { type: "wall"; wall: RectWall }
     | { type: "corner"; corner: RectCorner }
     | { type: "vertex"; vertexIndex: number }
-    | { type: "wall-segment"; wallSegmentIndex: number };
+    | { type: "wall-segment"; wallSegmentIndex: number }
+    | { type: "split-wall-corner"; split: WallSplitResult };
   startBounds: RoomRectBounds | null;
   startPoints: Point[];
   latestSnappedPoints: Point[] | null;
@@ -136,7 +151,7 @@ function getCursorForCorner(corner: RectCorner): string {
     : NWSE_RESIZE_CURSOR;
 }
 
-function getCursorForConstrainedVertex(room: Room, vertexIndex: number): string {
+function getCursorForConstrainedVertex(room: Pick<Room, "points">, vertexIndex: number): string {
   const pointCount = room.points.length;
   const point = room.points[vertexIndex];
   const previousPoint = room.points[(vertexIndex - 1 + pointCount) % pointCount];
@@ -287,6 +302,7 @@ export function attachRoomResizeInput(
   let hoveredCorner: RectCorner | null = null;
   let hoveredVertexIndex: number | null = null;
   let hoveredWallSegmentIndex: number | null = null;
+  let hoveredWallSplitPoint: Point | null = null;
   let activeSession: ResizeSession | null = null;
   let currentCursor: string = "";
   const commitRoomResize = store.getState().commitRoomResize;
@@ -449,6 +465,79 @@ export function attachRoomResizeInput(
     );
   };
 
+  const getHitWallSplitHandle = (
+    selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>,
+    screenPoint: Point
+  ): { wall: RoomWall; splitPoint: Point } | null => {
+    if (selected.state.roomDraft.points.length > 0 || activeSession) return null;
+    const wallCount = selected.room.points.length;
+
+    for (let wallIndex = 0; wallIndex < wallCount; wallIndex += 1) {
+      const layout = getWallSplitHandleLayout(
+        selected.room,
+        wallIndex,
+        selected.state.camera,
+        selected.state.viewport,
+        selected.state.settings
+      );
+      if (!layout || !hitTestWallSplitHandle(layout.center, screenPoint)) continue;
+      return { wall: wallIndex, splitPoint: layout.splitPoint };
+    }
+
+    return null;
+  };
+
+  const getPowerUserWallSplitPoint = (
+    selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>,
+    screenPoint: Point
+  ): Point | null =>
+    getWallSplitPointAtScreenPoint(
+      selected.room,
+      screenPoint,
+      selected.state.camera,
+      selected.state.viewport
+    );
+
+  const startWallSplitDrag = (
+    selected: NonNullable<ReturnType<typeof getSelectedEditableRoom>>,
+    splitPoint: Point,
+    event: PointerEvent,
+    screenPoint: Point
+  ): boolean => {
+    const split = selected.state.splitWallAtPoint(selected.room.id, splitPoint);
+    if (!split) return false;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    canvas.setPointerCapture(event.pointerId);
+
+    activeSession = {
+      pointerId: event.pointerId,
+      roomId: selected.room.id,
+      target: { type: "split-wall-corner", split },
+      startBounds: null,
+      startPoints: split.previousPoints.map((point) => ({ ...point })),
+      latestSnappedPoints: split.nextPoints.map((point) => ({ ...point })),
+      latestPreviewPoints: split.nextPoints.map((point) => ({ ...point })),
+      shapeMode: "constrained-orthogonal",
+    };
+    selected.state.setCanvasInteractionActive(true);
+    clearPendingTransformFeedbackTimeout();
+    setTransformFeedback(
+      getResizeTransformFeedback(selected.room.id, split.previousPoints, split.nextPoints, split.nextPoints)
+    );
+    hoveredWall = null;
+    hoveredCorner = null;
+    hoveredVertexIndex = null;
+    hoveredWallSegmentIndex = null;
+    hoveredWallSplitPoint = null;
+    updateCursor();
+    publishHandleState();
+    processActiveDragScreenPoint(screenPoint);
+    callbacks.requestRender();
+    return true;
+  };
+
   const publishHandleState = () => {
     callbacks.onHandleStateChange({
       hoveredWall,
@@ -462,7 +551,11 @@ export function attachRoomResizeInput(
       activeWall: activeSession?.target.type === "wall" ? activeSession.target.wall : null,
       activeCorner: activeSession?.target.type === "corner" ? activeSession.target.corner : null,
       activeVertexIndex:
-        activeSession?.target.type === "vertex" ? activeSession.target.vertexIndex : null,
+        activeSession?.target.type === "vertex"
+          ? activeSession.target.vertexIndex
+          : activeSession?.target.type === "split-wall-corner"
+            ? activeSession.target.split.cornerVertexIndex
+            : null,
       activeWallSegmentIndex:
         activeSession?.target.type === "wall-segment"
           ? activeSession.target.wallSegmentIndex
@@ -492,6 +585,11 @@ export function attachRoomResizeInput(
         setCursor(
           selected ? getCursorForWallSegment(selected.room, activeSession.target.wallSegmentIndex) : ""
         );
+      } else if (activeSession.target.type === "split-wall-corner") {
+        setCursor(getCursorForConstrainedVertex(
+          { points: activeSession.target.split.nextPoints },
+          activeSession.target.split.cornerVertexIndex
+        ));
       } else {
         setCursor(getCursorForWall(activeSession.target.wall));
       }
@@ -500,6 +598,11 @@ export function attachRoomResizeInput(
 
     if (hoveredCorner && !isSpaceHeld) {
       setCursor(getCursorForCorner(hoveredCorner));
+      return;
+    }
+
+    if (hoveredWallSplitPoint && !isSpaceHeld) {
+      setCursor("crosshair");
       return;
     }
 
@@ -529,12 +632,15 @@ export function attachRoomResizeInput(
     corner: RectCorner | null;
     vertexIndex: number | null;
     wallSegmentIndex: number | null;
+    wallSplitPoint?: Point | null;
   }) => {
+    const nextWallSplitPoint = next.wallSplitPoint ?? null;
     if (
       hoveredWall === next.wall &&
       hoveredCorner === next.corner &&
       hoveredVertexIndex === next.vertexIndex &&
-      hoveredWallSegmentIndex === next.wallSegmentIndex
+      hoveredWallSegmentIndex === next.wallSegmentIndex &&
+      pointsEqualOrNull(hoveredWallSplitPoint, nextWallSplitPoint)
     ) {
       return;
     }
@@ -542,6 +648,7 @@ export function attachRoomResizeInput(
     hoveredCorner = next.corner;
     hoveredVertexIndex = next.vertexIndex;
     hoveredWallSegmentIndex = next.wallSegmentIndex;
+    hoveredWallSplitPoint = nextWallSplitPoint;
     updateCursor();
     publishHandleState();
     callbacks.requestRender();
@@ -561,6 +668,7 @@ export function attachRoomResizeInput(
     hoveredCorner = null;
     hoveredVertexIndex = null;
     hoveredWallSegmentIndex = null;
+    hoveredWallSplitPoint = null;
     updateCursor();
     publishHandleState();
     callbacks.requestRender();
@@ -600,6 +708,16 @@ export function attachRoomResizeInput(
       activeSnapStepMm,
       magneticGuides
     );
+
+    if (activeSession.target.type === "split-wall-corner") {
+      const nextPoints = getWallSplitDragPoints(activeSession.target.split, resolvedCursorWorld);
+      if (!nextPoints) return;
+
+      activeSession.latestSnappedPoints = nextPoints;
+      previewRoomResize(activeSession.roomId, nextPoints);
+      setSnapGuides(visibleGuides);
+      return;
+    }
 
     if (activeSession.target.type === "vertex") {
       const nextPoints =
@@ -710,6 +828,18 @@ export function attachRoomResizeInput(
       screenToWorld(screenPoint, selected.state.camera, selected.state.viewport)
     );
 
+    const hitWallSplit = getHitWallSplitHandle(selected, screenPoint);
+    if (hitWallSplit) {
+      setHoveredHandle({
+        wall: null,
+        corner: null,
+        vertexIndex: null,
+        wallSegmentIndex: null,
+        wallSplitPoint: hitWallSplit.splitPoint,
+      });
+      return;
+    }
+
     if (selected.isConstrainedVertexRoom || selected.isEightWayRoom) {
       const { vertexHandles, wallHandles } = getSelectedRoomHandleLayouts(selected);
       const hitVertexIndex = selected.isEightWayRoom
@@ -764,6 +894,19 @@ export function attachRoomResizeInput(
 
     const screenPoint = toCanvasPoint(event);
     if (hasSelectedOpeningResizeHandleHit(screenPoint)) return;
+
+    const hitWallSplit = getHitWallSplitHandle(selected, screenPoint);
+    if (hitWallSplit) {
+      startWallSplitDrag(selected, hitWallSplit.splitPoint, event, screenPoint);
+      return;
+    }
+
+    const powerUserSplitPoint =
+      event.altKey || event.detail >= 2 ? getPowerUserWallSplitPoint(selected, screenPoint) : null;
+    if (powerUserSplitPoint) {
+      startWallSplitDrag(selected, powerUserSplitPoint, event, screenPoint);
+      return;
+    }
 
     const hitVertexIndex = selected.isConstrainedVertexRoom || selected.isEightWayRoom
       ? selected.isEightWayRoom
@@ -862,7 +1005,14 @@ export function attachRoomResizeInput(
     }
 
     const session = activeSession;
-    const nextPoints = session.latestSnappedPoints ?? session.startPoints;
+    const rawNextPoints = session.latestSnappedPoints ?? session.startPoints;
+    const nextPoints =
+      session.target.type === "split-wall-corner"
+        ? getCleanWallSplitCommitPoints(session.target.split, rawNextPoints)
+        : rawNextPoints;
+    if (!arePointListsEqual(rawNextPoints, nextPoints)) {
+      previewRoomResize(session.roomId, nextPoints);
+    }
     if (arePointListsEqual(session.startPoints, nextPoints)) {
       setTransformFeedback(null);
     } else {
@@ -875,7 +1025,12 @@ export function attachRoomResizeInput(
           "settling"
         )
       );
-      commitRoomResize(session.roomId, session.startPoints, nextPoints);
+      commitRoomResize(
+        session.roomId,
+        session.startPoints,
+        nextPoints,
+        session.target.type === "split-wall-corner" ? { editKind: "wall-split" } : undefined
+      );
       scheduleTransformFeedbackClear();
       callbacks.onRoomResizeCommitted?.(session.roomId);
     }
@@ -965,6 +1120,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+}
+
+function pointsEqualOrNull(a: Point | null, b: Point | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.x === b.x && a.y === b.y;
 }
 
 function arePointListsEqual(a: Point[], b: Point[]): boolean {

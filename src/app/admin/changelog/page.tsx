@@ -10,6 +10,41 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.75.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-06</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added selected-wall split affordances with a calm midpoint plus handle, delayed tooltip, and cursor feedback.</li>
+                <li>Added wall split actions from the plus handle, Alt/Option-click, and double-click on selected-room wall segments.</li>
+                <li>Added split-specific history metadata so undo labels and Sonner messages can say things like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Bedroom wall split</code>.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Wall split placement now reuses the existing overlay, room resize, transform feedback, and undo paths rather than adding a separate editing mode.</li>
+                <li>Split dragging shows the anchored original room and live preview while preserving orthogonal, grid-aligned geometry.</li>
+                <li>Undo and redo shortcut interception now claims browser-reserved history shortcuts earlier on non-editable editor targets.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Cleaned up split commits so too-short or collinear wall fragments do not create awkward room geometry.</li>
+                <li>Improved split tooltip placement so it avoids overlapping the plus handle.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.74.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>

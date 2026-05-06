@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.75.0",
+    date: "2026-05-06",
+    title: "Split walls while you edit",
+    items: [
+      "Selected room walls now show a calm split handle, with a tooltip and cursor that make the action easier to find.",
+      "Click the plus, Alt/Option-click a wall, or double-click a wall to split it and immediately shape the new corner.",
+      "Wall splits now have clearer undo labels and friendly confirmations, including messages such as 'Bedroom wall split'.",
+    ],
+  },
+  {
     version: "v0.74.0",
     date: "2026-05-06",
     title: "Focus on one room",

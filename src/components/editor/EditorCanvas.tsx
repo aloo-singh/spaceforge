@@ -41,6 +41,11 @@ import {
   hitTestOrthogonalWallHandle,
 } from "@/lib/editor/orthogonalWallResize";
 import {
+  getWallSplitHandleLayout,
+  hitTestWallSplitHandle,
+  WALL_SPLIT_HANDLE_RADIUS_PX,
+} from "@/lib/editor/wallSplit";
+import {
   findOpeningAtScreenPoint,
   findSelectedOpeningWidthHandleAtScreenPoint,
   getResolvedRoomOpeningLayout,
@@ -296,6 +301,15 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
+const WALL_SPLIT_HANDLE_PLUS_SIZE_PX = 8;
+const WALL_SPLIT_TOOLTIP_TEXT = "Split wall here";
+const WALL_SPLIT_TOOLTIP_FONT_SIZE_PX = 11;
+const WALL_SPLIT_TOOLTIP_PADDING_X_PX = 8;
+const WALL_SPLIT_TOOLTIP_PADDING_Y_PX = 5;
+const WALL_SPLIT_TOOLTIP_RADIUS_PX = 8;
+const WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX = 8;
+const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
+const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
 const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
 const ROOM_HANDLE_LAYOUT_CACHE = new WeakMap<
@@ -399,6 +413,12 @@ type EditorCanvasProps = {
         sidebarCollapseControl: ReactNode;
         isLeftSidebarCollapsed: boolean;
       }) => ReactNode);
+};
+
+type WallSplitHoverUi = {
+  roomId: string;
+  wall: RoomWall;
+  tooltipVisible: boolean;
 };
 
 function CanvasHudCard({ children, className }: { children: ReactNode; className?: string }) {
@@ -884,6 +904,8 @@ export default function EditorCanvas({
     activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   }>({ ...EMPTY_ROOM_RESIZE_UI });
+  const wallSplitHoverUiRef = useRef<WallSplitHoverUi | null>(null);
+  const wallSplitTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
   // Holds in-progress asset rotation animations keyed by assetId.
@@ -1075,6 +1097,7 @@ export default function EditorCanvas({
       hoveredSelectableWallRef.current,
       openingMoveUiRef.current,
       roomResizeUiRef.current,
+      wallSplitHoverUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
@@ -2673,8 +2696,128 @@ export default function EditorCanvas({
           drawCurrentScene();
         },
       });
+      const clearWallSplitTooltipTimeout = () => {
+        if (!wallSplitTooltipTimeoutRef.current) return;
+        clearTimeout(wallSplitTooltipTimeoutRef.current);
+        wallSplitTooltipTimeoutRef.current = null;
+      };
+      const setWallSplitHoverUi = (next: WallSplitHoverUi | null) => {
+        const current = wallSplitHoverUiRef.current;
+        if (
+          current?.roomId === next?.roomId &&
+          current?.wall === next?.wall &&
+          current?.tooltipVisible === next?.tooltipVisible
+        ) {
+          return;
+        }
+        wallSplitHoverUiRef.current = next;
+        drawCurrentScene();
+      };
+      const clearWallSplitHoverUi = () => {
+        clearWallSplitTooltipTimeout();
+        setWallSplitHoverUi(null);
+      };
+      const scheduleWallSplitTooltip = (roomId: string, wall: RoomWall) => {
+        if (wallSplitTooltipTimeoutRef.current) return;
+        wallSplitTooltipTimeoutRef.current = setTimeout(() => {
+          wallSplitTooltipTimeoutRef.current = null;
+          const current = wallSplitHoverUiRef.current;
+          if (!current || current.roomId !== roomId || current.wall !== wall) return;
+          setWallSplitHoverUi({ roomId, wall, tooltipVisible: true });
+        }, WALL_SPLIT_TOOLTIP_DELAY_MS);
+      };
+      const toCanvasPoint = (event: PointerEvent): ScreenPoint => {
+        const rect = app.canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      };
+      const setWallSplitCursor = (isHovered: boolean) => {
+        if (!isHovered) return;
+        app.canvas.style.cursor = "crosshair";
+        document.body.style.cursor = "crosshair";
+      };
+      const onWallSplitPointerMove = (event: PointerEvent) => {
+        if (event.buttons !== 0) {
+          clearWallSplitHoverUi();
+          return;
+        }
+
+        const state = useEditorStore.getState();
+        const roomResizeUi = roomResizeUiRef.current;
+        const targetRoomId = getSingleSelectedRoomIdForSplitAffordance(
+          state.selectedRoomId,
+          state.selection
+        );
+        if (!targetRoomId || state.roomDraft.points.length > 0 || roomResizeUi.activeRoomId) {
+          clearWallSplitHoverUi();
+          return;
+        }
+
+        const room =
+          getVisibleRoomsForFocusedRoom(getRoomsForActiveFloor(state.document), state.focusedRoomId)
+            .find((candidate) => candidate.id === targetRoomId) ?? null;
+        if (!room) {
+          clearWallSplitHoverUi();
+          return;
+        }
+
+        const hoveredWall =
+          roomResizeUi.hoveredRoomId === targetRoomId
+            ? roomResizeUi.hoveredWallSegmentIndex ?? roomResizeUi.hoveredWall
+            : null;
+        const retainedWall =
+          wallSplitHoverUiRef.current?.roomId === targetRoomId
+            ? wallSplitHoverUiRef.current.wall
+            : null;
+        const candidateWalls = [hoveredWall, retainedWall].filter(
+          (wall, index, walls): wall is RoomWall =>
+            wall !== null && walls.findIndex((candidate) => candidate === wall) === index
+        );
+        const screenPoint = toCanvasPoint(event);
+
+        for (const wall of candidateWalls) {
+          const layout = getWallSplitHandleLayout(
+            room,
+            wall,
+            state.camera,
+            state.viewport,
+            state.settings
+          );
+          if (!layout) continue;
+
+          if (!hitTestWallSplitHandle(layout.center, screenPoint)) continue;
+
+          setWallSplitCursor(true);
+          const tooltipVisible =
+            wallSplitHoverUiRef.current?.roomId === targetRoomId &&
+            wallSplitHoverUiRef.current.wall === wall &&
+            wallSplitHoverUiRef.current.tooltipVisible;
+          setWallSplitHoverUi({ roomId: targetRoomId, wall, tooltipVisible });
+          if (!tooltipVisible) {
+            scheduleWallSplitTooltip(targetRoomId, wall);
+          }
+          return;
+        }
+
+        clearWallSplitTooltipTimeout();
+        if (hoveredWall !== null) {
+          setWallSplitHoverUi({ roomId: targetRoomId, wall: hoveredWall, tooltipVisible: false });
+          return;
+        }
+        setWallSplitHoverUi(null);
+      };
+      const onWallSplitPointerLeave = () => {
+        clearWallSplitHoverUi();
+      };
+      app.canvas.addEventListener("pointermove", onWallSplitPointerMove);
+      app.canvas.addEventListener("pointerleave", onWallSplitPointerLeave);
+      app.canvas.addEventListener("pointerdown", onWallSplitPointerLeave);
 
       return () => {
+        app.canvas.removeEventListener("pointermove", onWallSplitPointerMove);
+        app.canvas.removeEventListener("pointerleave", onWallSplitPointerLeave);
+        app.canvas.removeEventListener("pointerdown", onWallSplitPointerLeave);
+        clearWallSplitTooltipTimeout();
+        wallSplitHoverUiRef.current = null;
         detachPanZoomInput();
         detachRoomResizeInput();
         detachRoomDrawInput();
@@ -3708,6 +3851,7 @@ function drawScene(
     activeWallSegmentIndex: number | null;
     activeRoomId: string | null;
   },
+  wallSplitHoverUi: WallSplitHoverUi | null,
   transformFeedback: TransformFeedback | null,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
@@ -3920,6 +4064,18 @@ function drawScene(
       theme
     );
   }
+  drawWallSplitHoverAffordance(
+    dimensionOverlayContainer,
+    renderedRooms,
+    state.selectedRoomId,
+    state.selection,
+    roomResizeUi,
+    wallSplitHoverUi,
+    state.camera,
+    state.viewport,
+    state.settings,
+    theme
+  );
   drawDraft(
     draftGraphics,
     state.roomDraft.points,
@@ -6133,6 +6289,222 @@ function drawDimensionLabels(
     text.alpha = RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA;
     labelContainer.addChild(text);
   }
+}
+
+function drawWallSplitHoverAffordance(
+  labelContainer: Container,
+  rooms: Room[],
+  selectedRoomId: string | null,
+  selection: SharedSelectionItem[],
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
+    activeRoomId: string | null;
+  },
+  wallSplitHoverUi: WallSplitHoverUi | null,
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "wallMeasurementPosition">,
+  theme: EditorCanvasTheme
+) {
+  const targetRoomId = getSingleSelectedRoomIdForSplitAffordance(selectedRoomId, selection);
+  if (!targetRoomId || roomResizeUi.activeRoomId) {
+    return;
+  }
+  if (
+    roomResizeUi.hoveredCorner ||
+    roomResizeUi.hoveredVertexIndex !== null ||
+    roomResizeUi.activeWall ||
+    roomResizeUi.activeCorner ||
+    roomResizeUi.activeVertexIndex !== null ||
+    roomResizeUi.activeWallSegmentIndex !== null
+  ) {
+    return;
+  }
+
+  const hoveredWall: RoomWall | null =
+    roomResizeUi.hoveredRoomId === targetRoomId
+      ? roomResizeUi.hoveredWallSegmentIndex ?? roomResizeUi.hoveredWall
+      : null;
+  const wall = hoveredWall ?? (
+    wallSplitHoverUi?.roomId === targetRoomId ? wallSplitHoverUi.wall : null
+  );
+  if (wall === null) return;
+
+  const room = rooms.find((candidate) => candidate.id === targetRoomId);
+  if (!room) return;
+
+  const layout = getWallSplitHandleLayout(room, wall, camera, viewport, settings);
+  if (!layout) return;
+
+  drawWallSplitHandle(labelContainer, layout.center, theme);
+  if (wallSplitHoverUi?.roomId === targetRoomId && wallSplitHoverUi.wall === wall && wallSplitHoverUi.tooltipVisible) {
+    drawWallSplitTooltip(labelContainer, layout.center, viewport, theme);
+  }
+}
+
+function getSingleSelectedRoomIdForSplitAffordance(
+  selectedRoomId: string | null,
+  selection: SharedSelectionItem[]
+) {
+  if (!selectedRoomId) return null;
+  if (selection.length === 0) return selectedRoomId;
+  if (selection.length !== 1) return null;
+
+  const [item] = selection;
+  if (item.type === "room" && item.id === selectedRoomId) return selectedRoomId;
+  if (item.type === "wall" && item.roomId === selectedRoomId) return selectedRoomId;
+  return null;
+}
+
+function drawWallSplitHandle(
+  labelContainer: Container,
+  center: ScreenPoint,
+  theme: EditorCanvasTheme
+) {
+  const graphics = new Graphics();
+  const resolution = getTextResolution();
+  const x = snapToPixel(center.x, resolution);
+  const y = snapToPixel(center.y, resolution);
+
+  graphics.setFillStyle({ color: theme.wallSelectionAccent, alpha: 0.1 });
+  graphics.circle(x, y, WALL_SPLIT_HANDLE_RADIUS_PX + 3);
+  graphics.fill();
+  graphics.setFillStyle({ color: theme.roomLabelPillFill, alpha: 0.96 });
+  graphics.circle(x, y, WALL_SPLIT_HANDLE_RADIUS_PX);
+  graphics.fill();
+  graphics.setStrokeStyle({
+    width: 1.2,
+    color: theme.wallSelectionAccent,
+    alpha: 0.74,
+    cap: "round",
+    join: "round",
+  });
+  graphics.circle(x, y, WALL_SPLIT_HANDLE_RADIUS_PX);
+  graphics.stroke();
+
+  const halfPlus = WALL_SPLIT_HANDLE_PLUS_SIZE_PX / 2;
+  graphics.setStrokeStyle({
+    width: 1.6,
+    color: theme.wallSelectionAccent,
+    alpha: 0.9,
+    cap: "round",
+    join: "round",
+  });
+  graphics.moveTo(x - halfPlus, y);
+  graphics.lineTo(x + halfPlus, y);
+  graphics.moveTo(x, y - halfPlus);
+  graphics.lineTo(x, y + halfPlus);
+  graphics.stroke();
+  labelContainer.addChild(graphics);
+}
+
+function drawWallSplitTooltip(
+  labelContainer: Container,
+  controlCenter: ScreenPoint,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const resolution = getTextResolution();
+  const text = new Text({
+    text: WALL_SPLIT_TOOLTIP_TEXT,
+    resolution,
+    style: {
+      fontFamily: "Inter, sans-serif",
+      fontSize: WALL_SPLIT_TOOLTIP_FONT_SIZE_PX,
+      fontWeight: "500",
+      fill: theme.roomLabelFill,
+      letterSpacing: 0,
+    },
+  });
+  const width = text.width + WALL_SPLIT_TOOLTIP_PADDING_X_PX * 2;
+  const height = text.height + WALL_SPLIT_TOOLTIP_PADDING_Y_PX * 2;
+  const center = getWallSplitTooltipCenter(controlCenter, width, height, viewport);
+  const left = snapToPixel(center.x - width / 2, resolution);
+  const top = snapToPixel(center.y - height / 2, resolution);
+  const tooltip = new Graphics();
+
+  tooltip.setFillStyle({ color: theme.roomLabelPillFill, alpha: 0.96 });
+  tooltip.roundRect(left, top, width, height, WALL_SPLIT_TOOLTIP_RADIUS_PX);
+  tooltip.fill();
+  tooltip.setStrokeStyle({
+    width: 1,
+    color: theme.roomLabelPillSelectedStroke,
+    alpha: 0.48,
+  });
+  tooltip.roundRect(left, top, width, height, WALL_SPLIT_TOOLTIP_RADIUS_PX);
+  tooltip.stroke();
+  labelContainer.addChild(tooltip);
+
+  text.roundPixels = true;
+  text.anchor.set(0.5);
+  text.position.set(snapToPixel(center.x, resolution), snapToPixel(center.y, resolution));
+  labelContainer.addChild(text);
+}
+
+function getWallSplitTooltipCenter(
+  controlCenter: ScreenPoint,
+  width: number,
+  height: number,
+  viewport: ViewportSize
+): ScreenPoint {
+  const directions = [
+    { x: 0, y: -1 },
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+  ];
+  const minX = WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + width / 2;
+  const maxX = Math.max(minX, viewport.width - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - width / 2);
+  const minY = WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX + height / 2;
+  const maxY = Math.max(minY, viewport.height - WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX - height / 2);
+
+  let best: { center: ScreenPoint; overflow: number; distance: number } | null = null;
+
+  for (const direction of directions) {
+    const projectedHalfExtent =
+      (Math.abs(direction.x) * width) / 2 + (Math.abs(direction.y) * height) / 2;
+    const offset =
+      WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX + projectedHalfExtent;
+    const rawCenter = {
+      x: controlCenter.x + direction.x * offset,
+      y: controlCenter.y + direction.y * offset,
+    };
+    const clampedCenter = {
+      x: clampValue(rawCenter.x, minX, maxX),
+      y: clampValue(rawCenter.y, minY, maxY),
+    };
+    const rect = getCenteredRect(clampedCenter, width, height);
+    const controlRect = getCenteredRect(
+      controlCenter,
+      (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX / 2) * 2,
+      (WALL_SPLIT_HANDLE_RADIUS_PX + WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX / 2) * 2
+    );
+    const overlapsControl = rectsOverlap(rect, controlRect);
+    const overflow = Math.abs(clampedCenter.x - rawCenter.x) + Math.abs(clampedCenter.y - rawCenter.y);
+    const distance = Math.hypot(clampedCenter.x - controlCenter.x, clampedCenter.y - controlCenter.y);
+    const score = {
+      center: clampedCenter,
+      overflow: overlapsControl ? overflow + 10000 : overflow,
+      distance,
+    };
+
+    if (!best || score.overflow < best.overflow || (score.overflow === best.overflow && score.distance < best.distance)) {
+      best = score;
+    }
+  }
+
+  return best?.center ?? {
+    x: clampValue(controlCenter.x, minX, maxX),
+    y: clampValue(controlCenter.y, minY, maxY),
+  };
 }
 
 function getResizeDimensionLabelSpecs(

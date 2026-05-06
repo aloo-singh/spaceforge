@@ -144,6 +144,8 @@ export type EditorCommand =
       roomId: string;
       previousPoints: Room["points"];
       nextPoints: Room["points"];
+      editKind?: "wall-split";
+      roomName?: string;
       previousInteriorAssets?: RoomInteriorAsset[];
       nextInteriorAssets?: RoomInteriorAsset[];
     }
