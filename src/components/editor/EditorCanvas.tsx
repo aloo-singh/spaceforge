@@ -310,6 +310,11 @@ const WALL_SPLIT_TOOLTIP_RADIUS_PX = 8;
 const WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX = 8;
 const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
 const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
+const VERTEX_DELETE_HANDLE_RADIUS_PX = 8;
+const VERTEX_DELETE_HANDLE_CROSS_SIZE_PX = 5;
+const VERTEX_DELETE_HANDLE_OFFSET_PX = 22;
+const VERTEX_DELETE_HANDLE_COLOR = 0xe53e3e;
+const VERTEX_DELETE_TOOLTIP_TEXT = "Remove corner";
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
 const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
 const ROOM_HANDLE_LAYOUT_CACHE = new WeakMap<
@@ -4076,6 +4081,16 @@ function drawScene(
     state.settings,
     theme
   );
+  drawVertexDeleteHoverAffordance(
+    dimensionOverlayContainer,
+    renderedRooms,
+    state.selectedRoomId,
+    state.selection,
+    roomResizeUi,
+    state.camera,
+    state.viewport,
+    theme
+  );
   drawDraft(
     draftGraphics,
     state.roomDraft.points,
@@ -6505,6 +6520,153 @@ function getWallSplitTooltipCenter(
     x: clampValue(controlCenter.x, minX, maxX),
     y: clampValue(controlCenter.y, minY, maxY),
   };
+}
+
+function drawVertexDeleteHandle(
+  labelContainer: Container,
+  center: ScreenPoint,
+  theme: EditorCanvasTheme
+) {
+  const graphics = new Graphics();
+  const resolution = getTextResolution();
+  const x = snapToPixel(center.x, resolution);
+  const y = snapToPixel(center.y, resolution);
+
+  graphics.setFillStyle({ color: VERTEX_DELETE_HANDLE_COLOR, alpha: 0.08 });
+  graphics.circle(x, y, VERTEX_DELETE_HANDLE_RADIUS_PX + 3);
+  graphics.fill();
+  graphics.setFillStyle({ color: theme.roomLabelPillFill, alpha: 0.96 });
+  graphics.circle(x, y, VERTEX_DELETE_HANDLE_RADIUS_PX);
+  graphics.fill();
+  graphics.setStrokeStyle({
+    width: 1.2,
+    color: VERTEX_DELETE_HANDLE_COLOR,
+    alpha: 0.72,
+    cap: "round",
+    join: "round",
+  });
+  graphics.circle(x, y, VERTEX_DELETE_HANDLE_RADIUS_PX);
+  graphics.stroke();
+
+  const half = VERTEX_DELETE_HANDLE_CROSS_SIZE_PX / 2;
+  graphics.setStrokeStyle({
+    width: 1.6,
+    color: VERTEX_DELETE_HANDLE_COLOR,
+    alpha: 0.88,
+    cap: "round",
+    join: "round",
+  });
+  graphics.moveTo(x - half, y - half);
+  graphics.lineTo(x + half, y + half);
+  graphics.moveTo(x + half, y - half);
+  graphics.lineTo(x - half, y + half);
+  graphics.stroke();
+  labelContainer.addChild(graphics);
+}
+
+function drawVertexDeleteTooltip(
+  labelContainer: Container,
+  controlCenter: ScreenPoint,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const resolution = getTextResolution();
+  const text = new Text({
+    text: VERTEX_DELETE_TOOLTIP_TEXT,
+    resolution,
+    style: {
+      fontFamily: "Inter, sans-serif",
+      fontSize: WALL_SPLIT_TOOLTIP_FONT_SIZE_PX,
+      fontWeight: "500",
+      fill: theme.roomLabelFill,
+      letterSpacing: 0,
+    },
+  });
+  const width = text.width + WALL_SPLIT_TOOLTIP_PADDING_X_PX * 2;
+  const height = text.height + WALL_SPLIT_TOOLTIP_PADDING_Y_PX * 2;
+  const center = getWallSplitTooltipCenter(controlCenter, width, height, viewport);
+  const left = snapToPixel(center.x - width / 2, resolution);
+  const top = snapToPixel(center.y - height / 2, resolution);
+  const tooltip = new Graphics();
+
+  tooltip.setFillStyle({ color: theme.roomLabelPillFill, alpha: 0.96 });
+  tooltip.roundRect(left, top, width, height, WALL_SPLIT_TOOLTIP_RADIUS_PX);
+  tooltip.fill();
+  tooltip.setStrokeStyle({
+    width: 1,
+    color: theme.roomLabelPillSelectedStroke,
+    alpha: 0.48,
+  });
+  tooltip.roundRect(left, top, width, height, WALL_SPLIT_TOOLTIP_RADIUS_PX);
+  tooltip.stroke();
+  labelContainer.addChild(tooltip);
+
+  text.roundPixels = true;
+  text.anchor.set(0.5);
+  text.position.set(snapToPixel(center.x, resolution), snapToPixel(center.y, resolution));
+  labelContainer.addChild(text);
+}
+
+function drawVertexDeleteHoverAffordance(
+  labelContainer: Container,
+  rooms: Room[],
+  selectedRoomId: string | null,
+  selection: SharedSelectionItem[],
+  roomResizeUi: {
+    hoveredWall: RectWall | null;
+    hoveredCorner: RectCorner | null;
+    hoveredVertexIndex: number | null;
+    hoveredWallSegmentIndex: number | null;
+    hoveredRoomId: string | null;
+    activeWall: RectWall | null;
+    activeCorner: RectCorner | null;
+    activeVertexIndex: number | null;
+    activeWallSegmentIndex: number | null;
+    activeRoomId: string | null;
+  },
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const targetRoomId = getSingleSelectedRoomIdForSplitAffordance(selectedRoomId, selection);
+  if (!targetRoomId || roomResizeUi.activeRoomId) return;
+  if (
+    roomResizeUi.activeWall ||
+    roomResizeUi.activeCorner ||
+    roomResizeUi.activeVertexIndex !== null ||
+    roomResizeUi.activeWallSegmentIndex !== null
+  ) {
+    return;
+  }
+
+  const hoveredVertexIndex =
+    roomResizeUi.hoveredRoomId === targetRoomId ? roomResizeUi.hoveredVertexIndex : null;
+  if (hoveredVertexIndex === null) return;
+
+  const room = rooms.find((r) => r.id === targetRoomId);
+  if (!room || hoveredVertexIndex >= room.points.length) return;
+
+  const vertexWorld = room.points[hoveredVertexIndex];
+  const vertexScreen = worldToScreen(vertexWorld, camera, viewport);
+
+  // Offset the delete handle outward from the room centroid so it never overlaps the drag handle.
+  const centroidWorld = room.points.reduce(
+    (acc, p) => ({ x: acc.x + p.x / room.points.length, y: acc.y + p.y / room.points.length }),
+    { x: 0, y: 0 }
+  );
+  const centroidScreen = worldToScreen(centroidWorld, camera, viewport);
+  const dx = vertexScreen.x - centroidScreen.x;
+  const dy = vertexScreen.y - centroidScreen.y;
+  const len = Math.hypot(dx, dy);
+  const dir = len > 1 ? { x: dx / len, y: dy / len } : { x: 0, y: -1 };
+
+  const handleCenter: ScreenPoint = {
+    x: vertexScreen.x + dir.x * VERTEX_DELETE_HANDLE_OFFSET_PX,
+    y: vertexScreen.y + dir.y * VERTEX_DELETE_HANDLE_OFFSET_PX,
+  };
+
+  drawVertexDeleteHandle(labelContainer, handleCenter, theme);
+  drawVertexDeleteTooltip(labelContainer, handleCenter, viewport, theme);
 }
 
 function getResizeDimensionLabelSpecs(
