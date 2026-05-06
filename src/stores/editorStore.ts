@@ -213,6 +213,7 @@ type EditorState = {
   roomDraft: RoomDraftState;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
+  focusedRoomId: string | null;
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
@@ -262,6 +263,7 @@ type EditorState = {
   ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
+  setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
@@ -506,10 +508,20 @@ function preserveHistoryForSelectionUpdate(
   state: EditorState,
   nextState: Partial<EditorState>
 ): Partial<EditorState> {
+  const shouldClearFocusedRoom =
+    !("focusedRoomId" in nextState) &&
+    ("selectedNorthIndicator" in nextState ||
+      "selectedRoomId" in nextState ||
+      "selectedWall" in nextState ||
+      "selectedOpening" in nextState ||
+      "selectedInteriorAsset" in nextState ||
+      "selection" in nextState);
+
   // Selection/focus/navigation updates are transient UI state and must never
   // create undo entries or alter canUndo/canRedo.
   return {
     ...nextState,
+    ...(shouldClearFocusedRoom ? { focusedRoomId: null } : null),
     history: state.history,
     canUndo: state.canUndo,
     canRedo: state.canRedo,
@@ -2196,6 +2208,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   roomDraft: EMPTY_ROOM_DRAFT,
   selectedNorthIndicator: false,
   selectedRoomId: null,
+  focusedRoomId: null,
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
@@ -2756,6 +2769,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetDraft: () =>
     set({
       roomDraft: EMPTY_ROOM_DRAFT,
+    }),
+  setFocusedRoomId: (roomId) =>
+    set((state) => {
+      if (
+        roomId !== null &&
+        !getRoomsForActiveFloor(state.document).some((room) => room.id === roomId)
+      ) {
+        return state;
+      }
+      if (state.focusedRoomId === roomId) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        focusedRoomId: roomId,
+      });
     }),
   selectRoomById: (roomId) =>
     set((state) => {
@@ -5752,6 +5779,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
       selectedNorthIndicator: false,
       selectedRoomId: null,
+      focusedRoomId: null,
       selectedWall: null,
       selectedOpening: null,
       selectedInteriorAsset: null,
@@ -5792,6 +5820,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: restoredDocument,
         camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
+        focusedRoomId: getSelectionIfRoomExists(state.focusedRoomId, restoredDocument),
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
           restoredDocument,
@@ -5836,6 +5865,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: restoredDocument,
         camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
+        focusedRoomId: getSelectionIfRoomExists(state.focusedRoomId, restoredDocument),
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
           restoredDocument,
@@ -5896,6 +5926,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: restoredDocument,
         camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
+        focusedRoomId: getSelectionIfRoomExists(state.focusedRoomId, restoredDocument),
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
           restoredDocument,
@@ -5953,6 +5984,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: restoredDocument,
         camera: syncCameraRotationToDocument(state.camera, restoredDocument),
         selectedNorthIndicator: state.selectedNorthIndicator,
+        focusedRoomId: getSelectionIfRoomExists(state.focusedRoomId, restoredDocument),
         selectedRoomId: getSelectedRoomIdAfterHistoryCommand(
           state.selectedRoomId,
           restoredDocument,
@@ -6077,6 +6109,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomDraft: EMPTY_ROOM_DRAFT,
         selectedNorthIndicator: false,
         selectedRoomId: null,
+        focusedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
         selectedInteriorAsset: null,

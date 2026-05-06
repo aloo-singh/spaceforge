@@ -3763,8 +3763,10 @@ function drawScene(
     state.settings,
     state.isDimensionsVisibilityOverrideActive
   );
-  const renderedRooms = getRenderedRoomsForTransform(getRoomsForActiveFloor(state.document), transformFeedback);
-  const renderedLabelRooms = getRenderedRoomsForLabelTransform(getRoomsForActiveFloor(state.document), transformFeedback);
+  const activeFloorRooms = getRoomsForActiveFloor(state.document);
+  const visibleRooms = getVisibleRoomsForFocusedRoom(activeFloorRooms, state.focusedRoomId);
+  const renderedRooms = getRenderedRoomsForTransform(visibleRooms, transformFeedback);
+  const renderedLabelRooms = getRenderedRoomsForLabelTransform(visibleRooms, transformFeedback);
   
   // Get the peer room for linked staircases
   let linkedStaircasePeerRoom: Room | null = null;
@@ -4253,6 +4255,12 @@ function drawRooms(
 
 function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {
   return selection.some((item) => item.type === "room" && item.id === roomId);
+}
+
+function getVisibleRoomsForFocusedRoom(rooms: Room[], focusedRoomId: string | null): Room[] {
+  if (!focusedRoomId) return rooms;
+  const focusedRoom = rooms.find((room) => room.id === focusedRoomId);
+  return focusedRoom ? [focusedRoom] : rooms;
 }
 
 function isWallSelected(selection: SharedSelectionItem[], roomId: string, wall: RoomWall) {

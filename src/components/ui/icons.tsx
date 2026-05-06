@@ -27,6 +27,7 @@ export {
   IconCopy as Copy,
   IconDoor as DoorOpen,
   IconDownload as Download,
+  IconEye as IconEye,
   IconFocus as Focus,
   IconFocus2 as LocateFixed,
   IconHanger as Hanger,
