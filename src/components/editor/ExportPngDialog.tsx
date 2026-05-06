@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EDITOR_EXPORT_SIGNATURE_MAX_LENGTH } from "@/lib/editor/settings";
 import type {
   EditorExportLegendPosition,
@@ -155,6 +156,7 @@ export function ExportPngDialog({
   const [showPdfUpsellDialog, setShowPdfUpsellDialog] = useState(false);
   const [selectedScopeValue, setSelectedScopeValue] = useState("");
   const previewRequestIdRef = useRef(0);
+  const previewScopeValueRef = useRef("");
 
   const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const setDevSubscriptionTier = useEditorStore((state) => state.setDevSubscriptionTier);
@@ -221,6 +223,8 @@ export function ExportPngDialog({
 
     const requestId = previewRequestIdRef.current + 1;
     previewRequestIdRef.current = requestId;
+    const shouldRefreshImmediately = previewScopeValueRef.current !== effectiveScopeValue;
+    previewScopeValueRef.current = effectiveScopeValue;
     let refreshIndicatorTimeoutId: number | null = null;
     const timeoutId = window.setTimeout(() => {
       setIsPreviewRefreshing(true);
@@ -266,7 +270,7 @@ export function ExportPngDialog({
           setIsPreviewRefreshing(false);
           setIsPreviewRefreshVisible(false);
         });
-    }, 180);
+    }, shouldRefreshImmediately ? 0 : 180);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -277,6 +281,7 @@ export function ExportPngDialog({
   }, [
     open,
     onPreviewRequest,
+    effectiveScopeValue,
     exportScope,
     title,
     description,
@@ -324,6 +329,7 @@ export function ExportPngDialog({
       setIsPreviewRefreshing(false);
       setIsPreviewRefreshVisible(false);
       setSelectedScopeValue("");
+      previewScopeValueRef.current = "";
     }
     onOpenChange(nextOpen);
   };
@@ -491,9 +497,16 @@ export function ExportPngDialog({
                   What to export
                 </label>
                 <Select value={effectiveScopeValue} onValueChange={setSelectedScopeValue}>
-                  <SelectTrigger id="export-png-scope" className="h-9 bg-background/90">
-                    <SelectValue placeholder="Choose export scope" />
-                  </SelectTrigger>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SelectTrigger id="export-png-scope" className="h-9 bg-background/90">
+                          <SelectValue placeholder="Choose export scope" />
+                        </SelectTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Choose a floor or a single room for this export.</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <SelectContent>
                     {exportScopeOptions.floors.map((floor, index) => (
                       <SelectGroup key={floor.id}>
