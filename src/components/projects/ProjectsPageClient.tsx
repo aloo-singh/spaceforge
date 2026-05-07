@@ -68,6 +68,7 @@ type ProjectFilterOption = {
   value: number;
   label: string;
   icon: typeof Blocks;
+  paidOnly?: boolean;
 };
 
 const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
@@ -94,8 +95,32 @@ const PROJECT_FILTER_OPTIONS: ProjectFilterOption[] = [
     value: 2,
     label: "2+ floors",
     icon: Stack,
+    paidOnly: true,
   },
 ];
+
+function getProjectTotalAreaSquareMetres(project: ProjectListItem) {
+  return (project.stats?.totalAreaSquareMillimetres ?? 0) / 1_000_000;
+}
+
+function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterState) {
+  if (filters.minRooms !== null && (project.stats?.roomCount ?? 0) < filters.minRooms) {
+    return false;
+  }
+
+  if (
+    filters.minArea !== null &&
+    getProjectTotalAreaSquareMetres(project) < filters.minArea
+  ) {
+    return false;
+  }
+
+  if (filters.minFloors !== null && (project.stats?.floorCount ?? 1) < filters.minFloors) {
+    return false;
+  }
+
+  return true;
+}
 
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
   if (!DEV_MODE_ENABLED || typeof window === "undefined") {
@@ -151,6 +176,7 @@ export function ProjectsPageClient() {
   
   // Current subscription tier (respects dev mode when enabled)
   const currentTier: SubscriptionTier = DEV_MODE_ENABLED ? devTier : "Free";
+  const canUsePaidProjectFilters = currentTier !== "Free";
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
@@ -208,6 +234,28 @@ export function ProjectsPageClient() {
     };
   }, [errorMessage, isLoading]);
 
+  useEffect(() => {
+    if (canUsePaidProjectFilters || projectFilters.minFloors === null) {
+      return;
+    }
+
+    setProjectFilters((currentFilters) => ({
+      ...currentFilters,
+      minFloors: null,
+    }));
+  }, [canUsePaidProjectFilters, projectFilters.minFloors]);
+
+  useEffect(() => {
+    if (
+      projects.length > 1 ||
+      Object.values(projectFilters).every((value) => value === null)
+    ) {
+      return;
+    }
+
+    setProjectFilters(DEFAULT_PROJECT_FILTERS);
+  }, [projectFilters, projects.length]);
+
   const canCreateProject =
     !isCreatingProject &&
     renamingProjectId === null &&
@@ -216,9 +264,22 @@ export function ProjectsPageClient() {
   const maxProjects = getEffectiveMaxProjects(currentTier);
   const isAtProjectLimit = projects.length >= maxProjects;
   const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
-  const activeFilterCount = Object.values(projectFilters).filter(
+  const availableProjectFilterOptions = PROJECT_FILTER_OPTIONS.filter(
+    (filterOption) => !filterOption.paidOnly || canUsePaidProjectFilters
+  );
+  const effectiveProjectFilters: ProjectFilterState = canUsePaidProjectFilters
+    ? projectFilters
+    : {
+        ...projectFilters,
+        minFloors: null,
+      };
+  const activeFilterCount = Object.values(effectiveProjectFilters).filter(
     (value) => value !== null
   ).length;
+  const filteredProjects = projects.filter((project) =>
+    projectMatchesFilters(project, effectiveProjectFilters)
+  );
+  const shouldShowProjectFilters = projects.length > 1;
 
   const toggleProjectFilter = (key: ProjectFilterKey, value: number) => {
     setProjectFilters((currentFilters) => ({
@@ -509,53 +570,55 @@ export function ProjectsPageClient() {
 
         {!isLoading && projects.length > 0 ? (
           <div className="space-y-4">
-            <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Filter projects</p>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  Start with room count, floor area, or floors.
-                </p>
+            {shouldShowProjectFilters ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Filter projects</p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Showing {filteredProjects.length} of {projects.length}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {availableProjectFilterOptions.map((filterOption) => {
+                    const Icon = filterOption.icon;
+                    const isActive =
+                      projectFilters[filterOption.key] === filterOption.value;
+
+                    return (
+                      <Button
+                        key={`${filterOption.key}-${filterOption.value}`}
+                        type="button"
+                        variant={isActive ? "secondary" : "outline"}
+                        size="sm"
+                        aria-pressed={isActive}
+                        onClick={() =>
+                          toggleProjectFilter(filterOption.key, filterOption.value)
+                        }
+                        className="rounded-full"
+                      >
+                        <Icon className="size-3.5" />
+                        {filterOption.label}
+                      </Button>
+                    );
+                  })}
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearProjectFilters}
+                    disabled={activeFilterCount === 0}
+                    className="rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    Clear all
+                  </Button>
+                </div>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {PROJECT_FILTER_OPTIONS.map((filterOption) => {
-                  const Icon = filterOption.icon;
-                  const isActive =
-                    projectFilters[filterOption.key] === filterOption.value;
-
-                  return (
-                    <Button
-                      key={`${filterOption.key}-${filterOption.value}`}
-                      type="button"
-                      variant={isActive ? "secondary" : "outline"}
-                      size="sm"
-                      aria-pressed={isActive}
-                      onClick={() =>
-                        toggleProjectFilter(filterOption.key, filterOption.value)
-                      }
-                      className="rounded-full"
-                    >
-                      <Icon className="size-3.5" />
-                      {filterOption.label}
-                    </Button>
-                  );
-                })}
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearProjectFilters}
-                  disabled={activeFilterCount === 0}
-                  className="rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
