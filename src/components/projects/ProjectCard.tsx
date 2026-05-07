@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
+  Blocks,
   BorderAll,
   CalendarWeek,
   Check,
   Clock3,
   PencilLine,
-  Receipt,
   Stack,
   Trash2,
   X,
@@ -76,7 +76,7 @@ function ProjectInfoMetric({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-white/45 bg-white/55 px-2.5 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-slate-950/55">
+    <div className="min-h-[3.25rem] min-w-0 rounded-md border border-white/45 bg-white/60 px-2 py-1.5 shadow-sm backdrop-blur-md sm:px-2.5 sm:py-2 dark:border-white/10 dark:bg-slate-950/55">
       <div className="flex items-center gap-1.5 font-measurement text-[10px] font-semibold uppercase text-foreground/55">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -93,7 +93,7 @@ function ProjectInfoMetric({
         </Tooltip>
         <span className="truncate">{label}</span>
       </div>
-      <p className="mt-1 truncate font-measurement text-sm font-semibold text-foreground">
+      <p className="mt-0.5 truncate font-measurement text-[13px] font-semibold text-foreground sm:mt-1 sm:text-sm">
         {value}
       </p>
     </div>
@@ -218,29 +218,29 @@ export function ProjectCard({
             )}
           </div>
           <div
-            className={`pointer-events-none absolute inset-0 flex items-end bg-background/20 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none dark:bg-background/25 ${
+            className={`pointer-events-none absolute inset-0 flex items-end bg-background/20 p-2.5 transition-opacity duration-200 ease-out motion-reduce:transition-none sm:p-3 dark:bg-background/25 ${
               showProjectInfo ? "opacity-100" : "opacity-0"
             }`}
             aria-hidden={!showProjectInfo}
           >
             <ImmediateTooltipProvider>
               <div
-                className={`grid w-full grid-cols-2 gap-2 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out motion-reduce:transition-none ${
+                className={`grid w-full grid-cols-2 gap-1.5 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out sm:gap-2 motion-reduce:transition-none ${
                   showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
                 }`}
               >
                 <ProjectInfoMetric
-                  icon={BorderAll}
+                  icon={Blocks}
                   isInteractive={showProjectInfo}
                   label="Rooms"
-                  tooltip="How many rooms this layout has so far."
+                  tooltip="Rooms you've sketched in this layout."
                   value={`${stats.roomCount}`}
                 />
                 <ProjectInfoMetric
-                  icon={Receipt}
+                  icon={BorderAll}
                   isInteractive={showProjectInfo}
                   label="Area"
-                  tooltip="Total drawn floor area across this project."
+                  tooltip="All drawn room area, added together."
                   value={stats.totalArea}
                 />
                 {canShowPaidStats ? (
@@ -249,14 +249,14 @@ export function ProjectCard({
                       icon={Stack}
                       isInteractive={showProjectInfo}
                       label="Floors"
-                      tooltip="How many floors are in this project."
+                      tooltip="Floors in this layout, when your plan goes upstairs."
                       value={`${stats.floorCount}`}
                     />
                     <ProjectInfoMetric
                       icon={CalendarWeek}
                       isInteractive={showProjectInfo}
                       label="Created"
-                      tooltip="When this layout was first created."
+                      tooltip="The day this layout first joined your projects."
                       value={stats.createdDate}
                     />
                   </>

@@ -75,6 +75,7 @@ export function ProjectsPageClient() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
+  // First of the /projects trio: info overlay, then filtering, then layout modes.
   const [showProjectInfo, setShowProjectInfo] = useState(false);
   const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
