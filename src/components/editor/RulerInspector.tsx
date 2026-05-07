@@ -2,7 +2,7 @@
 
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { Button, ButtonGroup } from "@/components/ui/button";
-import { IconEye, Trash2 } from "@/components/ui/icons";
+import { IconEye, RulerMeasure2, Trash2 } from "@/components/ui/icons";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { formatMetricWallDimension, getEdgeLengthMillimetres } from "@/lib/editor/measurements";
 import { useEditorStore } from "@/stores/editorStore";
@@ -33,13 +33,14 @@ export function RulerInspector({ className }: RulerInspectorProps) {
       className={className}
       bodyClassName="flex flex-col gap-4"
     >
-      <div className="rounded-md border border-lime-600/25 bg-lime-600/10 px-3 py-2">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          Live distance
-        </p>
-        <p className="mt-1 font-mono text-lg font-semibold text-lime-600 dark:text-lime-400">
-          {liveDistance ?? "Place start point"}
-        </p>
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-muted-foreground">Live distance</p>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <RulerMeasure2 className="size-4 shrink-0 text-muted-foreground" />
+          <span className="font-mono">
+            {liveDistance ?? <span className="text-muted-foreground italic">Place start point</span>}
+          </span>
+        </div>
       </div>
 
       {isDrawingRuler ? (
