@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCcw,
   Stack,
+  X,
 } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
@@ -44,6 +45,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
@@ -65,11 +73,17 @@ type ProjectFilterKey = keyof ProjectFilterState;
 
 type ProjectFilterOption = {
   key: ProjectFilterKey;
-  value: number;
   label: string;
+  placeholder: string;
   icon: typeof Blocks;
   paidOnly?: boolean;
+  options: {
+    value: number;
+    label: string;
+  }[];
 };
+
+const PROJECT_FILTER_ANY_VALUE = "any";
 
 const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
   minRooms: null,
@@ -80,22 +94,39 @@ const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
 const PROJECT_FILTER_OPTIONS: ProjectFilterOption[] = [
   {
     key: "minRooms",
-    value: 3,
-    label: "3+ rooms",
+    label: "Min rooms",
+    placeholder: "Any rooms",
     icon: Blocks,
+    options: [
+      { value: 1, label: "1+ room" },
+      { value: 3, label: "3+ rooms" },
+      { value: 5, label: "5+ rooms" },
+      { value: 10, label: "10+ rooms" },
+    ],
   },
   {
     key: "minArea",
-    value: 50,
-    label: "50m²+",
+    label: "Min area",
+    placeholder: "Any area",
     icon: BorderAll,
+    options: [
+      { value: 10, label: "10+ m²" },
+      { value: 25, label: "25+ m²" },
+      { value: 50, label: "50+ m²" },
+      { value: 100, label: "100+ m²" },
+    ],
   },
   {
     key: "minFloors",
-    value: 2,
-    label: "2+ floors",
+    label: "Min floors",
+    placeholder: "Any floors",
     icon: Stack,
     paidOnly: true,
+    options: [
+      { value: 1, label: "1+ floor" },
+      { value: 2, label: "2+ floors" },
+      { value: 3, label: "3+ floors" },
+    ],
   },
 ];
 
@@ -120,6 +151,10 @@ function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterS
   }
 
   return true;
+}
+
+function formatProjectFilterSelectValue(value: number | null) {
+  return value === null ? PROJECT_FILTER_ANY_VALUE : String(value);
 }
 
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
@@ -280,11 +315,37 @@ export function ProjectsPageClient() {
     projectMatchesFilters(project, effectiveProjectFilters)
   );
   const shouldShowProjectFilters = projects.length > 1;
+  const activeProjectFilters = availableProjectFilterOptions
+    .map((filterOption) => {
+      const value = effectiveProjectFilters[filterOption.key];
+      if (value === null) {
+        return null;
+      }
 
-  const toggleProjectFilter = (key: ProjectFilterKey, value: number) => {
+      const selectedOption = filterOption.options.find((option) => option.value === value);
+      return {
+        key: filterOption.key,
+        label: `${filterOption.label}: ${selectedOption?.label ?? `${value}+`}`,
+      };
+    })
+    .filter(
+      (filter): filter is { key: ProjectFilterKey; label: string } => filter !== null
+    );
+
+  const setProjectFilterFromSelect = (key: ProjectFilterKey, selectedValue: string) => {
     setProjectFilters((currentFilters) => ({
       ...currentFilters,
-      [key]: currentFilters[key] === value ? null : value,
+      [key]:
+        selectedValue === PROJECT_FILTER_ANY_VALUE
+          ? null
+          : Number.parseInt(selectedValue, 10),
+    }));
+  };
+
+  const removeProjectFilter = (key: ProjectFilterKey) => {
+    setProjectFilters((currentFilters) => ({
+      ...currentFilters,
+      [key]: null,
     }));
   };
 
@@ -571,37 +632,14 @@ export function ProjectsPageClient() {
         {!isLoading && projects.length > 0 ? (
           <div className="space-y-4">
             {shouldShowProjectFilters ? (
-              <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Filter projects</p>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    Showing {filteredProjects.length} of {projects.length}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {availableProjectFilterOptions.map((filterOption) => {
-                    const Icon = filterOption.icon;
-                    const isActive =
-                      projectFilters[filterOption.key] === filterOption.value;
-
-                    return (
-                      <Button
-                        key={`${filterOption.key}-${filterOption.value}`}
-                        type="button"
-                        variant={isActive ? "secondary" : "outline"}
-                        size="sm"
-                        aria-pressed={isActive}
-                        onClick={() =>
-                          toggleProjectFilter(filterOption.key, filterOption.value)
-                        }
-                        className="rounded-full"
-                      >
-                        <Icon className="size-3.5" />
-                        {filterOption.label}
-                      </Button>
-                    );
-                  })}
+              <div className="space-y-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Filter projects</p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Showing {filteredProjects.length} of {projects.length}
+                    </p>
+                  </div>
 
                   <Button
                     type="button"
@@ -609,11 +647,75 @@ export function ProjectsPageClient() {
                     size="sm"
                     onClick={clearProjectFilters}
                     disabled={activeFilterCount === 0}
-                    className="rounded-full text-muted-foreground hover:text-foreground"
+                    className="w-fit rounded-full text-muted-foreground hover:text-foreground"
                   >
                     Clear all
                   </Button>
                 </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {availableProjectFilterOptions.map((filterOption) => {
+                    const Icon = filterOption.icon;
+
+                    return (
+                      <div key={filterOption.key} className="space-y-1">
+                        <label
+                          htmlFor={`project-filter-${filterOption.key}`}
+                          className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.04em] text-foreground/70 uppercase"
+                        >
+                          <Icon className="size-3.5 text-blue-500" />
+                          {filterOption.label}
+                        </label>
+                        <Select
+                          value={formatProjectFilterSelectValue(
+                            projectFilters[filterOption.key]
+                          )}
+                          onValueChange={(selectedValue) =>
+                            setProjectFilterFromSelect(filterOption.key, selectedValue)
+                          }
+                        >
+                          <SelectTrigger
+                            id={`project-filter-${filterOption.key}`}
+                            className="h-9 rounded-full bg-background/90"
+                          >
+                            <SelectValue placeholder={filterOption.placeholder} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={PROJECT_FILTER_ANY_VALUE}>
+                              {filterOption.placeholder}
+                            </SelectItem>
+                            {filterOption.options.map((option) => (
+                              <SelectItem
+                                key={`${filterOption.key}-${option.value}`}
+                                value={String(option.value)}
+                              >
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {activeProjectFilters.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {activeProjectFilters.map((activeFilter) => (
+                      <Button
+                        key={activeFilter.key}
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => removeProjectFilter(activeFilter.key)}
+                        className="h-8 rounded-full px-2.5 text-xs"
+                      >
+                        {activeFilter.label}
+                        <X className="size-3" />
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
