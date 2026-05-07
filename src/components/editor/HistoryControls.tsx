@@ -575,7 +575,14 @@ export function HistoryControls({
                   <Restore />
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content="Ruler tool — Measure distances">
+              <EditorChromeTooltip
+                content={
+                  <span className="inline-flex items-center gap-2">
+                    <span>Ruler tool — Measure distances</span>
+                    <ShortcutKbdGroup keys={["R"]} />
+                  </span>
+                }
+              >
                 <Button
                   type="button"
                   variant="outline"

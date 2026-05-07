@@ -2081,6 +2081,7 @@ export default function EditorCanvas({
         "toggle-guidelines",
         "toggle-canvas-hud",
         "toggle-snapping",
+        "toggle-ruler-tool",
         "fit-selected-room",
         "fit-all-rooms",
       ]);
@@ -2114,6 +2115,16 @@ export default function EditorCanvas({
         showKeyboardShortcutFeedback(shortcut.id, {
           feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
           context: { isEnabled: nextSnappingEnabled },
+        });
+        return;
+      }
+
+      if (shortcut.id === "toggle-ruler-tool") {
+        const nextIsRulerMode = !store.isRulerMode;
+        store.setRulerMode(nextIsRulerMode);
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextIsRulerMode },
         });
         return;
       }

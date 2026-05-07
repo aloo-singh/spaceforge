@@ -6,6 +6,7 @@ export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
   | "toggle-guidelines"
   | "toggle-snapping"
+  | "toggle-ruler-tool"
   | "fit-all-rooms"
   | "fit-selected-room"
   | "multi-select-toggle"
@@ -83,6 +84,17 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "toggle",
     bindings: [{ key: "s", code: "KeyS" }],
     sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
+  },
+  {
+    id: "toggle-ruler-tool",
+    section: "View",
+    keyCombination: "R",
+    description: "Toggle ruler tool",
+    macKeys: "R",
+    windowsKeys: "R",
+    type: "toggle",
+    bindings: [{ key: "r", code: "KeyR" }],
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Ruler tool enabled" : "Ruler tool disabled"),
   },
   {
     id: "fit-all-rooms",
