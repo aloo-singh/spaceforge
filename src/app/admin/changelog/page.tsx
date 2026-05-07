@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.77.2</h2>
+            <span className="text-sm text-muted-foreground">2026-05-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added the second feature in the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">/projects</code> improvement trio: local project filtering by room count, total area, and paid-tier floor count.</li>
+                <li>Added compact shadcn Select controls for filter dimensions, with Free users seeing rooms and area while Pro, Studio, and Education users also see floors.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Polished the filter bar into a calm, icon-led layout with a passive <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Filter2</code> tooltip, smaller dropdowns, result count, and a Clear all reset.</li>
+                <li>Filter controls now only appear when there is more than one project, keeping single-project lists quiet.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.77.1</h2>
             <span className="text-sm text-muted-foreground">2026-05-07</span>
           </div>
