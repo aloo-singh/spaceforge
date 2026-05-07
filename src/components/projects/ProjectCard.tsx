@@ -3,12 +3,25 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "@/components/ui/icons";
+import {
+  ArrowUpRight,
+  BorderAll,
+  CalendarWeek,
+  Check,
+  Clock3,
+  PencilLine,
+  Receipt,
+  Stack,
+  Trash2,
+  X,
+} from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
+import { formatMetricRoomArea } from "@/lib/editor/measurements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 type ProjectCardProps = {
   project: ProjectListItem;
@@ -16,8 +29,54 @@ type ProjectCardProps = {
   onDeleteRequest: (project: ProjectListItem) => void;
   isRenaming: boolean;
   isDeleting: boolean;
+  showProjectInfo?: boolean;
+  currentTier: SubscriptionTier;
   isInteractionDisabled?: boolean;
 };
+
+function formatProjectCreatedDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Recent";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function getProjectCardStats(project: ProjectListItem) {
+  return {
+    roomCount: project.stats?.roomCount ?? 0,
+    floorCount: project.stats?.floorCount ?? 1,
+    totalArea: formatMetricRoomArea(project.stats?.totalAreaSquareMillimetres ?? 0),
+    createdDate: formatProjectCreatedDate(project.createdAt),
+  };
+}
+
+function ProjectInfoMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof BorderAll;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-white/45 bg-white/55 px-2.5 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-slate-950/55">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase text-foreground/55">
+        <Icon className="size-3.5 text-blue-500" />
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="mt-1 truncate font-measurement text-sm font-semibold text-foreground">
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export function ProjectCard({
   project,
@@ -25,6 +84,8 @@ export function ProjectCard({
   onDeleteRequest,
   isRenaming,
   isDeleting,
+  showProjectInfo = false,
+  currentTier,
   isInteractionDisabled = false,
 }: ProjectCardProps) {
   const router = useRouter();
@@ -33,6 +94,8 @@ export function ProjectCard({
   const [hasThumbnailLoadError, setHasThumbnailLoadError] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isSubmittingRenameRef = useRef(false);
+  const stats = getProjectCardStats(project);
+  const canShowPaidStats = currentTier !== "Free";
 
   const handleCardClick = () => {
     if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
@@ -128,6 +191,36 @@ export function ProjectCard({
               </div>
             )}
           </div>
+          {showProjectInfo ? (
+            <div className="pointer-events-none absolute inset-0 flex items-end bg-background/20 p-3 backdrop-blur-[1px] dark:bg-background/25">
+              <div className="grid w-full grid-cols-2 gap-2">
+                <ProjectInfoMetric
+                  icon={BorderAll}
+                  label="Rooms"
+                  value={`${stats.roomCount}`}
+                />
+                <ProjectInfoMetric
+                  icon={Receipt}
+                  label="Area"
+                  value={stats.totalArea}
+                />
+                {canShowPaidStats ? (
+                  <>
+                    <ProjectInfoMetric
+                      icon={Stack}
+                      label="Floors"
+                      value={`${stats.floorCount}`}
+                    />
+                    <ProjectInfoMetric
+                      icon={CalendarWeek}
+                      label="Created"
+                      value={stats.createdDate}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-3">

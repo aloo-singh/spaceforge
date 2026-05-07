@@ -447,6 +447,8 @@ export function ProjectsPageClient() {
                 onDeleteRequest={setProjectPendingDelete}
                 isRenaming={renamingProjectId === project.id}
                 isDeleting={deletingProjectId === project.id}
+                showProjectInfo={showProjectInfo}
+                currentTier={currentTier}
                 isInteractionDisabled={
                   isCreatingProject ||
                   (deletingProjectId !== null && deletingProjectId !== project.id)

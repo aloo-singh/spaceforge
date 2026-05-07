@@ -8,6 +8,7 @@ import {
   type ProjectListItem,
   type ProjectRecord,
 } from "@/lib/projects/types";
+import { getProjectListStats } from "@/lib/projects/stats";
 import { getSupabaseServerConfig } from "@/lib/supabase/server";
 
 type SupabaseAppUserRow = {
@@ -96,7 +97,10 @@ function mapProjectRecord(row: SupabaseProjectRow): ProjectRecord {
   };
 }
 
-function mapProjectListItem(row: Omit<SupabaseProjectRow, "document">): ProjectListItem {
+function mapProjectListItem(row: SupabaseProjectRow): ProjectListItem {
+  if (!isProjectDocument(row.document)) {
+    throw new Error(`Project ${row.id} has an invalid document payload.`);
+  }
   if (!isProjectThumbnailDataUrl(row.thumbnail_data_url)) {
     throw new Error(`Project ${row.id} has an invalid thumbnail payload.`);
   }
@@ -109,6 +113,7 @@ function mapProjectListItem(row: Omit<SupabaseProjectRow, "document">): ProjectL
     maxFloors: resolveProjectMaxFloors(row.max_floors),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    stats: getProjectListStats(row.document),
   };
 }
 
@@ -194,12 +199,12 @@ export async function createProjectForClientToken(
 export async function fetchProjectsForClientToken(clientToken: string): Promise<ProjectListItem[]> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
   const searchParams = new URLSearchParams({
-    select: "id,user_id,name,thumbnail_data_url,max_floors,created_at,updated_at",
+    select: "id,user_id,name,document,thumbnail_data_url,max_floors,created_at,updated_at",
     user_id: `eq.${user.id}`,
     order: "updated_at.desc",
   });
   const response = await supabaseRequest("projects", { method: "GET" }, searchParams);
-  const rows = (await response.json()) as Array<Omit<SupabaseProjectRow, "document">>;
+  const rows = (await response.json()) as SupabaseProjectRow[];
   return rows.map(mapProjectListItem);
 }
 

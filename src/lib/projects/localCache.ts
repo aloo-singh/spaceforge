@@ -2,6 +2,7 @@
 
 import { cloneProjectDocument, isProjectDocument, isProjectThumbnailDataUrl, resolveProjectMaxFloors, type ProjectListItem, type ProjectRecord } from "@/lib/projects/types";
 import { sortProjectsByUpdatedAt } from "@/lib/projects/listState";
+import { getProjectListStats } from "@/lib/projects/stats";
 
 const PROJECT_CACHE_STORAGE_KEY = "spaceforge.projects.cache.v1";
 const PROJECT_CACHE_VERSION = 1;
@@ -151,6 +152,7 @@ function toProjectListItem(project: ProjectRecord): ProjectListItem {
     maxFloors: project.maxFloors,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
+    stats: getProjectListStats(project.document),
   };
 }
 
