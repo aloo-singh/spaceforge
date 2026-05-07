@@ -21,6 +21,12 @@ import { formatMetricRoomArea } from "@/lib/editor/measurements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 type ProjectCardProps = {
@@ -58,17 +64,33 @@ function getProjectCardStats(project: ProjectListItem) {
 
 function ProjectInfoMetric({
   icon: Icon,
+  isInteractive,
   label,
+  tooltip,
   value,
 }: {
   icon: typeof BorderAll;
+  isInteractive: boolean;
   label: string;
+  tooltip: string;
   value: string;
 }) {
   return (
     <div className="min-w-0 rounded-md border border-white/45 bg-white/55 px-2.5 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-slate-950/55">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase text-foreground/55">
-        <Icon className="size-3.5 text-blue-500" />
+      <div className="flex items-center gap-1.5 font-measurement text-[10px] font-semibold uppercase text-foreground/55">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={`inline-flex ${isInteractive ? "pointer-events-auto" : "pointer-events-none"}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Icon className="size-3.5 text-blue-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center">
+            {tooltip}
+          </TooltipContent>
+        </Tooltip>
         <span className="truncate">{label}</span>
       </div>
       <p className="mt-1 truncate font-measurement text-sm font-semibold text-foreground">
@@ -168,7 +190,11 @@ export function ProjectCard({
     >
       <CardContent className="flex h-full flex-col gap-4 p-4">
         <div className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/35">
-          <div className="aspect-[8/5] w-full">
+          <div
+            className={`aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none ${
+              showProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
+            }`}
+          >
             {project.thumbnailDataUrl && !hasThumbnailLoadError ? (
               <Image
                 src={project.thumbnailDataUrl}
@@ -191,36 +217,53 @@ export function ProjectCard({
               </div>
             )}
           </div>
-          {showProjectInfo ? (
-            <div className="pointer-events-none absolute inset-0 flex items-end bg-background/20 p-3 backdrop-blur-[1px] dark:bg-background/25">
-              <div className="grid w-full grid-cols-2 gap-2">
+          <div
+            className={`pointer-events-none absolute inset-0 flex items-end bg-background/20 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none dark:bg-background/25 ${
+              showProjectInfo ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden={!showProjectInfo}
+          >
+            <ImmediateTooltipProvider>
+              <div
+                className={`grid w-full grid-cols-2 gap-2 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out motion-reduce:transition-none ${
+                  showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                }`}
+              >
                 <ProjectInfoMetric
                   icon={BorderAll}
+                  isInteractive={showProjectInfo}
                   label="Rooms"
+                  tooltip="How many rooms this layout has so far."
                   value={`${stats.roomCount}`}
                 />
                 <ProjectInfoMetric
                   icon={Receipt}
+                  isInteractive={showProjectInfo}
                   label="Area"
+                  tooltip="Total drawn floor area across this project."
                   value={stats.totalArea}
                 />
                 {canShowPaidStats ? (
                   <>
                     <ProjectInfoMetric
                       icon={Stack}
+                      isInteractive={showProjectInfo}
                       label="Floors"
+                      tooltip="How many floors are in this project."
                       value={`${stats.floorCount}`}
                     />
                     <ProjectInfoMetric
                       icon={CalendarWeek}
+                      isInteractive={showProjectInfo}
                       label="Created"
+                      tooltip="When this layout was first created."
                       value={stats.createdDate}
                     />
                   </>
                 ) : null}
               </div>
-            </div>
-          ) : null}
+            </ImmediateTooltipProvider>
+          </div>
         </div>
 
         <div className="space-y-3">
