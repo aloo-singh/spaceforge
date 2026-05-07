@@ -4,7 +4,17 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertCircle, ArrowRight, InfoCircle, Plus, RefreshCcw } from "@/components/ui/icons";
+import {
+  AlertCircle,
+  ArrowRight,
+  Blocks,
+  BorderAll,
+  Filter2,
+  InfoCircle,
+  Plus,
+  RefreshCcw,
+  Stack,
+} from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
@@ -35,6 +45,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
@@ -45,6 +62,100 @@ import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
 const DEV_MODE_ENABLED = process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true";
+
+type ProjectFilterState = {
+  minRooms: number | null;
+  minArea: number | null;
+  minFloors: number | null;
+};
+
+type ProjectFilterKey = keyof ProjectFilterState;
+
+type ProjectFilterOption = {
+  key: ProjectFilterKey;
+  label: string;
+  placeholder: string;
+  icon: typeof Blocks;
+  paidOnly?: boolean;
+  options: {
+    value: number;
+    label: string;
+  }[];
+};
+
+const PROJECT_FILTER_ANY_VALUE = "any";
+
+const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
+  minRooms: null,
+  minArea: null,
+  minFloors: null,
+};
+
+const PROJECT_FILTER_OPTIONS: ProjectFilterOption[] = [
+  {
+    key: "minRooms",
+    label: "Min rooms",
+    placeholder: "Any rooms",
+    icon: Blocks,
+    options: [
+      { value: 1, label: "1+ room" },
+      { value: 3, label: "3+ rooms" },
+      { value: 5, label: "5+ rooms" },
+      { value: 10, label: "10+ rooms" },
+    ],
+  },
+  {
+    key: "minArea",
+    label: "Min area",
+    placeholder: "Any area",
+    icon: BorderAll,
+    options: [
+      { value: 10, label: "10+ m²" },
+      { value: 25, label: "25+ m²" },
+      { value: 50, label: "50+ m²" },
+      { value: 100, label: "100+ m²" },
+    ],
+  },
+  {
+    key: "minFloors",
+    label: "Min floors",
+    placeholder: "Any floors",
+    icon: Stack,
+    paidOnly: true,
+    options: [
+      { value: 1, label: "1+ floor" },
+      { value: 2, label: "2+ floors" },
+      { value: 3, label: "3+ floors" },
+    ],
+  },
+];
+
+function getProjectTotalAreaSquareMetres(project: ProjectListItem) {
+  return (project.stats?.totalAreaSquareMillimetres ?? 0) / 1_000_000;
+}
+
+function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterState) {
+  if (filters.minRooms !== null && (project.stats?.roomCount ?? 0) < filters.minRooms) {
+    return false;
+  }
+
+  if (
+    filters.minArea !== null &&
+    getProjectTotalAreaSquareMetres(project) < filters.minArea
+  ) {
+    return false;
+  }
+
+  if (filters.minFloors !== null && (project.stats?.floorCount ?? 1) < filters.minFloors) {
+    return false;
+  }
+
+  return true;
+}
+
+function formatProjectFilterSelectValue(value: number | null) {
+  return value === null ? PROJECT_FILTER_ANY_VALUE : String(value);
+}
 
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
   if (!DEV_MODE_ENABLED || typeof window === "undefined") {
@@ -77,6 +188,10 @@ export function ProjectsPageClient() {
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
   // First of the /projects trio: info overlay, then filtering, then layout modes.
   const [showProjectInfo, setShowProjectInfo] = useState(false);
+  // Second of the /projects trio: local filter controls first, filtering logic next.
+  const [projectFilters, setProjectFilters] = useState<ProjectFilterState>(
+    DEFAULT_PROJECT_FILTERS
+  );
   const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
@@ -96,6 +211,7 @@ export function ProjectsPageClient() {
   
   // Current subscription tier (respects dev mode when enabled)
   const currentTier: SubscriptionTier = DEV_MODE_ENABLED ? devTier : "Free";
+  const canUsePaidProjectFilters = currentTier !== "Free";
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
@@ -153,6 +269,28 @@ export function ProjectsPageClient() {
     };
   }, [errorMessage, isLoading]);
 
+  useEffect(() => {
+    if (canUsePaidProjectFilters || projectFilters.minFloors === null) {
+      return;
+    }
+
+    setProjectFilters((currentFilters) => ({
+      ...currentFilters,
+      minFloors: null,
+    }));
+  }, [canUsePaidProjectFilters, projectFilters.minFloors]);
+
+  useEffect(() => {
+    if (
+      projects.length > 1 ||
+      Object.values(projectFilters).every((value) => value === null)
+    ) {
+      return;
+    }
+
+    setProjectFilters(DEFAULT_PROJECT_FILTERS);
+  }, [projectFilters, projects.length]);
+
   const canCreateProject =
     !isCreatingProject &&
     renamingProjectId === null &&
@@ -161,6 +299,36 @@ export function ProjectsPageClient() {
   const maxProjects = getEffectiveMaxProjects(currentTier);
   const isAtProjectLimit = projects.length >= maxProjects;
   const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
+  const availableProjectFilterOptions = PROJECT_FILTER_OPTIONS.filter(
+    (filterOption) => !filterOption.paidOnly || canUsePaidProjectFilters
+  );
+  const effectiveProjectFilters: ProjectFilterState = canUsePaidProjectFilters
+    ? projectFilters
+    : {
+        ...projectFilters,
+        minFloors: null,
+      };
+  const activeFilterCount = Object.values(effectiveProjectFilters).filter(
+    (value) => value !== null
+  ).length;
+  const filteredProjects = projects.filter((project) =>
+    projectMatchesFilters(project, effectiveProjectFilters)
+  );
+  const shouldShowProjectFilters = projects.length > 1;
+
+  const setProjectFilterFromSelect = (key: ProjectFilterKey, selectedValue: string) => {
+    setProjectFilters((currentFilters) => ({
+      ...currentFilters,
+      [key]:
+        selectedValue === PROJECT_FILTER_ANY_VALUE
+          ? null
+          : Number.parseInt(selectedValue, 10),
+    }));
+  };
+
+  const clearProjectFilters = () => {
+    setProjectFilters(DEFAULT_PROJECT_FILTERS);
+  };
 
   const handleCreateProject = () => {
     if (!canCreateProject) return;
@@ -439,58 +607,152 @@ export function ProjectsPageClient() {
         ) : null}
 
         {!isLoading && projects.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onRename={handleRenameProject}
-                onDeleteRequest={setProjectPendingDelete}
-                isRenaming={renamingProjectId === project.id}
-                isDeleting={deletingProjectId === project.id}
-                showProjectInfo={showProjectInfo}
-                currentTier={currentTier}
-                isInteractionDisabled={
-                  isCreatingProject ||
-                  (deletingProjectId !== null && deletingProjectId !== project.id)
-                }
-              />
-            ))}
-            {shouldShowProjectLimitBanner ? (
-              <Card
-                onClick={() => setIsProjectLimitDialogOpen(true)}
-                className="border-border/70 bg-gradient-to-br from-blue-50/50 to-blue-50/30 transition-colors hover:border-blue-200/70 hover:bg-blue-50/60 cursor-pointer dark:from-blue-950/20 dark:to-blue-950/10 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setIsProjectLimitDialogOpen(true);
-                  }
-                }}
-              >
-                <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                  <div className="space-y-2">
-                    <p className="text-base font-semibold tracking-tight text-foreground">
-                      Unlock unlimited projects
-                    </p>
-                    <p className="text-sm leading-5 text-muted-foreground">
-                      Upgrade to Pro to create as many projects as you need.
-                    </p>
+          <div className="space-y-4">
+            {shouldShowProjectFilters ? (
+              <div className="space-y-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:p-4">
+                <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-start">
+                  <ImmediateTooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          aria-label="Filter projects"
+                          tabIndex={0}
+                          className="flex h-8 items-center text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/45"
+                        >
+                          <Filter2 className="size-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        Filter projects
+                      </TooltipContent>
+                    </Tooltip>
+                  </ImmediateTooltipProvider>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {availableProjectFilterOptions.map((filterOption) => {
+                          const Icon = filterOption.icon;
+
+                          return (
+                            <Select
+                              key={filterOption.key}
+                              value={formatProjectFilterSelectValue(
+                                projectFilters[filterOption.key]
+                              )}
+                              onValueChange={(selectedValue) =>
+                                setProjectFilterFromSelect(filterOption.key, selectedValue)
+                              }
+                            >
+                              <SelectTrigger
+                                id={`project-filter-${filterOption.key}`}
+                                className="h-8 rounded-full bg-background/90 px-2.5 text-xs"
+                              >
+                                <SelectValue placeholder={filterOption.placeholder} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  value={`${filterOption.key}-label`}
+                                  disabled
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Icon className="size-3.5 text-blue-500" />
+                                    {filterOption.label}
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value={PROJECT_FILTER_ANY_VALUE}>
+                                  {filterOption.placeholder}
+                                </SelectItem>
+                                {filterOption.options.map((option) => (
+                                  <SelectItem
+                                    key={`${filterOption.key}-${option.value}`}
+                                    value={String(option.value)}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs leading-5 whitespace-nowrap text-muted-foreground">
+                          Showing {filteredProjects.length} of {projects.length}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearProjectFilters}
+                          disabled={activeFilterCount === 0}
+                          className="h-8 rounded-full px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Clear all
+                        </Button>
+                      </div>
+                    </div>
+
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsProjectLimitDialogOpen(true);
-                    }}
-                    className="mt-1"
-                  >
-                    Learn more
-                  </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ) : null}
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onRename={handleRenameProject}
+                  onDeleteRequest={setProjectPendingDelete}
+                  isRenaming={renamingProjectId === project.id}
+                  isDeleting={deletingProjectId === project.id}
+                  showProjectInfo={showProjectInfo}
+                  currentTier={currentTier}
+                  isInteractionDisabled={
+                    isCreatingProject ||
+                    (deletingProjectId !== null && deletingProjectId !== project.id)
+                  }
+                />
+              ))}
+              {shouldShowProjectLimitBanner ? (
+                <Card
+                  onClick={() => setIsProjectLimitDialogOpen(true)}
+                  className="border-border/70 bg-gradient-to-br from-blue-50/50 to-blue-50/30 transition-colors hover:border-blue-200/70 hover:bg-blue-50/60 cursor-pointer dark:from-blue-950/20 dark:to-blue-950/10 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setIsProjectLimitDialogOpen(true);
+                    }
+                  }}
+                >
+                  <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                    <div className="space-y-2">
+                      <p className="text-base font-semibold tracking-tight text-foreground">
+                        Unlock unlimited projects
+                      </p>
+                      <p className="text-sm leading-5 text-muted-foreground">
+                        Upgrade to Pro to create as many projects as you need.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsProjectLimitDialogOpen(true);
+                      }}
+                      className="mt-1"
+                    >
+                      Learn more
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
