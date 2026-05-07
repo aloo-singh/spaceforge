@@ -295,6 +295,7 @@ type EditorState = {
   updateRulerMeasurement: (ruler: RulerMeasurement) => void;
   toggleRulerHidden: (rulerId: string) => void;
   deleteRulerMeasurement: (rulerId: string) => void;
+  clearRulerMeasurements: () => void;
   setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -1768,6 +1769,18 @@ function getSelectedRulerIdAfterHistoryCommand(
     return command.nextRuler.id;
   }
 
+  if (command.type === "bulk-delete") {
+    const rulerCommands = command.deleteCommands.filter(
+      (subCommand): subCommand is Extract<
+        Extract<EditorCommand, { type: "bulk-delete" }>["deleteCommands"][number],
+        { type: "delete-ruler" }
+      > => subCommand.type === "delete-ruler"
+    );
+    if (rulerCommands.length === command.deleteCommands.length && rulerCommands.length > 0) {
+      return direction === "undo" ? rulerCommands[0].ruler.id : null;
+    }
+  }
+
   return hasRuler(selectedRulerId) ? selectedRulerId : null;
 }
 
@@ -1840,7 +1853,7 @@ function getTargetFloorForHistoryCommand(
         }
       }
       for (const sub of command.deleteCommands) {
-        if (sub.type !== "delete-room") {
+        if (sub.type === "delete-opening" || sub.type === "delete-interior-asset") {
           const floor = findFloorForRoom(sub.roomId);
           if (floor) return floor;
         }
@@ -3274,6 +3287,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: applyEditorCommand(state.document, command, "redo"),
         selectedRulerId: state.selectedRulerId === rulerId ? null : state.selectedRulerId,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  clearRulerMeasurements: () =>
+    set((state) => {
+      if (state.document.rulerMeasurements.length === 0) return state;
+
+      const command: EditorCommand = {
+        type: "bulk-delete",
+        deleteCommands: state.document.rulerMeasurements.map((ruler, previousIndex) => ({
+          type: "delete-ruler",
+          ruler: {
+            ...ruler,
+            start: { ...ruler.start },
+            end: { ...ruler.end },
+          },
+          previousIndex,
+        })),
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: null,
+        rulerDraft: EMPTY_RULER_DRAFT,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],

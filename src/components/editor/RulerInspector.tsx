@@ -20,6 +20,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
   const selectRulerById = useEditorStore((state) => state.selectRulerById);
   const toggleRulerHidden = useEditorStore((state) => state.toggleRulerHidden);
   const deleteRulerMeasurement = useEditorStore((state) => state.deleteRulerMeasurement);
+  const clearRulerMeasurements = useEditorStore((state) => state.clearRulerMeasurements);
   const liveDistance =
     rulerDraft.start && rulerDraft.end
       ? formatMetricWallDimension(getEdgeLengthMillimetres(rulerDraft.start, rulerDraft.end))
@@ -73,7 +74,20 @@ export function RulerInspector({ className }: RulerInspectorProps) {
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Rulers
           </h4>
-          <span className="font-mono text-xs text-muted-foreground">{rulers.length}</span>
+          <div className="flex items-center gap-2">
+            {rulers.length > 1 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={clearRulerMeasurements}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+              >
+                Clear all
+              </Button>
+            ) : null}
+            <span className="font-mono text-xs text-muted-foreground">{rulers.length}</span>
+          </div>
         </div>
 
         {rulers.length === 0 ? (
@@ -109,9 +123,16 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                   )}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground/86">
-                      Ruler {index + 1}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground/86">
+                        Ruler {index + 1}
+                      </p>
+                      {ruler.hidden ? (
+                        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                          Hidden
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="font-mono text-sm text-lime-700 dark:text-lime-300">
                       {distance}
                     </p>

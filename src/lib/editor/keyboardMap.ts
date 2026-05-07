@@ -383,6 +383,15 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "Ruler deleted";
   }
 
+  if (command.type === "bulk-delete") {
+    const rulerDeleteCount = command.deleteCommands.filter(
+      (deleteCommand) => deleteCommand.type === "delete-ruler"
+    ).length;
+    if (rulerDeleteCount === command.deleteCommands.length && rulerDeleteCount > 0) {
+      return rulerDeleteCount === 1 ? "Ruler deleted" : `${rulerDeleteCount} rulers cleared`;
+    }
+  }
+
   if (command.type === "complete-room") {
     return "room creation";
   }

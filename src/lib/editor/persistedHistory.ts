@@ -256,6 +256,32 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   if (
     hasOnlyRulerChange &&
     addedRulers.length === 0 &&
+    removedRulers.length > 1 &&
+    changedRulers.length === 0
+  ) {
+    const deleteCommands = removedRulers.flatMap((ruler) => {
+      const previousIndex = previousRulers.findIndex((candidate) => candidate.id === ruler.id);
+      if (previousIndex < 0) return [];
+      return [
+        {
+          type: "delete-ruler" as const,
+          ruler: cloneRulerMeasurement(ruler),
+          previousIndex,
+        },
+      ];
+    });
+
+    if (deleteCommands.length !== removedRulers.length) return null;
+
+    return {
+      type: "bulk-delete",
+      deleteCommands,
+    };
+  }
+
+  if (
+    hasOnlyRulerChange &&
+    addedRulers.length === 0 &&
     removedRulers.length === 1 &&
     changedRulers.length === 0
   ) {

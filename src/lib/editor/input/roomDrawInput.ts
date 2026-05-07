@@ -929,7 +929,7 @@ export function attachRoomDrawInput(
     }
 
     if (!isSpaceHeld && store.getState().isRulerMode) {
-      if (hoveredRulerTarget?.target === "body") {
+      if (hoveredRulerTarget) {
         setCursor("grab");
         return;
       }

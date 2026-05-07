@@ -294,6 +294,11 @@ export type EditorCommand =
             roomId: string;
             asset: RoomInteriorAsset;
           }
+        | {
+            type: "delete-ruler";
+            ruler: RulerMeasurement;
+            previousIndex: number;
+          }
       )[];
     }
   | {
