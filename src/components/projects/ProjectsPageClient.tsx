@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertCircle, ArrowRight, Plus, RefreshCcw } from "@/components/ui/icons";
+import { AlertCircle, ArrowRight, InfoCircle, Plus, RefreshCcw } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
@@ -34,6 +34,12 @@ import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getEffectiveMaxProjects } from "@/lib/subscription/features";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
@@ -69,6 +75,8 @@ export function ProjectsPageClient() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
+  // First of the /projects trio: info overlay, then filtering, then layout modes.
+  const [showProjectInfo, setShowProjectInfo] = useState(false);
   const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
@@ -301,16 +309,39 @@ export function ProjectsPageClient() {
             </div>
           </div>
 
-          <Button
-            type="button"
-            size="lg"
-            onClick={handleCreateProject}
-            disabled={isCreatingProject}
-            className="h-11 rounded-full bg-blue-500 px-5 text-white hover:bg-blue-500/90"
-          >
-            <Plus className="size-4" />
-            New project
-          </Button>
+          <div className="flex items-center gap-2">
+            <ImmediateTooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-lg"
+                    aria-label="Show project details"
+                    aria-pressed={showProjectInfo}
+                    onClick={() => setShowProjectInfo((current) => !current)}
+                    className="rounded-full text-foreground/70 hover:text-foreground"
+                  >
+                    <InfoCircle className="size-4.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  Show project details
+                </TooltipContent>
+              </Tooltip>
+            </ImmediateTooltipProvider>
+
+            <Button
+              type="button"
+              size="lg"
+              onClick={handleCreateProject}
+              disabled={isCreatingProject}
+              className="h-11 rounded-full bg-blue-500 px-5 text-white hover:bg-blue-500/90"
+            >
+              <Plus className="size-4" />
+              New project
+            </Button>
+          </div>
         </div>
 
         {errorMessage ? (
@@ -417,6 +448,8 @@ export function ProjectsPageClient() {
                 onDeleteRequest={setProjectPendingDelete}
                 isRenaming={renamingProjectId === project.id}
                 isDeleting={deletingProjectId === project.id}
+                showProjectInfo={showProjectInfo}
+                currentTier={currentTier}
                 isInteractionDisabled={
                   isCreatingProject ||
                   (deletingProjectId !== null && deletingProjectId !== project.id)

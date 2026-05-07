@@ -10,6 +10,34 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.77.1</h2>
+            <span className="text-sm text-muted-foreground">2026-05-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added the first feature in the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">/projects</code> improvement trio: a non-persisted info toggle in the projects page header.</li>
+                <li>Added hybrid project-card info overlays that keep thumbnails visible while showing JetBrains Mono stats.</li>
+                <li>Free tier cards show room count and total floor area; Pro, Studio, and Education cards also show floor count and created date.</li>
+                <li>Metric icons use the shared Tabler icons (<code className="bg-muted px-1.5 py-0.5 rounded text-xs">Blocks</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">BorderAll</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Stack</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">CalendarWeek</code>) with the brand blue accent.</li>
+                <li>Each metric icon has a short Rory-toned tooltip explaining what the number means.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Info overlay spacing was tuned for the current thumbnail aspect ratio in both two-metric Free and four-metric paid layouts.</li>
+                <li>The toggle animation now uses a gentle thumbnail blur/scale and overlay fade, while respecting reduced-motion preferences.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.77.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-07</span>
           </div>

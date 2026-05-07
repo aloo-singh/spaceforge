@@ -1,4 +1,5 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
+import type { ProjectListStats } from "@/lib/projects/stats";
 import {
   DEFAULT_CANVAS_ROTATION_DEGREES,
   normalizeCanvasRotationDegrees,
@@ -31,7 +32,9 @@ export type ProjectRecord = {
   updatedAt: string;
 };
 
-export type ProjectListItem = Omit<ProjectRecord, "document">;
+export type ProjectListItem = Omit<ProjectRecord, "document"> & {
+  stats?: ProjectListStats;
+};
 
 export type ProjectCatalogEntry = {
   id: string;

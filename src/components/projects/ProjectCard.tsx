@@ -3,12 +3,31 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Check, Clock3, PencilLine, Trash2, X } from "@/components/ui/icons";
+import {
+  ArrowUpRight,
+  Blocks,
+  BorderAll,
+  CalendarWeek,
+  Check,
+  Clock3,
+  PencilLine,
+  Stack,
+  Trash2,
+  X,
+} from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
+import { formatMetricRoomArea } from "@/lib/editor/measurements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  ImmediateTooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 type ProjectCardProps = {
   project: ProjectListItem;
@@ -16,8 +35,70 @@ type ProjectCardProps = {
   onDeleteRequest: (project: ProjectListItem) => void;
   isRenaming: boolean;
   isDeleting: boolean;
+  showProjectInfo?: boolean;
+  currentTier: SubscriptionTier;
   isInteractionDisabled?: boolean;
 };
+
+function formatProjectCreatedDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Recent";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function getProjectCardStats(project: ProjectListItem) {
+  return {
+    roomCount: project.stats?.roomCount ?? 0,
+    floorCount: project.stats?.floorCount ?? 1,
+    totalArea: formatMetricRoomArea(project.stats?.totalAreaSquareMillimetres ?? 0),
+    createdDate: formatProjectCreatedDate(project.createdAt),
+  };
+}
+
+function ProjectInfoMetric({
+  icon: Icon,
+  isInteractive,
+  label,
+  tooltip,
+  value,
+}: {
+  icon: typeof BorderAll;
+  isInteractive: boolean;
+  label: string;
+  tooltip: string;
+  value: string;
+}) {
+  return (
+    <div className="min-h-[3.25rem] min-w-0 rounded-md border border-white/45 bg-white/60 px-2 py-1.5 shadow-sm backdrop-blur-md sm:px-2.5 sm:py-2 dark:border-white/10 dark:bg-slate-950/55">
+      <div className="flex items-center gap-1.5 font-measurement text-[10px] font-semibold uppercase text-foreground/55">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={`inline-flex ${isInteractive ? "pointer-events-auto" : "pointer-events-none"}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Icon className="size-3.5 text-blue-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center">
+            {tooltip}
+          </TooltipContent>
+        </Tooltip>
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="mt-0.5 truncate font-measurement text-[13px] font-semibold text-foreground sm:mt-1 sm:text-sm">
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export function ProjectCard({
   project,
@@ -25,6 +106,8 @@ export function ProjectCard({
   onDeleteRequest,
   isRenaming,
   isDeleting,
+  showProjectInfo = false,
+  currentTier,
   isInteractionDisabled = false,
 }: ProjectCardProps) {
   const router = useRouter();
@@ -33,6 +116,8 @@ export function ProjectCard({
   const [hasThumbnailLoadError, setHasThumbnailLoadError] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isSubmittingRenameRef = useRef(false);
+  const stats = getProjectCardStats(project);
+  const canShowPaidStats = currentTier !== "Free";
 
   const handleCardClick = () => {
     if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
@@ -105,7 +190,11 @@ export function ProjectCard({
     >
       <CardContent className="flex h-full flex-col gap-4 p-4">
         <div className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/35">
-          <div className="aspect-[8/5] w-full">
+          <div
+            className={`aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none ${
+              showProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
+            }`}
+          >
             {project.thumbnailDataUrl && !hasThumbnailLoadError ? (
               <Image
                 src={project.thumbnailDataUrl}
@@ -127,6 +216,53 @@ export function ProjectCard({
                 </div>
               </div>
             )}
+          </div>
+          <div
+            className={`pointer-events-none absolute inset-0 flex items-end bg-background/20 p-2.5 transition-opacity duration-200 ease-out motion-reduce:transition-none sm:p-3 dark:bg-background/25 ${
+              showProjectInfo ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden={!showProjectInfo}
+          >
+            <ImmediateTooltipProvider>
+              <div
+                className={`grid w-full grid-cols-2 gap-1.5 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out sm:gap-2 motion-reduce:transition-none ${
+                  showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                }`}
+              >
+                <ProjectInfoMetric
+                  icon={Blocks}
+                  isInteractive={showProjectInfo}
+                  label="Rooms"
+                  tooltip="Rooms you've sketched in this layout."
+                  value={`${stats.roomCount}`}
+                />
+                <ProjectInfoMetric
+                  icon={BorderAll}
+                  isInteractive={showProjectInfo}
+                  label="Area"
+                  tooltip="All drawn room area, added together."
+                  value={stats.totalArea}
+                />
+                {canShowPaidStats ? (
+                  <>
+                    <ProjectInfoMetric
+                      icon={Stack}
+                      isInteractive={showProjectInfo}
+                      label="Floors"
+                      tooltip="Floors in this layout, when your plan goes upstairs."
+                      value={`${stats.floorCount}`}
+                    />
+                    <ProjectInfoMetric
+                      icon={CalendarWeek}
+                      isInteractive={showProjectInfo}
+                      label="Created"
+                      tooltip="The day this layout first joined your projects."
+                      value={stats.createdDate}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </ImmediateTooltipProvider>
           </div>
         </div>
 

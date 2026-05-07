@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "Unreleased",
+    date: "2026-05-07",
+    title: "Project details at a glance",
+    items: [
+      "The projects page now has a calm info toggle for showing project details directly over each thumbnail.",
+      "Free projects show room count and total floor area; paid tiers also show floor count and created date.",
+      "The overlay keeps thumbnails visible underneath, with subtle blue icons, measurement-style type, and helpful tooltips.",
+    ],
+  },
+  {
     version: "v0.77.0",
     date: "2026-05-07",
     title: "Measure distances with the ruler tool",
