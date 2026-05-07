@@ -4,7 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertCircle, ArrowRight, InfoCircle, Plus, RefreshCcw } from "@/components/ui/icons";
+import {
+  AlertCircle,
+  ArrowRight,
+  Blocks,
+  BorderAll,
+  InfoCircle,
+  Plus,
+  RefreshCcw,
+  Stack,
+} from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
@@ -46,6 +55,48 @@ import type { SubscriptionTier } from "@/lib/subscription/tiers";
 const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
 const DEV_MODE_ENABLED = process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true";
 
+type ProjectFilterState = {
+  minRooms: number | null;
+  minArea: number | null;
+  minFloors: number | null;
+};
+
+type ProjectFilterKey = keyof ProjectFilterState;
+
+type ProjectFilterOption = {
+  key: ProjectFilterKey;
+  value: number;
+  label: string;
+  icon: typeof Blocks;
+};
+
+const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
+  minRooms: null,
+  minArea: null,
+  minFloors: null,
+};
+
+const PROJECT_FILTER_OPTIONS: ProjectFilterOption[] = [
+  {
+    key: "minRooms",
+    value: 3,
+    label: "3+ rooms",
+    icon: Blocks,
+  },
+  {
+    key: "minArea",
+    value: 50,
+    label: "50m²+",
+    icon: BorderAll,
+  },
+  {
+    key: "minFloors",
+    value: 2,
+    label: "2+ floors",
+    icon: Stack,
+  },
+];
+
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
   if (!DEV_MODE_ENABLED || typeof window === "undefined") {
     return "Free";
@@ -77,6 +128,10 @@ export function ProjectsPageClient() {
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
   // First of the /projects trio: info overlay, then filtering, then layout modes.
   const [showProjectInfo, setShowProjectInfo] = useState(false);
+  // Second of the /projects trio: local filter controls first, filtering logic next.
+  const [projectFilters, setProjectFilters] = useState<ProjectFilterState>(
+    DEFAULT_PROJECT_FILTERS
+  );
   const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
@@ -161,6 +216,20 @@ export function ProjectsPageClient() {
   const maxProjects = getEffectiveMaxProjects(currentTier);
   const isAtProjectLimit = projects.length >= maxProjects;
   const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
+  const activeFilterCount = Object.values(projectFilters).filter(
+    (value) => value !== null
+  ).length;
+
+  const toggleProjectFilter = (key: ProjectFilterKey, value: number) => {
+    setProjectFilters((currentFilters) => ({
+      ...currentFilters,
+      [key]: currentFilters[key] === value ? null : value,
+    }));
+  };
+
+  const clearProjectFilters = () => {
+    setProjectFilters(DEFAULT_PROJECT_FILTERS);
+  };
 
   const handleCreateProject = () => {
     if (!canCreateProject) return;
@@ -439,58 +508,105 @@ export function ProjectsPageClient() {
         ) : null}
 
         {!isLoading && projects.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onRename={handleRenameProject}
-                onDeleteRequest={setProjectPendingDelete}
-                isRenaming={renamingProjectId === project.id}
-                isDeleting={deletingProjectId === project.id}
-                showProjectInfo={showProjectInfo}
-                currentTier={currentTier}
-                isInteractionDisabled={
-                  isCreatingProject ||
-                  (deletingProjectId !== null && deletingProjectId !== project.id)
-                }
-              />
-            ))}
-            {shouldShowProjectLimitBanner ? (
-              <Card
-                onClick={() => setIsProjectLimitDialogOpen(true)}
-                className="border-border/70 bg-gradient-to-br from-blue-50/50 to-blue-50/30 transition-colors hover:border-blue-200/70 hover:bg-blue-50/60 cursor-pointer dark:from-blue-950/20 dark:to-blue-950/10 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setIsProjectLimitDialogOpen(true);
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Filter projects</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Start with room count, floor area, or floors.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {PROJECT_FILTER_OPTIONS.map((filterOption) => {
+                  const Icon = filterOption.icon;
+                  const isActive =
+                    projectFilters[filterOption.key] === filterOption.value;
+
+                  return (
+                    <Button
+                      key={`${filterOption.key}-${filterOption.value}`}
+                      type="button"
+                      variant={isActive ? "secondary" : "outline"}
+                      size="sm"
+                      aria-pressed={isActive}
+                      onClick={() =>
+                        toggleProjectFilter(filterOption.key, filterOption.value)
+                      }
+                      className="rounded-full"
+                    >
+                      <Icon className="size-3.5" />
+                      {filterOption.label}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearProjectFilters}
+                  disabled={activeFilterCount === 0}
+                  className="rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onRename={handleRenameProject}
+                  onDeleteRequest={setProjectPendingDelete}
+                  isRenaming={renamingProjectId === project.id}
+                  isDeleting={deletingProjectId === project.id}
+                  showProjectInfo={showProjectInfo}
+                  currentTier={currentTier}
+                  isInteractionDisabled={
+                    isCreatingProject ||
+                    (deletingProjectId !== null && deletingProjectId !== project.id)
                   }
-                }}
-              >
-                <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                  <div className="space-y-2">
-                    <p className="text-base font-semibold tracking-tight text-foreground">
-                      Unlock unlimited projects
-                    </p>
-                    <p className="text-sm leading-5 text-muted-foreground">
-                      Upgrade to Pro to create as many projects as you need.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                />
+              ))}
+              {shouldShowProjectLimitBanner ? (
+                <Card
+                  onClick={() => setIsProjectLimitDialogOpen(true)}
+                  className="border-border/70 bg-gradient-to-br from-blue-50/50 to-blue-50/30 transition-colors hover:border-blue-200/70 hover:bg-blue-50/60 cursor-pointer dark:from-blue-950/20 dark:to-blue-950/10 dark:hover:border-blue-900/50 dark:hover:bg-blue-950/30"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
                       setIsProjectLimitDialogOpen(true);
-                    }}
-                    className="mt-1"
-                  >
-                    Learn more
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : null}
+                    }
+                  }}
+                >
+                  <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                    <div className="space-y-2">
+                      <p className="text-base font-semibold tracking-tight text-foreground">
+                        Unlock unlimited projects
+                      </p>
+                      <p className="text-sm leading-5 text-muted-foreground">
+                        Upgrade to Pro to create as many projects as you need.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsProjectLimitDialogOpen(true);
+                      }}
+                      className="mt-1"
+                    >
+                      Learn more
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
