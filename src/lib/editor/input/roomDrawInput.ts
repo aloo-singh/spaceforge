@@ -69,7 +69,6 @@ type RoomDrawStoreState = {
   settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
   keyboardShortcutFeedbackEnabled: boolean;
   is45DegreeDrawingEnabled: boolean;
-  rulerToolActive: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
   selectedRoomId: string | null;
@@ -165,8 +164,6 @@ type RoomDrawInputCallbacks = {
   onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   onInteriorAssetDragTargetChange?: (roomId: string | null) => void;
-  onRulerPointerDown?: (worldPoint: Point) => void;
-  onRulerEscape?: () => void;
   requestRender: () => void;
 };
 
@@ -1298,13 +1295,6 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
-
-    if (state.rulerToolActive) {
-      callbacks.onRulerPointerDown?.(cursorWorld);
-      callbacks.requestRender();
-      return;
-    }
-
     const selectedInteriorAsset = getSelectedInteriorAssetForHandles();
     const selectedInteriorAssetHit = selectedInteriorAsset
       ? findInteriorAssetAtScreenPoint(
@@ -2214,10 +2204,6 @@ export function attachRoomDrawInput(
 
     if (event.code === "Escape") {
       const state = store.getState();
-      if (state.rulerToolActive) {
-        callbacks.onRulerEscape?.();
-        return;
-      }
       if (state.roomDraft.points.length > 0) {
         state.resetDraft();
         setSnapGuides(null);
