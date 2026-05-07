@@ -586,7 +586,7 @@ export function HistoryControls({
                   className={cn(
                     "sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8",
                     isRulerMode &&
-                      "border-lime-600/70 bg-lime-600/10 text-lime-600 hover:bg-lime-600/15 dark:text-lime-400"
+                      "border-lime-500/70 bg-lime-500/10 text-lime-700 hover:bg-lime-500/15 dark:text-lime-300"
                   )}
                 >
                   <Ruler2 className="size-4" />

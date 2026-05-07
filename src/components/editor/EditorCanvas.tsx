@@ -418,7 +418,7 @@ type EditorCanvasProps = {
         isLeftSidebarCollapsed: boolean;
       }) => ReactNode);
 };
-const RULER_ACCENT_COLOR = 0x65a30d;
+const RULER_ACCENT_COLOR = 0x84cc16;
 
 type WallSplitHoverUi = {
   roomId: string;
@@ -7924,9 +7924,9 @@ function drawRulerLine(
 
   if (startX !== endX || startY !== endY) {
     graphics.setStrokeStyle({
-      width: isSelected ? 2.75 : 2,
+      width: isSelected ? 2 : 1.5,
       color: RULER_ACCENT_COLOR,
-      alpha,
+      alpha: isSelected ? alpha : alpha * 0.72,
       cap: "round",
       join: "round",
     });
@@ -7935,20 +7935,20 @@ function drawRulerLine(
     graphics.stroke();
   }
 
-  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.16 * alpha });
-  graphics.circle(startX, startY, isSelected ? 7 : 6);
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.12 * alpha });
+  graphics.circle(startX, startY, isSelected ? 6 : 5);
   graphics.fill();
-  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha });
-  graphics.circle(startX, startY, isSelected ? 3.75 : 3);
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: alpha * 0.8 });
+  graphics.circle(startX, startY, isSelected ? 3 : 2.5);
   graphics.fill();
 
   if (startX === endX && startY === endY) return;
 
-  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.12 * alpha });
-  graphics.circle(endX, endY, isSelected ? 7 : 6);
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.1 * alpha });
+  graphics.circle(endX, endY, isSelected ? 6 : 5);
   graphics.fill();
-  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.92 * alpha });
-  graphics.circle(endX, endY, isSelected ? 3.75 : 3);
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: isSelected ? alpha * 0.8 : alpha * 0.65 });
+  graphics.circle(endX, endY, isSelected ? 3 : 2.5);
   graphics.fill();
 
   if (interactionTarget === "start" || interactionTarget === "end") {

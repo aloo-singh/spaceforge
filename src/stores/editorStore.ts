@@ -171,6 +171,11 @@ type FloorRenameSessionState = {
   initialName: string;
 } | null;
 
+type RulerRenameSessionState = {
+  rulerId: string;
+  initialName: string;
+} | null;
+
 type ClipboardData =
   | { type: "room"; source: "copy" | "cut"; rooms: Room[] }
   | {
@@ -238,6 +243,7 @@ type EditorState = {
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
   interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
   floorRenameSession: FloorRenameSessionState;
+  rulerRenameSession: RulerRenameSessionState;
   clipboard: ClipboardData;
   /**
    * Undo history policy:
@@ -340,6 +346,10 @@ type EditorState = {
   updateFloorRenameDraft: (floorId: string, name: string) => void;
   commitFloorRenameSession: () => void;
   cancelFloorRename: () => void;
+  startRulerRenameSession: (rulerId: string) => void;
+  updateRulerRenameDraft: (rulerId: string, name: string) => void;
+  commitRulerRenameSession: () => void;
+  cancelRulerRenameSession: () => void;
   deleteFloor: (floorId: string) => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
@@ -2480,6 +2490,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   interiorAssetRenameSession: null,
   interiorAssetArrowLabelSession: null,
   floorRenameSession: null,
+  rulerRenameSession: null,
   clipboard: null,
   history: {
     past: hydratedHistoryState.past,
@@ -3158,6 +3169,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         interiorAssetRenameSession: null,
         interiorAssetArrowLabelSession: null,
         floorRenameSession: null,
+        rulerRenameSession: null,
       });
     }),
   updateRulerMeasurement: (nextRuler) =>
@@ -5014,6 +5026,91 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         floorRenameSession: null,
+      };
+    }),
+  startRulerRenameSession: (rulerId) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive) return state;
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === rulerId);
+      if (!ruler) return state;
+      if (state.rulerRenameSession?.rulerId === rulerId) return state;
+
+      return {
+        rulerRenameSession: {
+          rulerId,
+          initialName: ruler.name ?? "",
+        },
+      };
+    }),
+  updateRulerRenameDraft: (rulerId, name) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive) return state;
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === rulerId);
+      if (!ruler) return state;
+
+      const rulerRenameSession =
+        state.rulerRenameSession?.rulerId === rulerId
+          ? state.rulerRenameSession
+          : { rulerId, initialName: ruler.name ?? "" };
+
+      return {
+        document: {
+          ...state.document,
+          rulerMeasurements: state.document.rulerMeasurements.map((r) =>
+            r.id === rulerId ? { ...r, name } : r
+          ),
+        },
+        rulerRenameSession,
+      };
+    }),
+  commitRulerRenameSession: () =>
+    set((state) => {
+      const session = state.rulerRenameSession;
+      if (!session) return state;
+
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === session.rulerId);
+      if (!ruler) return { rulerRenameSession: null };
+
+      const didNameChange = (ruler.name ?? "") !== session.initialName;
+      if (!didNameChange) return { rulerRenameSession: null };
+
+      const previousRuler: RulerMeasurement = { ...ruler, name: session.initialName };
+      const nextRuler: RulerMeasurement = { ...ruler };
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      return {
+        rulerRenameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  cancelRulerRenameSession: () =>
+    set((state) => {
+      const session = state.rulerRenameSession;
+      if (!session) return state;
+
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === session.rulerId);
+      const nextDocument =
+        ruler && (ruler.name ?? "") !== session.initialName
+          ? {
+              ...state.document,
+              rulerMeasurements: state.document.rulerMeasurements.map((r) =>
+                r.id === session.rulerId ? { ...r, name: session.initialName } : r
+              ),
+            }
+          : state.document;
+
+      return {
+        document: nextDocument,
+        rulerRenameSession: null,
       };
     }),
   deleteFloor: (floorId) =>

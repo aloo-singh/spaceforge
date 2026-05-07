@@ -68,6 +68,7 @@ export type Wall = {
 
 export type RulerMeasurement = {
   id: string;
+  name?: string;
   start: Point;
   end: Point;
   hidden?: boolean;

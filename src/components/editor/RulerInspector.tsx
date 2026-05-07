@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { IconEye, RulerMeasure2, Trash2 } from "@/components/ui/icons";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -13,14 +15,20 @@ type RulerInspectorProps = {
 };
 
 export function RulerInspector({ className }: RulerInspectorProps) {
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const rulerDraft = useEditorStore((state) => state.rulerDraft);
   const rulers = useEditorStore((state) => state.document.rulerMeasurements);
   const selectedRulerId = useEditorStore((state) => state.selectedRulerId);
+  const rulerRenameSession = useEditorStore((state) => state.rulerRenameSession);
   const resetRulerDraft = useEditorStore((state) => state.resetRulerDraft);
   const selectRulerById = useEditorStore((state) => state.selectRulerById);
   const toggleRulerHidden = useEditorStore((state) => state.toggleRulerHidden);
   const deleteRulerMeasurement = useEditorStore((state) => state.deleteRulerMeasurement);
   const clearRulerMeasurements = useEditorStore((state) => state.clearRulerMeasurements);
+  const startRulerRenameSession = useEditorStore((state) => state.startRulerRenameSession);
+  const updateRulerRenameDraft = useEditorStore((state) => state.updateRulerRenameDraft);
+  const commitRulerRenameSession = useEditorStore((state) => state.commitRulerRenameSession);
+  const cancelRulerRenameSession = useEditorStore((state) => state.cancelRulerRenameSession);
   const liveDistance =
     rulerDraft.start && rulerDraft.end
       ? formatMetricWallDimension(getEdgeLengthMillimetres(rulerDraft.start, rulerDraft.end))
@@ -107,18 +115,60 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                     ruler.hidden && "opacity-60"
                   )}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground/86">
-                        Ruler {index + 1}
-                      </p>
+                      {isSelected && rulerRenameSession?.rulerId === ruler.id ? (
+                        <EditorSidebarRenameInput
+                          ref={(el) => {
+                            if (el) inputRefs.current.set(ruler.id, el);
+                            else inputRefs.current.delete(ruler.id);
+                          }}
+                          value={ruler.name ?? `Ruler ${index + 1}`}
+                          onChange={(event) => updateRulerRenameDraft(ruler.id, event.target.value)}
+                          onBlur={() => {
+                            commitRulerRenameSession();
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.nativeEvent.isComposing) return;
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              event.currentTarget.blur();
+                              return;
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              cancelRulerRenameSession();
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          onClick={(event) => event.stopPropagation()}
+                          aria-label={`Rename ruler ${index + 1}`}
+                          className="flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0 text-sm font-medium"
+                        />
+                      ) : (
+                        <p
+                          className="text-sm font-medium text-foreground/86 min-w-0 truncate"
+                          onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            selectRulerById(ruler.id);
+                            startRulerRenameSession(ruler.id);
+                            requestAnimationFrame(() => {
+                              inputRefs.current.get(ruler.id)?.focus();
+                            });
+                          }}
+                        >
+                          {ruler.name || `Ruler ${index + 1}`}
+                        </p>
+                      )}
                       {ruler.hidden ? (
-                        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shrink-0">
                           Hidden
                         </span>
                       ) : null}
                     </div>
-                    <p className="font-mono text-sm text-lime-600 dark:text-lime-400">
+                    <p className="font-mono text-sm text-lime-500 dark:text-lime-400">
                       {distance}
                     </p>
                   </div>

@@ -216,6 +216,7 @@ function isPoint(value: unknown): value is Point {
 function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
   return {
     id: ruler.id,
+    ...(ruler.name !== undefined ? { name: ruler.name } : {}),
     start: { ...ruler.start },
     end: { ...ruler.end },
     ...(ruler.hidden ? { hidden: true } : {}),
