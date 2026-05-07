@@ -2518,6 +2518,13 @@ function getResolvedRulerPointFromCursor(
   constraintMode: DrawConstraintMode
 ): Point {
   const activeSnapStepMm = getEffectiveSnapStepMm(state);
+
+  // When placing the start point there is no anchor yet, so no magnetic wall
+  // snapping — use pure grid snap, which matches the cursor HUD visual.
+  if (!state.rulerDraft.start) {
+    return getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, null);
+  }
+
   const magneticGuides = getMagneticSnapGuidesForSettings(
     getRoomsForActiveFloor(state.document),
     cursorWorld,
@@ -2531,15 +2538,13 @@ function getResolvedRulerPointFromCursor(
     magneticGuides
   );
 
-  return state.rulerDraft.start
-    ? getConstrainedDrawPoint(
-        state.rulerDraft.start,
-        snappedCursorWorld,
-        activeSnapStepMm,
-        null,
-        constraintMode
-      )
-    : snappedCursorWorld;
+  return getConstrainedDrawPoint(
+    state.rulerDraft.start,
+    snappedCursorWorld,
+    activeSnapStepMm,
+    null,
+    constraintMode
+  );
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
