@@ -224,6 +224,8 @@ type EditorState = {
   /** Shared selection model: single source of truth for all selections */
   selection: SharedSelectionItem[];
   isCanvasInteractionActive: boolean;
+  rulerToolActive: boolean;
+  rulerMeasurement: { startWorld: Point; endWorld: Point } | null;
   shouldFocusSelectedRoomNameInput: boolean;
   renameSession: RenameSessionState;
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
@@ -294,6 +296,9 @@ type EditorState = {
   /** Reorder a room within its floor */
   reorderRoomInFloor: (roomId: string, targetIndex: number) => void;
   setCanvasInteractionActive: (isActive: boolean) => void;
+  toggleRulerTool: () => void;
+  setRulerMeasurement: (startWorld: Point, endWorld: Point) => void;
+  clearRulerMeasurement: () => void;
   consumeSelectedRoomNameInputFocusRequest: () => void;
   startRoomRenameSession: (roomId: string) => void;
   updateRoomRenameDraft: (roomId: string, name: string) => void;
@@ -2359,6 +2364,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedInteriorAsset: null,
   selection: [],
   isCanvasInteractionActive: false,
+  rulerToolActive: false,
+  rulerMeasurement: null,
   shouldFocusSelectedRoomNameInput: false,
   renameSession: null,
   interiorAssetRenameSession: null,
@@ -4135,6 +4142,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isCanvasInteractionActive: isActive,
       };
     }),
+  toggleRulerTool: () =>
+    set((state) => ({
+      rulerToolActive: !state.rulerToolActive,
+      rulerMeasurement: state.rulerToolActive ? null : state.rulerMeasurement,
+    })),
+  setRulerMeasurement: (startWorld, endWorld) =>
+    set({ rulerMeasurement: { startWorld, endWorld } }),
+  clearRulerMeasurement: () =>
+    set({ rulerMeasurement: null }),
   consumeSelectedRoomNameInputFocusRequest: () =>
     set((state) => {
       if (!state.shouldFocusSelectedRoomNameInput) return state;

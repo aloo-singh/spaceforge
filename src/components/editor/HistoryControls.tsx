@@ -193,6 +193,8 @@ export function HistoryControls({
   const exportPreferences = useEditorStore((state) => state.exportPreferences);
   const updateExportPreferences = useEditorStore((state) => state.updateExportPreferences);
   const updateProjectExportConfig = useEditorStore((state) => state.updateProjectExportConfig);
+  const rulerToolActive = useEditorStore((state) => state.rulerToolActive);
+  const toggleRulerTool = useEditorStore((state) => state.toggleRulerTool);
   const fitAllRoomsLabel = "Fit all rooms into view";
   const fitSelectedRoomLabel = "Fit selected room into view";
   const resetCameraTitle = !hasHydrated
@@ -573,12 +575,14 @@ export function HistoryControls({
                   <Restore />
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content="Ruler tool">
+              <EditorChromeTooltip content={rulerToolActive ? "Deactivate ruler tool" : "Ruler tool"}>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={rulerToolActive ? "secondary" : "outline"}
                   size="icon"
-                  aria-label="Ruler tool"
+                  onClick={toggleRulerTool}
+                  aria-label={rulerToolActive ? "Deactivate ruler tool" : "Ruler tool"}
+                  aria-pressed={rulerToolActive}
                   className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
                 >
                   <Ruler2 className="size-4" />

@@ -917,6 +917,8 @@ export default function EditorCanvas({
   const wallSplitTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vertexDeleteHoverUiRef = useRef<VertexDeleteHoverUi | null>(null);
   const vertexDeleteTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rulerPendingStartWorldRef = useRef<Point | null>(null);
+  const rulerLiveEndWorldRef = useRef<Point | null>(null);
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
   // Holds in-progress asset rotation animations keyed by assetId.
@@ -1093,6 +1095,15 @@ export default function EditorCanvas({
       return;
     }
 
+    const storeSnap = useEditorStore.getState();
+    const rulerOverlay = storeSnap.rulerToolActive
+      ? storeSnap.rulerMeasurement
+        ? { startWorld: storeSnap.rulerMeasurement.startWorld, endWorld: storeSnap.rulerMeasurement.endWorld, isLive: false }
+        : (rulerPendingStartWorldRef.current && rulerLiveEndWorldRef.current)
+          ? { startWorld: rulerPendingStartWorldRef.current, endWorld: rulerLiveEndWorldRef.current, isLive: true }
+          : null
+      : null;
+
     drawScene(
       grid,
       floorFootprint,
@@ -1102,7 +1113,7 @@ export default function EditorCanvas({
       roomLabels,
       draft,
       dimensionOverlay,
-      useEditorStore.getState(),
+      storeSnap,
       cursorWorldRef.current,
       hoveredRoomLabelIdRef.current,
       hoveredSelectableWallRef.current,
@@ -1118,7 +1129,8 @@ export default function EditorCanvas({
       footprintPreviewFloorIdRef.current,
       footprintPreviewOpacityRef.current,
       assetDragTargetRoomIdRef.current,
-      assetRotationAnimationsRef.current
+      assetRotationAnimationsRef.current,
+      rulerOverlay
     );
 
     if (app) {
@@ -1239,6 +1251,21 @@ export default function EditorCanvas({
     startFootprintFadeAnimation();
     drawCurrentScene();
   }, [drawCurrentScene, footprintFloorId, startFootprintFadeAnimation]);
+
+  // Clear ruler refs when the tool is toggled off so stale state isn't rendered.
+  useEffect(() => {
+    let prevActive = useEditorStore.getState().rulerToolActive;
+    const unsubscribe = useEditorStore.subscribe(() => {
+      const active = useEditorStore.getState().rulerToolActive;
+      if (prevActive && !active) {
+        rulerPendingStartWorldRef.current = null;
+        rulerLiveEndWorldRef.current = null;
+        drawCurrentScene();
+      }
+      prevActive = active;
+    });
+    return unsubscribe;
+  }, [drawCurrentScene]);
 
   useEffect(() => {
     if (activeFloorId !== null && previousActiveFloorId !== null && activeFloorId !== previousActiveFloorId) {
@@ -2682,6 +2709,11 @@ export default function EditorCanvas({
       const detachRoomDrawInput = attachRoomDrawInput(app.canvas, useEditorStore, {
         onCursorWorldChange: (cursorWorld) => {
           cursorWorldRef.current = cursorWorld;
+          if (cursorWorld !== null && useEditorStore.getState().rulerToolActive && rulerPendingStartWorldRef.current !== null) {
+            rulerLiveEndWorldRef.current = cursorWorld;
+          } else if (cursorWorld === null) {
+            rulerLiveEndWorldRef.current = null;
+          }
         },
         onHoveredRoomLabelChange: (roomId) => {
           hoveredRoomLabelIdRef.current = roomId;
@@ -2703,6 +2735,28 @@ export default function EditorCanvas({
         },
         onInteriorAssetDragTargetChange: (roomId) => {
           assetDragTargetRoomIdRef.current = roomId;
+        },
+        onRulerPointerDown: (worldPoint) => {
+          if (rulerPendingStartWorldRef.current === null) {
+            useEditorStore.getState().clearRulerMeasurement();
+            rulerPendingStartWorldRef.current = worldPoint;
+            rulerLiveEndWorldRef.current = worldPoint;
+          } else {
+            useEditorStore.getState().setRulerMeasurement(rulerPendingStartWorldRef.current, worldPoint);
+            rulerPendingStartWorldRef.current = null;
+            rulerLiveEndWorldRef.current = null;
+          }
+          drawCurrentScene();
+        },
+        onRulerEscape: () => {
+          if (rulerPendingStartWorldRef.current !== null) {
+            rulerPendingStartWorldRef.current = null;
+            rulerLiveEndWorldRef.current = null;
+            drawCurrentScene();
+          } else {
+            useEditorStore.getState().toggleRulerTool();
+            drawCurrentScene();
+          }
         },
         requestRender: () => {
           drawCurrentScene();
@@ -3975,7 +4029,8 @@ function drawScene(
   footprintFloorId: string | null,
   footprintOpacity: number,
   assetDragTargetRoomId: string | null = null,
-  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
+  animations: ReadonlyMap<string, AssetRotationAnimation> = new Map(),
+  rulerOverlay: { startWorld: Point; endWorld: Point; isLive: boolean } | null = null
 ) {
   clearContainerChildren(roomLabelContainer);
   clearContainerChildren(dimensionOverlayContainer);
@@ -4202,6 +4257,18 @@ function drawScene(
     state.viewport,
     theme
   );
+  if (rulerOverlay) {
+    drawRulerOverlay(
+      dimensionOverlayContainer,
+      rulerOverlay.startWorld,
+      rulerOverlay.endWorld,
+      state.camera,
+      state.viewport,
+      state.settings,
+      theme,
+      rulerOverlay.isLive
+    );
+  }
   drawDraft(
     draftGraphics,
     state.roomDraft.points,
@@ -6415,6 +6482,69 @@ function drawDimensionLabels(
     text.alpha = RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA;
     labelContainer.addChild(text);
   }
+}
+
+function drawRulerOverlay(
+  labelContainer: Container,
+  startWorld: Point,
+  endWorld: Point,
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme,
+  isLive: boolean
+) {
+  const startScreen = worldToScreen(startWorld, camera, viewport);
+  const endScreen = worldToScreen(endWorld, camera, viewport);
+  const distanceMm = Math.hypot(endWorld.x - startWorld.x, endWorld.y - startWorld.y);
+
+  const g = new Graphics();
+  const lineAlpha = isLive ? 0.55 : 0.82;
+  g.setStrokeStyle({
+    width: 1.5,
+    color: theme.interactiveAccent,
+    alpha: lineAlpha,
+    cap: "round",
+  });
+  g.moveTo(startScreen.x, startScreen.y);
+  g.lineTo(endScreen.x, endScreen.y);
+  g.stroke();
+
+  const dotRadius = isLive ? 3.5 : 4;
+  const dotAlpha = isLive ? 0.7 : 0.9;
+  g.setFillStyle({ color: theme.interactiveAccent, alpha: dotAlpha });
+  g.circle(startScreen.x, startScreen.y, dotRadius);
+  g.fill();
+  g.circle(endScreen.x, endScreen.y, dotRadius);
+  g.fill();
+  labelContainer.addChild(g);
+
+  if (distanceMm < 1) return;
+
+  const midScreen = {
+    x: (startScreen.x + endScreen.x) / 2,
+    y: (startScreen.y + endScreen.y) / 2,
+  };
+  const lineDx = endScreen.x - startScreen.x;
+  const lineDy = endScreen.y - startScreen.y;
+  const lineLen = Math.hypot(lineDx, lineDy);
+  const outwardDirection: ScreenPoint = lineLen > 0.001
+    ? { x: -lineDy / lineLen, y: lineDx / lineLen }
+    : { x: 0, y: -1 };
+  const tangentDirection: ScreenPoint = lineLen > 0.001
+    ? { x: lineDx / lineLen, y: lineDy / lineLen }
+    : { x: 1, y: 0 };
+
+  const layout = createOpeningMoveDimensionLabelLayout(
+    formatMetricWallDimension(distanceMm),
+    midScreen,
+    outwardDirection,
+    tangentDirection,
+    viewport,
+    settings,
+    theme
+  );
+  drawDimensionLabels(labelContainer, [layout], settings, theme);
 }
 
 function drawWallSplitHoverAffordance(
