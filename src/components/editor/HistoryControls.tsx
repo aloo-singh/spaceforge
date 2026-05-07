@@ -575,7 +575,7 @@ export function HistoryControls({
                   <Restore />
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content="Measure distances">
+              <EditorChromeTooltip content="Ruler tool — Measure distances">
                 <Button
                   type="button"
                   variant="outline"
