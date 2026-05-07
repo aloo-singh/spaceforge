@@ -287,6 +287,11 @@ type EditorState = {
   ) => void;
   resetRulerDraft: () => void;
   selectRulerById: (rulerId: string | null) => void;
+  previewRulerMeasurement: (ruler: RulerMeasurement) => void;
+  commitRulerMeasurementUpdate: (
+    previousRuler: RulerMeasurement,
+    nextRuler: RulerMeasurement
+  ) => void;
   updateRulerMeasurement: (ruler: RulerMeasurement) => void;
   toggleRulerHidden: (rulerId: string) => void;
   deleteRulerMeasurement: (rulerId: string) => void;
@@ -3146,6 +3151,60 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const previousRuler = state.document.rulerMeasurements.find((ruler) => ruler.id === nextRuler.id);
       if (!previousRuler) return state;
+      if (
+        previousRuler.start.x === nextRuler.start.x &&
+        previousRuler.start.y === nextRuler.start.y &&
+        previousRuler.end.x === nextRuler.end.x &&
+        previousRuler.end.y === nextRuler.end.y &&
+        Boolean(previousRuler.hidden) === Boolean(nextRuler.hidden)
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: nextRuler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  previewRulerMeasurement: (nextRuler) =>
+    set((state) => {
+      if (!state.document.rulerMeasurements.some((ruler) => ruler.id === nextRuler.id)) {
+        return state;
+      }
+
+      return preserveHistoryForSelectionUpdate(state, {
+        document: {
+          ...state.document,
+          rulerMeasurements: state.document.rulerMeasurements.map((ruler) =>
+            ruler.id === nextRuler.id
+              ? {
+                  ...nextRuler,
+                  start: { ...nextRuler.start },
+                  end: { ...nextRuler.end },
+                  ...(nextRuler.hidden ? { hidden: true } : {}),
+                }
+              : ruler
+          ),
+        },
+      });
+    }),
+  commitRulerMeasurementUpdate: (previousRuler, nextRuler) =>
+    set((state) => {
+      if (!state.document.rulerMeasurements.some((ruler) => ruler.id === nextRuler.id)) {
+        return state;
+      }
       if (
         previousRuler.start.x === nextRuler.start.x &&
         previousRuler.start.y === nextRuler.start.y &&

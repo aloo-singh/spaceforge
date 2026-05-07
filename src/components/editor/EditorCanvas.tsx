@@ -919,6 +919,7 @@ export default function EditorCanvas({
   const wallSplitTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vertexDeleteHoverUiRef = useRef<VertexDeleteHoverUi | null>(null);
   const vertexDeleteTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rulerInteractionUiRef = useRef<RulerInteractionUi | null>(null);
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
   // Holds in-progress asset rotation animations keyed by assetId.
@@ -1113,6 +1114,7 @@ export default function EditorCanvas({
       roomResizeUiRef.current,
       wallSplitHoverUiRef.current,
       vertexDeleteHoverUiRef.current,
+      rulerInteractionUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
@@ -2707,6 +2709,10 @@ export default function EditorCanvas({
         onInteriorAssetDragTargetChange: (roomId) => {
           assetDragTargetRoomIdRef.current = roomId;
         },
+        onRulerInteractionUiChange: (rulerUi) => {
+          rulerInteractionUiRef.current = rulerUi;
+          drawCurrentScene();
+        },
         requestRender: () => {
           drawCurrentScene();
         },
@@ -3940,6 +3946,12 @@ export default function EditorCanvas({
 
 type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 
+type RulerInteractionUi = {
+  rulerId: string;
+  target: "start" | "end" | "body";
+  isDragging: boolean;
+};
+
 function drawScene(
   gridGraphics: Graphics,
   floorFootprintGraphics: Graphics,
@@ -3974,6 +3986,7 @@ function drawScene(
   },
   wallSplitHoverUi: WallSplitHoverUi | null,
   vertexDeleteHoverUi: VertexDeleteHoverUi | null,
+  rulerInteractionUi: RulerInteractionUi | null,
   transformFeedback: TransformFeedback | null,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
@@ -4242,6 +4255,7 @@ function drawScene(
     state.document.rulerMeasurements,
     state.rulerDraft,
     state.selectedRulerId,
+    rulerInteractionUi,
     state.camera,
     state.viewport
   );
@@ -7861,19 +7875,25 @@ function drawRulers(
   rulers: Array<{ id: string; start: Point; end: Point; hidden?: boolean }>,
   draft: { start: Point | null; end: Point | null },
   selectedRulerId: string | null,
+  rulerInteractionUi: RulerInteractionUi | null,
   camera: CameraState,
   viewport: ViewportSize
 ) {
   for (const ruler of rulers) {
     if (ruler.hidden) continue;
+    const interactionTarget =
+      rulerInteractionUi?.rulerId === ruler.id ? rulerInteractionUi.target : null;
+    const isActive = ruler.id === selectedRulerId || interactionTarget !== null;
     drawRulerLine(
       graphics,
       ruler.start,
       ruler.end,
       camera,
       viewport,
-      ruler.id === selectedRulerId ? 1 : 0.78,
-      ruler.id === selectedRulerId
+      isActive ? 1 : 0.78,
+      isActive,
+      interactionTarget,
+      rulerInteractionUi?.rulerId === ruler.id && rulerInteractionUi.isDragging
     );
   }
 
@@ -7890,7 +7910,9 @@ function drawRulerLine(
   camera: CameraState,
   viewport: ViewportSize,
   alpha: number,
-  isSelected: boolean
+  isSelected: boolean,
+  interactionTarget: "start" | "end" | "body" | null = null,
+  isDragging = false
 ) {
   const startScreen = worldToScreen(start, camera, viewport);
   const endScreen = worldToScreen(end, camera, viewport);
@@ -7928,6 +7950,21 @@ function drawRulerLine(
   graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.92 * alpha });
   graphics.circle(endX, endY, isSelected ? 3.75 : 3);
   graphics.fill();
+
+  if (interactionTarget === "start" || interactionTarget === "end") {
+    const handleX = interactionTarget === "start" ? startX : endX;
+    const handleY = interactionTarget === "start" ? startY : endY;
+    graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: isDragging ? 0.18 : 0.12 });
+    graphics.circle(handleX, handleY, isDragging ? 10 : 9);
+    graphics.fill();
+    graphics.setStrokeStyle({
+      width: isDragging ? 2 : 1.5,
+      color: RULER_ACCENT_COLOR,
+      alpha: 0.9,
+    });
+    graphics.circle(handleX, handleY, isDragging ? 10 : 9);
+    graphics.stroke();
+  }
 }
 
 function drawAngleIndicator(
