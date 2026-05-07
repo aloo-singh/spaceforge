@@ -368,19 +368,27 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
   }
 
   if (command.type === "add-ruler") {
-    return "Ruler added";
+    const rulerLabel = command.ruler.name?.trim() || `Ruler ${command.rulerIndex + 1}`;
+    return `Ruler "${rulerLabel}" added`;
   }
 
   if (command.type === "update-ruler") {
     if (command.previousRuler.hidden !== command.nextRuler.hidden) {
-      return command.nextRuler.hidden ? "Ruler hidden" : "Ruler shown";
+      const rulerLabel = command.nextRuler.name?.trim() || "Ruler";
+      return command.nextRuler.hidden ? `Ruler "${rulerLabel}" hidden` : `Ruler "${rulerLabel}" shown`;
+    }
+
+    if (command.previousRuler.name !== command.nextRuler.name) {
+      const newName = command.nextRuler.name?.trim() || "Ruler";
+      return `Ruler renamed to "${newName}"`;
     }
 
     return "Ruler moved";
   }
 
   if (command.type === "delete-ruler") {
-    return "Ruler deleted";
+    const rulerLabel = command.ruler.name?.trim() || `Ruler ${command.previousIndex + 1}`;
+    return `Ruler "${rulerLabel}" deleted`;
   }
 
   if (command.type === "bulk-delete") {

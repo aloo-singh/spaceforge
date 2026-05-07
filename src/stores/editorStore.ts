@@ -480,6 +480,10 @@ let activeVertexDeleteToast:
 let activeConnectedFloorPromptToastId: string | number | null = null;
 let activeFloorRenameToastId: string | number | null = null;
 let activeDeleteFloorToastId: string | number | null = null;
+let activeDeleteRulerToastId: string | number | null = null;
+let activeClearRulersToastId: string | number | null = null;
+let activeRulerRenameToastId: string | number | null = null;
+let activeAddRulerToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
@@ -1660,6 +1664,124 @@ function dismissDeleteFloorToastForCommand(command: EditorCommand) {
 
   toast.dismiss(activeDeleteFloorToastId);
   activeDeleteFloorToastId = null;
+}
+
+function getRulerToastLabel(name: string | undefined, fallbackIndex: number): string {
+  const label = name?.trim();
+  return label ? label : `Ruler ${fallbackIndex + 1}`;
+}
+
+function showAddRulerToast(rulerId: string, rulerIndex: number) {
+  if (activeAddRulerToastId !== null) {
+    toast.dismiss(activeAddRulerToastId);
+  }
+  const rulerLabel = `Ruler ${rulerIndex + 1}`;
+  const id = toast(`Ruler "${rulerLabel}" added`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeAddRulerToastId === id) activeAddRulerToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "add-ruler" || latestCommand.ruler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeAddRulerToastId = id;
+}
+
+function dismissAddRulerToastForCommand(command: EditorCommand) {
+  if (command.type !== "add-ruler" || activeAddRulerToastId === null) return;
+  toast.dismiss(activeAddRulerToastId);
+  activeAddRulerToastId = null;
+}
+
+function showDeleteRulerToast(rulerId: string, rulerLabel: string) {
+  if (activeDeleteRulerToastId !== null) {
+    toast.dismiss(activeDeleteRulerToastId);
+  }
+  const id = toast(`Ruler "${rulerLabel}" deleted`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeDeleteRulerToastId === id) activeDeleteRulerToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "delete-ruler" || latestCommand.ruler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeDeleteRulerToastId = id;
+}
+
+function dismissDeleteRulerToastForCommand(command: EditorCommand) {
+  if (command.type !== "delete-ruler" || activeDeleteRulerToastId === null) return;
+  toast.dismiss(activeDeleteRulerToastId);
+  activeDeleteRulerToastId = null;
+}
+
+function showClearRulersToast(count: number) {
+  if (activeClearRulersToastId !== null) {
+    toast.dismiss(activeClearRulersToastId);
+  }
+  const id = toast(`${count} ruler${count !== 1 ? "s" : ""} cleared`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeClearRulersToastId === id) activeClearRulersToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "bulk-delete") return;
+        state.undo();
+      },
+    },
+  });
+  activeClearRulersToastId = id;
+}
+
+function dismissClearRulersToastForCommand(command: EditorCommand) {
+  if (command.type !== "bulk-delete" || activeClearRulersToastId === null) return;
+  toast.dismiss(activeClearRulersToastId);
+  activeClearRulersToastId = null;
+}
+
+function showRulerRenameToast(rulerId: string, newName: string) {
+  if (activeRulerRenameToastId !== null) {
+    toast.dismiss(activeRulerRenameToastId);
+  }
+  const id = toast(`Ruler renamed to "${newName}"`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeRulerRenameToastId === id) activeRulerRenameToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "update-ruler" || latestCommand.nextRuler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeRulerRenameToastId = id;
+}
+
+function dismissRulerRenameToastForCommand(command: EditorCommand) {
+  if (command.type !== "update-ruler" || activeRulerRenameToastId === null) return;
+  toast.dismiss(activeRulerRenameToastId);
+  activeRulerRenameToastId = null;
 }
 
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
@@ -3103,10 +3225,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         start: { ...state.rulerDraft.start },
         end: { ...resolvedPoint },
       };
+      const rulerIndex = state.document.rulerMeasurements.length;
       const command: EditorCommand = {
         type: "add-ruler",
         ruler,
+        rulerIndex,
       };
+
+      showAddRulerToast(ruler.id, rulerIndex);
 
       return {
         document: applyEditorCommand(state.document, command, "redo"),
@@ -3290,11 +3416,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const previousIndex = state.document.rulerMeasurements.findIndex((ruler) => ruler.id === rulerId);
       if (previousIndex < 0) return state;
 
+      const rulerToDelete = state.document.rulerMeasurements[previousIndex];
       const command: EditorCommand = {
         type: "delete-ruler",
-        ruler: state.document.rulerMeasurements[previousIndex],
+        ruler: rulerToDelete,
         previousIndex,
       };
+
+      showDeleteRulerToast(rulerId, getRulerToastLabel(rulerToDelete.name, previousIndex));
 
       return {
         document: applyEditorCommand(state.document, command, "redo"),
@@ -3311,6 +3440,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.document.rulerMeasurements.length === 0) return state;
 
+      const rulerCount = state.document.rulerMeasurements.length;
       const command: EditorCommand = {
         type: "bulk-delete",
         deleteCommands: state.document.rulerMeasurements.map((ruler, previousIndex) => ({
@@ -3323,6 +3453,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           previousIndex,
         })),
       };
+
+      showClearRulersToast(rulerCount);
 
       return {
         document: applyEditorCommand(state.document, command, "redo"),
@@ -5082,6 +5214,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         nextRuler,
       };
 
+      const displayName = (ruler.name ?? "").trim() || "Ruler";
+      showRulerRenameToast(session.rulerId, displayName);
+
       return {
         rulerRenameSession: null,
         history: {
@@ -6510,6 +6645,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dismissVertexDeleteToastForCommand(command);
       dismissFloorRenameToastForCommand(command);
       dismissDeleteFloorToastForCommand(command);
+      dismissDeleteRulerToastForCommand(command);
+      dismissClearRulersToastForCommand(command);
+      dismissRulerRenameToastForCommand(command);
+      dismissAddRulerToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];

@@ -350,6 +350,7 @@ export type EditorCommand =
   | {
       type: "add-ruler";
       ruler: RulerMeasurement;
+      rulerIndex: number;
     }
   | {
       type: "update-ruler";
@@ -1258,6 +1259,7 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
 export function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
   return {
     id: ruler.id,
+    ...(ruler.name !== undefined ? { name: ruler.name } : {}),
     start: { ...ruler.start },
     end: { ...ruler.end },
     ...(ruler.hidden ? { hidden: true } : {}),

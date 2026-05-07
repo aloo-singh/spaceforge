@@ -20,7 +20,6 @@ export function RulerInspector({ className }: RulerInspectorProps) {
   const rulers = useEditorStore((state) => state.document.rulerMeasurements);
   const selectedRulerId = useEditorStore((state) => state.selectedRulerId);
   const rulerRenameSession = useEditorStore((state) => state.rulerRenameSession);
-  const resetRulerDraft = useEditorStore((state) => state.resetRulerDraft);
   const selectRulerById = useEditorStore((state) => state.selectRulerById);
   const toggleRulerHidden = useEditorStore((state) => state.toggleRulerHidden);
   const deleteRulerMeasurement = useEditorStore((state) => state.deleteRulerMeasurement);
@@ -33,7 +32,6 @@ export function RulerInspector({ className }: RulerInspectorProps) {
     rulerDraft.start && rulerDraft.end
       ? formatMetricWallDimension(getEdgeLengthMillimetres(rulerDraft.start, rulerDraft.end))
       : null;
-  const isDrawingRuler = rulerDraft.start !== null;
 
   return (
     <EditorInspectorSection
