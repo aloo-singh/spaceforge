@@ -45,7 +45,7 @@ import {
   hitTestWallSplitHandle,
   WALL_SPLIT_HANDLE_RADIUS_PX,
 } from "@/lib/editor/wallSplit";
-import { getVertexDeleteHandleCenter } from "@/lib/editor/vertexDeletion";
+import { getVertexDeleteHandleCenter, hitTestVertexDeleteHandle } from "@/lib/editor/vertexDeletion";
 import {
   findOpeningAtScreenPoint,
   findSelectedOpeningWidthHandleAtScreenPoint,
@@ -311,9 +311,7 @@ const WALL_SPLIT_TOOLTIP_RADIUS_PX = 8;
 const WALL_SPLIT_TOOLTIP_CONTROL_GAP_PX = 8;
 const WALL_SPLIT_TOOLTIP_VIEWPORT_MARGIN_PX = 8;
 const WALL_SPLIT_TOOLTIP_DELAY_MS = 700;
-const VERTEX_DELETE_HANDLE_RADIUS_PX = 8;
-const VERTEX_DELETE_HANDLE_CROSS_SIZE_PX = 5;
-const VERTEX_DELETE_HANDLE_COLOR = 0xe53e3e;
+const VERTEX_DELETE_HANDLE_RADIUS_PX = 9;
 const VERTEX_DELETE_TOOLTIP_TEXT = "Remove corner";
 const STAIR_DIRECTION_LABEL_MIN_FONT_SIZE_PX = 10;
 const STAIR_DIRECTION_LABEL_MAX_FONT_SIZE_PX = 18;
@@ -2879,6 +2877,31 @@ export default function EditorCanvas({
           roomResizeUi.hoveredRoomId === targetRoomId ? roomResizeUi.hoveredVertexIndex : null;
         if (hoveredVertexIndex === null) {
           clearVertexDeleteHoverUi();
+          return;
+        }
+
+        const room =
+          getVisibleRoomsForFocusedRoom(getRoomsForActiveFloor(state.document), state.focusedRoomId)
+            .find((candidate) => candidate.id === targetRoomId) ?? null;
+        if (!room) {
+          clearVertexDeleteHoverUi();
+          return;
+        }
+
+        const handleCenter = getVertexDeleteHandleCenter(
+          room, hoveredVertexIndex, state.camera, state.viewport
+        );
+        const screenPoint = toCanvasPoint(event);
+
+        if (!handleCenter || !hitTestVertexDeleteHandle(handleCenter, screenPoint)) {
+          // Pointer is near the vertex but not yet over the × circle — clear the
+          // tooltip schedule so the 700ms countdown only starts from the circle.
+          clearVertexDeleteTooltipTimeout();
+          if (hoveredVertexIndex !== null) {
+            setVertexDeleteHoverUi({ roomId: targetRoomId, vertexIndex: hoveredVertexIndex, tooltipVisible: false });
+          } else {
+            setVertexDeleteHoverUi(null);
+          }
           return;
         }
 
@@ -6620,7 +6643,7 @@ function drawVertexDeleteHandle(
   const x = snapToPixel(center.x, resolution);
   const y = snapToPixel(center.y, resolution);
 
-  graphics.setFillStyle({ color: VERTEX_DELETE_HANDLE_COLOR, alpha: 0.08 });
+  graphics.setFillStyle({ color: theme.wallSelectionAccent, alpha: 0.1 });
   graphics.circle(x, y, VERTEX_DELETE_HANDLE_RADIUS_PX + 3);
   graphics.fill();
   graphics.setFillStyle({ color: theme.roomLabelPillFill, alpha: 0.96 });
@@ -6628,26 +6651,28 @@ function drawVertexDeleteHandle(
   graphics.fill();
   graphics.setStrokeStyle({
     width: 1.2,
-    color: VERTEX_DELETE_HANDLE_COLOR,
-    alpha: 0.72,
+    color: theme.wallSelectionAccent,
+    alpha: 0.74,
     cap: "round",
     join: "round",
   });
   graphics.circle(x, y, VERTEX_DELETE_HANDLE_RADIUS_PX);
   graphics.stroke();
 
-  const half = VERTEX_DELETE_HANDLE_CROSS_SIZE_PX / 2;
+  const half = WALL_SPLIT_HANDLE_PLUS_SIZE_PX / 2;
+  // Draw a × by rotating the + arms 45°. cos45 = sin45 = √2/2 ≈ 0.7071.
+  const c45 = half * 0.7071;
   graphics.setStrokeStyle({
     width: 1.6,
-    color: VERTEX_DELETE_HANDLE_COLOR,
-    alpha: 0.88,
+    color: theme.wallSelectionAccent,
+    alpha: 0.9,
     cap: "round",
     join: "round",
   });
-  graphics.moveTo(x - half, y - half);
-  graphics.lineTo(x + half, y + half);
-  graphics.moveTo(x + half, y - half);
-  graphics.lineTo(x - half, y + half);
+  graphics.moveTo(x - c45, y - c45);
+  graphics.lineTo(x + c45, y + c45);
+  graphics.moveTo(x + c45, y - c45);
+  graphics.lineTo(x - c45, y + c45);
   graphics.stroke();
   labelContainer.addChild(graphics);
 }
