@@ -396,6 +396,10 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
       return `${getHistoryRoomLabel(command.roomName)} wall split`;
     }
 
+    if (command.editKind === "vertex-delete") {
+      return `${getHistoryRoomLabel(command.roomName)} corner removed`;
+    }
+
     return "room resize";
   }
 
