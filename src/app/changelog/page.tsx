@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.76.0",
+    date: "2026-05-07",
+    title: "Remove a corner in one click",
+    items: [
+      "Hovering a corner on a selected room now reveals a calm × handle offset along the outward diagonal — click it to remove the corner and merge its two walls.",
+      "An L-shape becomes a rectangle in a single click; the canvas settles smoothly with the same animation used when splitting walls.",
+      "The action is fully undoable with a friendly confirmation message such as \"Bedroom corner removed\".",
+    ],
+  },
+  {
     version: "v0.75.0",
     date: "2026-05-06",
     title: "Split walls while you edit",
