@@ -367,6 +367,22 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "north rotation";
   }
 
+  if (command.type === "add-ruler") {
+    return "Ruler added";
+  }
+
+  if (command.type === "update-ruler") {
+    if (command.previousRuler.hidden !== command.nextRuler.hidden) {
+      return command.nextRuler.hidden ? "Ruler hidden" : "Ruler shown";
+    }
+
+    return "Ruler moved";
+  }
+
+  if (command.type === "delete-ruler") {
+    return "Ruler deleted";
+  }
+
   if (command.type === "complete-room") {
     return "room creation";
   }

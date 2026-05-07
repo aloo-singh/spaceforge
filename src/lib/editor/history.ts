@@ -8,7 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
   DEFAULT_PROJECT_EXPORT_CONFIG,
@@ -69,6 +69,7 @@ export type EditorDocumentState = {
   floors: Floor[];
   activeFloorId: string | null;
   rooms: Room[];
+  rulerMeasurements: RulerMeasurement[];
   exportConfig: ProjectExportConfig;
   northBearingDegrees: number;
   canvasRotationDegrees: number;
@@ -340,6 +341,20 @@ export type EditorCommand =
       roomId: string;
       fromIndex: number;
       toIndex: number;
+    }
+  | {
+      type: "add-ruler";
+      ruler: RulerMeasurement;
+    }
+  | {
+      type: "update-ruler";
+      previousRuler: RulerMeasurement;
+      nextRuler: RulerMeasurement;
+    }
+  | {
+      type: "delete-ruler";
+      ruler: RulerMeasurement;
+      previousIndex: number;
     };
 
 export function applyEditorCommand(
@@ -390,6 +405,49 @@ export function applyEditorCommand(
       northBearingDegrees: normalizeNorthBearingDegrees(
         direction === "undo" ? command.previousBearingDegrees : command.nextBearingDegrees
       ),
+    };
+  }
+
+  if (command.type === "add-ruler") {
+    return {
+      ...document,
+      rulerMeasurements:
+        direction === "undo"
+          ? document.rulerMeasurements.filter((ruler) => ruler.id !== command.ruler.id)
+          : [
+              ...document.rulerMeasurements.filter((ruler) => ruler.id !== command.ruler.id),
+              cloneRulerMeasurement(command.ruler),
+            ],
+    };
+  }
+
+  if (command.type === "update-ruler") {
+    const nextRuler = direction === "undo" ? command.previousRuler : command.nextRuler;
+    return {
+      ...document,
+      rulerMeasurements: document.rulerMeasurements.map((ruler) =>
+        ruler.id === nextRuler.id ? cloneRulerMeasurement(nextRuler) : ruler
+      ),
+    };
+  }
+
+  if (command.type === "delete-ruler") {
+    if (direction === "undo") {
+      const rulersWithoutDeleted = document.rulerMeasurements.filter(
+        (ruler) => ruler.id !== command.ruler.id
+      );
+      const nextRulers = [...rulersWithoutDeleted];
+      nextRulers.splice(command.previousIndex, 0, cloneRulerMeasurement(command.ruler));
+
+      return {
+        ...document,
+        rulerMeasurements: nextRulers,
+      };
+    }
+
+    return {
+      ...document,
+      rulerMeasurements: document.rulerMeasurements.filter((ruler) => ruler.id !== command.ruler.id),
     };
   }
 
@@ -1166,6 +1224,7 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
     floors: [createDefaultFloor()],
     activeFloorId: DEFAULT_FLOOR_ID,
     rooms: [],
+    rulerMeasurements: [],
     exportConfig: cloneProjectExportConfig(DEFAULT_PROJECT_EXPORT_CONFIG),
     northBearingDegrees: DEFAULT_NORTH_BEARING_DEGREES,
     canvasRotationDegrees: DEFAULT_CANVAS_ROTATION_DEGREES,
@@ -1184,10 +1243,24 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
       openings: cloneRoomOpenings(room.openings),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
     })),
+    rulerMeasurements: cloneRulerMeasurements(document.rulerMeasurements ?? []),
     exportConfig: cloneProjectExportConfig(document.exportConfig),
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(document.canvasRotationDegrees),
   };
+}
+
+export function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
+  return {
+    id: ruler.id,
+    start: { ...ruler.start },
+    end: { ...ruler.end },
+    ...(ruler.hidden ? { hidden: true } : {}),
+  };
+}
+
+export function cloneRulerMeasurements(rulers: RulerMeasurement[]): RulerMeasurement[] {
+  return rulers.map((ruler) => cloneRulerMeasurement(ruler));
 }
 
 function getTranslationDelta(previousPoints: Room["points"], nextPoints: Room["points"]) {

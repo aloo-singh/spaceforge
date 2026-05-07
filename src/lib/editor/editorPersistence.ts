@@ -3,7 +3,7 @@ import {
   normalizeRoomOpeningsForSegmentAnchoring,
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
-import type { CameraState, Floor, Point, Room } from "@/lib/editor/types";
+import type { CameraState, Floor, Point, Room, RulerMeasurement } from "@/lib/editor/types";
 import {
   DEFAULT_FLOOR_ID,
   getNormalizedActiveFloorId,
@@ -47,10 +47,11 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 // - v9 payloads also persist export dialog session preferences.
 // - v10 payloads also persist canvas rotation with document + camera state.
 // - v11 payloads also persist floors and the active floor.
+// - v12 payloads also persist ruler measurements.
 // - Unknown versions or malformed layout payloads are rejected entirely.
-// - Malformed history inside an otherwise valid v2/v3/v4/v5/v6/v7/v8/v9/v10/v11 payload is dropped while layout/camera/settings still hydrate.
+// - Malformed history inside an otherwise valid payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 11;
+export const EDITOR_PERSISTENCE_VERSION = 12;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 function warnEditorPersistence(message: string, details?: unknown) {
@@ -72,6 +73,7 @@ type PersistedDocument = {
   floors?: Floor[];
   activeFloorId?: string | null;
   rooms: PersistedRoom[];
+  rulerMeasurements?: RulerMeasurement[];
   exportConfig?: EditorDocumentState["exportConfig"];
   northBearingDegrees?: number;
   canvasRotationDegrees?: number;
@@ -211,6 +213,23 @@ function isPoint(value: unknown): value is Point {
   return isFiniteNumber(value.x) && isFiniteNumber(value.y);
 }
 
+function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
+  return {
+    id: ruler.id,
+    start: { ...ruler.start },
+    end: { ...ruler.end },
+    ...(ruler.hidden ? { hidden: true } : {}),
+  };
+}
+
+function isRulerMeasurement(value: unknown): value is RulerMeasurement {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (!isPoint(value.start) || !isPoint(value.end)) return false;
+  if (value.hidden !== undefined && typeof value.hidden !== "boolean") return false;
+  return true;
+}
+
 function isFloor(value: unknown): value is Floor {
   if (!isObject(value)) return false;
   return typeof value.id === "string" && typeof value.name === "string";
@@ -322,6 +341,13 @@ function isPersistedDocument(value: unknown): value is PersistedDocument {
     return false;
   }
   if (!Array.isArray(value.rooms)) return false;
+  if (
+    value.rulerMeasurements !== undefined &&
+    (!Array.isArray(value.rulerMeasurements) ||
+      !value.rulerMeasurements.every(isRulerMeasurement))
+  ) {
+    return false;
+  }
   if (value.exportConfig !== undefined && !isObject(value.exportConfig)) return false;
   if (
     value.northBearingDegrees !== undefined &&
@@ -393,6 +419,7 @@ function cloneDocument(document: PersistedDocument | EditorDocumentState): Edito
         activeFloorId,
       }),
     })),
+    rulerMeasurements: (document.rulerMeasurements ?? []).map(cloneRulerMeasurement),
   };
 }
 
@@ -465,6 +492,7 @@ function normalizeDocumentForSegmentAnchoring(
         openings: normalizeRoomOpeningsForSegmentAnchoring(normalizedRoom),
       };
     }),
+    rulerMeasurements: (document.rulerMeasurements ?? []).map(cloneRulerMeasurement),
   };
 }
 
@@ -503,6 +531,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 8 &&
         parsed.version !== 9 &&
         parsed.version !== 10 &&
+        parsed.version !== 11 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -542,7 +571,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
             : normalizeEditorSettings(parsed.settings) ?? DEFAULT_EDITOR_SETTINGS
         ),
         exportPreferences: cloneEditorExportPreferences(
-          parsed.version === EDITOR_PERSISTENCE_VERSION
+          parsed.version >= 11
             ? normalizeEditorExportPreferences(parsed.exportPreferences)
             : DEFAULT_EDITOR_EXPORT_PREFERENCES
         ),

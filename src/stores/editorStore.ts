@@ -125,6 +125,7 @@ import type {
   RoomOpening,
   RoomOpeningSelection,
   RoomWallSelection,
+  RulerMeasurement,
   ScreenPoint,
   SharedSelectionItem,
   ViewportSize,
@@ -139,12 +140,6 @@ declare global {
 type RoomDraftState = {
   points: Point[];
   history: Point[][];
-};
-
-export type RulerMeasurement = {
-  id: string;
-  start: Point;
-  end: Point;
 };
 
 type RulerDraftState = {
@@ -228,7 +223,7 @@ type EditorState = {
   roomDraft: RoomDraftState;
   isRulerMode: boolean;
   rulerDraft: RulerDraftState;
-  rulerMeasurements: RulerMeasurement[];
+  selectedRulerId: string | null;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
   focusedRoomId: string | null;
@@ -291,6 +286,10 @@ type EditorState = {
     options?: { constraintMode?: DrawConstraintMode }
   ) => void;
   resetRulerDraft: () => void;
+  selectRulerById: (rulerId: string | null) => void;
+  updateRulerMeasurement: (ruler: RulerMeasurement) => void;
+  toggleRulerHidden: (rulerId: string) => void;
+  deleteRulerMeasurement: (rulerId: string) => void;
   setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -1743,6 +1742,30 @@ function getSelectedInteriorAssetAfterHistoryCommand(
   return getSelectedInteriorAssetIfExists(selectedInteriorAsset, nextDocument);
 }
 
+function getSelectedRulerIdAfterHistoryCommand(
+  selectedRulerId: string | null,
+  nextDocument: DocumentState,
+  command: EditorCommand,
+  direction: "undo" | "redo"
+): string | null {
+  const hasRuler = (rulerId: string | null) =>
+    rulerId !== null && nextDocument.rulerMeasurements.some((ruler) => ruler.id === rulerId);
+
+  if (command.type === "add-ruler") {
+    return direction === "redo" ? command.ruler.id : null;
+  }
+
+  if (command.type === "delete-ruler") {
+    return direction === "undo" ? command.ruler.id : null;
+  }
+
+  if (command.type === "update-ruler") {
+    return command.nextRuler.id;
+  }
+
+  return hasRuler(selectedRulerId) ? selectedRulerId : null;
+}
+
 /**
  * Returns the floor the user should be viewing immediately after applying a history command,
  * so the modified item is visible. Returns null if no floor switch is needed.
@@ -2142,6 +2165,12 @@ function getSafePersistedHistorySnapshot(
           },
           canvasRotationDegrees: document.canvasRotationDegrees,
           northBearingDegrees: document.northBearingDegrees,
+          rulerMeasurements: document.rulerMeasurements.map((ruler) => ({
+            id: ruler.id,
+            start: { ...ruler.start },
+            end: { ...ruler.end },
+            ...(ruler.hidden ? { hidden: true } : {}),
+          })),
           rooms: document.rooms.map((room) => ({
             id: room.id,
             floorId: room.floorId,
@@ -2419,7 +2448,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   roomDraft: EMPTY_ROOM_DRAFT,
   isRulerMode: false,
   rulerDraft: EMPTY_RULER_DRAFT,
-  rulerMeasurements: [],
+  selectedRulerId: null,
   selectedNorthIndicator: false,
   selectedRoomId: null,
   focusedRoomId: null,
@@ -2561,6 +2590,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: true,
         selectedRoomId: null,
         selectedWall: null,
@@ -2851,6 +2881,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         isRulerMode: false,
+        selectedRulerId: null,
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
@@ -2920,6 +2951,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           isRulerMode: false,
           rulerDraft: EMPTY_RULER_DRAFT,
+          selectedRulerId: null,
           roomDraft: {
             points: [resolvedCursorWorld],
             history: [],
@@ -2960,6 +2992,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         isRulerMode: false,
         rulerDraft: EMPTY_RULER_DRAFT,
+        selectedRulerId: null,
         roomDraft: {
           points: nextDraftPoints,
           history: [...state.roomDraft.history, clonePoints(draftPoints)],
@@ -2998,6 +3031,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isRulerMode: isActive,
         roomDraft: isActive ? EMPTY_ROOM_DRAFT : state.roomDraft,
         rulerDraft: EMPTY_RULER_DRAFT,
+        selectedRulerId: isActive ? state.selectedRulerId : null,
         selectedNorthIndicator: isActive ? false : state.selectedNorthIndicator,
         selectedRoomId: isActive ? null : state.selectedRoomId,
         selectedWall: isActive ? null : state.selectedWall,
@@ -3035,17 +3069,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
 
-      return preserveHistoryForSelectionUpdate(state, {
+      const ruler: RulerMeasurement = {
+        id: createRulerMeasurementId(),
+        start: { ...state.rulerDraft.start },
+        end: { ...resolvedPoint },
+      };
+      const command: EditorCommand = {
+        type: "add-ruler",
+        ruler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
         rulerDraft: EMPTY_RULER_DRAFT,
-        rulerMeasurements: [
-          ...state.rulerMeasurements,
-          {
-            id: createRulerMeasurementId(),
-            start: { ...state.rulerDraft.start },
-            end: { ...resolvedPoint },
-          },
-        ],
-      });
+        selectedRulerId: ruler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   updateRulerPreviewFromCursor: (cursorWorld, options) =>
     set((state) => {
@@ -3074,6 +3118,110 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         rulerDraft: EMPTY_RULER_DRAFT,
       });
+    }),
+  selectRulerById: (rulerId) =>
+    set((state) => {
+      if (rulerId !== null && !state.document.rulerMeasurements.some((ruler) => ruler.id === rulerId)) {
+        return state;
+      }
+      if (state.selectedRulerId === rulerId) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: true,
+        selectedRulerId: rulerId,
+        selectedNorthIndicator: false,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [],
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+        floorRenameSession: null,
+      });
+    }),
+  updateRulerMeasurement: (nextRuler) =>
+    set((state) => {
+      const previousRuler = state.document.rulerMeasurements.find((ruler) => ruler.id === nextRuler.id);
+      if (!previousRuler) return state;
+      if (
+        previousRuler.start.x === nextRuler.start.x &&
+        previousRuler.start.y === nextRuler.start.y &&
+        previousRuler.end.x === nextRuler.end.x &&
+        previousRuler.end.y === nextRuler.end.y &&
+        Boolean(previousRuler.hidden) === Boolean(nextRuler.hidden)
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: nextRuler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  toggleRulerHidden: (rulerId) =>
+    set((state) => {
+      const ruler = state.document.rulerMeasurements.find((candidate) => candidate.id === rulerId);
+      if (!ruler) return state;
+
+      const nextRuler: RulerMeasurement = {
+        ...ruler,
+        start: { ...ruler.start },
+        end: { ...ruler.end },
+        hidden: !ruler.hidden,
+      };
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler: ruler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: rulerId,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  deleteRulerMeasurement: (rulerId) =>
+    set((state) => {
+      const previousIndex = state.document.rulerMeasurements.findIndex((ruler) => ruler.id === rulerId);
+      if (previousIndex < 0) return state;
+
+      const command: EditorCommand = {
+        type: "delete-ruler",
+        ruler: state.document.rulerMeasurements[previousIndex],
+        previousIndex,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: state.selectedRulerId === rulerId ? null : state.selectedRulerId,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   setFocusedRoomId: (roomId) =>
     set((state) => {
@@ -3116,6 +3264,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3140,6 +3289,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return preserveHistoryForSelectionUpdate(state, {
           document: nextDocument,
           isRulerMode: false,
+          selectedRulerId: null,
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -3168,6 +3318,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -3206,6 +3357,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3238,6 +3390,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3255,6 +3408,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedOpening === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
         isRulerMode: false,
+        selectedRulerId: null,
         selectedOpening: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3264,6 +3418,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedInteriorAsset === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
         isRulerMode: false,
+        selectedRulerId: null,
         selectedInteriorAsset: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
@@ -3275,6 +3430,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selectedWall === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
         isRulerMode: false,
+        selectedRulerId: null,
         selectedWall: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3283,6 +3439,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) =>
       preserveHistoryForSelectionUpdate(state, {
         isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: null,
         selectedWall: null,
@@ -6126,7 +6283,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
       isRulerMode: false,
       rulerDraft: EMPTY_RULER_DRAFT,
-      rulerMeasurements: [],
+      selectedRulerId: null,
       selectedNorthIndicator: false,
       selectedRoomId: null,
       focusedRoomId: null,
@@ -6187,6 +6344,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           command,
           "undo"
         ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
+          restoredDocument,
+          command,
+          "undo"
+        ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -6228,6 +6391,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
+          restoredDocument,
+          command,
+          "redo"
+        ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
           restoredDocument,
           command,
           "redo"
@@ -6295,6 +6464,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           lastCommand,
           "undo"
         ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
+          restoredDocument,
+          lastCommand,
+          "undo"
+        ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -6349,6 +6524,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
+          restoredDocument,
+          lastCommand,
+          "redo"
+        ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
           restoredDocument,
           lastCommand,
           "redo"

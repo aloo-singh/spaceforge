@@ -4188,7 +4188,7 @@ function drawScene(
   }
   drawRulerDimensionLabels(
     dimensionOverlayContainer,
-    state.rulerMeasurements,
+    state.document.rulerMeasurements,
     state.rulerDraft,
     state.camera,
     state.viewport,
@@ -4239,8 +4239,9 @@ function drawScene(
   );
   drawRulers(
     draftGraphics,
-    state.rulerMeasurements,
+    state.document.rulerMeasurements,
     state.rulerDraft,
+    state.selectedRulerId,
     state.camera,
     state.viewport
   );
@@ -6450,7 +6451,7 @@ function drawDimensionLabels(
 
 function drawRulerDimensionLabels(
   labelContainer: Container,
-  rulers: Array<{ start: Point; end: Point }>,
+  rulers: Array<{ start: Point; end: Point; hidden?: boolean }>,
   draft: { start: Point | null; end: Point | null },
   camera: CameraState,
   viewport: ViewportSize,
@@ -6458,7 +6459,9 @@ function drawRulerDimensionLabels(
   theme: EditorCanvasTheme
 ) {
   const labelSpecs = [
-    ...rulers.map((ruler) => createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport)),
+    ...rulers
+      .filter((ruler) => !ruler.hidden)
+      .map((ruler) => createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport)),
     draft.start && draft.end
       ? createRulerDimensionLabelSpec(draft.start, draft.end, camera, viewport)
       : null,
@@ -7855,18 +7858,28 @@ function drawCursorHud(
 
 function drawRulers(
   graphics: Graphics,
-  rulers: Array<{ start: Point; end: Point }>,
+  rulers: Array<{ id: string; start: Point; end: Point; hidden?: boolean }>,
   draft: { start: Point | null; end: Point | null },
+  selectedRulerId: string | null,
   camera: CameraState,
   viewport: ViewportSize
 ) {
   for (const ruler of rulers) {
-    drawRulerLine(graphics, ruler.start, ruler.end, camera, viewport, 0.86);
+    if (ruler.hidden) continue;
+    drawRulerLine(
+      graphics,
+      ruler.start,
+      ruler.end,
+      camera,
+      viewport,
+      ruler.id === selectedRulerId ? 1 : 0.78,
+      ruler.id === selectedRulerId
+    );
   }
 
   if (draft.start) {
     const end = draft.end ?? draft.start;
-    drawRulerLine(graphics, draft.start, end, camera, viewport, 1);
+    drawRulerLine(graphics, draft.start, end, camera, viewport, 1, true);
   }
 }
 
@@ -7876,7 +7889,8 @@ function drawRulerLine(
   end: Point,
   camera: CameraState,
   viewport: ViewportSize,
-  alpha: number
+  alpha: number,
+  isSelected: boolean
 ) {
   const startScreen = worldToScreen(start, camera, viewport);
   const endScreen = worldToScreen(end, camera, viewport);
@@ -7888,7 +7902,7 @@ function drawRulerLine(
 
   if (startX !== endX || startY !== endY) {
     graphics.setStrokeStyle({
-      width: 2,
+      width: isSelected ? 2.75 : 2,
       color: RULER_ACCENT_COLOR,
       alpha,
       cap: "round",
@@ -7900,19 +7914,19 @@ function drawRulerLine(
   }
 
   graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.16 * alpha });
-  graphics.circle(startX, startY, 6);
+  graphics.circle(startX, startY, isSelected ? 7 : 6);
   graphics.fill();
   graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha });
-  graphics.circle(startX, startY, 3);
+  graphics.circle(startX, startY, isSelected ? 3.75 : 3);
   graphics.fill();
 
   if (startX === endX && startY === endY) return;
 
   graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.12 * alpha });
-  graphics.circle(endX, endY, 6);
+  graphics.circle(endX, endY, isSelected ? 7 : 6);
   graphics.fill();
   graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.92 * alpha });
-  graphics.circle(endX, endY, 3);
+  graphics.circle(endX, endY, isSelected ? 3.75 : 3);
   graphics.fill();
 }
 
