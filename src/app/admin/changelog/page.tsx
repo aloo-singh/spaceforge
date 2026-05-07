@@ -10,6 +10,35 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.76.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a vertex deletion affordance: hovering a selected constrained-vertex or eight-way room corner shows a calm × handle offset along the outward diagonal bisector.</li>
+                <li>Clicking the × handle removes the corner, merges its adjacent walls, and cleans up any resulting collinear points (e.g. an L-shape becomes a rectangle in one click).</li>
+                <li>Vertex deletion reuses the existing transform-feedback settling animation, history path, and Sonner toast with an Undo button (label: “Bedroom corner removed”).</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Handle position uses a right-hand normal bisector in screen space so the × always sits at the true 45° outward diagonal for any room shape or camera rotation.</li>
+                <li>Diagonal offset magnitude adjusted to <code className="bg-muted px-1.5 py-0.5 rounded text-xs">20 × √2 ≈ 28px</code> so per-axis clearance matches the wall-split plus handle’s 20px orthogonal offset.</li>
+                <li>Handle style, size, stroke weight, and tooltip delay now match the wall-split + handle exactly; the × glyph is the same arm length as the + rotated 45°.</li>
+                <li>Hover state persists smoothly as the pointer moves from the vertex drag handle into the × circle.</li>
+                <li>Tooltip appears after the same 700ms delay as the + handle, timed from when the pointer enters the × circle specifically.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.75.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-06</span>
           </div>
