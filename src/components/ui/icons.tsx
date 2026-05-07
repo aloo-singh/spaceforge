@@ -32,6 +32,7 @@ export {
   IconFocus2 as LocateFixed,
   IconHanger as Hanger,
   IconInbox as Inbox,
+  IconInfoCircle as InfoCircle,
   IconLayoutBottombarCollapse as PanelBottomCollapse,
   IconLayoutBottombarExpand as PanelBottomExpand,
   IconLayoutSidebarLeftCollapse as PanelLeft,
