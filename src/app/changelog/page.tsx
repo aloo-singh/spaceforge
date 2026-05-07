@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.77.0",
+    date: "2026-05-07",
+    title: "Measure distances with the ruler tool",
+    items: [
+      "A new ruler tool lets you drop precise measurement lines anywhere on the canvas — click to set the start, click again to lock the end.",
+      "Rulers snap to the grid and to room walls, constrain to horizontal, vertical, or 45° diagonals, and show live distance labels as you draw.",
+      "Press R to toggle the ruler tool, rename rulers in the inspector, hide or delete individual ones, and undo every action with a friendly confirmation.",
+    ],
+  },
+  {
     version: "v0.76.0",
     date: "2026-05-07",
     title: "Remove a corner in one click",
