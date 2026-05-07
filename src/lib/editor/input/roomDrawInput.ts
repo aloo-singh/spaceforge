@@ -72,6 +72,7 @@ type RoomDrawStoreState = {
   isRulerMode: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
+  rulerDraft: { start: Point | null; end: Point | null };
   selectedRoomId: string | null;
   selectedWall: { roomId: string; wall: RoomWall } | null;
   selectedOpening: { roomId: string; openingId: string } | null;
@@ -82,6 +83,15 @@ type RoomDrawStoreState = {
   ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
+  startOrCommitRulerFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  updateRulerPreviewFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  resetRulerDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
@@ -848,6 +858,11 @@ export function attachRoomDrawInput(
       !activeInteriorAssetDragSession &&
       !activeInteriorAssetResizeSession
     ) {
+      state.updateRulerPreviewFromCursor(cursorWorld, {
+        constraintMode: event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled
+          ? "diagonal45"
+          : "orthogonal",
+      });
       setHoveredRoomLabelId(null);
       hoveredOpeningWidthHandle = null;
       hoveredOpening = null;
@@ -1304,13 +1319,6 @@ export function attachRoomDrawInput(
 
     const state = store.getState();
 
-    if (state.isRulerMode && event.button === 0) {
-      event.preventDefault();
-      activePointerCount++;
-      updateCursor();
-      return;
-    }
-
     if (event.button === 2) {
       if (state.roomDraft.points.length > 0) {
         event.preventDefault();
@@ -1332,6 +1340,16 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+
+    if (state.isRulerMode) {
+      event.preventDefault();
+      state.startOrCommitRulerFromCursor(cursorWorld, {
+        constraintMode: event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled ? "diagonal45" : "orthogonal",
+      });
+      updateCursor();
+      return;
+    }
+
     const selectedInteriorAsset = getSelectedInteriorAssetForHandles();
     const selectedInteriorAssetHit = selectedInteriorAsset
       ? findInteriorAssetAtScreenPoint(
@@ -2241,7 +2259,11 @@ export function attachRoomDrawInput(
 
     if (event.code === "Escape") {
       const state = store.getState();
-      if (state.roomDraft.points.length > 0) {
+      if (state.isRulerMode && state.rulerDraft.start) {
+        state.resetRulerDraft();
+        updateCursor();
+        callbacks.requestRender();
+      } else if (state.roomDraft.points.length > 0) {
         state.resetDraft();
         setSnapGuides(null);
         updateCursor();

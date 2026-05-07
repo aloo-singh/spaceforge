@@ -4186,6 +4186,15 @@ function drawScene(
       theme
     );
   }
+  drawRulerDimensionLabels(
+    dimensionOverlayContainer,
+    state.rulerMeasurements,
+    state.rulerDraft,
+    state.camera,
+    state.viewport,
+    state.settings,
+    theme
+  );
   drawWallSplitHoverAffordance(
     dimensionOverlayContainer,
     renderedRooms,
@@ -4227,6 +4236,13 @@ function drawScene(
         }
       : theme,
     hideCursorHud
+  );
+  drawRulers(
+    draftGraphics,
+    state.rulerMeasurements,
+    state.rulerDraft,
+    state.camera,
+    state.viewport
   );
 }
 
@@ -5923,6 +5939,8 @@ type ResizeDimensionLabelSpec = {
   wallLengthPx: number;
   normalPlacement: "center" | "inside" | "outside";
   normalOffsetBiasPx: number;
+  strokeColor?: number;
+  strokeAlpha?: number;
 };
 
 type ResizeDimensionLabelLayout = {
@@ -6428,6 +6446,76 @@ function drawDimensionLabels(
     text.alpha = RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA;
     labelContainer.addChild(text);
   }
+}
+
+function drawRulerDimensionLabels(
+  labelContainer: Container,
+  rulers: Array<{ start: Point; end: Point }>,
+  draft: { start: Point | null; end: Point | null },
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  const labelSpecs = [
+    ...rulers.map((ruler) => createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport)),
+    draft.start && draft.end
+      ? createRulerDimensionLabelSpec(draft.start, draft.end, camera, viewport)
+      : null,
+  ].filter((labelSpec): labelSpec is ResizeDimensionLabelSpec => labelSpec !== null);
+
+  if (labelSpecs.length === 0) return;
+
+  const rulerTheme = {
+    ...theme,
+    roomLabelPillSelectedStroke: RULER_ACCENT_COLOR,
+  };
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    labelSpecs,
+    null,
+    viewport,
+    [],
+    settings
+  );
+  drawDimensionLabels(labelContainer, labelLayouts, settings, rulerTheme);
+}
+
+function createRulerDimensionLabelSpec(
+  start: Point,
+  end: Point,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec | null {
+  if (pointsEqual(start, end)) return null;
+
+  const startScreen = worldToScreen(start, camera, viewport);
+  const endScreen = worldToScreen(end, camera, viewport);
+  const tangent = normalizeScreenDirection({
+    x: endScreen.x - startScreen.x,
+    y: endScreen.y - startScreen.y,
+  });
+  const normal = normalizeScreenDirection({
+    x: -tangent.y,
+    y: tangent.x,
+  });
+  const upwardNormal = normal.y > 0 ? { x: -normal.x, y: -normal.y } : normal;
+
+  return {
+    text: formatMetricWallDimension(getEdgeLengthMillimetres(start, end)),
+    wall: "top",
+    axis: Math.abs(tangent.x) >= Math.abs(tangent.y) ? "horizontal" : "vertical",
+    center: {
+      x: (startScreen.x + endScreen.x) / 2,
+      y: (startScreen.y + endScreen.y) / 2,
+    },
+    outwardDirection: upwardNormal,
+    tangentDirection: tangent,
+    wallLengthPx: Math.hypot(endScreen.x - startScreen.x, endScreen.y - startScreen.y),
+    normalPlacement: "outside",
+    normalOffsetBiasPx: 0,
+    strokeColor: RULER_ACCENT_COLOR,
+    strokeAlpha: 0.86,
+  };
 }
 
 function drawWallSplitHoverAffordance(
@@ -7247,6 +7335,8 @@ function getResolvedResizeDimensionLabelLayouts(
       outwardDirection: labelSpec.outwardDirection,
       tangentDirection: labelSpec.tangentDirection,
       avoidanceDirection,
+      strokeColor: labelSpec.strokeColor,
+      strokeAlpha: labelSpec.strokeAlpha,
       width,
       height,
     };
@@ -7760,6 +7850,69 @@ function drawCursorHud(
 
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.9 });
   graphics.circle(point.x, point.y, dotRadius);
+  graphics.fill();
+}
+
+function drawRulers(
+  graphics: Graphics,
+  rulers: Array<{ start: Point; end: Point }>,
+  draft: { start: Point | null; end: Point | null },
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  for (const ruler of rulers) {
+    drawRulerLine(graphics, ruler.start, ruler.end, camera, viewport, 0.86);
+  }
+
+  if (draft.start) {
+    const end = draft.end ?? draft.start;
+    drawRulerLine(graphics, draft.start, end, camera, viewport, 1);
+  }
+}
+
+function drawRulerLine(
+  graphics: Graphics,
+  start: Point,
+  end: Point,
+  camera: CameraState,
+  viewport: ViewportSize,
+  alpha: number
+) {
+  const startScreen = worldToScreen(start, camera, viewport);
+  const endScreen = worldToScreen(end, camera, viewport);
+  const textResolution = getTextResolution();
+  const startX = snapToPixel(startScreen.x, textResolution);
+  const startY = snapToPixel(startScreen.y, textResolution);
+  const endX = snapToPixel(endScreen.x, textResolution);
+  const endY = snapToPixel(endScreen.y, textResolution);
+
+  if (startX !== endX || startY !== endY) {
+    graphics.setStrokeStyle({
+      width: 2,
+      color: RULER_ACCENT_COLOR,
+      alpha,
+      cap: "round",
+      join: "round",
+    });
+    graphics.moveTo(startX, startY);
+    graphics.lineTo(endX, endY);
+    graphics.stroke();
+  }
+
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.16 * alpha });
+  graphics.circle(startX, startY, 6);
+  graphics.fill();
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha });
+  graphics.circle(startX, startY, 3);
+  graphics.fill();
+
+  if (startX === endX && startY === endY) return;
+
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.12 * alpha });
+  graphics.circle(endX, endY, 6);
+  graphics.fill();
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.92 * alpha });
+  graphics.circle(endX, endY, 3);
   graphics.fill();
 }
 

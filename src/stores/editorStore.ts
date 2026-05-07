@@ -141,6 +141,17 @@ type RoomDraftState = {
   history: Point[][];
 };
 
+export type RulerMeasurement = {
+  id: string;
+  start: Point;
+  end: Point;
+};
+
+type RulerDraftState = {
+  start: Point | null;
+  end: Point | null;
+};
+
 type DocumentState = EditorDocumentState;
 
 type RenameSessionState = {
@@ -216,6 +227,8 @@ type EditorState = {
   setDevSubscriptionTier: (tier: SubscriptionTier) => void;
   roomDraft: RoomDraftState;
   isRulerMode: boolean;
+  rulerDraft: RulerDraftState;
+  rulerMeasurements: RulerMeasurement[];
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
   focusedRoomId: string | null;
@@ -269,6 +282,15 @@ type EditorState = {
   stepBackDraft: () => void;
   resetDraft: () => void;
   setRulerMode: (isActive: boolean) => void;
+  startOrCommitRulerFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  updateRulerPreviewFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  resetRulerDraft: () => void;
   setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -522,6 +544,10 @@ const EMPTY_ROOM_DRAFT: RoomDraftState = {
   points: [],
   history: [],
 };
+const EMPTY_RULER_DRAFT: RulerDraftState = {
+  start: null,
+  end: null,
+};
 const HISTORY_LIMIT = PERSISTED_HISTORY_STATE_LIMIT - 1;
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
@@ -592,6 +618,14 @@ function createStairConnectionId(): string {
   }
 
   return `stair-connection-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function createRulerMeasurementId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `ruler-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 /**
@@ -2299,6 +2333,36 @@ function getEffectiveSnapStepMm(
   return getActiveSnapStepMm(state.camera);
 }
 
+function getResolvedRulerPointFromCursor(
+  state: Pick<EditorState, "document" | "camera" | "settings" | "rulerDraft">,
+  cursorWorld: Point,
+  constraintMode: DrawConstraintMode
+): Point {
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+  const magneticGuides = getMagneticSnapGuidesForSettings(
+    getRoomsForActiveFloor(state.document),
+    cursorWorld,
+    state.camera,
+    state.settings,
+    { constraintMode }
+  );
+  const snappedCursorWorld = getSnappedPointFromGuides(
+    cursorWorld,
+    activeSnapStepMm,
+    magneticGuides
+  );
+
+  return state.rulerDraft.start
+    ? getConstrainedDrawPoint(
+        state.rulerDraft.start,
+        snappedCursorWorld,
+        activeSnapStepMm,
+        null,
+        constraintMode
+      )
+    : snappedCursorWorld;
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
@@ -2354,6 +2418,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   roomDraft: EMPTY_ROOM_DRAFT,
   isRulerMode: false,
+  rulerDraft: EMPTY_RULER_DRAFT,
+  rulerMeasurements: [],
   selectedNorthIndicator: false,
   selectedRoomId: null,
   focusedRoomId: null,
@@ -2853,6 +2919,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (draftPoints.length === 0) {
         return {
           isRulerMode: false,
+          rulerDraft: EMPTY_RULER_DRAFT,
           roomDraft: {
             points: [resolvedCursorWorld],
             history: [],
@@ -2892,6 +2959,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         isRulerMode: false,
+        rulerDraft: EMPTY_RULER_DRAFT,
         roomDraft: {
           points: nextDraftPoints,
           history: [...state.roomDraft.history, clonePoints(draftPoints)],
@@ -2929,6 +2997,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return preserveHistoryForSelectionUpdate(state, {
         isRulerMode: isActive,
         roomDraft: isActive ? EMPTY_ROOM_DRAFT : state.roomDraft,
+        rulerDraft: EMPTY_RULER_DRAFT,
         selectedNorthIndicator: isActive ? false : state.selectedNorthIndicator,
         selectedRoomId: isActive ? null : state.selectedRoomId,
         selectedWall: isActive ? null : state.selectedWall,
@@ -2940,6 +3009,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         interiorAssetRenameSession: isActive ? null : state.interiorAssetRenameSession,
         interiorAssetArrowLabelSession: isActive ? null : state.interiorAssetArrowLabelSession,
         floorRenameSession: isActive ? null : state.floorRenameSession,
+      });
+    }),
+  startOrCommitRulerFromCursor: (cursorWorld, options) =>
+    set((state) => {
+      if (!state.isRulerMode) return state;
+
+      const constraintMode = options?.constraintMode ?? "orthogonal";
+      const resolvedPoint = getResolvedRulerPointFromCursor(
+        state,
+        cursorWorld,
+        constraintMode
+      );
+
+      if (!state.rulerDraft.start) {
+        return preserveHistoryForSelectionUpdate(state, {
+          rulerDraft: {
+            start: { ...resolvedPoint },
+            end: { ...resolvedPoint },
+          },
+        });
+      }
+
+      if (isZeroLengthSegment(state.rulerDraft.start, resolvedPoint)) {
+        return state;
+      }
+
+      return preserveHistoryForSelectionUpdate(state, {
+        rulerDraft: EMPTY_RULER_DRAFT,
+        rulerMeasurements: [
+          ...state.rulerMeasurements,
+          {
+            id: createRulerMeasurementId(),
+            start: { ...state.rulerDraft.start },
+            end: { ...resolvedPoint },
+          },
+        ],
+      });
+    }),
+  updateRulerPreviewFromCursor: (cursorWorld, options) =>
+    set((state) => {
+      if (!state.isRulerMode || !state.rulerDraft.start) return state;
+
+      const constraintMode = options?.constraintMode ?? "orthogonal";
+      const resolvedPoint = getResolvedRulerPointFromCursor(
+        state,
+        cursorWorld,
+        constraintMode
+      );
+      if (state.rulerDraft.end && pointsEqual(state.rulerDraft.end, resolvedPoint)) {
+        return state;
+      }
+
+      return preserveHistoryForSelectionUpdate(state, {
+        rulerDraft: {
+          start: state.rulerDraft.start,
+          end: { ...resolvedPoint },
+        },
+      });
+    }),
+  resetRulerDraft: () =>
+    set((state) => {
+      if (!state.rulerDraft.start && !state.rulerDraft.end) return state;
+      return preserveHistoryForSelectionUpdate(state, {
+        rulerDraft: EMPTY_RULER_DRAFT,
       });
     }),
   setFocusedRoomId: (roomId) =>
@@ -5992,6 +6125,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         history: [],
       },
       isRulerMode: false,
+      rulerDraft: EMPTY_RULER_DRAFT,
+      rulerMeasurements: [],
       selectedNorthIndicator: false,
       selectedRoomId: null,
       focusedRoomId: null,
