@@ -62,6 +62,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `Upgrade to ${nextTier} to create unlimited projects and unlock advanced features.`,
       terminalMessage: "You've reached your Free tier project limit. Ready to expand?",
     },
+    exportHighRes: {
+      name: "Hi-res Export",
+      label: "Hi-res PNG export",
+      description: "Export floor plans at 4x resolution (5120px) for crystal-clear prints and presentations.",
+      limit: 0,
+      singularLabel: "resolution level",
+      pluralLabel: "resolution levels",
+      upsellMessage: (nextTier) =>
+        `Upgrade to ${nextTier} to unlock Hi-res export (4x resolution = 16x total pixels for prints that stay sharp at any size).`,
+      terminalMessage: "Free tier doesn't include Hi-res export. Upgrade for crisp, sharp prints.",
+    },
   },
 
   Pro: {
@@ -86,6 +97,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You've unlocked unlimited projects on Pro. Create freely.`,
       terminalMessage: "You have unlimited projects on Pro tier. Build away!",
+    },
+    exportHighRes: {
+      name: "Hi-res Export",
+      label: "Hi-res PNG export",
+      description: "Export floor plans at 4x resolution (5120px) for crystal-clear prints and presentations.",
+      limit: 1,
+      singularLabel: "resolution level",
+      pluralLabel: "resolution levels",
+      upsellMessage: () =>
+        `You've unlocked Hi-res export on Pro. Export crisp prints at any size.`,
+      terminalMessage: "You've unlocked Hi-res export on Pro. Export crisp prints at any size.",
     },
   },
 
@@ -112,6 +134,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `You've unlocked unlimited projects on Studio. Create freely.`,
       terminalMessage: "You have unlimited projects on Studio tier. Build away!",
     },
+    exportHighRes: {
+      name: "Hi-res Export",
+      label: "Hi-res PNG export",
+      description: "Export floor plans at 4x resolution (5120px) for crystal-clear prints and presentations.",
+      limit: 1,
+      singularLabel: "resolution level",
+      pluralLabel: "resolution levels",
+      upsellMessage: () =>
+        `You've unlocked Hi-res export on Studio. Export crisp prints at any size.`,
+      terminalMessage: "You've unlocked Hi-res export on Studio. Export crisp prints at any size.",
+    },
   },
 
   Education: {
@@ -136,6 +169,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You've unlocked unlimited projects on Education. Create freely.`,
       terminalMessage: "You have unlimited projects on Education tier. Build away!",
+    },
+    exportHighRes: {
+      name: "Hi-res Export",
+      label: "Hi-res PNG export",
+      description: "Export floor plans at 4x resolution (5120px) for crystal-clear prints and presentations.",
+      limit: 1,
+      singularLabel: "resolution level",
+      pluralLabel: "resolution levels",
+      upsellMessage: () =>
+        `You've unlocked Hi-res export on Education. Export crisp prints at any size.`,
+      terminalMessage: "You've unlocked Hi-res export on Education. Export crisp prints at any size.",
     },
   },
 };

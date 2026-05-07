@@ -6,6 +6,7 @@ export type EditorKeyboardShortcutId =
   | "toggle-canvas-hud"
   | "toggle-guidelines"
   | "toggle-snapping"
+  | "toggle-ruler-tool"
   | "fit-all-rooms"
   | "fit-selected-room"
   | "multi-select-toggle"
@@ -83,6 +84,17 @@ export const EDITOR_KEYBOARD_SHORTCUTS: readonly EditorKeyboardShortcut[] = [
     type: "toggle",
     bindings: [{ key: "s", code: "KeyS" }],
     sonnerMessage: ({ isEnabled }) => (isEnabled ? "Snapping enabled" : "Snapping disabled"),
+  },
+  {
+    id: "toggle-ruler-tool",
+    section: "View",
+    keyCombination: "R",
+    description: "Toggle ruler tool",
+    macKeys: "R",
+    windowsKeys: "R",
+    type: "toggle",
+    bindings: [{ key: "r", code: "KeyR" }],
+    sonnerMessage: ({ isEnabled }) => (isEnabled ? "Ruler tool enabled" : "Ruler tool disabled"),
   },
   {
     id: "fit-all-rooms",
@@ -365,6 +377,39 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
 
   if (command.type === "update-north-bearing") {
     return "north rotation";
+  }
+
+  if (command.type === "add-ruler") {
+    const rulerLabel = command.ruler.name?.trim() || `Ruler ${command.rulerIndex + 1}`;
+    return `Ruler "${rulerLabel}" added`;
+  }
+
+  if (command.type === "update-ruler") {
+    if (command.previousRuler.hidden !== command.nextRuler.hidden) {
+      const rulerLabel = command.nextRuler.name?.trim() || "Ruler";
+      return command.nextRuler.hidden ? `Ruler "${rulerLabel}" hidden` : `Ruler "${rulerLabel}" shown`;
+    }
+
+    if (command.previousRuler.name !== command.nextRuler.name) {
+      const newName = command.nextRuler.name?.trim() || "Ruler";
+      return `Ruler renamed to "${newName}"`;
+    }
+
+    return "Ruler moved";
+  }
+
+  if (command.type === "delete-ruler") {
+    const rulerLabel = command.ruler.name?.trim() || `Ruler ${command.previousIndex + 1}`;
+    return `Ruler "${rulerLabel}" deleted`;
+  }
+
+  if (command.type === "bulk-delete") {
+    const rulerDeleteCount = command.deleteCommands.filter(
+      (deleteCommand) => deleteCommand.type === "delete-ruler"
+    ).length;
+    if (rulerDeleteCount === command.deleteCommands.length && rulerDeleteCount > 0) {
+      return rulerDeleteCount === 1 ? "Ruler deleted" : `${rulerDeleteCount} rulers cleared`;
+    }
   }
 
   if (command.type === "complete-room") {

@@ -187,6 +187,7 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
 import { SelectedWallInspector } from "@/components/editor/SelectedWallInspector";
 import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
+import { RulerInspector } from "@/components/editor/RulerInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
@@ -417,6 +418,7 @@ type EditorCanvasProps = {
         isLeftSidebarCollapsed: boolean;
       }) => ReactNode);
 };
+const RULER_ACCENT_COLOR = 0x84cc16;
 
 type WallSplitHoverUi = {
   roomId: string;
@@ -917,6 +919,7 @@ export default function EditorCanvas({
   const wallSplitTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vertexDeleteHoverUiRef = useRef<VertexDeleteHoverUi | null>(null);
   const vertexDeleteTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rulerInteractionUiRef = useRef<RulerInteractionUi | null>(null);
   const transformFeedbackRef = useRef<TransformFeedback | null>(null);
   const snapGuidesRef = useRef<SnapGuides | null>(null);
   // Holds in-progress asset rotation animations keyed by assetId.
@@ -944,6 +947,7 @@ export default function EditorCanvas({
   const rooms = useMemo(() => getRoomsForActiveFloor(editorDocument), [editorDocument]);
   const roomCount = rooms.length;
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
+  const isRulerMode = useEditorStore((state) => state.isRulerMode);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
@@ -969,6 +973,8 @@ export default function EditorCanvas({
   const zoomAtScreenPoint = useEditorStore((state) => state.zoomAtScreenPoint);
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const resetDraft = useEditorStore((state) => state.resetDraft);
+  const rulerDraftHasStart = useEditorStore((state) => state.rulerDraft.start !== null);
+  const resetRulerDraft = useEditorStore((state) => state.resetRulerDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
@@ -1110,6 +1116,7 @@ export default function EditorCanvas({
       roomResizeUiRef.current,
       wallSplitHoverUiRef.current,
       vertexDeleteHoverUiRef.current,
+      rulerInteractionUiRef.current,
       transformFeedbackRef.current,
       snapGuidesRef.current,
       draftConstraintModeRef.current,
@@ -2074,6 +2081,7 @@ export default function EditorCanvas({
         "toggle-guidelines",
         "toggle-canvas-hud",
         "toggle-snapping",
+        "toggle-ruler-tool",
         "fit-selected-room",
         "fit-all-rooms",
       ]);
@@ -2107,6 +2115,16 @@ export default function EditorCanvas({
         showKeyboardShortcutFeedback(shortcut.id, {
           feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
           context: { isEnabled: nextSnappingEnabled },
+        });
+        return;
+      }
+
+      if (shortcut.id === "toggle-ruler-tool") {
+        const nextIsRulerMode = !store.isRulerMode;
+        store.setRulerMode(nextIsRulerMode);
+        showKeyboardShortcutFeedback(shortcut.id, {
+          feedbackEnabled: store.keyboardShortcutFeedbackEnabled,
+          context: { isEnabled: nextIsRulerMode },
         });
         return;
       }
@@ -2704,6 +2722,10 @@ export default function EditorCanvas({
         onInteriorAssetDragTargetChange: (roomId) => {
           assetDragTargetRoomIdRef.current = roomId;
         },
+        onRulerInteractionUiChange: (rulerUi) => {
+          rulerInteractionUiRef.current = rulerUi;
+          drawCurrentScene();
+        },
         requestRender: () => {
           drawCurrentScene();
         },
@@ -3031,6 +3053,10 @@ export default function EditorCanvas({
       return isCompact ? <RoomDrawingInspector /> : <RoomDrawingInspector className="h-full" />;
     }
 
+    if (isRulerMode) {
+      return isCompact ? <RulerInspector /> : <RulerInspector className="h-full" />;
+    }
+
     // Get the last selected item from the selection array
     const selectedItem = selection.length > 0 ? selection[selection.length - 1] : null;
     
@@ -3123,6 +3149,7 @@ export default function EditorCanvas({
   const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
   const shouldShowTouchZoomControls = isMobile || isCompactLandscapeViewport;
   const shouldShowTouchCancelButton = (isMobile || isCompactLandscapeViewport) && roomDraftPointCount > 0;
+  const shouldShowRulerCancelButton = (isMobile || isCompactLandscapeViewport) && isRulerMode && rulerDraftHasStart;
   const expandedLeftSidebarWidth = isMobile
     ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
     : isCompactLandscapeViewport
@@ -3628,7 +3655,7 @@ export default function EditorCanvas({
               </div>
             </div>
           ) : null}
-          {shouldShowTouchCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
+          {shouldShowTouchCancelButton || shouldShowRulerCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
             <div
               className={cn(
                 "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
@@ -3704,6 +3731,21 @@ export default function EditorCanvas({
                   size="icon-sm"
                   aria-label="Cancel drawing"
                   onClick={resetDraft}
+                  className={cn(
+                    "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
+                    useCompactMobileControls && "size-9 rounded-xl"
+                  )}
+                >
+                  <X className="size-4" />
+                </Button>
+              ) : null}
+              {shouldShowRulerCancelButton ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  aria-label="Cancel ruler"
+                  onClick={resetRulerDraft}
                   className={cn(
                     "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
                     useCompactMobileControls && "size-9 rounded-xl"
@@ -3933,6 +3975,12 @@ export default function EditorCanvas({
 
 type EditorSnapshot = ReturnType<typeof useEditorStore.getState>;
 
+type RulerInteractionUi = {
+  rulerId: string;
+  target: "start" | "end" | "body";
+  isDragging: boolean;
+};
+
 function drawScene(
   gridGraphics: Graphics,
   floorFootprintGraphics: Graphics,
@@ -3967,6 +4015,7 @@ function drawScene(
   },
   wallSplitHoverUi: WallSplitHoverUi | null,
   vertexDeleteHoverUi: VertexDeleteHoverUi | null,
+  rulerInteractionUi: RulerInteractionUi | null,
   transformFeedback: TransformFeedback | null,
   snapGuides: SnapGuides | null,
   draftConstraintMode: "orthogonal" | "diagonal45",
@@ -4179,6 +4228,15 @@ function drawScene(
       theme
     );
   }
+  drawRulerDimensionLabels(
+    dimensionOverlayContainer,
+    state.document.rulerMeasurements,
+    state.rulerDraft,
+    state.camera,
+    state.viewport,
+    state.settings,
+    theme
+  );
   drawWallSplitHoverAffordance(
     dimensionOverlayContainer,
     renderedRooms,
@@ -4212,8 +4270,23 @@ function drawScene(
     activeSnapStepMm,
     draftConstraintMode,
     visibleGuides,
-    theme,
+    state.isRulerMode
+      ? {
+          ...theme,
+          interactiveAccent: RULER_ACCENT_COLOR,
+          guidelineAccent: RULER_ACCENT_COLOR,
+        }
+      : theme,
     hideCursorHud
+  );
+  drawRulers(
+    draftGraphics,
+    state.document.rulerMeasurements,
+    state.rulerDraft,
+    state.selectedRulerId,
+    rulerInteractionUi,
+    state.camera,
+    state.viewport
   );
 }
 
@@ -5910,6 +5983,8 @@ type ResizeDimensionLabelSpec = {
   wallLengthPx: number;
   normalPlacement: "center" | "inside" | "outside";
   normalOffsetBiasPx: number;
+  strokeColor?: number;
+  strokeAlpha?: number;
 };
 
 type ResizeDimensionLabelLayout = {
@@ -6415,6 +6490,78 @@ function drawDimensionLabels(
     text.alpha = RESIZE_DIMENSION_ACTIVE_TEXT_ALPHA;
     labelContainer.addChild(text);
   }
+}
+
+function drawRulerDimensionLabels(
+  labelContainer: Container,
+  rulers: Array<{ start: Point; end: Point; hidden?: boolean }>,
+  draft: { start: Point | null; end: Point | null },
+  camera: CameraState,
+  viewport: ViewportSize,
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  theme: EditorCanvasTheme
+) {
+  const labelSpecs = [
+    ...rulers
+      .filter((ruler) => !ruler.hidden)
+      .map((ruler) => createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport)),
+    draft.start && draft.end
+      ? createRulerDimensionLabelSpec(draft.start, draft.end, camera, viewport)
+      : null,
+  ].filter((labelSpec): labelSpec is ResizeDimensionLabelSpec => labelSpec !== null);
+
+  if (labelSpecs.length === 0) return;
+
+  const rulerTheme = {
+    ...theme,
+    roomLabelPillSelectedStroke: RULER_ACCENT_COLOR,
+  };
+  const labelLayouts = getResolvedResizeDimensionLabelLayouts(
+    labelSpecs,
+    null,
+    viewport,
+    [],
+    settings
+  );
+  drawDimensionLabels(labelContainer, labelLayouts, settings, rulerTheme);
+}
+
+function createRulerDimensionLabelSpec(
+  start: Point,
+  end: Point,
+  camera: CameraState,
+  viewport: ViewportSize
+): ResizeDimensionLabelSpec | null {
+  if (pointsEqual(start, end)) return null;
+
+  const startScreen = worldToScreen(start, camera, viewport);
+  const endScreen = worldToScreen(end, camera, viewport);
+  const tangent = normalizeScreenDirection({
+    x: endScreen.x - startScreen.x,
+    y: endScreen.y - startScreen.y,
+  });
+  const normal = normalizeScreenDirection({
+    x: -tangent.y,
+    y: tangent.x,
+  });
+  const upwardNormal = normal.y > 0 ? { x: -normal.x, y: -normal.y } : normal;
+
+  return {
+    text: formatMetricWallDimension(getEdgeLengthMillimetres(start, end)),
+    wall: "top",
+    axis: Math.abs(tangent.x) >= Math.abs(tangent.y) ? "horizontal" : "vertical",
+    center: {
+      x: (startScreen.x + endScreen.x) / 2,
+      y: (startScreen.y + endScreen.y) / 2,
+    },
+    outwardDirection: upwardNormal,
+    tangentDirection: tangent,
+    wallLengthPx: Math.hypot(endScreen.x - startScreen.x, endScreen.y - startScreen.y),
+    normalPlacement: "outside",
+    normalOffsetBiasPx: 0,
+    strokeColor: RULER_ACCENT_COLOR,
+    strokeAlpha: 0.86,
+  };
 }
 
 function drawWallSplitHoverAffordance(
@@ -7234,6 +7381,8 @@ function getResolvedResizeDimensionLabelLayouts(
       outwardDirection: labelSpec.outwardDirection,
       tangentDirection: labelSpec.tangentDirection,
       avoidanceDirection,
+      strokeColor: labelSpec.strokeColor,
+      strokeAlpha: labelSpec.strokeAlpha,
       width,
       height,
     };
@@ -7748,6 +7897,103 @@ function drawCursorHud(
   graphics.setFillStyle({ color: theme.interactiveAccent, alpha: 0.9 });
   graphics.circle(point.x, point.y, dotRadius);
   graphics.fill();
+}
+
+function drawRulers(
+  graphics: Graphics,
+  rulers: Array<{ id: string; start: Point; end: Point; hidden?: boolean }>,
+  draft: { start: Point | null; end: Point | null },
+  selectedRulerId: string | null,
+  rulerInteractionUi: RulerInteractionUi | null,
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  for (const ruler of rulers) {
+    if (ruler.hidden) continue;
+    const interactionTarget =
+      rulerInteractionUi?.rulerId === ruler.id ? rulerInteractionUi.target : null;
+    const isActive = ruler.id === selectedRulerId || interactionTarget !== null;
+    drawRulerLine(
+      graphics,
+      ruler.start,
+      ruler.end,
+      camera,
+      viewport,
+      isActive ? 1 : 0.78,
+      isActive,
+      interactionTarget,
+      rulerInteractionUi?.rulerId === ruler.id && rulerInteractionUi.isDragging
+    );
+  }
+
+  if (draft.start) {
+    const end = draft.end ?? draft.start;
+    drawRulerLine(graphics, draft.start, end, camera, viewport, 1, true);
+  }
+}
+
+function drawRulerLine(
+  graphics: Graphics,
+  start: Point,
+  end: Point,
+  camera: CameraState,
+  viewport: ViewportSize,
+  alpha: number,
+  isSelected: boolean,
+  interactionTarget: "start" | "end" | "body" | null = null,
+  isDragging = false
+) {
+  const startScreen = worldToScreen(start, camera, viewport);
+  const endScreen = worldToScreen(end, camera, viewport);
+  const textResolution = getTextResolution();
+  const startX = snapToPixel(startScreen.x, textResolution);
+  const startY = snapToPixel(startScreen.y, textResolution);
+  const endX = snapToPixel(endScreen.x, textResolution);
+  const endY = snapToPixel(endScreen.y, textResolution);
+
+  if (startX !== endX || startY !== endY) {
+    graphics.setStrokeStyle({
+      width: isSelected ? 2 : 1.5,
+      color: RULER_ACCENT_COLOR,
+      alpha: isSelected ? alpha : alpha * 0.72,
+      cap: "round",
+      join: "round",
+    });
+    graphics.moveTo(startX, startY);
+    graphics.lineTo(endX, endY);
+    graphics.stroke();
+  }
+
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.12 * alpha });
+  graphics.circle(startX, startY, isSelected ? 6 : 5);
+  graphics.fill();
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: alpha * 0.8 });
+  graphics.circle(startX, startY, isSelected ? 3 : 2.5);
+  graphics.fill();
+
+  if (startX === endX && startY === endY) return;
+
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: 0.1 * alpha });
+  graphics.circle(endX, endY, isSelected ? 6 : 5);
+  graphics.fill();
+  graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: isSelected ? alpha * 0.8 : alpha * 0.65 });
+  graphics.circle(endX, endY, isSelected ? 3 : 2.5);
+  graphics.fill();
+
+  if (interactionTarget === "start" || interactionTarget === "end") {
+    const handleX = interactionTarget === "start" ? startX : endX;
+    const handleY = interactionTarget === "start" ? startY : endY;
+    graphics.setFillStyle({ color: RULER_ACCENT_COLOR, alpha: isDragging ? 0.18 : 0.12 });
+    graphics.circle(handleX, handleY, isDragging ? 10 : 9);
+    graphics.fill();
+    graphics.setStrokeStyle({
+      width: isDragging ? 2 : 1.5,
+      color: RULER_ACCENT_COLOR,
+      alpha: 0.9,
+    });
+    graphics.circle(handleX, handleY, isDragging ? 10 : 9);
+    graphics.stroke();
+  }
 }
 
 function drawAngleIndicator(

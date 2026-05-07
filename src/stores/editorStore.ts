@@ -125,6 +125,7 @@ import type {
   RoomOpening,
   RoomOpeningSelection,
   RoomWallSelection,
+  RulerMeasurement,
   ScreenPoint,
   SharedSelectionItem,
   ViewportSize,
@@ -139,6 +140,11 @@ declare global {
 type RoomDraftState = {
   points: Point[];
   history: Point[][];
+};
+
+type RulerDraftState = {
+  start: Point | null;
+  end: Point | null;
 };
 
 type DocumentState = EditorDocumentState;
@@ -162,6 +168,11 @@ type InteriorAssetArrowLabelSessionState = {
 
 type FloorRenameSessionState = {
   floorId: string;
+  initialName: string;
+} | null;
+
+type RulerRenameSessionState = {
+  rulerId: string;
   initialName: string;
 } | null;
 
@@ -215,6 +226,9 @@ type EditorState = {
   devSubscriptionTier: SubscriptionTier;
   setDevSubscriptionTier: (tier: SubscriptionTier) => void;
   roomDraft: RoomDraftState;
+  isRulerMode: boolean;
+  rulerDraft: RulerDraftState;
+  selectedRulerId: string | null;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
   focusedRoomId: string | null;
@@ -229,6 +243,7 @@ type EditorState = {
   interiorAssetRenameSession: InteriorAssetRenameSessionState;
   interiorAssetArrowLabelSession: InteriorAssetArrowLabelSessionState;
   floorRenameSession: FloorRenameSessionState;
+  rulerRenameSession: RulerRenameSessionState;
   clipboard: ClipboardData;
   /**
    * Undo history policy:
@@ -267,6 +282,26 @@ type EditorState = {
   ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
+  setRulerMode: (isActive: boolean) => void;
+  startOrCommitRulerFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  updateRulerPreviewFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  resetRulerDraft: () => void;
+  selectRulerById: (rulerId: string | null) => void;
+  previewRulerMeasurement: (ruler: RulerMeasurement) => void;
+  commitRulerMeasurementUpdate: (
+    previousRuler: RulerMeasurement,
+    nextRuler: RulerMeasurement
+  ) => void;
+  updateRulerMeasurement: (ruler: RulerMeasurement) => void;
+  toggleRulerHidden: (rulerId: string) => void;
+  deleteRulerMeasurement: (rulerId: string) => void;
+  clearRulerMeasurements: () => void;
   setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -311,6 +346,10 @@ type EditorState = {
   updateFloorRenameDraft: (floorId: string, name: string) => void;
   commitFloorRenameSession: () => void;
   cancelFloorRename: () => void;
+  startRulerRenameSession: (rulerId: string) => void;
+  updateRulerRenameDraft: (rulerId: string, name: string) => void;
+  commitRulerRenameSession: () => void;
+  cancelRulerRenameSession: () => void;
   deleteFloor: (floorId: string) => void;
   deleteSelectedRoom: () => void;
   deleteSelectedOpening: () => void;
@@ -441,6 +480,10 @@ let activeVertexDeleteToast:
 let activeConnectedFloorPromptToastId: string | number | null = null;
 let activeFloorRenameToastId: string | number | null = null;
 let activeDeleteFloorToastId: string | number | null = null;
+let activeDeleteRulerToastId: string | number | null = null;
+let activeClearRulersToastId: string | number | null = null;
+let activeRulerRenameToastId: string | number | null = null;
+let activeAddRulerToastId: string | number | null = null;
 
 const DOCUMENT_AUTOSAVE_DEBOUNCE_MS = 300;
 const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
@@ -520,6 +563,10 @@ const EMPTY_ROOM_DRAFT: RoomDraftState = {
   points: [],
   history: [],
 };
+const EMPTY_RULER_DRAFT: RulerDraftState = {
+  start: null,
+  end: null,
+};
 const HISTORY_LIMIT = PERSISTED_HISTORY_STATE_LIMIT - 1;
 
 function pushToPast(past: EditorCommand[], command: EditorCommand): EditorCommand[] {
@@ -590,6 +637,14 @@ function createStairConnectionId(): string {
   }
 
   return `stair-connection-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function createRulerMeasurementId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `ruler-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 /**
@@ -1611,6 +1666,124 @@ function dismissDeleteFloorToastForCommand(command: EditorCommand) {
   activeDeleteFloorToastId = null;
 }
 
+function getRulerToastLabel(name: string | undefined, fallbackIndex: number): string {
+  const label = name?.trim();
+  return label ? label : `Ruler ${fallbackIndex + 1}`;
+}
+
+function showAddRulerToast(rulerId: string, rulerIndex: number) {
+  if (activeAddRulerToastId !== null) {
+    toast.dismiss(activeAddRulerToastId);
+  }
+  const rulerLabel = `Ruler ${rulerIndex + 1}`;
+  const id = toast(`Ruler "${rulerLabel}" added`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeAddRulerToastId === id) activeAddRulerToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "add-ruler" || latestCommand.ruler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeAddRulerToastId = id;
+}
+
+function dismissAddRulerToastForCommand(command: EditorCommand) {
+  if (command.type !== "add-ruler" || activeAddRulerToastId === null) return;
+  toast.dismiss(activeAddRulerToastId);
+  activeAddRulerToastId = null;
+}
+
+function showDeleteRulerToast(rulerId: string, rulerLabel: string) {
+  if (activeDeleteRulerToastId !== null) {
+    toast.dismiss(activeDeleteRulerToastId);
+  }
+  const id = toast(`Ruler "${rulerLabel}" deleted`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeDeleteRulerToastId === id) activeDeleteRulerToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "delete-ruler" || latestCommand.ruler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeDeleteRulerToastId = id;
+}
+
+function dismissDeleteRulerToastForCommand(command: EditorCommand) {
+  if (command.type !== "delete-ruler" || activeDeleteRulerToastId === null) return;
+  toast.dismiss(activeDeleteRulerToastId);
+  activeDeleteRulerToastId = null;
+}
+
+function showClearRulersToast(count: number) {
+  if (activeClearRulersToastId !== null) {
+    toast.dismiss(activeClearRulersToastId);
+  }
+  const id = toast(`${count} ruler${count !== 1 ? "s" : ""} cleared`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeClearRulersToastId === id) activeClearRulersToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "bulk-delete") return;
+        state.undo();
+      },
+    },
+  });
+  activeClearRulersToastId = id;
+}
+
+function dismissClearRulersToastForCommand(command: EditorCommand) {
+  if (command.type !== "bulk-delete" || activeClearRulersToastId === null) return;
+  toast.dismiss(activeClearRulersToastId);
+  activeClearRulersToastId = null;
+}
+
+function showRulerRenameToast(rulerId: string, newName: string) {
+  if (activeRulerRenameToastId !== null) {
+    toast.dismiss(activeRulerRenameToastId);
+  }
+  const id = toast(`Ruler renamed to "${newName}"`, {
+    duration: 5000,
+    onDismiss: () => {
+      if (activeRulerRenameToastId === id) activeRulerRenameToastId = null;
+    },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        const state = useEditorStore.getState();
+        const latestCommand = state.history.past[state.history.past.length - 1];
+        if (latestCommand?.type !== "update-ruler" || latestCommand.nextRuler.id !== rulerId) return;
+        state.undo();
+      },
+    },
+  });
+  activeRulerRenameToastId = id;
+}
+
+function dismissRulerRenameToastForCommand(command: EditorCommand) {
+  if (command.type !== "update-ruler" || activeRulerRenameToastId === null) return;
+  toast.dismiss(activeRulerRenameToastId);
+  activeRulerRenameToastId = null;
+}
+
 function areCamerasEqual(a: CameraState, b: CameraState): boolean {
   return (
     a.xMm === b.xMm &&
@@ -1707,6 +1880,42 @@ function getSelectedInteriorAssetAfterHistoryCommand(
   return getSelectedInteriorAssetIfExists(selectedInteriorAsset, nextDocument);
 }
 
+function getSelectedRulerIdAfterHistoryCommand(
+  selectedRulerId: string | null,
+  nextDocument: DocumentState,
+  command: EditorCommand,
+  direction: "undo" | "redo"
+): string | null {
+  const hasRuler = (rulerId: string | null) =>
+    rulerId !== null && nextDocument.rulerMeasurements.some((ruler) => ruler.id === rulerId);
+
+  if (command.type === "add-ruler") {
+    return direction === "redo" ? command.ruler.id : null;
+  }
+
+  if (command.type === "delete-ruler") {
+    return direction === "undo" ? command.ruler.id : null;
+  }
+
+  if (command.type === "update-ruler") {
+    return command.nextRuler.id;
+  }
+
+  if (command.type === "bulk-delete") {
+    const rulerCommands = command.deleteCommands.filter(
+      (subCommand): subCommand is Extract<
+        Extract<EditorCommand, { type: "bulk-delete" }>["deleteCommands"][number],
+        { type: "delete-ruler" }
+      > => subCommand.type === "delete-ruler"
+    );
+    if (rulerCommands.length === command.deleteCommands.length && rulerCommands.length > 0) {
+      return direction === "undo" ? rulerCommands[0].ruler.id : null;
+    }
+  }
+
+  return hasRuler(selectedRulerId) ? selectedRulerId : null;
+}
+
 /**
  * Returns the floor the user should be viewing immediately after applying a history command,
  * so the modified item is visible. Returns null if no floor switch is needed.
@@ -1776,7 +1985,7 @@ function getTargetFloorForHistoryCommand(
         }
       }
       for (const sub of command.deleteCommands) {
-        if (sub.type !== "delete-room") {
+        if (sub.type === "delete-opening" || sub.type === "delete-interior-asset") {
           const floor = findFloorForRoom(sub.roomId);
           if (floor) return floor;
         }
@@ -2106,6 +2315,12 @@ function getSafePersistedHistorySnapshot(
           },
           canvasRotationDegrees: document.canvasRotationDegrees,
           northBearingDegrees: document.northBearingDegrees,
+          rulerMeasurements: document.rulerMeasurements.map((ruler) => ({
+            id: ruler.id,
+            start: { ...ruler.start },
+            end: { ...ruler.end },
+            ...(ruler.hidden ? { hidden: true } : {}),
+          })),
           rooms: document.rooms.map((room) => ({
             id: room.id,
             floorId: room.floorId,
@@ -2297,6 +2512,41 @@ function getEffectiveSnapStepMm(
   return getActiveSnapStepMm(state.camera);
 }
 
+function getResolvedRulerPointFromCursor(
+  state: Pick<EditorState, "document" | "camera" | "settings" | "rulerDraft">,
+  cursorWorld: Point,
+  constraintMode: DrawConstraintMode
+): Point {
+  const activeSnapStepMm = getEffectiveSnapStepMm(state);
+
+  // When placing the start point there is no anchor yet, so no magnetic wall
+  // snapping — use pure grid snap, which matches the cursor HUD visual.
+  if (!state.rulerDraft.start) {
+    return getSnappedPointFromGuides(cursorWorld, activeSnapStepMm, null);
+  }
+
+  const magneticGuides = getMagneticSnapGuidesForSettings(
+    getRoomsForActiveFloor(state.document),
+    cursorWorld,
+    state.camera,
+    state.settings,
+    { constraintMode }
+  );
+  const snappedCursorWorld = getSnappedPointFromGuides(
+    cursorWorld,
+    activeSnapStepMm,
+    magneticGuides
+  );
+
+  return getConstrainedDrawPoint(
+    state.rulerDraft.start,
+    snappedCursorWorld,
+    activeSnapStepMm,
+    null,
+    constraintMode
+  );
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createInitialDocumentState(),
   camera: createInitialCameraState(),
@@ -2351,6 +2601,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   roomDraft: EMPTY_ROOM_DRAFT,
+  isRulerMode: false,
+  rulerDraft: EMPTY_RULER_DRAFT,
+  selectedRulerId: null,
   selectedNorthIndicator: false,
   selectedRoomId: null,
   focusedRoomId: null,
@@ -2364,6 +2617,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   interiorAssetRenameSession: null,
   interiorAssetArrowLabelSession: null,
   floorRenameSession: null,
+  rulerRenameSession: null,
   clipboard: null,
   history: {
     past: hydratedHistoryState.past,
@@ -2491,6 +2745,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: true,
         selectedRoomId: null,
         selectedWall: null,
@@ -2780,6 +3036,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
@@ -2847,6 +3105,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (draftPoints.length === 0) {
         return {
+          isRulerMode: false,
+          rulerDraft: EMPTY_RULER_DRAFT,
+          selectedRulerId: null,
           roomDraft: {
             points: [resolvedCursorWorld],
             history: [],
@@ -2885,6 +3146,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (arePointListsEqual(draftPoints, nextDraftPoints)) return state;
 
       return {
+        isRulerMode: false,
+        rulerDraft: EMPTY_RULER_DRAFT,
+        selectedRulerId: null,
         roomDraft: {
           points: nextDraftPoints,
           history: [...state.roomDraft.history, clonePoints(draftPoints)],
@@ -2914,6 +3178,300 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetDraft: () =>
     set({
       roomDraft: EMPTY_ROOM_DRAFT,
+    }),
+  setRulerMode: (isActive) =>
+    set((state) => {
+      if (state.isRulerMode === isActive) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: isActive,
+        roomDraft: isActive ? EMPTY_ROOM_DRAFT : state.roomDraft,
+        rulerDraft: EMPTY_RULER_DRAFT,
+        selectedRulerId: isActive ? state.selectedRulerId : null,
+        selectedNorthIndicator: isActive ? false : state.selectedNorthIndicator,
+        selectedRoomId: isActive ? null : state.selectedRoomId,
+        selectedWall: isActive ? null : state.selectedWall,
+        selectedOpening: isActive ? null : state.selectedOpening,
+        selectedInteriorAsset: isActive ? null : state.selectedInteriorAsset,
+        selection: isActive ? [] : state.selection,
+        shouldFocusSelectedRoomNameInput: isActive ? false : state.shouldFocusSelectedRoomNameInput,
+        renameSession: isActive ? null : state.renameSession,
+        interiorAssetRenameSession: isActive ? null : state.interiorAssetRenameSession,
+        interiorAssetArrowLabelSession: isActive ? null : state.interiorAssetArrowLabelSession,
+        floorRenameSession: isActive ? null : state.floorRenameSession,
+      });
+    }),
+  startOrCommitRulerFromCursor: (cursorWorld, options) =>
+    set((state) => {
+      if (!state.isRulerMode) return state;
+
+      const constraintMode = options?.constraintMode ?? "orthogonal";
+      const resolvedPoint = getResolvedRulerPointFromCursor(
+        state,
+        cursorWorld,
+        constraintMode
+      );
+
+      if (!state.rulerDraft.start) {
+        return preserveHistoryForSelectionUpdate(state, {
+          rulerDraft: {
+            start: { ...resolvedPoint },
+            end: { ...resolvedPoint },
+          },
+        });
+      }
+
+      if (isZeroLengthSegment(state.rulerDraft.start, resolvedPoint)) {
+        return state;
+      }
+
+      const ruler: RulerMeasurement = {
+        id: createRulerMeasurementId(),
+        start: { ...state.rulerDraft.start },
+        end: { ...resolvedPoint },
+      };
+      const rulerIndex = state.document.rulerMeasurements.length;
+      const command: EditorCommand = {
+        type: "add-ruler",
+        ruler,
+        rulerIndex,
+      };
+
+      showAddRulerToast(ruler.id, rulerIndex);
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        rulerDraft: EMPTY_RULER_DRAFT,
+        selectedRulerId: ruler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  updateRulerPreviewFromCursor: (cursorWorld, options) =>
+    set((state) => {
+      if (!state.isRulerMode || !state.rulerDraft.start) return state;
+
+      const constraintMode = options?.constraintMode ?? "orthogonal";
+      const resolvedPoint = getResolvedRulerPointFromCursor(
+        state,
+        cursorWorld,
+        constraintMode
+      );
+      if (state.rulerDraft.end && pointsEqual(state.rulerDraft.end, resolvedPoint)) {
+        return state;
+      }
+
+      return preserveHistoryForSelectionUpdate(state, {
+        rulerDraft: {
+          start: state.rulerDraft.start,
+          end: { ...resolvedPoint },
+        },
+      });
+    }),
+  resetRulerDraft: () =>
+    set((state) => {
+      if (!state.rulerDraft.start && !state.rulerDraft.end) return state;
+      return preserveHistoryForSelectionUpdate(state, {
+        rulerDraft: EMPTY_RULER_DRAFT,
+      });
+    }),
+  selectRulerById: (rulerId) =>
+    set((state) => {
+      if (rulerId !== null && !state.document.rulerMeasurements.some((ruler) => ruler.id === rulerId)) {
+        return state;
+      }
+      if (state.selectedRulerId === rulerId) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: true,
+        selectedRulerId: rulerId,
+        selectedNorthIndicator: false,
+        selectedRoomId: null,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [],
+        shouldFocusSelectedRoomNameInput: false,
+        renameSession: null,
+        interiorAssetRenameSession: null,
+        interiorAssetArrowLabelSession: null,
+        floorRenameSession: null,
+        rulerRenameSession: null,
+      });
+    }),
+  updateRulerMeasurement: (nextRuler) =>
+    set((state) => {
+      const previousRuler = state.document.rulerMeasurements.find((ruler) => ruler.id === nextRuler.id);
+      if (!previousRuler) return state;
+      if (
+        previousRuler.start.x === nextRuler.start.x &&
+        previousRuler.start.y === nextRuler.start.y &&
+        previousRuler.end.x === nextRuler.end.x &&
+        previousRuler.end.y === nextRuler.end.y &&
+        Boolean(previousRuler.hidden) === Boolean(nextRuler.hidden)
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: nextRuler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  previewRulerMeasurement: (nextRuler) =>
+    set((state) => {
+      if (!state.document.rulerMeasurements.some((ruler) => ruler.id === nextRuler.id)) {
+        return state;
+      }
+
+      return preserveHistoryForSelectionUpdate(state, {
+        document: {
+          ...state.document,
+          rulerMeasurements: state.document.rulerMeasurements.map((ruler) =>
+            ruler.id === nextRuler.id
+              ? {
+                  ...nextRuler,
+                  start: { ...nextRuler.start },
+                  end: { ...nextRuler.end },
+                  ...(nextRuler.hidden ? { hidden: true } : {}),
+                }
+              : ruler
+          ),
+        },
+      });
+    }),
+  commitRulerMeasurementUpdate: (previousRuler, nextRuler) =>
+    set((state) => {
+      if (!state.document.rulerMeasurements.some((ruler) => ruler.id === nextRuler.id)) {
+        return state;
+      }
+      if (
+        previousRuler.start.x === nextRuler.start.x &&
+        previousRuler.start.y === nextRuler.start.y &&
+        previousRuler.end.x === nextRuler.end.x &&
+        previousRuler.end.y === nextRuler.end.y &&
+        Boolean(previousRuler.hidden) === Boolean(nextRuler.hidden)
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: nextRuler.id,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  toggleRulerHidden: (rulerId) =>
+    set((state) => {
+      const ruler = state.document.rulerMeasurements.find((candidate) => candidate.id === rulerId);
+      if (!ruler) return state;
+
+      const nextRuler: RulerMeasurement = {
+        ...ruler,
+        start: { ...ruler.start },
+        end: { ...ruler.end },
+        hidden: !ruler.hidden,
+      };
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler: ruler,
+        nextRuler,
+      };
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: rulerId,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  deleteRulerMeasurement: (rulerId) =>
+    set((state) => {
+      const previousIndex = state.document.rulerMeasurements.findIndex((ruler) => ruler.id === rulerId);
+      if (previousIndex < 0) return state;
+
+      const rulerToDelete = state.document.rulerMeasurements[previousIndex];
+      const command: EditorCommand = {
+        type: "delete-ruler",
+        ruler: rulerToDelete,
+        previousIndex,
+      };
+
+      showDeleteRulerToast(rulerId, getRulerToastLabel(rulerToDelete.name, previousIndex));
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: state.selectedRulerId === rulerId ? null : state.selectedRulerId,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  clearRulerMeasurements: () =>
+    set((state) => {
+      if (state.document.rulerMeasurements.length === 0) return state;
+
+      const rulerCount = state.document.rulerMeasurements.length;
+      const command: EditorCommand = {
+        type: "bulk-delete",
+        deleteCommands: state.document.rulerMeasurements.map((ruler, previousIndex) => ({
+          type: "delete-ruler",
+          ruler: {
+            ...ruler,
+            start: { ...ruler.start },
+            end: { ...ruler.end },
+          },
+          previousIndex,
+        })),
+      };
+
+      showClearRulersToast(rulerCount);
+
+      return {
+        document: applyEditorCommand(state.document, command, "redo"),
+        selectedRulerId: null,
+        rulerDraft: EMPTY_RULER_DRAFT,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
     }),
   setFocusedRoomId: (roomId) =>
     set((state) => {
@@ -2955,6 +3513,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2978,6 +3538,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           : state.document;
         return preserveHistoryForSelectionUpdate(state, {
           document: nextDocument,
+          isRulerMode: false,
+          selectedRulerId: null,
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -3005,6 +3567,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -3042,6 +3606,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3073,6 +3639,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3089,6 +3657,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedOpening === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedOpening: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3097,6 +3667,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedInteriorAsset === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedInteriorAsset: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
@@ -3107,6 +3679,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedWall === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedWall: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3114,6 +3688,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearRoomSelection: () =>
     set((state) =>
       preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
+        selectedRulerId: null,
         selectedNorthIndicator: false,
         selectedRoomId: null,
         selectedWall: null,
@@ -4589,6 +5165,94 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         floorRenameSession: null,
       };
     }),
+  startRulerRenameSession: (rulerId) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive) return state;
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === rulerId);
+      if (!ruler) return state;
+      if (state.rulerRenameSession?.rulerId === rulerId) return state;
+
+      return {
+        rulerRenameSession: {
+          rulerId,
+          initialName: ruler.name ?? "",
+        },
+      };
+    }),
+  updateRulerRenameDraft: (rulerId, name) =>
+    set((state) => {
+      if (state.isCanvasInteractionActive) return state;
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === rulerId);
+      if (!ruler) return state;
+
+      const rulerRenameSession =
+        state.rulerRenameSession?.rulerId === rulerId
+          ? state.rulerRenameSession
+          : { rulerId, initialName: ruler.name ?? "" };
+
+      return {
+        document: {
+          ...state.document,
+          rulerMeasurements: state.document.rulerMeasurements.map((r) =>
+            r.id === rulerId ? { ...r, name } : r
+          ),
+        },
+        rulerRenameSession,
+      };
+    }),
+  commitRulerRenameSession: () =>
+    set((state) => {
+      const session = state.rulerRenameSession;
+      if (!session) return state;
+
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === session.rulerId);
+      if (!ruler) return { rulerRenameSession: null };
+
+      const didNameChange = (ruler.name ?? "") !== session.initialName;
+      if (!didNameChange) return { rulerRenameSession: null };
+
+      const previousRuler: RulerMeasurement = { ...ruler, name: session.initialName };
+      const nextRuler: RulerMeasurement = { ...ruler };
+      const command: EditorCommand = {
+        type: "update-ruler",
+        previousRuler,
+        nextRuler,
+      };
+
+      const displayName = (ruler.name ?? "").trim() || "Ruler";
+      showRulerRenameToast(session.rulerId, displayName);
+
+      return {
+        rulerRenameSession: null,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  cancelRulerRenameSession: () =>
+    set((state) => {
+      const session = state.rulerRenameSession;
+      if (!session) return state;
+
+      const ruler = state.document.rulerMeasurements.find((r) => r.id === session.rulerId);
+      const nextDocument =
+        ruler && (ruler.name ?? "") !== session.initialName
+          ? {
+              ...state.document,
+              rulerMeasurements: state.document.rulerMeasurements.map((r) =>
+                r.id === session.rulerId ? { ...r, name: session.initialName } : r
+              ),
+            }
+          : state.document;
+
+      return {
+        document: nextDocument,
+        rulerRenameSession: null,
+      };
+    }),
   deleteFloor: (floorId) =>
     set((state) => {
       const floor = state.document.floors.find((candidate) => candidate.id === floorId);
@@ -5955,6 +6619,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         points: [],
         history: [],
       },
+      isRulerMode: false,
+      rulerDraft: EMPTY_RULER_DRAFT,
+      selectedRulerId: null,
       selectedNorthIndicator: false,
       selectedRoomId: null,
       focusedRoomId: null,
@@ -5983,6 +6650,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dismissVertexDeleteToastForCommand(command);
       dismissFloorRenameToastForCommand(command);
       dismissDeleteFloorToastForCommand(command);
+      dismissDeleteRulerToastForCommand(command);
+      dismissClearRulersToastForCommand(command);
+      dismissRulerRenameToastForCommand(command);
+      dismissAddRulerToastForCommand(command);
       const nextDocument = applyEditorCommand(state.document, command, "undo");
       const nextPast = state.history.past.slice(0, -1);
       const nextFuture = [command, ...state.history.future];
@@ -6011,6 +6682,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
+          restoredDocument,
+          command,
+          "undo"
+        ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
           restoredDocument,
           command,
           "undo"
@@ -6056,6 +6733,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
+          restoredDocument,
+          command,
+          "redo"
+        ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
           restoredDocument,
           command,
           "redo"
@@ -6123,6 +6806,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           lastCommand,
           "undo"
         ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
+          restoredDocument,
+          lastCommand,
+          "undo"
+        ),
         shouldFocusSelectedRoomNameInput: false,
         renameSession: null,
         interiorAssetRenameSession: null,
@@ -6177,6 +6866,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedOpening: getSelectedOpeningIfExists(state.selectedOpening, restoredDocument),
         selectedInteriorAsset: getSelectedInteriorAssetAfterHistoryCommand(
           state.selectedInteriorAsset,
+          restoredDocument,
+          lastCommand,
+          "redo"
+        ),
+        selectedRulerId: getSelectedRulerIdAfterHistoryCommand(
+          state.selectedRulerId,
           restoredDocument,
           lastCommand,
           "redo"

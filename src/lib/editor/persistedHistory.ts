@@ -1,5 +1,7 @@
 import {
   applyEditorCommand,
+  cloneRulerMeasurement,
+  cloneRulerMeasurements,
   getNormalizedActiveFloorId,
   getNormalizedFloors,
   getRoomFloorId,
@@ -15,13 +17,34 @@ import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType } from "@/lib/editor/types";
+import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 
 function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i += 1) {
     if (a[i].id !== b[i].id || a[i].name !== b[i].name) return false;
+  }
+
+  return true;
+}
+
+function areRulerMeasurementsEqual(a: RulerMeasurement[], b: RulerMeasurement[]): boolean {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i += 1) {
+    const rulerA = a[i];
+    const rulerB = b[i];
+    if (
+      rulerA.id !== rulerB.id ||
+      rulerA.start.x !== rulerB.start.x ||
+      rulerA.start.y !== rulerB.start.y ||
+      rulerA.end.x !== rulerB.end.x ||
+      rulerA.end.y !== rulerB.end.y ||
+      Boolean(rulerA.hidden) !== Boolean(rulerB.hidden)
+    ) {
+      return false;
+    }
   }
 
   return true;
@@ -63,6 +86,9 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
   }
 
   if (a.rooms.length !== b.rooms.length) return false;
+  if (!areRulerMeasurementsEqual(a.rulerMeasurements ?? [], b.rulerMeasurements ?? [])) {
+    return false;
+  }
 
   for (let i = 0; i < a.rooms.length; i += 1) {
     const roomA = a.rooms[i];
@@ -105,6 +131,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       openings: cloneRoomOpenings(room.openings ?? []),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
     })),
+    rulerMeasurements: cloneRulerMeasurements(document.rulerMeasurements ?? []),
   };
 }
 
@@ -131,6 +158,17 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
   const nextById = new Map(next.rooms.map((room) => [room.id, room]));
   const removedRooms = previous.rooms.filter((room) => !nextById.has(room.id));
   const addedRooms = next.rooms.filter((room) => !previousById.has(room.id));
+  const previousRulers = previous.rulerMeasurements ?? [];
+  const nextRulers = next.rulerMeasurements ?? [];
+  const previousRulersById = new Map(previousRulers.map((ruler) => [ruler.id, ruler]));
+  const nextRulersById = new Map(nextRulers.map((ruler) => [ruler.id, ruler]));
+  const removedRulers = previousRulers.filter((ruler) => !nextRulersById.has(ruler.id));
+  const addedRulers = nextRulers.filter((ruler) => !previousRulersById.has(ruler.id));
+  const changedRulers = nextRulers.flatMap((ruler) => {
+    const previousRuler = previousRulersById.get(ruler.id);
+    if (!previousRuler || areRulerMeasurementsEqual([previousRuler], [ruler])) return [];
+    return [{ previous: previousRuler, next: ruler }];
+  });
 
   const changedRooms: Array<{
     previous: Room;
@@ -191,6 +229,84 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         nextDocument: cloneDocumentState(next),
       };
     }
+  }
+
+  const hasOnlyRulerChange =
+    nextFloors.length === previousFloors.length &&
+    areFloorsEqual(previousFloors, nextFloors) &&
+    previousActiveFloorId === nextActiveFloorId &&
+    removedRooms.length === 0 &&
+    addedRooms.length === 0 &&
+    changedRooms.length === 0 &&
+    previousCanvasRotation === nextCanvasRotation &&
+    previousNorthBearing === nextNorthBearing;
+
+  if (
+    hasOnlyRulerChange &&
+    addedRulers.length === 1 &&
+    removedRulers.length === 0 &&
+    changedRulers.length === 0
+  ) {
+    return {
+      type: "add-ruler",
+      ruler: cloneRulerMeasurement(addedRulers[0]),
+      rulerIndex: previousRulers.length,
+    };
+  }
+
+  if (
+    hasOnlyRulerChange &&
+    addedRulers.length === 0 &&
+    removedRulers.length > 1 &&
+    changedRulers.length === 0
+  ) {
+    const deleteCommands = removedRulers.flatMap((ruler) => {
+      const previousIndex = previousRulers.findIndex((candidate) => candidate.id === ruler.id);
+      if (previousIndex < 0) return [];
+      return [
+        {
+          type: "delete-ruler" as const,
+          ruler: cloneRulerMeasurement(ruler),
+          previousIndex,
+        },
+      ];
+    });
+
+    if (deleteCommands.length !== removedRulers.length) return null;
+
+    return {
+      type: "bulk-delete",
+      deleteCommands,
+    };
+  }
+
+  if (
+    hasOnlyRulerChange &&
+    addedRulers.length === 0 &&
+    removedRulers.length === 1 &&
+    changedRulers.length === 0
+  ) {
+    const previousIndex = previousRulers.findIndex((ruler) => ruler.id === removedRulers[0].id);
+    if (previousIndex < 0) return null;
+
+    return {
+      type: "delete-ruler",
+      ruler: cloneRulerMeasurement(removedRulers[0]),
+      previousIndex,
+    };
+  }
+
+  if (
+    hasOnlyRulerChange &&
+    addedRulers.length === 0 &&
+    removedRulers.length === 0 &&
+    changedRulers.length === 1
+  ) {
+    return {
+      type: "update-ruler",
+      previousRuler: cloneRulerMeasurement(changedRulers[0].previous),
+      nextRuler: cloneRulerMeasurement(changedRulers[0].next),
+    };
   }
 
   if (

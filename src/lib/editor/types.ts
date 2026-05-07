@@ -66,6 +66,14 @@ export type Wall = {
   b: Point;
 };
 
+export type RulerMeasurement = {
+  id: string;
+  name?: string;
+  start: Point;
+  end: Point;
+  hidden?: boolean;
+};
+
 export type RoomWallSelection = {
   roomId: string;
   wall: RoomWall;

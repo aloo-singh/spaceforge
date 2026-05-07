@@ -11,11 +11,17 @@ type EditorSidebarRenameInputProps = ComponentProps<typeof Input>;
 export const EditorSidebarRenameInput = forwardRef<
   HTMLInputElement,
   EditorSidebarRenameInputProps
->(function EditorSidebarRenameInput({ className, ...props }, ref) {
+>(function EditorSidebarRenameInput({ className, onKeyDown, ...props }, ref) {
   return (
     <Input
       ref={ref}
       className={cn(EDITOR_SIDEBAR_RENAME_INPUT_CLASS, className)}
+      onKeyDown={(event) => {
+        // Prevent parent elements (e.g. role="button" list items) from
+        // intercepting keystrokes like Space and calling preventDefault.
+        event.stopPropagation();
+        onKeyDown?.(event);
+      }}
       {...props}
     />
   );

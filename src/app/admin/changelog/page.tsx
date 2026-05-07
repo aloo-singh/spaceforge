@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.77.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-07</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added ruler tool: press R or click the ruler button in the toolbar to enter ruler mode. Click to place a start point (grid-snapped), click again to lock the end and commit the ruler.</li>
+                <li>Rulers snap to the grid and to room wall vertices via magnetic guides; hold Shift or enable 45° mode to constrain to orthogonal/diagonal directions.</li>
+                <li>Rulers render as lime-500 lines with endpoint circles, live distance labels that track the cursor, and dimension labels on committed rulers.</li>
+                <li>Ruler inspector panel lets you rename rulers (single-click to edit, Space key works correctly), toggle individual visibility, delete, or clear all rulers.</li>
+                <li>Added undo/redo for all ruler actions with per-ruler name labels (e.g. <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ruler &ldquo;Kitchen wall&rdquo; deleted</code>) and Sonner toasts with Undo buttons.</li>
+                <li>Added R keyboard shortcut to toggle ruler mode; keycap shown in the toolbar tooltip alongside &ldquo;Ruler tool &mdash; Measure distances&rdquo;.</li>
+                <li>On mobile and compact-landscape viewports, a HUD cancel button appears while drawing a ruler (matches the room-drawing cancel affordance).</li>
+                <li>Fixed: ruler start point now uses pure grid snap (matching the cursor HUD visual) rather than magnetic wall snap, eliminating a mismatch when zoomed out near walls.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.76.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-07</span>
           </div>

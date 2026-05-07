@@ -5,7 +5,7 @@ import {
 import { findOpeningAtScreenPoint, getRoomWallSegment } from "@/lib/editor/openings";
 import { findRoomWallAtScreenPoint } from "@/lib/editor/openings";
 import { findSelectedOpeningWidthHandleAtScreenPoint } from "@/lib/editor/openings";
-import { screenToWorld } from "@/lib/editor/camera";
+import { screenToWorld, worldToScreen } from "@/lib/editor/camera";
 import { track } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ import {
   getRoomTranslationDelta,
   translateRoomPointsOnGrid,
 } from "@/lib/editor/roomTranslation";
-import type { Point, Room } from "@/lib/editor/types";
+import type { Point, Room, RulerMeasurement } from "@/lib/editor/types";
 import type { RoomWall } from "@/lib/editor/types";
 import type { SharedSelectionItem } from "@/lib/editor/types";
 import {
@@ -69,8 +69,10 @@ type RoomDrawStoreState = {
   settings: { showGuidelines: boolean; snappingEnabled: boolean; multiSelectModeEnabled: boolean };
   keyboardShortcutFeedbackEnabled: boolean;
   is45DegreeDrawingEnabled: boolean;
+  isRulerMode: boolean;
   document: EditorDocumentState;
   roomDraft: { points: Point[] };
+  rulerDraft: { start: Point | null; end: Point | null };
   selectedRoomId: string | null;
   selectedWall: { roomId: string; wall: RoomWall } | null;
   selectedOpening: { roomId: string; openingId: string } | null;
@@ -81,7 +83,23 @@ type RoomDrawStoreState = {
   ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
+  startOrCommitRulerFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  updateRulerPreviewFromCursor: (
+    cursorWorld: Point,
+    options?: { constraintMode?: DrawConstraintMode }
+  ) => void;
+  resetRulerDraft: () => void;
   selectRoomById: (roomId: string | null) => void;
+  selectedRulerId: string | null;
+  selectRulerById: (rulerId: string | null) => void;
+  previewRulerMeasurement: (ruler: RulerMeasurement) => void;
+  commitRulerMeasurementUpdate: (
+    previousRuler: RulerMeasurement,
+    nextRuler: RulerMeasurement
+  ) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWall) => void;
   selectOpeningById: (roomId: string, openingId: string) => void;
   selectInteriorAssetById: (roomId: string, assetId: string) => void;
@@ -164,6 +182,13 @@ type RoomDrawInputCallbacks = {
   onDraftConstraintModeChange?: (mode: DrawConstraintMode) => void;
   onRoomLabelSelected?: (roomId: string) => void;
   onInteriorAssetDragTargetChange?: (roomId: string | null) => void;
+  onRulerInteractionUiChange?: (
+    rulerUi: {
+      rulerId: string;
+      target: "start" | "end" | "body";
+      isDragging: boolean;
+    } | null
+  ) => void;
   requestRender: () => void;
 };
 
@@ -230,6 +255,17 @@ type InteriorAssetResizeSession = {
     | { type: "corner"; corner: "top-left" | "top-right" | "bottom-right" | "bottom-left" };
 };
 
+type RulerDragSession = {
+  pointerId: number;
+  rulerId: string;
+  target: "start" | "end" | "body";
+  startScreenPoint: Point;
+  startWorldPoint: Point;
+  originalRuler: RulerMeasurement;
+  latestRuler: RulerMeasurement | null;
+  didDrag: boolean;
+};
+
 type SelectableWallHit = {
   roomId: string;
   wall: RoomWall;
@@ -239,6 +275,10 @@ type SelectableWallHit = {
 const ROOM_LABEL_DRAG_THRESHOLD_PX = 6;
 const WALL_INTERIOR_SIDE_EPSILON_MM = 0.001;
 const DRAFT_GUIDE_TAIL_PX = 44;
+const RULER_ENDPOINT_HIT_RADIUS_PX = 10;
+const RULER_BODY_HIT_DISTANCE_PX = 7;
+const RULER_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%2318181b' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Cg fill='none' stroke='%2384cc16' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.5' fill='%2384cc16'/%3E%3C/svg%3E\") 12 12, crosshair";
 
 function isPrimaryModifierActionKey(event: KeyboardEvent): boolean {
   if (!(event.metaKey || event.ctrlKey)) return false;
@@ -433,6 +473,11 @@ export function attachRoomDrawInput(
   let activeOpeningResizeSession: OpeningResizeSession | null = null;
   let activeInteriorAssetDragSession: InteriorAssetDragSession | null = null;
   let activeInteriorAssetResizeSession: InteriorAssetResizeSession | null = null;
+  let activeRulerDragSession: RulerDragSession | null = null;
+  let hoveredRulerTarget: {
+    rulerId: string;
+    target: "start" | "end" | "body";
+  } | null = null;
   const commitRoomMove = store.getState().commitRoomMove;
   const commitBulkRoomMove = store.getState().commitBulkRoomMove;
   const commitOpeningMove = store.getState().commitOpeningMove;
@@ -571,6 +616,63 @@ export function attachRoomDrawInput(
     setSnapGuides(draftGuides);
   };
 
+  const getRulerSnapGuides = (
+    state: Pick<RoomDrawStoreState, "document" | "camera" | "settings" | "rulerDraft" | "is45DegreeDrawingEnabled">,
+    cursorWorld: Point,
+    shiftOverride?: boolean
+  ): SnapGuides => {
+    const anchorPoint = state.rulerDraft.start;
+    const constraintMode = getDrawConstraintMode(shiftOverride);
+    const guides = anchorPoint
+      ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
+          constraintMode,
+          anchorPoint,
+        })
+      : null;
+
+    const constrainedPoint = anchorPoint
+      ? getConstrainedDrawPoint(
+          anchorPoint,
+          cursorWorld,
+          getActiveSnapStepMm(state.camera),
+          null,
+          constraintMode
+        )
+      : cursorWorld;
+    const fallbackSegment = anchorPoint
+      ? getShortDraftGuideSegment(anchorPoint, constrainedPoint, state.camera.pixelsPerMm)
+      : null;
+
+    return guides ?? {
+      point: cursorWorld,
+      showVertical: false,
+      showHorizontal: false,
+      diagonalLine: null,
+      segments: fallbackSegment ? [fallbackSegment] : [],
+      constraintMode,
+      diagonalGuideSegments: [],
+    };
+  };
+
+  const syncRulerSnapGuides = (shiftOverride?: boolean) => {
+    const state = store.getState();
+    if (!state.rulerDraft.start || !latestCursorWorld) {
+      setSnapGuides(null);
+      return;
+    }
+
+    const rulerGuides = getRulerSnapGuides(state, latestCursorWorld, shiftOverride);
+    if (!state.settings.showGuidelines) {
+      setSnapGuides({
+        ...rulerGuides,
+        segments: [],
+      });
+      return;
+    }
+
+    setSnapGuides(rulerGuides);
+  };
+
   const getInteriorAssetResizeCursorWorld = (
     session: InteriorAssetResizeSession,
     cursorWorld: Point
@@ -611,6 +713,160 @@ export function attachRoomDrawInput(
     return { x: bounds.minX + delta.x, y: bounds.maxY + delta.y };
   };
 
+  const setHoveredRulerTarget = (
+    next: { rulerId: string; target: "start" | "end" | "body" } | null
+  ) => {
+    if (
+      hoveredRulerTarget?.rulerId === next?.rulerId &&
+      hoveredRulerTarget?.target === next?.target
+    ) {
+      return;
+    }
+
+    hoveredRulerTarget = next;
+    callbacks.onRulerInteractionUiChange?.(
+      next ? { ...next, isDragging: false } : null
+    );
+    callbacks.requestRender();
+  };
+
+  const setActiveRulerDragUi = (session: RulerDragSession | null) => {
+    callbacks.onRulerInteractionUiChange?.(
+      session
+        ? {
+            rulerId: session.rulerId,
+            target: session.target,
+            isDragging: true,
+          }
+        : hoveredRulerTarget
+          ? { ...hoveredRulerTarget, isDragging: false }
+          : null
+    );
+    callbacks.requestRender();
+  };
+
+  const getRulerEndpointHit = (
+    ruler: RulerMeasurement,
+    screenPoint: Point,
+    state: RoomDrawStoreState
+  ): "start" | "end" | null => {
+    const startScreen = worldToScreen(ruler.start, state.camera, state.viewport);
+    const endScreen = worldToScreen(ruler.end, state.camera, state.viewport);
+    const startDistance = Math.hypot(screenPoint.x - startScreen.x, screenPoint.y - startScreen.y);
+    const endDistance = Math.hypot(screenPoint.x - endScreen.x, screenPoint.y - endScreen.y);
+
+    if (startDistance <= RULER_ENDPOINT_HIT_RADIUS_PX && startDistance <= endDistance) return "start";
+    if (endDistance <= RULER_ENDPOINT_HIT_RADIUS_PX) return "end";
+    return null;
+  };
+
+  const getDistanceToRulerBodyPx = (
+    ruler: RulerMeasurement,
+    screenPoint: Point,
+    state: RoomDrawStoreState
+  ) => {
+    const startScreen = worldToScreen(ruler.start, state.camera, state.viewport);
+    const endScreen = worldToScreen(ruler.end, state.camera, state.viewport);
+    const dx = endScreen.x - startScreen.x;
+    const dy = endScreen.y - startScreen.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared < 0.001) return Number.POSITIVE_INFINITY;
+
+    const projection = Math.max(
+      0,
+      Math.min(
+        1,
+        ((screenPoint.x - startScreen.x) * dx + (screenPoint.y - startScreen.y) * dy) /
+          lengthSquared
+      )
+    );
+    const closest = {
+      x: startScreen.x + projection * dx,
+      y: startScreen.y + projection * dy,
+    };
+    return Math.hypot(screenPoint.x - closest.x, screenPoint.y - closest.y);
+  };
+
+  const findRulerHitAtScreenPoint = (
+    screenPoint: Point,
+    state: RoomDrawStoreState
+  ): { ruler: RulerMeasurement; target: "start" | "end" | "body" } | null => {
+    const visibleRulers = state.document.rulerMeasurements.filter((ruler) => !ruler.hidden);
+    const selectedRuler = state.selectedRulerId
+      ? visibleRulers.find((ruler) => ruler.id === state.selectedRulerId) ?? null
+      : null;
+    const orderedRulers = selectedRuler
+      ? [selectedRuler, ...visibleRulers.filter((ruler) => ruler.id !== selectedRuler.id)]
+      : visibleRulers;
+
+    for (const ruler of orderedRulers) {
+      const endpointHit = getRulerEndpointHit(ruler, screenPoint, state);
+      if (endpointHit) return { ruler, target: endpointHit };
+    }
+
+    let bodyHit: { ruler: RulerMeasurement; distancePx: number } | null = null;
+    for (const ruler of orderedRulers) {
+      const distancePx = getDistanceToRulerBodyPx(ruler, screenPoint, state);
+      if (distancePx > RULER_BODY_HIT_DISTANCE_PX) continue;
+      if (!bodyHit || distancePx < bodyHit.distancePx) {
+        bodyHit = { ruler, distancePx };
+      }
+    }
+
+    return bodyHit ? { ruler: bodyHit.ruler, target: "body" } : null;
+  };
+
+  const getEndpointDragRuler = (
+    session: RulerDragSession,
+    cursorWorld: Point,
+    state: RoomDrawStoreState
+  ): RulerMeasurement => {
+    const constraintMode = getDrawConstraintMode();
+    const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+    const fixedPoint = session.target === "start"
+      ? session.originalRuler.end
+      : session.originalRuler.start;
+    const resolvedPoint = getConstrainedDrawPoint(
+      fixedPoint,
+      cursorWorld,
+      activeSnapStepMm,
+      null,
+      constraintMode
+    );
+
+    return {
+      ...session.originalRuler,
+      start: session.target === "start" ? resolvedPoint : { ...session.originalRuler.start },
+      end: session.target === "end" ? resolvedPoint : { ...session.originalRuler.end },
+    };
+  };
+
+  const getBodyDragRuler = (
+    session: RulerDragSession,
+    cursorWorld: Point,
+    state: RoomDrawStoreState
+  ): RulerMeasurement => {
+    const activeSnapStepMm = getActiveSnapStepMm(state.camera);
+    const rawStart = {
+      x: session.originalRuler.start.x + (cursorWorld.x - session.startWorldPoint.x),
+      y: session.originalRuler.start.y + (cursorWorld.y - session.startWorldPoint.y),
+    };
+    const snappedStart = getSnappedPointFromGuides(rawStart, activeSnapStepMm, null);
+    const delta = {
+      x: snappedStart.x - session.originalRuler.start.x,
+      y: snappedStart.y - session.originalRuler.start.y,
+    };
+
+    return {
+      ...session.originalRuler,
+      start: snappedStart,
+      end: {
+        x: session.originalRuler.end.x + delta.x,
+        y: session.originalRuler.end.y + delta.y,
+      },
+    };
+  };
+
   const getMoveTransformFeedback = (
     roomId: string,
     originalPoints: Point[],
@@ -645,10 +901,16 @@ export function attachRoomDrawInput(
     if (currentCursor === nextCursor) return;
     currentCursor = nextCursor;
     canvas.style.cursor = nextCursor;
-    document.body.style.cursor = nextCursor;
+    // Custom URL cursors should only apply within the canvas, not the rest of the UI.
+    document.body.style.cursor = nextCursor.startsWith("url(") ? "" : nextCursor;
   };
 
   const updateCursor = () => {
+    if (activeRulerDragSession?.didDrag) {
+      setCursor("grabbing");
+      return;
+    }
+
     if (activeLabelDragSession?.didDrag) {
       setCursor("grabbing");
       return;
@@ -721,6 +983,16 @@ export function attachRoomDrawInput(
     const isDrawingModeActive = store.getState().roomDraft.points.length > 0;
     if (!isSpaceHeld && isDrawingModeActive) {
       setCursor("crosshair");
+      return;
+    }
+
+    if (!isSpaceHeld && store.getState().isRulerMode) {
+      if (hoveredRulerTarget) {
+        setCursor("grab");
+        return;
+      }
+
+      setCursor(RULER_CURSOR);
       return;
     }
 
@@ -800,6 +1072,28 @@ export function attachRoomDrawInput(
     updateCursor();
   };
 
+  const stopRulerDragSession = (options?: { commit?: boolean }) => {
+    const session = activeRulerDragSession;
+    if (!session) return;
+    const pointerId = session.pointerId;
+
+    if (options?.commit && session.didDrag && session.latestRuler) {
+      store
+        .getState()
+        .commitRulerMeasurementUpdate(session.originalRuler, session.latestRuler);
+    } else if (session.didDrag && session.latestRuler) {
+      store.getState().previewRulerMeasurement(session.originalRuler);
+    }
+
+    if (canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+    activeRulerDragSession = null;
+    store.getState().setCanvasInteractionActive(false);
+    setActiveRulerDragUi(null);
+    updateCursor();
+  };
+
   const getSelectedInteriorAssetForHandles = () => {
     const state = store.getState();
     
@@ -831,6 +1125,67 @@ export function attachRoomDrawInput(
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
     latestCursorWorld = cursorWorld;
     callbacks.onCursorWorldChange(cursorWorld);
+
+    if (activeRulerDragSession) {
+      const session = activeRulerDragSession;
+      if (event.pointerId !== session.pointerId) return;
+
+      if (!session.didDrag) {
+        const dx = screenPoint.x - session.startScreenPoint.x;
+        const dy = screenPoint.y - session.startScreenPoint.y;
+        const dragThresholdSquared = ROOM_LABEL_DRAG_THRESHOLD_PX * ROOM_LABEL_DRAG_THRESHOLD_PX;
+        if (dx * dx + dy * dy < dragThresholdSquared) {
+          callbacks.requestRender();
+          return;
+        }
+
+        session.didDrag = true;
+        store.getState().setCanvasInteractionActive(true);
+        setActiveRulerDragUi(session);
+        updateCursor();
+      }
+
+      const nextRuler = session.target === "body"
+        ? getBodyDragRuler(session, cursorWorld, state)
+        : getEndpointDragRuler(session, cursorWorld, state);
+      session.latestRuler = nextRuler;
+      store.getState().previewRulerMeasurement(nextRuler);
+      callbacks.requestRender();
+      return;
+    }
+
+    if (
+      state.isRulerMode &&
+      !activeLabelDragSession &&
+      !activeOpeningDragSession &&
+      !activeOpeningResizeSession &&
+      !activeInteriorAssetDragSession &&
+      !activeInteriorAssetResizeSession
+    ) {
+      const rulerHit = !state.rulerDraft.start
+        ? findRulerHitAtScreenPoint(screenPoint, state)
+        : null;
+      setHoveredRulerTarget(
+        rulerHit ? { rulerId: rulerHit.ruler.id, target: rulerHit.target } : null
+      );
+      state.updateRulerPreviewFromCursor(cursorWorld, {
+        constraintMode: event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled
+          ? "diagonal45"
+          : "orthogonal",
+      });
+      setHoveredRoomLabelId(null);
+      hoveredOpeningWidthHandle = null;
+      hoveredOpening = null;
+      hoveredInteriorAsset = null;
+      hoveredInteriorAssetCornerHandle = null;
+      hoveredInteriorAssetWallHandle = null;
+      setHoveredSelectableWall(null);
+      setHoveredSelectableRoomId(null);
+      syncRulerSnapGuides();
+      updateCursor();
+      callbacks.requestRender();
+      return;
+    }
 
     if (activeLabelDragSession) {
       const session = activeLabelDragSession;
@@ -1230,7 +1585,8 @@ export function attachRoomDrawInput(
       activeOpeningDragSession ||
       activeOpeningResizeSession ||
       activeInteriorAssetDragSession
-      || activeInteriorAssetResizeSession
+      || activeInteriorAssetResizeSession ||
+      activeRulerDragSession
     ) {
       return;
     }
@@ -1243,6 +1599,7 @@ export function attachRoomDrawInput(
     hoveredInteriorAsset = null;
     hoveredInteriorAssetCornerHandle = null;
     hoveredInteriorAssetWallHandle = null;
+    setHoveredRulerTarget(null);
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
@@ -1295,6 +1652,41 @@ export function attachRoomDrawInput(
 
     const screenPoint = toCanvasPoint(event);
     const cursorWorld = screenToWorld(screenPoint, state.camera, state.viewport);
+
+    if (state.isRulerMode) {
+      event.preventDefault();
+      if (!state.rulerDraft.start) {
+        const rulerHit = findRulerHitAtScreenPoint(screenPoint, state);
+        if (rulerHit) {
+          activeRulerDragSession = {
+            pointerId: event.pointerId,
+            rulerId: rulerHit.ruler.id,
+            target: rulerHit.target,
+            startScreenPoint: screenPoint,
+            startWorldPoint: cursorWorld,
+            originalRuler: {
+              ...rulerHit.ruler,
+              start: { ...rulerHit.ruler.start },
+              end: { ...rulerHit.ruler.end },
+            },
+            latestRuler: null,
+            didDrag: false,
+          };
+          canvas.setPointerCapture(event.pointerId);
+          state.selectRulerById(rulerHit.ruler.id);
+          setHoveredRulerTarget({ rulerId: rulerHit.ruler.id, target: rulerHit.target });
+          updateCursor();
+          return;
+        }
+      }
+
+      state.startOrCommitRulerFromCursor(cursorWorld, {
+        constraintMode: event.shiftKey || isShiftHeld || state.is45DegreeDrawingEnabled ? "diagonal45" : "orthogonal",
+      });
+      updateCursor();
+      return;
+    }
+
     const selectedInteriorAsset = getSelectedInteriorAssetForHandles();
     const selectedInteriorAssetHit = selectedInteriorAsset
       ? findInteriorAssetAtScreenPoint(
@@ -1722,6 +2114,22 @@ export function attachRoomDrawInput(
     activePointerCount--;
     const screenPoint = toCanvasPoint(event);
 
+    if (activeRulerDragSession && event.pointerId === activeRulerDragSession.pointerId) {
+      stopRulerDragSession({ commit: true });
+      setSnapGuides(null);
+
+      const state = store.getState();
+      const rulerHit =
+        !isSpaceHeld && state.isRulerMode && !state.rulerDraft.start
+          ? findRulerHitAtScreenPoint(screenPoint, state)
+          : null;
+      setHoveredRulerTarget(
+        rulerHit ? { rulerId: rulerHit.ruler.id, target: rulerHit.target } : null
+      );
+      callbacks.requestRender();
+      return;
+    }
+
     if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
       const session = activeOpeningDragSession;
       if (session.didDrag) {
@@ -2013,6 +2421,14 @@ export function attachRoomDrawInput(
 
   const onPointerCancel = (event: PointerEvent) => {
     activePointerCount--;
+    if (activeRulerDragSession && event.pointerId === activeRulerDragSession.pointerId) {
+      stopRulerDragSession({ commit: false });
+      setSnapGuides(null);
+      setHoveredRulerTarget(null);
+      callbacks.requestRender();
+      return;
+    }
+
     if (activeOpeningDragSession && event.pointerId === activeOpeningDragSession.pointerId) {
       if (activeOpeningDragSession.didDrag) {
         store
@@ -2199,12 +2615,17 @@ export function attachRoomDrawInput(
       isShiftHeld = true;
       syncDraftConstraintMode(true);
       syncDraftSnapGuides();
+      syncRulerSnapGuides();
       return;
     }
 
     if (event.code === "Escape") {
       const state = store.getState();
-      if (state.roomDraft.points.length > 0) {
+      if (state.isRulerMode && state.rulerDraft.start) {
+        state.resetRulerDraft();
+        updateCursor();
+        callbacks.requestRender();
+      } else if (state.roomDraft.points.length > 0) {
         state.resetDraft();
         setSnapGuides(null);
         updateCursor();
@@ -2253,6 +2674,7 @@ export function attachRoomDrawInput(
       isShiftHeld = false;
       syncDraftConstraintMode(false);
       syncDraftSnapGuides(false);
+      syncRulerSnapGuides(false);
     }
   };
 
@@ -2326,12 +2748,16 @@ export function attachRoomDrawInput(
         activeInteriorAssetResizeSession.startAsset
       );
     }
+    if (activeRulerDragSession?.didDrag) {
+      store.getState().previewRulerMeasurement(activeRulerDragSession.originalRuler);
+    }
     setTransformFeedback(null);
     stopLabelDragSession();
     stopOpeningDragSession();
     stopOpeningResizeSession();
     stopInteriorAssetDragSession();
     stopInteriorAssetResizeSession();
+    stopRulerDragSession({ commit: false });
     setSnapGuides(null);
     setHoveredRoomLabelId(null);
     hoveredInteriorAssetCornerHandle = null;
@@ -2339,6 +2765,7 @@ export function attachRoomDrawInput(
     hoveredOpeningWidthHandle = null;
     hoveredOpening = null;
     hoveredInteriorAsset = null;
+    setHoveredRulerTarget(null);
     setHoveredSelectableWall(null);
     setHoveredSelectableRoomId(null);
     updateCursor();
@@ -2373,6 +2800,7 @@ export function attachRoomDrawInput(
     stopOpeningResizeSession();
     stopInteriorAssetDragSession();
     stopInteriorAssetResizeSession();
+    stopRulerDragSession({ commit: false });
     setSnapGuides(null);
     canvas.style.cursor = "";
   };
