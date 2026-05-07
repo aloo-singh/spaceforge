@@ -215,6 +215,7 @@ type EditorState = {
   devSubscriptionTier: SubscriptionTier;
   setDevSubscriptionTier: (tier: SubscriptionTier) => void;
   roomDraft: RoomDraftState;
+  isRulerMode: boolean;
   selectedNorthIndicator: boolean;
   selectedRoomId: string | null;
   focusedRoomId: string | null;
@@ -267,6 +268,7 @@ type EditorState = {
   ) => void;
   stepBackDraft: () => void;
   resetDraft: () => void;
+  setRulerMode: (isActive: boolean) => void;
   setFocusedRoomId: (roomId: string | null) => void;
   selectRoomById: (roomId: string | null) => void;
   selectWallByRoomId: (roomId: string, wall: RoomWallSelection["wall"]) => void;
@@ -2351,6 +2353,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   roomDraft: EMPTY_ROOM_DRAFT,
+  isRulerMode: false,
   selectedNorthIndicator: false,
   selectedRoomId: null,
   focusedRoomId: null,
@@ -2491,6 +2494,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
         selectedNorthIndicator: true,
         selectedRoomId: null,
         selectedWall: null,
@@ -2780,6 +2784,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
         selectedRoomId: null,
         selectedWall: null,
         selectedOpening: null,
@@ -2847,6 +2852,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (draftPoints.length === 0) {
         return {
+          isRulerMode: false,
           roomDraft: {
             points: [resolvedCursorWorld],
             history: [],
@@ -2885,6 +2891,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (arePointListsEqual(draftPoints, nextDraftPoints)) return state;
 
       return {
+        isRulerMode: false,
         roomDraft: {
           points: nextDraftPoints,
           history: [...state.roomDraft.history, clonePoints(draftPoints)],
@@ -2914,6 +2921,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetDraft: () =>
     set({
       roomDraft: EMPTY_ROOM_DRAFT,
+    }),
+  setRulerMode: (isActive) =>
+    set((state) => {
+      if (state.isRulerMode === isActive) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: isActive,
+        roomDraft: isActive ? EMPTY_ROOM_DRAFT : state.roomDraft,
+        selectedNorthIndicator: isActive ? false : state.selectedNorthIndicator,
+        selectedRoomId: isActive ? null : state.selectedRoomId,
+        selectedWall: isActive ? null : state.selectedWall,
+        selectedOpening: isActive ? null : state.selectedOpening,
+        selectedInteriorAsset: isActive ? null : state.selectedInteriorAsset,
+        selection: isActive ? [] : state.selection,
+        shouldFocusSelectedRoomNameInput: isActive ? false : state.shouldFocusSelectedRoomNameInput,
+        renameSession: isActive ? null : state.renameSession,
+        interiorAssetRenameSession: isActive ? null : state.interiorAssetRenameSession,
+        interiorAssetArrowLabelSession: isActive ? null : state.interiorAssetArrowLabelSession,
+        floorRenameSession: isActive ? null : state.floorRenameSession,
+      });
     }),
   setFocusedRoomId: (roomId) =>
     set((state) => {
@@ -2955,6 +2982,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -2978,6 +3006,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           : state.document;
         return preserveHistoryForSelectionUpdate(state, {
           document: nextDocument,
+          isRulerMode: false,
           selectedNorthIndicator: false,
           selectedRoomId: roomId,
           selectedWall: null,
@@ -3005,6 +3034,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: { roomId, wall },
@@ -3042,6 +3072,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3073,6 +3104,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return preserveHistoryForSelectionUpdate(state, {
         document: nextDocument,
+        isRulerMode: false,
         selectedNorthIndicator: false,
         selectedRoomId: roomId,
         selectedWall: null,
@@ -3089,6 +3121,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedOpening === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
         selectedOpening: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3097,6 +3130,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedInteriorAsset === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
         selectedInteriorAsset: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
         interiorAssetRenameSession: null,
@@ -3107,6 +3141,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (state.selectedWall === null) return state;
       return preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
         selectedWall: null,
         selection: state.selectedRoomId ? [{ type: "room" as const, id: state.selectedRoomId }] : [],
       });
@@ -3114,6 +3149,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearRoomSelection: () =>
     set((state) =>
       preserveHistoryForSelectionUpdate(state, {
+        isRulerMode: false,
         selectedNorthIndicator: false,
         selectedRoomId: null,
         selectedWall: null,
@@ -5955,6 +5991,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         points: [],
         history: [],
       },
+      isRulerMode: false,
       selectedNorthIndicator: false,
       selectedRoomId: null,
       focusedRoomId: null,

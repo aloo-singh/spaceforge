@@ -146,6 +146,8 @@ export function HistoryControls({
       : null
   );
   const selectedWall = useEditorStore((state) => state.selectedWall);
+  const isRulerMode = useEditorStore((state) => state.isRulerMode);
+  const setRulerMode = useEditorStore((state) => state.setRulerMode);
   const isCanvasEmpty = useEditorStore(
     (state) => state.document.rooms.length === 0 && state.roomDraft.points.length === 0
   );
@@ -573,13 +575,19 @@ export function HistoryControls({
                   <Restore />
                 </Button>
               </EditorChromeTooltip>
-              <EditorChromeTooltip content="Ruler tool">
+              <EditorChromeTooltip content="Measure distances">
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  aria-label="Ruler tool"
-                  className="sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8"
+                  onClick={() => setRulerMode(!isRulerMode)}
+                  aria-label="Measure distances"
+                  aria-pressed={isRulerMode}
+                  className={cn(
+                    "sm:size-8 [@media(max-height:540px)_and_(orientation:landscape)]:size-8",
+                    isRulerMode &&
+                      "border-lime-500/70 bg-lime-500/10 text-lime-700 hover:bg-lime-500/15 dark:text-lime-300"
+                  )}
                 >
                   <Ruler2 className="size-4" />
                 </Button>

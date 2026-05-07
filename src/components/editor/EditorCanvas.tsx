@@ -187,6 +187,7 @@ import { SelectedRoomNamePanel } from "@/components/editor/SelectedRoomNamePanel
 import { SelectedFloorInspector } from "@/components/editor/SelectedFloorInspector";
 import { SelectedWallInspector } from "@/components/editor/SelectedWallInspector";
 import { RoomDrawingInspector } from "@/components/editor/RoomDrawingInspector";
+import { RulerInspector } from "@/components/editor/RulerInspector";
 import { SelectedNorthInspector } from "@/components/editor/SelectedNorthInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
@@ -417,6 +418,7 @@ type EditorCanvasProps = {
         isLeftSidebarCollapsed: boolean;
       }) => ReactNode);
 };
+const RULER_ACCENT_COLOR = 0x84cc16;
 
 type WallSplitHoverUi = {
   roomId: string;
@@ -944,6 +946,7 @@ export default function EditorCanvas({
   const rooms = useMemo(() => getRoomsForActiveFloor(editorDocument), [editorDocument]);
   const roomCount = rooms.length;
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
+  const isRulerMode = useEditorStore((state) => state.isRulerMode);
   const canvasRotationDegrees = useEditorStore((state) => state.document.canvasRotationDegrees);
   const northBearingDegrees = useEditorStore((state) => state.document.northBearingDegrees);
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
@@ -3031,6 +3034,10 @@ export default function EditorCanvas({
       return isCompact ? <RoomDrawingInspector /> : <RoomDrawingInspector className="h-full" />;
     }
 
+    if (isRulerMode) {
+      return isCompact ? <RulerInspector /> : <RulerInspector className="h-full" />;
+    }
+
     // Get the last selected item from the selection array
     const selectedItem = selection.length > 0 ? selection[selection.length - 1] : null;
     
@@ -4212,7 +4219,13 @@ function drawScene(
     activeSnapStepMm,
     draftConstraintMode,
     visibleGuides,
-    theme,
+    state.isRulerMode
+      ? {
+          ...theme,
+          interactiveAccent: RULER_ACCENT_COLOR,
+          guidelineAccent: RULER_ACCENT_COLOR,
+        }
+      : theme,
     hideCursorHud
   );
 }
