@@ -33,28 +33,13 @@ export function RulerInspector({ className }: RulerInspectorProps) {
       className={className}
       bodyClassName="flex flex-col gap-4"
     >
-      <div className="rounded-md border border-lime-500/25 bg-lime-500/10 px-3 py-2">
+      <div className="rounded-md border border-lime-600/25 bg-lime-600/10 px-3 py-2">
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
           Live distance
         </p>
-        <p className="mt-1 font-mono text-lg font-semibold text-lime-700 dark:text-lime-300">
+        <p className="mt-1 font-mono text-lg font-semibold text-lime-600 dark:text-lime-400">
           {liveDistance ?? "Place start point"}
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-          <span className="text-sm text-foreground/80">45° line</span>
-          <KbdGroup>
-            <Kbd>Shift</Kbd>
-          </KbdGroup>
-        </div>
-        <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-          <span className="text-sm text-foreground/80">Cancel current ruler</span>
-          <KbdGroup>
-            <Kbd>Esc</Kbd>
-          </KbdGroup>
-        </div>
       </div>
 
       {isDrawingRuler ? (
@@ -63,7 +48,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
           variant="outline"
           size="sm"
           onClick={resetRulerDraft}
-          className="border-lime-500/40 text-lime-700 hover:bg-lime-500/10 dark:text-lime-300"
+          className="border-lime-600/40 text-lime-600 hover:bg-lime-600/10 dark:text-lime-400"
         >
           Cancel current ruler
         </Button>
@@ -117,7 +102,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                   className={cn(
                     "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors",
                     isSelected
-                      ? "border-lime-500/45 bg-lime-500/10"
+                      ? "border-lime-600/45 bg-lime-600/10"
                       : "border-border/70 bg-muted/35 hover:bg-muted/55",
                     ruler.hidden && "opacity-60"
                   )}
@@ -133,7 +118,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                         </span>
                       ) : null}
                     </div>
-                    <p className="font-mono text-sm text-lime-700 dark:text-lime-300">
+                    <p className="font-mono text-sm text-lime-600 dark:text-lime-400">
                       {distance}
                     </p>
                   </div>
@@ -149,7 +134,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                         event.stopPropagation();
                         toggleRulerHidden(ruler.id);
                       }}
-                      className={cn(!ruler.hidden && "text-lime-700 dark:text-lime-300")}
+                      className={cn(!ruler.hidden && "text-lime-600 dark:text-lime-400")}
                     >
                       <IconEye className="size-3.5" />
                     </Button>
@@ -172,6 +157,44 @@ export function RulerInspector({ className }: RulerInspectorProps) {
             })}
           </div>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Keyboard shortcuts
+        </h4>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+            <span className="text-sm text-foreground/80">45° angles</span>
+            <KbdGroup>
+              <Kbd>Shift</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+            <span className="text-sm text-foreground/80">Toggle snapping</span>
+            <KbdGroup>
+              <Kbd>S</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+            <span className="text-sm text-foreground/80">Toggle guides</span>
+            <KbdGroup>
+              <Kbd>G</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+            <span className="text-sm text-foreground/80">Pan canvas</span>
+            <KbdGroup>
+              <Kbd>Space</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+            <span className="text-sm text-foreground/80">Cancel ruler</span>
+            <KbdGroup>
+              <Kbd>Esc</Kbd>
+            </KbdGroup>
+          </div>
+        </div>
       </div>
     </EditorInspectorSection>
   );

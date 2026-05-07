@@ -418,7 +418,7 @@ type EditorCanvasProps = {
         isLeftSidebarCollapsed: boolean;
       }) => ReactNode);
 };
-const RULER_ACCENT_COLOR = 0x84cc16;
+const RULER_ACCENT_COLOR = 0x65a30d;
 
 type WallSplitHoverUi = {
   roomId: string;

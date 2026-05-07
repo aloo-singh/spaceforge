@@ -278,7 +278,7 @@ const DRAFT_GUIDE_TAIL_PX = 44;
 const RULER_ENDPOINT_HIT_RADIUS_PX = 10;
 const RULER_BODY_HIT_DISTANCE_PX = 7;
 const RULER_CURSOR =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%2318181b' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Cg fill='none' stroke='%2384cc16' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.5' fill='%2384cc16'/%3E%3C/svg%3E\") 12 12, crosshair";
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%2318181b' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Cg fill='none' stroke='%2365a30d' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18'/%3E%3Cpath d='M3 12h18'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.5' fill='%2365a30d'/%3E%3C/svg%3E\") 12 12, crosshair";
 
 function isPrimaryModifierActionKey(event: KeyboardEvent): boolean {
   if (!(event.metaKey || event.ctrlKey)) return false;
@@ -616,6 +616,63 @@ export function attachRoomDrawInput(
     setSnapGuides(draftGuides);
   };
 
+  const getRulerSnapGuides = (
+    state: Pick<RoomDrawStoreState, "document" | "camera" | "settings" | "rulerDraft" | "is45DegreeDrawingEnabled">,
+    cursorWorld: Point,
+    shiftOverride?: boolean
+  ): SnapGuides => {
+    const anchorPoint = state.rulerDraft.start;
+    const constraintMode = getDrawConstraintMode(shiftOverride);
+    const guides = anchorPoint
+      ? getPredictiveSnapGuides(getRoomsForActiveFloor(state.document), cursorWorld, state.camera, {
+          constraintMode,
+          anchorPoint,
+        })
+      : null;
+
+    const constrainedPoint = anchorPoint
+      ? getConstrainedDrawPoint(
+          anchorPoint,
+          cursorWorld,
+          getActiveSnapStepMm(state.camera),
+          null,
+          constraintMode
+        )
+      : cursorWorld;
+    const fallbackSegment = anchorPoint
+      ? getShortDraftGuideSegment(anchorPoint, constrainedPoint, state.camera.pixelsPerMm)
+      : null;
+
+    return guides ?? {
+      point: cursorWorld,
+      showVertical: false,
+      showHorizontal: false,
+      diagonalLine: null,
+      segments: fallbackSegment ? [fallbackSegment] : [],
+      constraintMode,
+      diagonalGuideSegments: [],
+    };
+  };
+
+  const syncRulerSnapGuides = (shiftOverride?: boolean) => {
+    const state = store.getState();
+    if (!state.rulerDraft.start || !latestCursorWorld) {
+      setSnapGuides(null);
+      return;
+    }
+
+    const rulerGuides = getRulerSnapGuides(state, latestCursorWorld, shiftOverride);
+    if (!state.settings.showGuidelines) {
+      setSnapGuides({
+        ...rulerGuides,
+        segments: [],
+      });
+      return;
+    }
+
+    setSnapGuides(rulerGuides);
+  };
+
   const getInteriorAssetResizeCursorWorld = (
     session: InteriorAssetResizeSession,
     cursorWorld: Point
@@ -844,7 +901,8 @@ export function attachRoomDrawInput(
     if (currentCursor === nextCursor) return;
     currentCursor = nextCursor;
     canvas.style.cursor = nextCursor;
-    document.body.style.cursor = nextCursor;
+    // Custom URL cursors should only apply within the canvas, not the rest of the UI.
+    document.body.style.cursor = nextCursor.startsWith("url(") ? "" : nextCursor;
   };
 
   const updateCursor = () => {
@@ -1123,7 +1181,7 @@ export function attachRoomDrawInput(
       hoveredInteriorAssetWallHandle = null;
       setHoveredSelectableWall(null);
       setHoveredSelectableRoomId(null);
-      setSnapGuides(null);
+      syncRulerSnapGuides();
       updateCursor();
       callbacks.requestRender();
       return;
@@ -2557,6 +2615,7 @@ export function attachRoomDrawInput(
       isShiftHeld = true;
       syncDraftConstraintMode(true);
       syncDraftSnapGuides();
+      syncRulerSnapGuides();
       return;
     }
 
@@ -2615,6 +2674,7 @@ export function attachRoomDrawInput(
       isShiftHeld = false;
       syncDraftConstraintMode(false);
       syncDraftSnapGuides(false);
+      syncRulerSnapGuides(false);
     }
   };
 
