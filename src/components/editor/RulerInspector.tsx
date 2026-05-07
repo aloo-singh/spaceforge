@@ -49,7 +49,6 @@ export function RulerInspector({ className }: RulerInspectorProps) {
           variant="outline"
           size="sm"
           onClick={resetRulerDraft}
-          className="border-lime-600/40 text-lime-600 hover:bg-lime-600/10 dark:text-lime-400"
         >
           Cancel current ruler
         </Button>
@@ -103,7 +102,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                   className={cn(
                     "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors",
                     isSelected
-                      ? "border-lime-600/45 bg-lime-600/10"
+                      ? "border-primary/40 bg-primary/8"
                       : "border-border/70 bg-muted/35 hover:bg-muted/55",
                     ruler.hidden && "opacity-60"
                   )}
@@ -135,7 +134,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                         event.stopPropagation();
                         toggleRulerHidden(ruler.id);
                       }}
-                      className={cn(!ruler.hidden && "text-lime-600 dark:text-lime-400")}
+                      className={cn(!ruler.hidden ? "text-foreground" : "text-muted-foreground")}
                     >
                       <IconEye className="size-3.5" />
                     </Button>
