@@ -973,6 +973,8 @@ export default function EditorCanvas({
   const zoomAtScreenPoint = useEditorStore((state) => state.zoomAtScreenPoint);
   const setCameraCenterMm = useEditorStore((state) => state.setCameraCenterMm);
   const resetDraft = useEditorStore((state) => state.resetDraft);
+  const rulerDraftHasStart = useEditorStore((state) => state.rulerDraft.start !== null);
+  const resetRulerDraft = useEditorStore((state) => state.resetRulerDraft);
   const hasRooms = hasHydratedClient && roomCount > 0;
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
@@ -3136,6 +3138,7 @@ export default function EditorCanvas({
   const useCompactMobileControls = isMobile || isCompactLandscapeViewport;
   const shouldShowTouchZoomControls = isMobile || isCompactLandscapeViewport;
   const shouldShowTouchCancelButton = (isMobile || isCompactLandscapeViewport) && roomDraftPointCount > 0;
+  const shouldShowRulerCancelButton = (isMobile || isCompactLandscapeViewport) && isRulerMode && rulerDraftHasStart;
   const expandedLeftSidebarWidth = isMobile
     ? MOBILE_SIDEBAR_EXPANDED_WIDTH_CSS
     : isCompactLandscapeViewport
@@ -3641,7 +3644,7 @@ export default function EditorCanvas({
               </div>
             </div>
           ) : null}
-          {shouldShowTouchCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
+          {shouldShowTouchCancelButton || shouldShowRulerCancelButton || shouldShowTouchZoomControls || roomDraftPointCount > 0 ? (
             <div
               className={cn(
                 "pointer-events-none absolute z-20 flex flex-col items-end sm:top-4 sm:right-4",
@@ -3717,6 +3720,21 @@ export default function EditorCanvas({
                   size="icon-sm"
                   aria-label="Cancel drawing"
                   onClick={resetDraft}
+                  className={cn(
+                    "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
+                    useCompactMobileControls && "size-9 rounded-xl"
+                  )}
+                >
+                  <X className="size-4" />
+                </Button>
+              ) : null}
+              {shouldShowRulerCancelButton ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  aria-label="Cancel ruler"
+                  onClick={resetRulerDraft}
                   className={cn(
                     "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
                     useCompactMobileControls && "size-9 rounded-xl"

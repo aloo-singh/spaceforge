@@ -51,17 +51,6 @@ export function RulerInspector({ className }: RulerInspectorProps) {
         </div>
       </div>
 
-      {isDrawingRuler ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={resetRulerDraft}
-        >
-          Cancel current ruler
-        </Button>
-      ) : null}
-
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -149,8 +138,8 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                         />
                       ) : (
                         <p
-                          className="text-sm font-medium text-foreground/86 min-w-0 truncate"
-                          onDoubleClick={(event) => {
+                          className="text-sm font-medium text-foreground/86 min-w-0 truncate cursor-text"
+                          onClick={(event) => {
                             event.stopPropagation();
                             selectRulerById(ruler.id);
                             startRulerRenameSession(ruler.id);
