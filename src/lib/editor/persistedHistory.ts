@@ -250,6 +250,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     return {
       type: "add-ruler",
       ruler: cloneRulerMeasurement(addedRulers[0]),
+      rulerIndex: previousRulers.length,
     };
   }
 

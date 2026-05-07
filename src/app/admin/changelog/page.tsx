@@ -22,8 +22,8 @@ export default function ChangelogPage() {
                 <li>Rulers snap to the grid and to room wall vertices via magnetic guides; hold Shift or enable 45° mode to constrain to orthogonal/diagonal directions.</li>
                 <li>Rulers render as lime-500 lines with endpoint circles, live distance labels that track the cursor, and dimension labels on committed rulers.</li>
                 <li>Ruler inspector panel lets you rename rulers (single-click to edit, Space key works correctly), toggle individual visibility, delete, or clear all rulers.</li>
-                <li>Added undo/redo for all ruler actions with per-ruler name labels (e.g. <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ruler "Kitchen wall" deleted</code>) and Sonner toasts with Undo buttons.</li>
-                <li>Added R keyboard shortcut to toggle ruler mode; keycap shown in the toolbar tooltip alongside "Ruler tool — Measure distances".</li>
+                <li>Added undo/redo for all ruler actions with per-ruler name labels (e.g. <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ruler &ldquo;Kitchen wall&rdquo; deleted</code>) and Sonner toasts with Undo buttons.</li>
+                <li>Added R keyboard shortcut to toggle ruler mode; keycap shown in the toolbar tooltip alongside &ldquo;Ruler tool &mdash; Measure distances&rdquo;.</li>
                 <li>On mobile and compact-landscape viewports, a HUD cancel button appears while drawing a ruler (matches the room-drawing cancel affordance).</li>
                 <li>Fixed: ruler start point now uses pure grid snap (matching the cursor HUD visual) rather than magnetic wall snap, eliminating a mismatch when zoomed out near walls.</li>
               </ul>
