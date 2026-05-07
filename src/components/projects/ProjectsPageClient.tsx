@@ -9,11 +9,11 @@ import {
   ArrowRight,
   Blocks,
   BorderAll,
+  Filter2,
   InfoCircle,
   Plus,
   RefreshCcw,
   Stack,
-  X,
 } from "@/components/ui/icons";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
@@ -315,22 +315,6 @@ export function ProjectsPageClient() {
     projectMatchesFilters(project, effectiveProjectFilters)
   );
   const shouldShowProjectFilters = projects.length > 1;
-  const activeProjectFilters = availableProjectFilterOptions
-    .map((filterOption) => {
-      const value = effectiveProjectFilters[filterOption.key];
-      if (value === null) {
-        return null;
-      }
-
-      const selectedOption = filterOption.options.find((option) => option.value === value);
-      return {
-        key: filterOption.key,
-        label: `${filterOption.label}: ${selectedOption?.label ?? `${value}+`}`,
-      };
-    })
-    .filter(
-      (filter): filter is { key: ProjectFilterKey; label: string } => filter !== null
-    );
 
   const setProjectFilterFromSelect = (key: ProjectFilterKey, selectedValue: string) => {
     setProjectFilters((currentFilters) => ({
@@ -339,13 +323,6 @@ export function ProjectsPageClient() {
         selectedValue === PROJECT_FILTER_ANY_VALUE
           ? null
           : Number.parseInt(selectedValue, 10),
-    }));
-  };
-
-  const removeProjectFilter = (key: ProjectFilterKey) => {
-    setProjectFilters((currentFilters) => ({
-      ...currentFilters,
-      [key]: null,
     }));
   };
 
@@ -633,89 +610,93 @@ export function ProjectsPageClient() {
           <div className="space-y-4">
             {shouldShowProjectFilters ? (
               <div className="space-y-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">Filter projects</p>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      Showing {filteredProjects.length} of {projects.length}
-                    </p>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearProjectFilters}
-                    disabled={activeFilterCount === 0}
-                    className="w-fit rounded-full text-muted-foreground hover:text-foreground"
-                  >
-                    Clear all
-                  </Button>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {availableProjectFilterOptions.map((filterOption) => {
-                    const Icon = filterOption.icon;
-
-                    return (
-                      <div key={filterOption.key} className="space-y-1">
-                        <label
-                          htmlFor={`project-filter-${filterOption.key}`}
-                          className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.04em] text-foreground/70 uppercase"
+                <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-start">
+                  <ImmediateTooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          aria-label="Filter projects"
+                          tabIndex={0}
+                          className="flex h-8 items-center text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/45"
                         >
-                          <Icon className="size-3.5 text-blue-500" />
-                          {filterOption.label}
-                        </label>
-                        <Select
-                          value={formatProjectFilterSelectValue(
-                            projectFilters[filterOption.key]
-                          )}
-                          onValueChange={(selectedValue) =>
-                            setProjectFilterFromSelect(filterOption.key, selectedValue)
-                          }
-                        >
-                          <SelectTrigger
-                            id={`project-filter-${filterOption.key}`}
-                            className="h-9 rounded-full bg-background/90"
-                          >
-                            <SelectValue placeholder={filterOption.placeholder} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={PROJECT_FILTER_ANY_VALUE}>
-                              {filterOption.placeholder}
-                            </SelectItem>
-                            {filterOption.options.map((option) => (
-                              <SelectItem
-                                key={`${filterOption.key}-${option.value}`}
-                                value={String(option.value)}
+                          <Filter2 className="size-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        Filter projects
+                      </TooltipContent>
+                    </Tooltip>
+                  </ImmediateTooltipProvider>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {availableProjectFilterOptions.map((filterOption) => {
+                          const Icon = filterOption.icon;
+
+                          return (
+                            <Select
+                              key={filterOption.key}
+                              value={formatProjectFilterSelectValue(
+                                projectFilters[filterOption.key]
+                              )}
+                              onValueChange={(selectedValue) =>
+                                setProjectFilterFromSelect(filterOption.key, selectedValue)
+                              }
+                            >
+                              <SelectTrigger
+                                id={`project-filter-${filterOption.key}`}
+                                className="h-8 rounded-full bg-background/90 px-2.5 text-xs"
                               >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                                <SelectValue placeholder={filterOption.placeholder} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  value={`${filterOption.key}-label`}
+                                  disabled
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Icon className="size-3.5 text-blue-500" />
+                                    {filterOption.label}
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value={PROJECT_FILTER_ANY_VALUE}>
+                                  {filterOption.placeholder}
+                                </SelectItem>
+                                {filterOption.options.map((option) => (
+                                  <SelectItem
+                                    key={`${filterOption.key}-${option.value}`}
+                                    value={String(option.value)}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
 
-                {activeProjectFilters.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {activeProjectFilters.map((activeFilter) => (
-                      <Button
-                        key={activeFilter.key}
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => removeProjectFilter(activeFilter.key)}
-                        className="h-8 rounded-full px-2.5 text-xs"
-                      >
-                        {activeFilter.label}
-                        <X className="size-3" />
-                      </Button>
-                    ))}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs leading-5 whitespace-nowrap text-muted-foreground">
+                          Showing {filteredProjects.length} of {projects.length}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearProjectFilters}
+                          disabled={activeFilterCount === 0}
+                          className="h-8 rounded-full px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Clear all
+                        </Button>
+                      </div>
+                    </div>
+
                   </div>
-                ) : null}
+                </div>
               </div>
             ) : null}
 
