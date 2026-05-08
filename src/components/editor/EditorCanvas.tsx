@@ -5248,51 +5248,50 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "kitchen-appliance") {
-        // Subtle corner lines (microwave-style) with lower opacity
+        // Dashed diagonal lines corner-to-corner (microwave-style X pattern)
         graphics.setStrokeStyle({
-          width: fgLineWidth * 0.7,
+          width: fgLineWidth * 0.65,
           color: fgColor,
           alpha: fgAlpha * 0.5,
         });
         
-        // Corner line length as fraction of overall size
-        const cornerFrac = 0.15;
-        const widthPx = Math.abs(bottomRight.x - topLeft.x);
-        const heightPx = Math.abs(bottomRight.y - topLeft.y);
-        const cornerLenX = widthPx * cornerFrac;
-        const cornerLenY = heightPx * cornerFrac;
+        // Calculate dash pattern based on viewport zoom for consistent appearance
+        const diagonalLen = Math.sqrt(
+          Math.pow(bottomRight.x - topLeft.x, 2) + Math.pow(bottomRight.y - topLeft.y, 2)
+        );
+        const dashLen = Math.max(3, diagonalLen * 0.06); // Dash length ~6% of diagonal
+        const gapLen = dashLen * 1.3; // Gap slightly larger than dash
+        const period = dashLen + gapLen;
         
-        // Top-left corner
-        graphics.moveTo(topLeft.x, topLeft.y);
-        graphics.lineTo(topLeft.x + cornerLenX, topLeft.y);
-        graphics.stroke();
-        graphics.moveTo(topLeft.x, topLeft.y);
-        graphics.lineTo(topLeft.x, topLeft.y + cornerLenY);
-        graphics.stroke();
+        // Helper to draw dashed line using short segments
+        const drawDashedLine = (x1: number, y1: number, x2: number, y2: number) => {
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const unitX = length > 0 ? dx / length : 0;
+          const unitY = length > 0 ? dy / length : 0;
+          const numSegments = Math.ceil(length / period);
+          
+          for (let i = 0; i < numSegments; i += 1) {
+            const segStart = i * period;
+            const segEnd = Math.min(segStart + dashLen, length);
+            if (segStart < length) {
+              const sx = x1 + unitX * segStart;
+              const sy = y1 + unitY * segStart;
+              const ex = x1 + unitX * segEnd;
+              const ey = y1 + unitY * segEnd;
+              graphics.moveTo(sx, sy);
+              graphics.lineTo(ex, ey);
+              graphics.stroke();
+            }
+          }
+        };
         
-        // Top-right corner
-        graphics.moveTo(bottomRight.x, topLeft.y);
-        graphics.lineTo(bottomRight.x - cornerLenX, topLeft.y);
-        graphics.stroke();
-        graphics.moveTo(bottomRight.x, topLeft.y);
-        graphics.lineTo(bottomRight.x, topLeft.y + cornerLenY);
-        graphics.stroke();
+        // Top-left to bottom-right diagonal
+        drawDashedLine(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
         
-        // Bottom-left corner
-        graphics.moveTo(topLeft.x, bottomRight.y);
-        graphics.lineTo(topLeft.x + cornerLenX, bottomRight.y);
-        graphics.stroke();
-        graphics.moveTo(topLeft.x, bottomRight.y);
-        graphics.lineTo(topLeft.x, bottomRight.y - cornerLenY);
-        graphics.stroke();
-        
-        // Bottom-right corner
-        graphics.moveTo(bottomRight.x, bottomRight.y);
-        graphics.lineTo(bottomRight.x - cornerLenX, bottomRight.y);
-        graphics.stroke();
-        graphics.moveTo(bottomRight.x, bottomRight.y);
-        graphics.lineTo(bottomRight.x, bottomRight.y - cornerLenY);
-        graphics.stroke();
+        // Top-right to bottom-left diagonal
+        drawDashedLine(bottomRight.x, topLeft.y, topLeft.x, bottomRight.y);
       }
 
 
