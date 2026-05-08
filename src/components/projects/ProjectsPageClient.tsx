@@ -208,14 +208,14 @@ function loadProjectLayoutFromStorage(): ProjectLayout {
 
 function getProjectLayoutClassName(projectLayout: ProjectLayout) {
   if (projectLayout === "grid-large") {
-    return "grid gap-5 lg:grid-cols-2";
+    return "grid gap-5 transition-[gap] duration-150 ease-out lg:grid-cols-2 motion-reduce:transition-none";
   }
 
   if (projectLayout === "list") {
-    return "flex flex-col gap-3";
+    return "flex flex-col gap-3 transition-[gap] duration-150 ease-out motion-reduce:transition-none";
   }
 
-  return "grid gap-4 sm:grid-cols-2 xl:grid-cols-3";
+  return "grid gap-4 transition-[gap] duration-150 ease-out sm:grid-cols-2 xl:grid-cols-3 motion-reduce:transition-none";
 }
 
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
@@ -600,7 +600,7 @@ export function ProjectsPageClient() {
                     aria-label="Show project details"
                     aria-pressed={showProjectInfo}
                     onClick={() => setShowProjectInfo((current) => !current)}
-                    className="rounded-full text-foreground/70 hover:text-foreground"
+                    className="h-11 w-11 rounded-full text-foreground/70 hover:text-foreground active:scale-[0.97]"
                   >
                     <InfoCircle className="size-4.5" />
                   </Button>
@@ -806,7 +806,6 @@ export function ProjectsPageClient() {
                         </Button>
                       </div>
                     </div>
-
                   </div>
                 </div>
               </div>
