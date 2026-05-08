@@ -352,8 +352,8 @@ export function ProjectCard({
               "sm:relative sm:h-40 sm:flex-row sm:items-center sm:justify-between sm:gap-5"
           )}
         >
-          <div className="min-w-0 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+          <div className={cn("min-w-0 space-y-3", isListLayout && "sm:relative sm:h-full sm:flex-1")}>
+            <div className={cn("flex items-start justify-between gap-3", isListLayout && "sm:h-full sm:items-center")}>
               <div className="min-w-0 flex-1 space-y-1">
               {isEditingName ? (
                 <div>
@@ -394,6 +394,51 @@ export function ProjectCard({
               )}
               </div>
             </div>
+            {isListLayout && !isEditingName ? (
+              <div
+                className={cn(
+                  "grid overflow-hidden transition-[grid-template-rows,opacity,transform,margin-top] duration-200 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-0 sm:bottom-0",
+                  showProjectInfo
+                    ? "mt-6 grid-rows-[1fr] translate-y-0 opacity-100 sm:mt-0"
+                    : "mt-0 grid-rows-[0fr] -translate-y-1 opacity-0"
+                )}
+                aria-hidden={!showProjectInfo}
+              >
+                <div className="min-h-0">
+                  <div
+                    className={cn(
+                      "flex flex-wrap gap-2 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out motion-reduce:transition-none lg:flex-nowrap",
+                      showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                    )}
+                  >
+                    <ProjectInlineInfoMetric
+                      icon={Blocks}
+                      label="Rooms"
+                      value={`${stats.roomCount}`}
+                    />
+                    <ProjectInlineInfoMetric
+                      icon={BorderAll}
+                      label="Area"
+                      value={stats.totalArea}
+                    />
+                    {canShowPaidStats ? (
+                      <>
+                        <ProjectInlineInfoMetric
+                          icon={Stack}
+                          label="Floors"
+                          value={`${stats.floorCount}`}
+                        />
+                        <ProjectInlineInfoMetric
+                          icon={CalendarWeek}
+                          label="Created"
+                          value={stats.createdDate}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div
@@ -486,51 +531,6 @@ export function ProjectCard({
               <ArrowUpRight className="size-4" />
             </Button>
           </div>
-          {isListLayout && !isEditingName ? (
-            <div
-              className={cn(
-                "grid overflow-hidden transition-[grid-template-rows,opacity,transform,margin-top] duration-200 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-0 sm:bottom-0",
-                showProjectInfo
-                  ? "mt-6 grid-rows-[1fr] translate-y-0 opacity-100 sm:mt-0"
-                  : "mt-0 grid-rows-[0fr] -translate-y-1 opacity-0"
-              )}
-              aria-hidden={!showProjectInfo}
-            >
-              <div className="min-h-0">
-                <div
-                  className={cn(
-                    "flex flex-wrap gap-2 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out motion-reduce:transition-none lg:flex-nowrap",
-                    showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-                  )}
-                >
-                  <ProjectInlineInfoMetric
-                    icon={Blocks}
-                    label="Rooms"
-                    value={`${stats.roomCount}`}
-                  />
-                  <ProjectInlineInfoMetric
-                    icon={BorderAll}
-                    label="Area"
-                    value={stats.totalArea}
-                  />
-                  {canShowPaidStats ? (
-                    <>
-                      <ProjectInlineInfoMetric
-                        icon={Stack}
-                        label="Floors"
-                        value={`${stats.floorCount}`}
-                      />
-                      <ProjectInlineInfoMetric
-                        icon={CalendarWeek}
-                        label="Created"
-                        value={stats.createdDate}
-                      />
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       </CardContent>
     </Card>
