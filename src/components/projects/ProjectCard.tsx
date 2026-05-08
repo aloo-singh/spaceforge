@@ -118,6 +118,28 @@ function ProjectInfoMetric({
   );
 }
 
+function ProjectInlineInfoMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof BorderAll;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-background/70 px-3 py-1.5 text-sm text-muted-foreground shadow-xs dark:bg-background/45">
+      <Icon className="size-4 shrink-0 text-blue-500" />
+      <span className="font-measurement text-xs font-semibold uppercase tracking-[0.08em]">
+        {label}
+      </span>
+      <span className="min-w-0 truncate font-measurement text-sm font-semibold text-foreground">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function ProjectCard({
   project,
   onRename,
@@ -139,6 +161,7 @@ export function ProjectCard({
   const canShowPaidStats = currentTier !== "Free";
   const isGridLargeLayout = layout === "grid-large";
   const isListLayout = layout === "list";
+  const shouldOverlayProjectInfo = showProjectInfo && !isListLayout;
   const infoMetricDensity = isListLayout
     ? "compact"
     : isGridLargeLayout
@@ -219,7 +242,7 @@ export function ProjectCard({
           "flex h-full flex-col gap-4 p-4",
           isGridLargeLayout && "gap-5 p-5",
           isListLayout &&
-            "gap-3 p-3 sm:grid sm:grid-cols-[minmax(13rem,17rem)_1fr] sm:items-center sm:gap-5"
+            "gap-3 p-3 sm:grid sm:grid-cols-[minmax(13rem,17rem)_1fr] sm:items-stretch sm:gap-5"
         )}
       >
         <div
@@ -233,7 +256,7 @@ export function ProjectCard({
             className={cn(
               "aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none",
               isListLayout && "sm:h-full sm:aspect-auto",
-              showProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
+              shouldOverlayProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
             )}
           >
             {project.thumbnailDataUrl && !hasThumbnailLoadError ? (
@@ -269,22 +292,22 @@ export function ProjectCard({
               "pointer-events-none absolute inset-0 flex items-end bg-background/20 p-2.5 transition-opacity duration-200 ease-out motion-reduce:transition-none sm:p-3 dark:bg-background/25",
               isGridLargeLayout && "sm:p-4",
               isListLayout && "sm:p-2.5",
-              showProjectInfo ? "opacity-100" : "opacity-0"
+              shouldOverlayProjectInfo ? "opacity-100" : "opacity-0"
             )}
-            aria-hidden={!showProjectInfo}
+            aria-hidden={!shouldOverlayProjectInfo}
           >
             <ImmediateTooltipProvider>
               <div
                 className={cn(
                   "grid w-full grid-cols-2 gap-1.5 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out sm:gap-2 motion-reduce:transition-none",
                   isListLayout && "sm:gap-1.5",
-                  showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                  shouldOverlayProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
                 )}
               >
                 <ProjectInfoMetric
                   density={infoMetricDensity}
                   icon={Blocks}
-                  isInteractive={showProjectInfo}
+                  isInteractive={shouldOverlayProjectInfo}
                   label="Rooms"
                   tooltip="Rooms you've sketched in this layout."
                   value={`${stats.roomCount}`}
@@ -292,7 +315,7 @@ export function ProjectCard({
                 <ProjectInfoMetric
                   density={infoMetricDensity}
                   icon={BorderAll}
-                  isInteractive={showProjectInfo}
+                  isInteractive={shouldOverlayProjectInfo}
                   label="Area"
                   tooltip="All drawn room area, added together."
                   value={stats.totalArea}
@@ -302,7 +325,7 @@ export function ProjectCard({
                     <ProjectInfoMetric
                       density={infoMetricDensity}
                       icon={Stack}
-                      isInteractive={showProjectInfo}
+                      isInteractive={shouldOverlayProjectInfo}
                       label="Floors"
                       tooltip="Floors in this layout, when your plan goes upstairs."
                       value={`${stats.floorCount}`}
@@ -310,7 +333,7 @@ export function ProjectCard({
                     <ProjectInfoMetric
                       density={infoMetricDensity}
                       icon={CalendarWeek}
-                      isInteractive={showProjectInfo}
+                      isInteractive={shouldOverlayProjectInfo}
                       label="Created"
                       tooltip="The day this layout first joined your projects."
                       value={stats.createdDate}
@@ -325,11 +348,12 @@ export function ProjectCard({
         <div
           className={cn(
             "flex min-w-0 flex-1 flex-col gap-3",
-            isListLayout && "sm:flex-row sm:items-center sm:justify-between sm:gap-5"
+            isListLayout &&
+              "sm:relative sm:h-40 sm:flex-row sm:items-center sm:justify-between sm:gap-5"
           )}
         >
-          <div className="min-w-0 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+          <div className={cn("min-w-0 space-y-3", isListLayout && "sm:relative sm:h-full sm:flex-1")}>
+            <div className={cn("flex items-start justify-between gap-3", isListLayout && "sm:h-full sm:items-center sm:translate-y-1")}>
               <div className="min-w-0 flex-1 space-y-1">
               {isEditingName ? (
                 <div>
@@ -370,12 +394,57 @@ export function ProjectCard({
               )}
               </div>
             </div>
+            {isListLayout && !isEditingName ? (
+              <div
+                className={cn(
+                  "grid overflow-hidden transition-[grid-template-rows,opacity,transform,margin-top] duration-200 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-0 sm:bottom-0",
+                  showProjectInfo
+                    ? "mt-6 grid-rows-[1fr] translate-y-0 opacity-100 sm:mt-0"
+                    : "mt-0 grid-rows-[0fr] -translate-y-1 opacity-0"
+                )}
+                aria-hidden={!showProjectInfo}
+              >
+                <div className="min-h-0">
+                  <div
+                    className={cn(
+                      "flex flex-wrap gap-2 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out motion-reduce:transition-none lg:flex-nowrap",
+                      showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                    )}
+                  >
+                    <ProjectInlineInfoMetric
+                      icon={Blocks}
+                      label="Rooms"
+                      value={`${stats.roomCount}`}
+                    />
+                    <ProjectInlineInfoMetric
+                      icon={BorderAll}
+                      label="Area"
+                      value={stats.totalArea}
+                    />
+                    {canShowPaidStats ? (
+                      <>
+                        <ProjectInlineInfoMetric
+                          icon={Stack}
+                          label="Floors"
+                          value={`${stats.floorCount}`}
+                        />
+                        <ProjectInlineInfoMetric
+                          icon={CalendarWeek}
+                          label="Created"
+                          value={stats.createdDate}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div
             className={cn(
               "mt-auto flex items-center justify-between gap-3",
-              isListLayout && "mt-0 shrink-0 sm:justify-end"
+              isListLayout && "mt-0 shrink-0 sm:translate-y-1 sm:justify-end"
             )}
           >
             <div className="flex items-center gap-2">
