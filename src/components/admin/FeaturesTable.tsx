@@ -1,7 +1,6 @@
 "use client";
 
 import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscription/features";
-import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -37,19 +36,6 @@ function getAllFeatureKeys(): string[] {
   return Array.from(keys).sort();
 }
 
-/**
- * Check if a feature has a limit constraint in the Free tier.
- */
-function isLimitedInFreeTier(featureKey: string): boolean {
-  const freeConfig = SUBSCRIPTION_FEATURES.Free[featureKey];
-  const proConfig = SUBSCRIPTION_FEATURES.Pro[featureKey];
-  
-  if (!freeConfig || !proConfig) return false;
-  
-  // If Free tier has a lower limit than Pro, it's limited
-  return freeConfig.limit < proConfig.limit;
-}
-
 export function FeaturesTable() {
   const featureKeys = getAllFeatureKeys();
 
@@ -76,28 +62,10 @@ export function FeaturesTable() {
         </TableHeader>
 
         <TableBody>
-          {featureKeys.map((featureKey) => {
-            const isLimited = isLimitedInFreeTier(featureKey);
-
-            return (
-              <TableRow
-                key={featureKey}
-                className={cn(
-                  "border-border/70 transition-colors",
-                  isLimited
-                    ? "bg-amber-50/40 hover:bg-amber-50/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
-                    : ""
-                )}
-              >
+          {featureKeys.map((featureKey) => (
+              <TableRow key={featureKey} className="border-border/70 transition-colors">
                 {/* Feature name and description */}
-                <TableCell
-                  className={cn(
-                    "sticky left-0 z-10 min-w-[12rem] px-3 py-3 sm:px-4 sm:py-4 transition-colors",
-                    isLimited
-                      ? "bg-amber-50/40 dark:bg-amber-950/20"
-                      : "bg-background/90"
-                  )}
-                >
+                <TableCell className="sticky left-0 z-10 min-w-[12rem] bg-background/90 px-3 py-3 transition-colors sm:px-4 sm:py-4">
                   <div className="space-y-1">
                     <p className="font-medium text-sm text-foreground">
                       {SUBSCRIPTION_FEATURES.Free[featureKey]?.label ||
@@ -124,8 +92,7 @@ export function FeaturesTable() {
                   );
                 })}
               </TableRow>
-            );
-          })}
+          ))}
         </TableBody>
       </Table>
     </div>
