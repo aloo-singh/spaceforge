@@ -279,7 +279,7 @@ export function createCenteredDefaultKitchenUnit(room: Room, id: string): RoomIn
     name: "Kitchen unit",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 900,
+    widthMm: 600,
     depthMm: 600,
     rotationDegrees: 0,
     anchor: "floor",

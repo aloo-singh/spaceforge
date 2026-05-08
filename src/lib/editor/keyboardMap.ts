@@ -604,7 +604,7 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
 
     if (previousAsset.rotationDegrees !== nextAsset.rotationDegrees) {
       const rotationDelta = ((nextAsset.rotationDegrees ?? 0) - (previousAsset.rotationDegrees ?? 0) + 360) % 360;
-      const direction = rotationDelta === 90 || rotationDelta === 270 ? "rotated right" : "rotated left";
+      const direction = rotationDelta === 90 ? "rotated right" : "rotated left";
       return `${getInteriorAssetTypeName(nextAsset.type)} ${direction} 90°`;
     }
 

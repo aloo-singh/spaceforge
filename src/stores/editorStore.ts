@@ -82,6 +82,7 @@ import {
   getRotatedInteriorAssetForRoom,
   getResizedStairForCornerDrag,
   getResizedStairForWallDrag,
+  getInteriorAssetDisplayName,
   isInteriorAssetWithinRoom,
 } from "@/lib/editor/interiorAssets";
 import {
@@ -5410,6 +5411,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
+      // Capture asset type name for toast before deletion
+      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+
+      // Show deletion toast on next tick with undo action
+      setTimeout(() => {
+        toast(`${assetTypeName} deleted`, {
+          duration: 5000,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              const currentState = useEditorStore.getState();
+              const latestCommand = currentState.history.past[currentState.history.past.length - 1];
+              if (latestCommand?.type !== "delete-interior-asset") return;
+              currentState.undo();
+            },
+          },
+        });
+      }, 0);
+
       return {
         document: nextDocument,
         selectedInteriorAsset: null,
@@ -5598,6 +5618,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
   placeAssetInSelectedRoom: (assetType: InteriorAssetType) => {
+    let placedAssetTypeName: string | null = null;
+    
     set((state) => {
       if (!state.selectedRoomId) return state;
       const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
@@ -5608,25 +5630,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       switch (assetType) {
         case "stairs":
           asset = createCenteredDefaultStair(room, createInteriorAssetId());
+          placedAssetTypeName = "Stairs";
           break;
         case "bed":
           asset = createCenteredDefaultBed(room, createInteriorAssetId());
+          placedAssetTypeName = "Bed";
           break;
         case "sofa":
           asset = createCenteredDefaultSofa(room, createInteriorAssetId());
+          placedAssetTypeName = "Sofa";
           break;
         case "wardrobe":
           asset = createCenteredDefaultWardrobe(room, createInteriorAssetId());
+          placedAssetTypeName = "Wardrobe";
           break;
         case "dining-table":
           asset = createCenteredDefaultDiningTable(room, createInteriorAssetId());
+          placedAssetTypeName = "Table";
           break;
         case "kitchen-unit":
           asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId());
+          placedAssetTypeName = "Kitchen unit";
           break;
       }
 
       if (!asset) return state;
+      
+      // Show toast on next tick to allow state update first
+      if (placedAssetTypeName) {
+        setTimeout(() => {
+          toast(`${placedAssetTypeName} added`, { duration: 3200 });
+        }, 0);
+      }
 
       const command: EditorCommand = {
         type: "add-interior-asset",
@@ -5754,6 +5789,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const updatedDocument = updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset);
       const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, room.id, nextAsset.id, deltaDegrees);
+
+      // Show rotation toast on next tick
+      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+      const direction = deltaDegrees > 0 ? "right" : "left";
+      setTimeout(() => {
+        toast(`${assetTypeName} rotated ${direction} 90°`, { duration: 3200 });
+      }, 0);
 
       const command: EditorCommand = {
         type: "update-interior-asset",
@@ -6371,6 +6413,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           yMm: nextAsset.yMm,
         },
       };
+
+      // Show resize toast on next tick
+      if (previousAsset.widthMm !== nextAsset.widthMm || previousAsset.depthMm !== nextAsset.depthMm) {
+        setTimeout(() => {
+          const assetTypeName = getInteriorAssetDisplayName(asset.type);
+          toast(`${assetTypeName} resized`, { duration: 3200 });
+        }, 0);
+      }
 
       return {
         document: updateRoomInteriorAssetInDocument(state.document, roomId, {
