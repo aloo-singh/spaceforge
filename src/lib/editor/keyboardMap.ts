@@ -731,5 +731,6 @@ function getInteriorAssetTypeName(type: RoomInteriorAsset["type"]): string {
     case "kitchen-unit": return "kitchen unit";
     case "kitchen-appliance": return "kitchen appliance";
     case "hob": return "hob";
+    case "sink": return "sink";
   }
 }

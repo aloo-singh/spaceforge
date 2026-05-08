@@ -369,6 +369,38 @@ export interface InteriorAssetHob extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Sink: kitchen or bathroom sink with configurable bowl type and optional drainer
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable within reasonable furniture dimensions
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - bowlType: "single" or "1.5" (1.5 is main bowl + smaller secondary) - default "single"
+ * - hasDefaultDrainer: whether to show drainer visualization - default false
+ *
+ * Visual distinction:
+ * - Single bowl: rounded square inside square outline
+ * - 1.5 bowl: narrower rounded square + smaller rounded rectangle (secondary bowl)
+ * - With drainer: rectangle shape with parallel lines running toward drainer circle
+ *
+ * Examples:
+ * - Standard single bowl: 600mm × 600mm
+ * - 1.5 bowl: 600mm × 600mm with proportional secondary bowl
+ * - Single with drainer: 800mm × 600mm with drainer detail
+ */
+export interface InteriorAssetSink extends InteriorAssetCommonProperties {
+  type: "sink";
+  bowlType?: "single" | "1.5";
+  hasDefaultDrainer?: boolean;
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -396,7 +428,7 @@ export interface InteriorAssetHob extends InteriorAssetCommonProperties {
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
@@ -508,6 +540,20 @@ export function isKitchenAppliance(asset: InteriorAsset): asset is InteriorAsset
  */
 export function isHob(asset: InteriorAsset): asset is InteriorAssetHob {
   return asset.type === "hob";
+}
+
+/**
+ * Type guard to safely extract sink from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isSink(asset)) {
+ *   console.log(asset.bowlType); // type-safe
+ * }
+ * ```
+ */
+export function isSink(asset: InteriorAsset): asset is InteriorAssetSink {
+  return asset.type === "sink";
 }
 
 /**

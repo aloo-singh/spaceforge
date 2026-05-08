@@ -5356,6 +5356,102 @@ function drawRoomInteriorAssets(
         }
       }
 
+      if (displayedAsset.type === "sink") {
+        // Sink bowl visualization
+        const bowlType = displayedAsset.bowlType ?? "single";
+        const hasDefaultDrainer = displayedAsset.hasDefaultDrainer ?? false;
+        const widthPx = Math.abs(bottomRight.x - topLeft.x);
+        const heightPx = Math.abs(bottomRight.y - topLeft.y);
+        const centerX = (topLeft.x + bottomRight.x) / 2;
+        const centerY = (topLeft.y + bottomRight.y) / 2;
+        
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.9,
+          color: fgColor,
+          alpha: fgAlpha * 0.75,
+        });
+        
+        graphics.setFillStyle({
+          color: fgColor,
+          alpha: 0,
+        });
+        
+        const cornerRadius = Math.max(3, Math.min(widthPx, heightPx) * 0.1); // ~10% of size
+        
+        if (hasDefaultDrainer) {
+          // Rectangle shape with drainer detail
+          const rectWidth = widthPx * 0.7;
+          const rectHeight = heightPx * 0.8;
+          const rectX = centerX - rectWidth / 2;
+          const rectY = centerY - rectHeight / 2;
+          
+          // Draw main sink rectangle with rounded corners
+          graphics.roundRect(rectX, rectY, rectWidth, rectHeight, cornerRadius);
+          graphics.stroke();
+          
+          // Draw drainer circle on right side
+          const drainerRadius = Math.max(3, Math.min(widthPx, heightPx) * 0.08);
+          const drainerX = rectX + rectWidth + drainerRadius * 1.5;
+          const drainerY = centerY;
+          graphics.circle(drainerX, drainerY, drainerRadius);
+          graphics.stroke();
+          
+          // Draw parallel lines from bowl toward drainer
+          const lineCount = 3;
+          for (let i = 0; i < lineCount; i += 1) {
+            const yOffset = (heightPx * 0.2) * (i - 1);
+            const startX = rectX + rectWidth * 0.6;
+            const startY = centerY + yOffset;
+            const endX = drainerX - drainerRadius * 1.5;
+            const endY = drainerY + yOffset;
+            graphics.moveTo(startX, startY);
+            graphics.lineTo(endX, endY);
+            graphics.stroke();
+          }
+        } else if (bowlType === "single") {
+          // Single bowl: square container with rounded square inside
+          const outerSize = Math.min(widthPx, heightPx) * 0.85;
+          const outerX = centerX - outerSize / 2;
+          const outerY = centerY - outerSize / 2;
+          
+          // Outer square with subtle roundness
+          graphics.roundRect(outerX, outerY, outerSize, outerSize, cornerRadius * 0.5);
+          graphics.stroke();
+          
+          // Inner bowl (rounded square)
+          const innerSize = outerSize * 0.65;
+          const innerX = centerX - innerSize / 2;
+          const innerY = centerY - innerSize / 2;
+          graphics.roundRect(innerX, innerY, innerSize, innerSize, cornerRadius);
+          graphics.stroke();
+        } else if (bowlType === "1.5") {
+          // 1.5 bowl: main bowl + secondary (smaller) bowl
+          const outerWidth = widthPx * 0.85;
+          const outerHeight = heightPx * 0.85;
+          const outerX = centerX - outerWidth / 2;
+          const outerY = centerY - outerHeight / 2;
+          
+          // Outer container
+          graphics.roundRect(outerX, outerY, outerWidth, outerHeight, cornerRadius * 0.5);
+          graphics.stroke();
+          
+          // Main bowl (left side, narrower)
+          const mainBowlWidth = outerWidth * 0.6;
+          const mainBowlHeight = outerHeight * 0.65;
+          const mainX = outerX + outerWidth * 0.1;
+          const mainY = centerY - mainBowlHeight / 2;
+          graphics.roundRect(mainX, mainY, mainBowlWidth, mainBowlHeight, cornerRadius);
+          graphics.stroke();
+          
+          // Secondary bowl (right side, smaller)
+          const secondaryBowlSize = outerHeight * 0.4;
+          const secondaryX = mainX + mainBowlWidth + outerWidth * 0.08;
+          const secondaryY = centerY - secondaryBowlSize / 2;
+          graphics.roundRect(secondaryX, secondaryY, secondaryBowlSize, secondaryBowlSize, cornerRadius * 0.8);
+          graphics.stroke();
+        }
+      }
+
 
     }
 

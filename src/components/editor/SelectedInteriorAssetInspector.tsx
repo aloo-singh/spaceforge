@@ -66,6 +66,8 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
     case "hob":
       return { title: "Selected hob", description: "Adjust the hob's position, size, and orientation." };
+    case "sink":
+      return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }
@@ -301,6 +303,59 @@ function FurnitureInspector({
               </ButtonGroup>
             </ImmediateTooltipProvider>
           </div>
+        ) : null}
+
+        {asset.type === "sink" ? (
+          <>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Bowl type</p>
+              <ImmediateTooltipProvider>
+                <ButtonGroup>
+                  <InspectorIconTooltip groupItem content="Single bowl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => useEditorStore.getState().setSinkBowlType("single")}
+                      aria-label="Single bowl"
+                      aria-pressed={asset.bowlType !== "1.5"}
+                    >
+                      Single
+                    </Button>
+                  </InspectorIconTooltip>
+                  <InspectorIconTooltip groupItem content="1.5 bowl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => useEditorStore.getState().setSinkBowlType("1.5")}
+                      aria-label="1.5 bowl"
+                      aria-pressed={asset.bowlType === "1.5"}
+                    >
+                      1.5
+                    </Button>
+                  </InspectorIconTooltip>
+                </ButtonGroup>
+              </ImmediateTooltipProvider>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Drainer</p>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="drainer-checkbox"
+                  checked={asset.hasDefaultDrainer ?? false}
+                  onChange={(e) => useEditorStore.getState().setSinkHasDefaultDrainer(e.target.checked)}
+                  className="h-4 w-4"
+                  aria-label="Enable drainer"
+                />
+                <label htmlFor="drainer-checkbox" className="text-sm font-medium">
+                  Add drainer
+                </label>
+              </div>
+            </div>
+          </>
         ) : null}
 
         <div className="flex justify-end">

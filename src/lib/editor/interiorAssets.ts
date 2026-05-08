@@ -339,6 +339,34 @@ export function createCenteredDefaultHob(room: Room, id: string): RoomInteriorAs
   };
 }
 
+/**
+ * Create a centered default sink in the given room.
+ * Standard single bowl sink dimensions: 600mm × 600mm
+ */
+export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "sink",
+    name: "Sink",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 600,
+    depthMm: 600,
+    rotationDegrees: 0,
+    anchor: "floor",
+    bowlType: "single",
+    hasDefaultDrainer: false,
+  };
+}
+
 export function findInteriorAssetAtScreenPoint(
   rooms: Room[],
   screenPoint: Point,
@@ -928,5 +956,6 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "kitchen-unit": return "Kitchen unit";
     case "kitchen-appliance": return "Kitchen appliance";
     case "hob": return "Hob";
+    case "sink": return "Sink";
   }
 }

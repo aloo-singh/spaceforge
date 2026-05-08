@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useLayoutEffect } from "react";
-import { Plus, BedFilled, Sofa, Hanger, ToolsKitchen2Filled, IconFridge, IconMicrowave, IconLadle } from "@/components/ui/icons";
+import { Plus, BedFilled, Sofa, Hanger, ToolsKitchen2Filled, IconFridge, IconMicrowave, IconLadle, IconWash } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -76,6 +76,12 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         label: "Hob",
         description: "Place a hob/cooktop",
         icon: <IconLadle className="size-5" />,
+      },
+      {
+        type: "sink",
+        label: "Sink",
+        description: "Place a sink",
+        icon: <IconWash className="size-5" />,
       },
     ],
   },

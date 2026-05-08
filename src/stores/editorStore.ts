@@ -79,6 +79,7 @@ import {
   createCenteredDefaultKitchenUnit,
   createCenteredDefaultKitchenAppliance,
   createCenteredDefaultHob,
+  createCenteredDefaultSink,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
   getRotatedInteriorAssetForRoom,
@@ -379,6 +380,8 @@ type EditorState = {
   updateSelectedInteriorAssetArrowLabel: (label: string) => void;
   setSelectedInteriorAssetDoorType: (doorType: "swing" | "sliding") => void;
   setSelectedInteriorAssetShape: (shape: "rectangular" | "round") => void;
+  setSinkBowlType: (bowlType: "single" | "1.5") => void;
+  setSinkHasDefaultDrainer: (hasDefaultDrainer: boolean) => void;
   setSelectedBedSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
@@ -5662,6 +5665,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           asset = createCenteredDefaultHob(room, createInteriorAssetId());
           placedAssetTypeName = "Hob";
           break;
+        case "sink":
+          asset = createCenteredDefaultSink(room, createInteriorAssetId());
+          placedAssetTypeName = "Sink";
+          break;
       }
 
       if (!asset) return state;
@@ -5873,6 +5880,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...cloneRoomInteriorAsset(asset),
           shape,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSinkBowlType: (bowlType) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.bowlType === bowlType) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          bowlType,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSinkHasDefaultDrainer: (hasDefaultDrainer) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.hasDefaultDrainer === hasDefaultDrainer) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          hasDefaultDrainer,
         };
       });
       return nextState ?? state;
