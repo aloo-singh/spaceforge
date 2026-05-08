@@ -10,6 +10,24 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.1</h2>
+            <span className="text-sm text-muted-foreground">2026-05-08</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Moved the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">/projects</code> filter icon into a header toggle beside the layout selector, with filters collapsed by default and a calm show/hide animation.</li>
+                <li>Standardized toolbar toggle active states across the filter, layout, info, and mobile 45° controls so selected controls read consistently in dark mode.</li>
+                <li>Adjusted list-view project info so grid layouts keep thumbnail overlays while list cards show inline metric chips beneath the project text, aligned to the text column and thumbnail bottom.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-08</span>
           </div>
