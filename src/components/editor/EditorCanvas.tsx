@@ -5246,6 +5246,8 @@ function drawRoomInteriorAssets(
         graphics.ellipse(cx, cy, rX, rY);
         graphics.stroke();
       }
+
+
     }
 
     // Stairs-specific visuals (tread lines and direction arrow)

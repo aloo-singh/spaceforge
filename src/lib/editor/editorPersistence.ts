@@ -241,7 +241,14 @@ function isOpeningType(value: unknown): value is Room["openings"][number]["type"
 }
 
 function isInteriorAssetType(value: unknown): value is Room["interiorAssets"][number]["type"] {
-  return value === "stairs";
+  return (
+    value === "stairs" ||
+    value === "bed" ||
+    value === "sofa" ||
+    value === "wardrobe" ||
+    value === "dining-table" ||
+    value === "kitchen-unit"
+  );
 }
 
 function isRoomOpening(value: unknown): value is Room["openings"][number] {

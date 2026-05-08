@@ -70,6 +70,7 @@ export {
   IconThumbUp as ThumbsUp,
   IconToolsKitchen2Filled as ToolsKitchen2Filled,
   IconTransfer as Transfer,
+  IconFridge as IconFridge,
   IconTriangle as IconTriangle,
   IconTriangleInverted as IconTriangleInverted,
   IconTrash as Trash2,
