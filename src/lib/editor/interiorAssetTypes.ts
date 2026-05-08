@@ -341,6 +341,34 @@ export interface InteriorAssetKitchenAppliance extends InteriorAssetCommonProper
 }
 
 /**
+ * Hob: cooktop/hob with configurable burner arrangement
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable within reasonable furniture dimensions
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - burnerCount: number of burners (2/4/5/6) - default 4
+ *
+ * Visual distinction:
+ * - Rendered with burner circles positioned in standard patterns
+ *
+ * Examples:
+ * - Standard 4-burner: 600mm × 600mm
+ * - 5-burner island: 750mm × 750mm
+ * - 2-burner portable: 400mm × 400mm
+ */
+export interface InteriorAssetHob extends InteriorAssetCommonProperties {
+  type: "hob";
+  burnerCount?: 2 | 4 | 5 | 6;
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -368,7 +396,7 @@ export interface InteriorAssetKitchenAppliance extends InteriorAssetCommonProper
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
@@ -466,6 +494,20 @@ export function isKitchenUnit(asset: InteriorAsset): asset is InteriorAssetKitch
  */
 export function isKitchenAppliance(asset: InteriorAsset): asset is InteriorAssetKitchenAppliance {
   return asset.type === "kitchen-appliance";
+}
+
+/**
+ * Type guard to safely extract hob from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isHob(asset)) {
+ *   console.log(asset.burnerCount); // type-safe
+ * }
+ * ```
+ */
+export function isHob(asset: InteriorAsset): asset is InteriorAssetHob {
+  return asset.type === "hob";
 }
 
 /**

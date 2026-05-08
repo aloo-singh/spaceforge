@@ -312,6 +312,33 @@ export function createCenteredDefaultKitchenAppliance(room: Room, id: string): R
   };
 }
 
+/**
+ * Create a centered default hob in the given room.
+ * Standard 4-burner hob dimensions: 600mm × 600mm
+ */
+export function createCenteredDefaultHob(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "hob",
+    name: "Hob",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 600,
+    depthMm: 600,
+    rotationDegrees: 0,
+    anchor: "floor",
+    burnerCount: 4,
+  };
+}
+
 export function findInteriorAssetAtScreenPoint(
   rooms: Room[],
   screenPoint: Point,
@@ -898,5 +925,8 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "sofa": return "Sofa";
     case "wardrobe": return "Wardrobe";
     case "dining-table": return "Table";
-    case "kitchen-unit": return "Kitchen unit";    case "kitchen-appliance": return "Kitchen appliance";  }
+    case "kitchen-unit": return "Kitchen unit";
+    case "kitchen-appliance": return "Kitchen appliance";
+    case "hob": return "Hob";
+  }
 }

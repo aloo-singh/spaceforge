@@ -98,10 +98,10 @@ export type StairDirection = "forward" | "reverse";
  * - Phase 1: stairs (existing) ✓
  * - Phase 2: wardrobe ✓
  * - Phase 3: bed, sofa, dining-table ✓
- * - Phase 4: kitchen-unit, kitchen-appliance (new assets batch begins)
+ * - Phase 4: kitchen-unit, kitchen-appliance, hob (new assets batch begins)
  * - Future: sink, toilet, range, island, shelving, armchair, etc.
  */
-export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table" | "kitchen-unit" | "kitchen-appliance";
+export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table" | "kitchen-unit" | "kitchen-appliance" | "hob";
 
 /**
  * Interior asset: a piece of furniture or fixture placed inside a room.
@@ -162,6 +162,8 @@ export type RoomInteriorAsset = {
   doorConstraint?: number;
   // Dining Table-specific properties (optional for other assets)
   shape?: "rectangular" | "round";
+  // Hob-specific properties (optional for other assets)
+  burnerCount?: 2 | 4 | 5 | 6;
   // Optional regionalisation (all assets)
   unitSystem?: "metric" | "imperial";
   sizePreset?: string;

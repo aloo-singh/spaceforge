@@ -33,6 +33,7 @@ export {
   IconDoor as DoorOpen,
   IconDownload as Download,
   IconEye as IconEye,
+  IconLadle as IconLadle,
   IconFilter2 as Filter2,
   IconFocus as Focus,
   IconFocus2 as LocateFixed,
