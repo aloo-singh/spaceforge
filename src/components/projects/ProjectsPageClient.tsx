@@ -254,7 +254,7 @@ export function ProjectsPageClient() {
   const [projectFilters, setProjectFilters] = useState<ProjectFilterState>(
     DEFAULT_PROJECT_FILTERS
   );
-  const [showProjectFilters, setShowProjectFilters] = useState(true);
+  const [showProjectFilters, setShowProjectFilters] = useState(false);
   // Third of the /projects trio: layout preference state first, rendering modes next.
   const [projectLayout, setProjectLayout] = useState<ProjectLayout>(DEFAULT_PROJECT_LAYOUT);
   const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
