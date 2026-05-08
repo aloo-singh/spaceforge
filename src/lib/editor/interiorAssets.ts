@@ -286,6 +286,32 @@ export function createCenteredDefaultKitchenUnit(room: Room, id: string): RoomIn
   };
 }
 
+/**
+ * Create a centered default kitchen appliance in the given room.
+ * Standard kitchen appliance dimensions: 600mm × 600mm
+ */
+export function createCenteredDefaultKitchenAppliance(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "kitchen-appliance",
+    name: "Kitchen appliance",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 600,
+    depthMm: 600,
+    rotationDegrees: 0,
+    anchor: "floor",
+  };
+}
+
 export function findInteriorAssetAtScreenPoint(
   rooms: Room[],
   screenPoint: Point,
@@ -872,6 +898,5 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "sofa": return "Sofa";
     case "wardrobe": return "Wardrobe";
     case "dining-table": return "Table";
-    case "kitchen-unit": return "Kitchen unit";
-  }
+    case "kitchen-unit": return "Kitchen unit";    case "kitchen-appliance": return "Kitchen appliance";  }
 }

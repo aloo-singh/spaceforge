@@ -50,6 +50,7 @@ export {
   IconLoader as LoaderCircle,
   IconLogout as LogOut,
   IconMail as Mail,
+  IconMicrowave as IconMicrowave,
   IconMessage as MessageSquare,
   IconMinus as Minus,
   IconPencil as PencilLine,
