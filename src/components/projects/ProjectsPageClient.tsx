@@ -560,7 +560,7 @@ export function ProjectsPageClient() {
 
           <div className="flex items-center gap-2">
             <ImmediateTooltipProvider>
-              <ButtonGroup className="rounded-full">
+              <ButtonGroup className="h-11 rounded-full">
                 {PROJECT_LAYOUT_OPTIONS.map((layoutOption) => {
                   const Icon = layoutOption.icon;
                   const isActive = projectLayout === layoutOption.value;
@@ -572,10 +572,11 @@ export function ProjectsPageClient() {
                           <Button
                             type="button"
                             variant="outline"
-                            size="icon-sm"
+                            size="icon-lg"
                             aria-label={layoutOption.label}
                             aria-pressed={isActive}
                             onClick={() => setProjectLayout(layoutOption.value)}
+                            className="h-11 w-11"
                           >
                             <Icon className="size-4" />
                           </Button>
