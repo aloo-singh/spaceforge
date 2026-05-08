@@ -314,6 +314,33 @@ export interface InteriorAssetKitchenUnit extends InteriorAssetCommonProperties 
 }
 
 /**
+ * Kitchen appliance: generic placeholder for kitchen appliances (microwave, oven, etc.)
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable within reasonable furniture dimensions
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - Currently no specific properties; all data captured in common properties
+ * - Future: could add properties like applianceType (microwave, oven, etc.)
+ *
+ * Visual distinction:
+ * - Rendered with subtle corner lines for microwave-style appearance
+ *
+ * Examples:
+ * - Microwave: 600mm × 600mm
+ * - Built-in oven: 600mm × 600mm
+ */
+export interface InteriorAssetKitchenAppliance extends InteriorAssetCommonProperties {
+  type: "kitchen-appliance";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -341,7 +368,7 @@ export interface InteriorAssetKitchenUnit extends InteriorAssetCommonProperties 
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
@@ -425,6 +452,20 @@ export function isDiningTable(asset: InteriorAsset): asset is InteriorAssetDinin
  */
 export function isKitchenUnit(asset: InteriorAsset): asset is InteriorAssetKitchenUnit {
   return asset.type === "kitchen-unit";
+}
+
+/**
+ * Type guard to safely extract kitchen appliance from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isKitchenAppliance(asset)) {
+ *   // asset-specific logic
+ * }
+ * ```
+ */
+export function isKitchenAppliance(asset: InteriorAsset): asset is InteriorAssetKitchenAppliance {
+  return asset.type === "kitchen-appliance";
 }
 
 /**

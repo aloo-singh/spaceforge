@@ -62,6 +62,8 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected table", description: "Adjust the table's shape, size, and orientation." };
     case "kitchen-unit":
       return { title: "Selected kitchen unit", description: "Adjust the kitchen unit's position, size, and orientation." };
+    case "kitchen-appliance":
+      return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }

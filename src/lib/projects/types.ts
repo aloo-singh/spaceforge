@@ -64,14 +64,15 @@ function isOpeningType(value: unknown): value is "door" | "window" {
   return value === "door" || value === "window";
 }
 
-function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa" | "wardrobe" | "dining-table" | "kitchen-unit" {
+function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa" | "wardrobe" | "dining-table" | "kitchen-unit" | "kitchen-appliance" {
   return (
     value === "stairs" ||
     value === "bed" ||
     value === "sofa" ||
     value === "wardrobe" ||
     value === "dining-table" ||
-    value === "kitchen-unit"
+    value === "kitchen-unit" ||
+    value === "kitchen-appliance"
   );
 }
 

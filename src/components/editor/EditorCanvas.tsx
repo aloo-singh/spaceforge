@@ -5247,6 +5247,54 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
+      if (displayedAsset.type === "kitchen-appliance") {
+        // Subtle corner lines (microwave-style) with lower opacity
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.7,
+          color: fgColor,
+          alpha: fgAlpha * 0.5,
+        });
+        
+        // Corner line length as fraction of overall size
+        const cornerFrac = 0.15;
+        const widthPx = Math.abs(bottomRight.x - topLeft.x);
+        const heightPx = Math.abs(bottomRight.y - topLeft.y);
+        const cornerLenX = widthPx * cornerFrac;
+        const cornerLenY = heightPx * cornerFrac;
+        
+        // Top-left corner
+        graphics.moveTo(topLeft.x, topLeft.y);
+        graphics.lineTo(topLeft.x + cornerLenX, topLeft.y);
+        graphics.stroke();
+        graphics.moveTo(topLeft.x, topLeft.y);
+        graphics.lineTo(topLeft.x, topLeft.y + cornerLenY);
+        graphics.stroke();
+        
+        // Top-right corner
+        graphics.moveTo(bottomRight.x, topLeft.y);
+        graphics.lineTo(bottomRight.x - cornerLenX, topLeft.y);
+        graphics.stroke();
+        graphics.moveTo(bottomRight.x, topLeft.y);
+        graphics.lineTo(bottomRight.x, topLeft.y + cornerLenY);
+        graphics.stroke();
+        
+        // Bottom-left corner
+        graphics.moveTo(topLeft.x, bottomRight.y);
+        graphics.lineTo(topLeft.x + cornerLenX, bottomRight.y);
+        graphics.stroke();
+        graphics.moveTo(topLeft.x, bottomRight.y);
+        graphics.lineTo(topLeft.x, bottomRight.y - cornerLenY);
+        graphics.stroke();
+        
+        // Bottom-right corner
+        graphics.moveTo(bottomRight.x, bottomRight.y);
+        graphics.lineTo(bottomRight.x - cornerLenX, bottomRight.y);
+        graphics.stroke();
+        graphics.moveTo(bottomRight.x, bottomRight.y);
+        graphics.lineTo(bottomRight.x, bottomRight.y - cornerLenY);
+        graphics.stroke();
+      }
+
 
     }
 
