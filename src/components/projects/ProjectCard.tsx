@@ -349,7 +349,7 @@ export function ProjectCard({
           className={cn(
             "flex min-w-0 flex-1 flex-col gap-3",
             isListLayout &&
-              "sm:grid sm:h-40 sm:grid-cols-[minmax(0,1fr)_auto] sm:grid-rows-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-5 sm:gap-y-0"
+              "sm:relative sm:h-40 sm:flex-row sm:items-center sm:justify-between sm:gap-5"
           )}
         >
           <div className="min-w-0 space-y-3">
@@ -489,9 +489,9 @@ export function ProjectCard({
           {isListLayout && !isEditingName ? (
             <div
               className={cn(
-                "grid overflow-hidden transition-[grid-template-rows,opacity,transform,margin-top] duration-200 ease-out motion-reduce:transition-none sm:col-span-2",
+                "grid overflow-hidden transition-[grid-template-rows,opacity,transform,margin-top] duration-200 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-0 sm:bottom-0",
                 showProjectInfo
-                  ? "mt-6 grid-rows-[1fr] translate-y-0 opacity-100 sm:self-end"
+                  ? "mt-6 grid-rows-[1fr] translate-y-0 opacity-100 sm:mt-0"
                   : "mt-0 grid-rows-[0fr] -translate-y-1 opacity-0"
               )}
               aria-hidden={!showProjectInfo}
