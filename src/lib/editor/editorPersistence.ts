@@ -248,7 +248,8 @@ function isInteriorAssetType(value: unknown): value is Room["interiorAssets"][nu
     value === "wardrobe" ||
     value === "dining-table" ||
     value === "kitchen-unit" ||
-    value === "kitchen-appliance"
+    value === "kitchen-appliance" ||
+    value === "hob"
   );
 }
 

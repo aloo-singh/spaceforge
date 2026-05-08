@@ -64,7 +64,7 @@ function isOpeningType(value: unknown): value is "door" | "window" {
   return value === "door" || value === "window";
 }
 
-function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa" | "wardrobe" | "dining-table" | "kitchen-unit" | "kitchen-appliance" {
+function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa" | "wardrobe" | "dining-table" | "kitchen-unit" | "kitchen-appliance" | "hob" {
   return (
     value === "stairs" ||
     value === "bed" ||
@@ -72,7 +72,8 @@ function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa"
     value === "wardrobe" ||
     value === "dining-table" ||
     value === "kitchen-unit" ||
-    value === "kitchen-appliance"
+    value === "kitchen-appliance" ||
+    value === "hob"
   );
 }
 
