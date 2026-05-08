@@ -253,6 +253,7 @@ export function ProjectsPageClient() {
   const [projectFilters, setProjectFilters] = useState<ProjectFilterState>(
     DEFAULT_PROJECT_FILTERS
   );
+  const [showProjectFilters, setShowProjectFilters] = useState(true);
   // Third of the /projects trio: layout preference state first, rendering modes next.
   const [projectLayout, setProjectLayout] = useState<ProjectLayout>(DEFAULT_PROJECT_LAYOUT);
   const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
@@ -559,6 +560,31 @@ export function ProjectsPageClient() {
           </div>
 
           <div className="flex items-center gap-2">
+            {shouldShowProjectFilters ? (
+              <ImmediateTooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-lg"
+                      aria-label={showProjectFilters ? "Hide project filters" : "Show project filters"}
+                      aria-controls="project-filters-panel"
+                      aria-expanded={showProjectFilters}
+                      aria-pressed={showProjectFilters}
+                      onClick={() => setShowProjectFilters((current) => !current)}
+                      className="h-11 w-11 rounded-full text-foreground/70 hover:text-foreground"
+                    >
+                      <Filter2 className="size-4.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="center">
+                    {showProjectFilters ? "Hide project filters" : "Show project filters"}
+                  </TooltipContent>
+                </Tooltip>
+              </ImmediateTooltipProvider>
+            ) : null}
+
             <ImmediateTooltipProvider>
               <ButtonGroup className="h-11 rounded-full">
                 {PROJECT_LAYOUT_OPTIONS.map((layoutOption) => {
@@ -722,26 +748,20 @@ export function ProjectsPageClient() {
         {!isLoading && projects.length > 0 ? (
           <div className="space-y-4">
             {shouldShowProjectFilters ? (
-              <div className="space-y-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:p-4">
-                <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-start">
-                  <ImmediateTooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                          aria-label="Filter projects"
-                          tabIndex={0}
-                          className="flex h-8 items-center text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/45"
-                        >
-                          <Filter2 className="size-4" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" align="start">
-                        Filter projects
-                      </TooltipContent>
-                    </Tooltip>
-                  </ImmediateTooltipProvider>
-
-                  <div className="space-y-3">
+              <div
+                className={
+                  showProjectFilters
+                    ? "grid grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity,transform] duration-200 ease-out motion-reduce:transition-none"
+                    : "grid grid-rows-[0fr] -translate-y-1 opacity-0 transition-[grid-template-rows,opacity,transform] duration-200 ease-out motion-reduce:transition-none"
+                }
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div
+                    id="project-filters-panel"
+                    aria-hidden={!showProjectFilters}
+                    inert={showProjectFilters ? undefined : true}
+                    className="space-y-3 rounded-xl border border-border/70 bg-card/45 p-3 sm:p-4"
+                  >
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
                       <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         {availableProjectFilterOptions.map((filterOption) => {
