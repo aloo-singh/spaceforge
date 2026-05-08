@@ -21,6 +21,7 @@ import { formatMetricRoomArea } from "@/lib/editor/measurements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -38,6 +39,7 @@ type ProjectCardProps = {
   showProjectInfo?: boolean;
   currentTier: SubscriptionTier;
   isInteractionDisabled?: boolean;
+  layout?: "grid-small" | "grid-large" | "list";
 };
 
 function formatProjectCreatedDate(value: string) {
@@ -109,6 +111,7 @@ export function ProjectCard({
   showProjectInfo = false,
   currentTier,
   isInteractionDisabled = false,
+  layout = "grid-small",
 }: ProjectCardProps) {
   const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -118,6 +121,8 @@ export function ProjectCard({
   const isSubmittingRenameRef = useRef(false);
   const stats = getProjectCardStats(project);
   const canShowPaidStats = currentTier !== "Free";
+  const isGridLargeLayout = layout === "grid-large";
+  const isListLayout = layout === "list";
 
   const handleCardClick = () => {
     if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
@@ -188,12 +193,25 @@ export function ProjectCard({
         }
       }}
     >
-      <CardContent className="flex h-full flex-col gap-4 p-4">
-        <div className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/35">
+      <CardContent
+        className={cn(
+          "flex h-full flex-col gap-4 p-4",
+          isGridLargeLayout && "gap-5 p-5",
+          isListLayout && "gap-3 p-3 sm:grid sm:grid-cols-[minmax(12rem,16rem)_1fr] sm:items-center sm:gap-4"
+        )}
+      >
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-xl border border-border/70 bg-muted/35",
+            isListLayout && "sm:h-36"
+          )}
+        >
           <div
-            className={`aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none ${
+            className={cn(
+              "aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none",
+              isListLayout && "sm:h-full sm:aspect-auto",
               showProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
-            }`}
+            )}
           >
             {project.thumbnailDataUrl && !hasThumbnailLoadError ? (
               <Image
@@ -201,7 +219,13 @@ export function ProjectCard({
                 alt={`Thumbnail preview for ${project.name}`}
                 fill
                 unoptimized
-                sizes="(min-width: 1280px) 22rem, (min-width: 640px) 45vw, 100vw"
+                sizes={
+                  isListLayout
+                    ? "(min-width: 640px) 16rem, 100vw"
+                    : isGridLargeLayout
+                      ? "(min-width: 1024px) 32rem, 100vw"
+                      : "(min-width: 1280px) 22rem, (min-width: 640px) 45vw, 100vw"
+                }
                 className="object-cover"
                 onError={() => {
                   setHasThumbnailLoadError(true);
@@ -266,7 +290,13 @@ export function ProjectCard({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-3",
+            isListLayout && "sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          )}
+        >
+        <div className="min-w-0 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
               {isEditingName ? (
@@ -310,7 +340,12 @@ export function ProjectCard({
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-3">
+        <div
+          className={cn(
+            "mt-auto flex items-center justify-between gap-3",
+            isListLayout && "mt-0 shrink-0 sm:justify-end"
+          )}
+        >
           <div className="flex items-center gap-2">
             {isEditingName ? (
               <>
@@ -394,6 +429,7 @@ export function ProjectCard({
             Open project
             <ArrowUpRight className="size-4" />
           </Button>
+        </div>
         </div>
       </CardContent>
     </Card>

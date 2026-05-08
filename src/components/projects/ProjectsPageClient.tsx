@@ -206,6 +206,18 @@ function loadProjectLayoutFromStorage(): ProjectLayout {
   }
 }
 
+function getProjectLayoutClassName(projectLayout: ProjectLayout) {
+  if (projectLayout === "grid-large") {
+    return "grid gap-5 lg:grid-cols-2";
+  }
+
+  if (projectLayout === "list") {
+    return "flex flex-col gap-3";
+  }
+
+  return "grid gap-4 sm:grid-cols-2 xl:grid-cols-3";
+}
+
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
   if (!DEV_MODE_ENABLED || typeof window === "undefined") {
     return "Free";
@@ -800,7 +812,7 @@ export function ProjectsPageClient() {
               </div>
             ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={getProjectLayoutClassName(projectLayout)}>
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
@@ -811,6 +823,7 @@ export function ProjectsPageClient() {
                   isDeleting={deletingProjectId === project.id}
                   showProjectInfo={showProjectInfo}
                   currentTier={currentTier}
+                  layout={projectLayout}
                   isInteractionDisabled={
                     isCreatingProject ||
                     (deletingProjectId !== null && deletingProjectId !== project.id)
