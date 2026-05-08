@@ -7,13 +7,13 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
-    version: "Unreleased",
-    date: "2026-05-07",
-    title: "Project details at a glance",
+    version: "v0.78.0",
+    date: "2026-05-08",
+    title: "Browse projects your way",
     items: [
       "The projects page now has a calm info toggle for showing project details directly over each thumbnail.",
-      "Free projects show room count and total floor area; paid tiers also show floor count and created date.",
-      "The overlay keeps thumbnails visible underneath, with subtle blue icons, measurement-style type, and helpful tooltips.",
+      "You can filter projects by rooms and area, with floor filters available on paid tiers.",
+      "Choose between small grid, large grid, and list views; your preferred layout is remembered for next time.",
     ],
   },
   {

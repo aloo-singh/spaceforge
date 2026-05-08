@@ -62,6 +62,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `Upgrade to ${nextTier} to create unlimited projects and unlock advanced features.`,
       terminalMessage: "You've reached your Free tier project limit. Ready to expand?",
     },
+    projectFilters: {
+      name: "Project Filters",
+      label: "Project filters",
+      description: "Filter the projects page by project details.",
+      limit: 2,
+      singularLabel: "filter",
+      pluralLabel: "filters",
+      upsellMessage: (nextTier, nextLimit) =>
+        `Upgrade to ${nextTier} to use ${nextLimit} project filters, including floors.`,
+      terminalMessage: "Free includes room and area filters. Upgrade when you need floor-level browsing.",
+    },
+    projectInfoMetrics: {
+      name: "Project Info Metrics",
+      label: "Project info metrics",
+      description: "Show useful project details on project thumbnails.",
+      limit: 2,
+      singularLabel: "metric",
+      pluralLabel: "metrics",
+      upsellMessage: (nextTier, nextLimit) =>
+        `Upgrade to ${nextTier} to see ${nextLimit} project info metrics, including floors and created date.`,
+      terminalMessage: "Free includes room count and total area. Upgrade for richer project details.",
+    },
     exportHighRes: {
       name: "Hi-res Export",
       label: "Hi-res PNG export",
@@ -72,6 +94,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: (nextTier) =>
         `Upgrade to ${nextTier} to unlock Hi-res export (4x resolution = 16x total pixels for prints that stay sharp at any size).`,
       terminalMessage: "Free tier doesn't include Hi-res export. Upgrade for crisp, sharp prints.",
+    },
+    exportPdf: {
+      name: "PDF Export",
+      label: "PDF export",
+      description: "Create print-ready PDF exports for sharing plans cleanly.",
+      limit: 0,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: (nextTier) =>
+        `Upgrade to ${nextTier} to export print-ready PDFs for sharing and review.`,
+      terminalMessage: "Free tier doesn't include PDF export. Upgrade when you need print-ready files.",
+    },
+    exportSvg: {
+      name: "SVG Export",
+      label: "SVG export",
+      description: "Export editable vector floor plans for design and presentation tools.",
+      limit: 0,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: (nextTier) =>
+        `Upgrade to ${nextTier} to export editable SVG files for vector workflows.`,
+      terminalMessage: "Free tier doesn't include SVG export. Upgrade for editable vector output.",
     },
   },
 
@@ -98,6 +142,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `You've unlocked unlimited projects on Pro. Create freely.`,
       terminalMessage: "You have unlimited projects on Pro tier. Build away!",
     },
+    projectFilters: {
+      name: "Project Filters",
+      label: "Project filters",
+      description: "Filter the projects page by project details.",
+      limit: 3,
+      singularLabel: "filter",
+      pluralLabel: "filters",
+      upsellMessage: () =>
+        `You've unlocked project filters for rooms, area, and floors on Pro.`,
+      terminalMessage: "Project filters for rooms, area, and floors are available on Pro.",
+    },
+    projectInfoMetrics: {
+      name: "Project Info Metrics",
+      label: "Project info metrics",
+      description: "Show useful project details on project thumbnails.",
+      limit: 4,
+      singularLabel: "metric",
+      pluralLabel: "metrics",
+      upsellMessage: () =>
+        `You've unlocked the full project info overlay on Pro.`,
+      terminalMessage: "The full project info overlay is available on Pro.",
+    },
     exportHighRes: {
       name: "Hi-res Export",
       label: "Hi-res PNG export",
@@ -108,6 +174,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You've unlocked Hi-res export on Pro. Export crisp prints at any size.`,
       terminalMessage: "You've unlocked Hi-res export on Pro. Export crisp prints at any size.",
+    },
+    exportPdf: {
+      name: "PDF Export",
+      label: "PDF export",
+      description: "Create print-ready PDF exports for sharing plans cleanly.",
+      limit: 1,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: () =>
+        `You've unlocked PDF export on Pro. Create print-ready plans for sharing and review.`,
+      terminalMessage: "You've unlocked PDF export on Pro. Create print-ready plans for sharing and review.",
+    },
+    exportSvg: {
+      name: "SVG Export",
+      label: "SVG export",
+      description: "Export editable vector floor plans for design and presentation tools.",
+      limit: 0,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: (nextTier) =>
+        `Upgrade to ${nextTier} to export editable SVG files for vector workflows.`,
+      terminalMessage: "Pro includes PDF export. Studio unlocks editable SVG export.",
     },
   },
 
@@ -134,6 +222,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `You've unlocked unlimited projects on Studio. Create freely.`,
       terminalMessage: "You have unlimited projects on Studio tier. Build away!",
     },
+    projectFilters: {
+      name: "Project Filters",
+      label: "Project filters",
+      description: "Filter the projects page by project details.",
+      limit: 3,
+      singularLabel: "filter",
+      pluralLabel: "filters",
+      upsellMessage: () =>
+        `You've unlocked project filters for rooms, area, and floors on Studio.`,
+      terminalMessage: "Project filters for rooms, area, and floors are available on Studio.",
+    },
+    projectInfoMetrics: {
+      name: "Project Info Metrics",
+      label: "Project info metrics",
+      description: "Show useful project details on project thumbnails.",
+      limit: 4,
+      singularLabel: "metric",
+      pluralLabel: "metrics",
+      upsellMessage: () =>
+        `You've unlocked the full project info overlay on Studio.`,
+      terminalMessage: "The full project info overlay is available on Studio.",
+    },
     exportHighRes: {
       name: "Hi-res Export",
       label: "Hi-res PNG export",
@@ -144,6 +254,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You've unlocked Hi-res export on Studio. Export crisp prints at any size.`,
       terminalMessage: "You've unlocked Hi-res export on Studio. Export crisp prints at any size.",
+    },
+    exportPdf: {
+      name: "PDF Export",
+      label: "PDF export",
+      description: "Create print-ready PDF exports for sharing plans cleanly.",
+      limit: 1,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: () =>
+        `You've unlocked PDF export on Studio. Create print-ready plans for sharing and review.`,
+      terminalMessage: "You've unlocked PDF export on Studio. Create print-ready plans for sharing and review.",
+    },
+    exportSvg: {
+      name: "SVG Export",
+      label: "SVG export",
+      description: "Export editable vector floor plans for design and presentation tools.",
+      limit: 1,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: () =>
+        `You've unlocked editable SVG export on Studio.`,
+      terminalMessage: "You've unlocked editable SVG export on Studio.",
     },
   },
 
@@ -170,6 +302,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `You've unlocked unlimited projects on Education. Create freely.`,
       terminalMessage: "You have unlimited projects on Education tier. Build away!",
     },
+    projectFilters: {
+      name: "Project Filters",
+      label: "Project filters",
+      description: "Filter the projects page by project details.",
+      limit: 3,
+      singularLabel: "filter",
+      pluralLabel: "filters",
+      upsellMessage: () =>
+        `You're on Education tier with full project filtering.`,
+      terminalMessage: "Project filters for rooms, area, and floors are available on Education.",
+    },
+    projectInfoMetrics: {
+      name: "Project Info Metrics",
+      label: "Project info metrics",
+      description: "Show useful project details on project thumbnails.",
+      limit: 4,
+      singularLabel: "metric",
+      pluralLabel: "metrics",
+      upsellMessage: () =>
+        `You're on Education tier with the full project info overlay.`,
+      terminalMessage: "The full project info overlay is available on Education.",
+    },
     exportHighRes: {
       name: "Hi-res Export",
       label: "Hi-res PNG export",
@@ -180,6 +334,28 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You've unlocked Hi-res export on Education. Export crisp prints at any size.`,
       terminalMessage: "You've unlocked Hi-res export on Education. Export crisp prints at any size.",
+    },
+    exportPdf: {
+      name: "PDF Export",
+      label: "PDF export",
+      description: "Create print-ready PDF exports for sharing plans cleanly.",
+      limit: 1,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: () =>
+        `You're on Education tier with PDF export unlocked.`,
+      terminalMessage: "PDF export is available on Education.",
+    },
+    exportSvg: {
+      name: "SVG Export",
+      label: "SVG export",
+      description: "Export editable vector floor plans for design and presentation tools.",
+      limit: 1,
+      singularLabel: "format",
+      pluralLabel: "formats",
+      upsellMessage: () =>
+        `You're on Education tier with editable SVG export unlocked.`,
+      terminalMessage: "Editable SVG export is available on Education.",
     },
   },
 };

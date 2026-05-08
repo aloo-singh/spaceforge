@@ -9,8 +9,11 @@ import {
   ArrowRight,
   Blocks,
   BorderAll,
+  Columns2,
+  Columns3,
   Filter2,
   InfoCircle,
+  LayoutList,
   Plus,
   RefreshCcw,
   Stack,
@@ -41,7 +44,7 @@ import {
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ProjectDeleteDialog } from "@/components/projects/ProjectDeleteDialog";
 import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonGroup } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
@@ -61,7 +64,10 @@ import { getEffectiveMaxProjects } from "@/lib/subscription/features";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
 const DEV_SUBSCRIPTION_TIER_STORAGE_KEY = "spaceforge_dev_subscription_tier";
+const PROJECT_LAYOUT_STORAGE_KEY = "spaceforge_project_layout";
 const DEV_MODE_ENABLED = process.env.NEXT_PUBLIC_DEV_SUBSCRIPTION_MODE === "true";
+
+type ProjectLayout = "grid-small" | "grid-large" | "list";
 
 type ProjectFilterState = {
   minRooms: number | null;
@@ -83,7 +89,15 @@ type ProjectFilterOption = {
   }[];
 };
 
+type ProjectLayoutOption = {
+  value: ProjectLayout;
+  label: string;
+  icon: typeof Columns3;
+};
+
 const PROJECT_FILTER_ANY_VALUE = "any";
+
+const DEFAULT_PROJECT_LAYOUT: ProjectLayout = "grid-small";
 
 const DEFAULT_PROJECT_FILTERS: ProjectFilterState = {
   minRooms: null,
@@ -130,6 +144,24 @@ const PROJECT_FILTER_OPTIONS: ProjectFilterOption[] = [
   },
 ];
 
+const PROJECT_LAYOUT_OPTIONS: ProjectLayoutOption[] = [
+  {
+    value: "grid-small",
+    label: "Grid small",
+    icon: Columns3,
+  },
+  {
+    value: "grid-large",
+    label: "Grid large",
+    icon: Columns2,
+  },
+  {
+    value: "list",
+    label: "List",
+    icon: LayoutList,
+  },
+];
+
 function getProjectTotalAreaSquareMetres(project: ProjectListItem) {
   return (project.stats?.totalAreaSquareMillimetres ?? 0) / 1_000_000;
 }
@@ -155,6 +187,35 @@ function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterS
 
 function formatProjectFilterSelectValue(value: number | null) {
   return value === null ? PROJECT_FILTER_ANY_VALUE : String(value);
+}
+
+function isProjectLayout(value: string | null): value is ProjectLayout {
+  return value === "grid-small" || value === "grid-large" || value === "list";
+}
+
+function loadProjectLayoutFromStorage(): ProjectLayout {
+  if (typeof window === "undefined") {
+    return DEFAULT_PROJECT_LAYOUT;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(PROJECT_LAYOUT_STORAGE_KEY);
+    return isProjectLayout(stored) ? stored : DEFAULT_PROJECT_LAYOUT;
+  } catch {
+    return DEFAULT_PROJECT_LAYOUT;
+  }
+}
+
+function getProjectLayoutClassName(projectLayout: ProjectLayout) {
+  if (projectLayout === "grid-large") {
+    return "grid gap-5 transition-[gap] duration-150 ease-out lg:grid-cols-2 motion-reduce:transition-none";
+  }
+
+  if (projectLayout === "list") {
+    return "flex flex-col gap-3 transition-[gap] duration-150 ease-out motion-reduce:transition-none";
+  }
+
+  return "grid gap-4 transition-[gap] duration-150 ease-out sm:grid-cols-2 xl:grid-cols-3 motion-reduce:transition-none";
 }
 
 function loadDevSubscriptionTierFromStorage(): SubscriptionTier {
@@ -192,6 +253,9 @@ export function ProjectsPageClient() {
   const [projectFilters, setProjectFilters] = useState<ProjectFilterState>(
     DEFAULT_PROJECT_FILTERS
   );
+  // Third of the /projects trio: layout preference state first, rendering modes next.
+  const [projectLayout, setProjectLayout] = useState<ProjectLayout>(DEFAULT_PROJECT_LAYOUT);
+  const [hasLoadedProjectLayout, setHasLoadedProjectLayout] = useState(false);
   const [devTier, setDevTier] = useState<SubscriptionTier>("Free");
   const didLoadProjectsRef = useRef(false);
   const [hasMeaningfulProjectsInteraction, setHasMeaningfulProjectsInteraction] = useState(false);
@@ -212,6 +276,23 @@ export function ProjectsPageClient() {
   // Current subscription tier (respects dev mode when enabled)
   const currentTier: SubscriptionTier = DEV_MODE_ENABLED ? devTier : "Free";
   const canUsePaidProjectFilters = currentTier !== "Free";
+
+  useEffect(() => {
+    if (!hasLoadedProjectLayout) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(PROJECT_LAYOUT_STORAGE_KEY, projectLayout);
+    } catch {
+      // localStorage may be unavailable in some environments
+    }
+  }, [hasLoadedProjectLayout, projectLayout]);
+
+  useEffect(() => {
+    setProjectLayout(loadProjectLayoutFromStorage());
+    setHasLoadedProjectLayout(true);
+  }, []);
 
   const loadProjects = async ({ showLoadingState }: { showLoadingState: boolean }) => {
     if (showLoadingState) {
@@ -479,6 +560,38 @@ export function ProjectsPageClient() {
 
           <div className="flex items-center gap-2">
             <ImmediateTooltipProvider>
+              <ButtonGroup className="h-11 rounded-full">
+                {PROJECT_LAYOUT_OPTIONS.map((layoutOption) => {
+                  const Icon = layoutOption.icon;
+                  const isActive = projectLayout === layoutOption.value;
+
+                  return (
+                    <Tooltip key={layoutOption.value}>
+                      <TooltipTrigger asChild>
+                        <span data-slot="button-group-item" className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-lg"
+                            aria-label={layoutOption.label}
+                            aria-pressed={isActive}
+                            onClick={() => setProjectLayout(layoutOption.value)}
+                            className="h-11 w-11"
+                          >
+                            <Icon className="size-4" />
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="center">
+                        {layoutOption.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </ButtonGroup>
+            </ImmediateTooltipProvider>
+
+            <ImmediateTooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -488,7 +601,7 @@ export function ProjectsPageClient() {
                     aria-label="Show project details"
                     aria-pressed={showProjectInfo}
                     onClick={() => setShowProjectInfo((current) => !current)}
-                    className="rounded-full text-foreground/70 hover:text-foreground"
+                    className="h-11 w-11 rounded-full text-foreground/70 hover:text-foreground active:scale-[0.97]"
                   >
                     <InfoCircle className="size-4.5" />
                   </Button>
@@ -694,13 +807,12 @@ export function ProjectsPageClient() {
                         </Button>
                       </div>
                     </div>
-
                   </div>
                 </div>
               </div>
             ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={getProjectLayoutClassName(projectLayout)}>
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
@@ -711,6 +823,7 @@ export function ProjectsPageClient() {
                   isDeleting={deletingProjectId === project.id}
                   showProjectInfo={showProjectInfo}
                   currentTier={currentTier}
+                  layout={projectLayout}
                   isInteractionDisabled={
                     isCreatingProject ||
                     (deletingProjectId !== null && deletingProjectId !== project.id)

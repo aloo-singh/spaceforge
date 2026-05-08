@@ -21,6 +21,7 @@ import { formatMetricRoomArea } from "@/lib/editor/measurements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -38,6 +39,7 @@ type ProjectCardProps = {
   showProjectInfo?: boolean;
   currentTier: SubscriptionTier;
   isInteractionDisabled?: boolean;
+  layout?: "grid-small" | "grid-large" | "list";
 };
 
 function formatProjectCreatedDate(value: string) {
@@ -63,12 +65,14 @@ function getProjectCardStats(project: ProjectListItem) {
 }
 
 function ProjectInfoMetric({
+  density = "default",
   icon: Icon,
   isInteractive,
   label,
   tooltip,
   value,
 }: {
+  density?: "default" | "compact" | "comfortable";
   icon: typeof BorderAll;
   isInteractive: boolean;
   label: string;
@@ -76,7 +80,16 @@ function ProjectInfoMetric({
   value: string;
 }) {
   return (
-    <div className="min-h-[3.25rem] min-w-0 rounded-md border border-white/45 bg-white/60 px-2 py-1.5 shadow-sm backdrop-blur-md sm:px-2.5 sm:py-2 dark:border-white/10 dark:bg-slate-950/55">
+    <div
+      className={cn(
+        "min-w-0 rounded-md border border-white/45 bg-white/60 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-slate-950/55",
+        density === "compact"
+          ? "min-h-[2.875rem] px-2 py-1.5"
+          : density === "comfortable"
+            ? "min-h-[3.5rem] px-2.5 py-2 sm:px-3 sm:py-2.5"
+            : "min-h-[3.25rem] px-2 py-1.5 sm:px-2.5 sm:py-2"
+      )}
+    >
       <div className="flex items-center gap-1.5 font-measurement text-[10px] font-semibold uppercase text-foreground/55">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -93,7 +106,12 @@ function ProjectInfoMetric({
         </Tooltip>
         <span className="truncate">{label}</span>
       </div>
-      <p className="mt-0.5 truncate font-measurement text-[13px] font-semibold text-foreground sm:mt-1 sm:text-sm">
+      <p
+        className={cn(
+          "mt-0.5 truncate font-measurement font-semibold text-foreground sm:mt-1",
+          density === "compact" ? "text-xs sm:text-[13px]" : "text-[13px] sm:text-sm"
+        )}
+      >
         {value}
       </p>
     </div>
@@ -109,6 +127,7 @@ export function ProjectCard({
   showProjectInfo = false,
   currentTier,
   isInteractionDisabled = false,
+  layout = "grid-small",
 }: ProjectCardProps) {
   const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -118,6 +137,13 @@ export function ProjectCard({
   const isSubmittingRenameRef = useRef(false);
   const stats = getProjectCardStats(project);
   const canShowPaidStats = currentTier !== "Free";
+  const isGridLargeLayout = layout === "grid-large";
+  const isListLayout = layout === "list";
+  const infoMetricDensity = isListLayout
+    ? "compact"
+    : isGridLargeLayout
+      ? "comfortable"
+      : "default";
 
   const handleCardClick = () => {
     if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
@@ -179,7 +205,7 @@ export function ProjectCard({
   return (
     <Card 
       onClick={handleCardClick}
-      className="border-border/70 bg-card/75 transition-colors hover:border-border hover:bg-card/95 cursor-pointer"
+      className="border-border/70 bg-card/75 transition-[border-color,background-color,box-shadow] duration-150 ease-out hover:border-border hover:bg-card/95 cursor-pointer motion-reduce:transition-none"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -188,12 +214,27 @@ export function ProjectCard({
         }
       }}
     >
-      <CardContent className="flex h-full flex-col gap-4 p-4">
-        <div className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/35">
+      <CardContent
+        className={cn(
+          "flex h-full flex-col gap-4 p-4",
+          isGridLargeLayout && "gap-5 p-5",
+          isListLayout &&
+            "gap-3 p-3 sm:grid sm:grid-cols-[minmax(13rem,17rem)_1fr] sm:items-center sm:gap-5"
+        )}
+      >
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-xl border border-border/70 bg-muted/35",
+            isGridLargeLayout && "rounded-2xl",
+            isListLayout && "sm:h-40"
+          )}
+        >
           <div
-            className={`aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none ${
+            className={cn(
+              "aspect-[8/5] w-full transform-gpu transition-[filter,transform] duration-200 ease-out motion-reduce:transition-none",
+              isListLayout && "sm:h-full sm:aspect-auto",
               showProjectInfo ? "scale-[1.01] blur-[1.5px]" : "scale-100 blur-0"
-            }`}
+            )}
           >
             {project.thumbnailDataUrl && !hasThumbnailLoadError ? (
               <Image
@@ -201,7 +242,13 @@ export function ProjectCard({
                 alt={`Thumbnail preview for ${project.name}`}
                 fill
                 unoptimized
-                sizes="(min-width: 1280px) 22rem, (min-width: 640px) 45vw, 100vw"
+                sizes={
+                  isListLayout
+                    ? "(min-width: 640px) 17rem, 100vw"
+                    : isGridLargeLayout
+                      ? "(min-width: 1024px) 32rem, 100vw"
+                      : "(min-width: 1280px) 22rem, (min-width: 640px) 45vw, 100vw"
+                }
                 className="object-cover"
                 onError={() => {
                   setHasThumbnailLoadError(true);
@@ -218,18 +265,24 @@ export function ProjectCard({
             )}
           </div>
           <div
-            className={`pointer-events-none absolute inset-0 flex items-end bg-background/20 p-2.5 transition-opacity duration-200 ease-out motion-reduce:transition-none sm:p-3 dark:bg-background/25 ${
+            className={cn(
+              "pointer-events-none absolute inset-0 flex items-end bg-background/20 p-2.5 transition-opacity duration-200 ease-out motion-reduce:transition-none sm:p-3 dark:bg-background/25",
+              isGridLargeLayout && "sm:p-4",
+              isListLayout && "sm:p-2.5",
               showProjectInfo ? "opacity-100" : "opacity-0"
-            }`}
+            )}
             aria-hidden={!showProjectInfo}
           >
             <ImmediateTooltipProvider>
               <div
-                className={`grid w-full grid-cols-2 gap-1.5 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out sm:gap-2 motion-reduce:transition-none ${
+                className={cn(
+                  "grid w-full grid-cols-2 gap-1.5 transform-gpu transition-[opacity,transform] delay-75 duration-200 ease-out sm:gap-2 motion-reduce:transition-none",
+                  isListLayout && "sm:gap-1.5",
                   showProjectInfo ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-                }`}
+                )}
               >
                 <ProjectInfoMetric
+                  density={infoMetricDensity}
                   icon={Blocks}
                   isInteractive={showProjectInfo}
                   label="Rooms"
@@ -237,6 +290,7 @@ export function ProjectCard({
                   value={`${stats.roomCount}`}
                 />
                 <ProjectInfoMetric
+                  density={infoMetricDensity}
                   icon={BorderAll}
                   isInteractive={showProjectInfo}
                   label="Area"
@@ -246,6 +300,7 @@ export function ProjectCard({
                 {canShowPaidStats ? (
                   <>
                     <ProjectInfoMetric
+                      density={infoMetricDensity}
                       icon={Stack}
                       isInteractive={showProjectInfo}
                       label="Floors"
@@ -253,6 +308,7 @@ export function ProjectCard({
                       value={`${stats.floorCount}`}
                     />
                     <ProjectInfoMetric
+                      density={infoMetricDensity}
                       icon={CalendarWeek}
                       isInteractive={showProjectInfo}
                       label="Created"
@@ -266,9 +322,15 @@ export function ProjectCard({
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-1">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-3",
+            isListLayout && "sm:flex-row sm:items-center sm:justify-between sm:gap-5"
+          )}
+        >
+          <div className="min-w-0 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-1">
               {isEditingName ? (
                 <div>
                   <Input
@@ -306,12 +368,17 @@ export function ProjectCard({
                   <span>{formatProjectUpdatedAt(project.updatedAt)}</span>
                 </p>
               )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              "mt-auto flex items-center justify-between gap-3",
+              isListLayout && "mt-0 shrink-0 sm:justify-end"
+            )}
+          >
+            <div className="flex items-center gap-2">
             {isEditingName ? (
               <>
                 <Button
@@ -380,20 +447,21 @@ export function ProjectCard({
                 </Button>
               </>
             )}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCardClick();
+              }}
+              disabled={isEditingName || isRenaming || isInteractionDisabled}
+              className="bg-blue-500 text-white hover:bg-blue-500/90"
+            >
+              Open project
+              <ArrowUpRight className="size-4" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCardClick();
-            }}
-            disabled={isEditingName || isRenaming || isInteractionDisabled}
-            className="bg-blue-500 text-white hover:bg-blue-500/90"
-          >
-            Open project
-            <ArrowUpRight className="size-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>
