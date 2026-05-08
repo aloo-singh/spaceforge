@@ -290,6 +290,30 @@ export interface InteriorAssetDiningTable extends InteriorAssetCommonProperties 
 }
 
 /**
+ * Kitchen Unit: simple resizable kitchen fixture (counter, island, appliance placement).
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate (respects size preset)
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Type-specific properties:
+ * - Currently no specific properties; all data captured in common properties
+ * - Future: could add properties like applianceType, cabinetStyle, etc.
+ *
+ * Examples:
+ * - Single: 900mm × 600mm
+ * - Double: 1800mm × 600mm
+ */
+export interface InteriorAssetKitchenUnit extends InteriorAssetCommonProperties {
+  type: "kitchen-unit";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -298,6 +322,7 @@ export interface InteriorAssetDiningTable extends InteriorAssetCommonProperties 
  * - Bed (Phase 3) ✓
  * - Sofa (Phase 3) ✓
  * - Dining Table (Phase 3) ✓
+ * - Kitchen Unit (Phase 4) ✓
  * - [Future: Sink, Toilet, Range, Island, Shelving, Armchair, etc.]
  *
  * Usage:
@@ -316,7 +341,7 @@ export interface InteriorAssetDiningTable extends InteriorAssetCommonProperties 
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
@@ -386,6 +411,20 @@ export function isSofa(asset: InteriorAsset): asset is InteriorAssetSofa {
  */
 export function isDiningTable(asset: InteriorAsset): asset is InteriorAssetDiningTable {
   return asset.type === "dining-table";
+}
+
+/**
+ * Type guard to safely extract kitchen unit from discriminated union.
+ *
+ * Usage:
+ * ```typescript
+ * if (isKitchenUnit(asset)) {
+ *   // asset-specific logic
+ * }
+ * ```
+ */
+export function isKitchenUnit(asset: InteriorAsset): asset is InteriorAssetKitchenUnit {
+  return asset.type === "kitchen-unit";
 }
 
 /**

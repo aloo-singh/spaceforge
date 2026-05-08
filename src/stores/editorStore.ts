@@ -76,6 +76,7 @@ import {
   createCenteredDefaultSofa,
   createCenteredDefaultWardrobe,
   createCenteredDefaultDiningTable,
+  createCenteredDefaultKitchenUnit,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
   getRotatedInteriorAssetForRoom,
@@ -5619,6 +5620,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           break;
         case "dining-table":
           asset = createCenteredDefaultDiningTable(room, createInteriorAssetId());
+          break;
+        case "kitchen-unit":
+          asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId());
           break;
       }
 

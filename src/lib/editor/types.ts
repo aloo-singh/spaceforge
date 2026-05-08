@@ -98,9 +98,10 @@ export type StairDirection = "forward" | "reverse";
  * - Phase 1: stairs (existing) ✓
  * - Phase 2: wardrobe ✓
  * - Phase 3: bed, sofa, dining-table ✓
+ * - Phase 4: kitchen-unit (new assets batch begins)
  * - Future: sink, toilet, range, island, shelving, armchair, etc.
  */
-export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table";
+export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table" | "kitchen-unit";
 
 /**
  * Interior asset: a piece of furniture or fixture placed inside a room.
