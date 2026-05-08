@@ -47,6 +47,7 @@ import { TierLimitUpsellDialog } from "@/components/editor/TierLimitUpsellDialog
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Toggle } from "@/components/ui/toggle";
 import {
   Select,
   SelectContent,
@@ -564,19 +565,19 @@ export function ProjectsPageClient() {
               <ImmediateTooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
+                    <Toggle
+                      variant="toolbar"
                       size="icon-lg"
+                      pressed={showProjectFilters}
+                      onPressedChange={setShowProjectFilters}
+                      data-active={showProjectFilters}
                       aria-label={showProjectFilters ? "Hide project filters" : "Show project filters"}
                       aria-controls="project-filters-panel"
                       aria-expanded={showProjectFilters}
-                      aria-pressed={showProjectFilters}
-                      onClick={() => setShowProjectFilters((current) => !current)}
-                      className="h-11 w-11 rounded-full text-foreground/70 hover:text-foreground"
+                      className="rounded-full"
                     >
                       <Filter2 className="size-4.5" />
-                    </Button>
+                    </Toggle>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="center">
                     {showProjectFilters ? "Hide project filters" : "Show project filters"}
@@ -595,17 +596,17 @@ export function ProjectsPageClient() {
                     <Tooltip key={layoutOption.value}>
                       <TooltipTrigger asChild>
                         <span data-slot="button-group-item" className="inline-flex">
-                          <Button
-                            type="button"
-                            variant="outline"
+                          <Toggle
+                            variant="toolbar"
                             size="icon-lg"
+                            pressed={isActive}
+                            onPressedChange={() => setProjectLayout(layoutOption.value)}
+                            data-active={isActive}
                             aria-label={layoutOption.label}
-                            aria-pressed={isActive}
-                            onClick={() => setProjectLayout(layoutOption.value)}
                             className="h-11 w-11"
                           >
                             <Icon className="size-4" />
-                          </Button>
+                          </Toggle>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" align="center">
@@ -620,20 +621,20 @@ export function ProjectsPageClient() {
             <ImmediateTooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
+                  <Toggle
+                    variant="toolbar"
                     size="icon-lg"
-                    aria-label="Show project details"
-                    aria-pressed={showProjectInfo}
-                    onClick={() => setShowProjectInfo((current) => !current)}
-                    className="h-11 w-11 rounded-full text-foreground/70 hover:text-foreground active:scale-[0.97]"
+                    pressed={showProjectInfo}
+                    onPressedChange={setShowProjectInfo}
+                    data-active={showProjectInfo}
+                    aria-label={showProjectInfo ? "Hide project details" : "Show project details"}
+                    className="rounded-full"
                   >
                     <InfoCircle className="size-4.5" />
-                  </Button>
+                  </Toggle>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  Show project details
+                  {showProjectInfo ? "Hide project details" : "Show project details"}
                 </TooltipContent>
               </Tooltip>
             </ImmediateTooltipProvider>

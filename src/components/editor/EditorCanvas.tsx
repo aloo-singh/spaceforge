@@ -3702,11 +3702,12 @@ export default function EditorCanvas({
                       <Toggle
                         pressed={is45DegreeDrawingEnabled}
                         onPressedChange={handleToggle45DegreeDrawing}
+                        variant="toolbar"
                         size={useCompactMobileControls ? "icon-sm" : "icon"}
+                        data-active={is45DegreeDrawingEnabled || isShiftKeyPressed}
                         className={cn(
-                          "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)] transition-colors",
-                          useCompactMobileControls && "size-9 rounded-xl",
-                          is45DegreeDrawingEnabled || isShiftKeyPressed ? "bg-blue-500 text-white" : "bg-transparent hover:bg-muted"
+                          "pointer-events-auto shadow-[0_8px_24px_rgba(15,23,42,0.2)]",
+                          useCompactMobileControls && "size-9 rounded-xl"
                         )}
                         aria-label="Enable 45 degree angles"
                       >
