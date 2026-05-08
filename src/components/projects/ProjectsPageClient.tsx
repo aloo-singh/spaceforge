@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -61,6 +61,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { getEffectiveMaxProjects } from "@/lib/subscription/features";
 import type { SubscriptionTier } from "@/lib/subscription/tiers";
 
@@ -94,6 +95,7 @@ type ProjectLayoutOption = {
   value: ProjectLayout;
   label: string;
   icon: typeof Columns3;
+  shortcut: string;
 };
 
 const PROJECT_FILTER_ANY_VALUE = "any";
@@ -150,18 +152,50 @@ const PROJECT_LAYOUT_OPTIONS: ProjectLayoutOption[] = [
     value: "grid-small",
     label: "Grid small",
     icon: Columns3,
+    shortcut: "1",
   },
   {
     value: "grid-large",
     label: "Grid large",
     icon: Columns2,
+    shortcut: "2",
   },
   {
     value: "list",
     label: "List",
     icon: LayoutList,
+    shortcut: "3",
   },
 ];
+
+function ShortcutTooltipContent({
+  label,
+  shortcut,
+}: {
+  label: string;
+  shortcut: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span>{label}</span>
+      <KbdGroup>
+        <Kbd>{shortcut}</Kbd>
+      </KbdGroup>
+    </span>
+  );
+}
+
+function isKeyboardShortcutEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [role="textbox"], [data-radix-select-trigger], [data-radix-select-content]'
+    )
+  );
+}
 
 function getProjectTotalAreaSquareMetres(project: ProjectListItem) {
   return (project.stats?.totalAreaSquareMillimetres ?? 0) / 1_000_000;
@@ -413,7 +447,7 @@ export function ProjectsPageClient() {
     setProjectFilters(DEFAULT_PROJECT_FILTERS);
   };
 
-  const handleCreateProject = () => {
+  const handleCreateProject = useCallback(() => {
     if (!canCreateProject) return;
 
     // Check project limit
@@ -444,7 +478,61 @@ export function ProjectsPageClient() {
         }
       })();
     });
-  };
+  }, [canCreateProject, isAtProjectLimit, projects.length, router, startCreateProjectTransition]);
+
+  useEffect(() => {
+    const handleProjectsPageShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isKeyboardShortcutEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      const shortcutKey = event.key.toLowerCase();
+
+      if (shortcutKey === "f" && shouldShowProjectFilters) {
+        event.preventDefault();
+        setShowProjectFilters((current) => !current);
+        return;
+      }
+
+      if (shortcutKey === "i") {
+        event.preventDefault();
+        setShowProjectInfo((current) => !current);
+        return;
+      }
+
+      if (shortcutKey === "n") {
+        event.preventDefault();
+        handleCreateProject();
+        return;
+      }
+
+      if (shortcutKey === "1") {
+        event.preventDefault();
+        setProjectLayout("grid-small");
+        return;
+      }
+
+      if (shortcutKey === "2") {
+        event.preventDefault();
+        setProjectLayout("grid-large");
+        return;
+      }
+
+      if (shortcutKey === "3") {
+        event.preventDefault();
+        setProjectLayout("list");
+      }
+    };
+
+    window.addEventListener("keydown", handleProjectsPageShortcut);
+    return () => window.removeEventListener("keydown", handleProjectsPageShortcut);
+  }, [handleCreateProject, shouldShowProjectFilters]);
 
   const handleRenameProject = async (projectId: string, name: string) => {
     if (isCreatingProject || renamingProjectId !== null || deletingProjectId !== null) return;
@@ -580,7 +668,10 @@ export function ProjectsPageClient() {
                     </Toggle>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="center">
-                    {showProjectFilters ? "Hide project filters" : "Show project filters"}
+                    <ShortcutTooltipContent
+                      label={showProjectFilters ? "Hide project filters" : "Show project filters"}
+                      shortcut="F"
+                    />
                   </TooltipContent>
                 </Tooltip>
               </ImmediateTooltipProvider>
@@ -610,7 +701,10 @@ export function ProjectsPageClient() {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" align="center">
-                        {layoutOption.label}
+                        <ShortcutTooltipContent
+                          label={layoutOption.label}
+                          shortcut={layoutOption.shortcut}
+                        />
                       </TooltipContent>
                     </Tooltip>
                   );
@@ -634,21 +728,33 @@ export function ProjectsPageClient() {
                   </Toggle>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  {showProjectInfo ? "Hide project details" : "Show project details"}
+                  <ShortcutTooltipContent
+                    label={showProjectInfo ? "Hide project details" : "Show project details"}
+                    shortcut="I"
+                  />
                 </TooltipContent>
               </Tooltip>
             </ImmediateTooltipProvider>
 
-            <Button
-              type="button"
-              size="lg"
-              onClick={handleCreateProject}
-              disabled={isCreatingProject}
-              className="h-11 rounded-full bg-blue-500 px-5 text-white hover:bg-blue-500/90"
-            >
-              <Plus className="size-4" />
-              New project
-            </Button>
+            <ImmediateTooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handleCreateProject}
+                    disabled={isCreatingProject}
+                    className="h-11 rounded-full bg-blue-500 px-5 text-white hover:bg-blue-500/90"
+                  >
+                    <Plus className="size-4" />
+                    New project
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <ShortcutTooltipContent label="New project" shortcut="N" />
+                </TooltipContent>
+              </Tooltip>
+            </ImmediateTooltipProvider>
           </div>
         </div>
 
