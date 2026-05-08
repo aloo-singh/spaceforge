@@ -10,6 +10,23 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.2</h2>
+            <span className="text-sm text-muted-foreground">2026-05-08</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added <code className="bg-muted px-1.5 py-0.5 rounded text-xs">/projects</code> keyboard shortcuts: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">F</code> for filters, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">I</code> for info, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">N</code> for a new project, and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">1</code>/<code className="bg-muted px-1.5 py-0.5 rounded text-xs">2</code>/<code className="bg-muted px-1.5 py-0.5 rounded text-xs">3</code> for small grid, large grid, and list layouts.</li>
+                <li>Added matching keycaps to the project toolbar tooltips, with shortcuts guarded so they do not fire while typing or editing.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.1</h2>
             <span className="text-sm text-muted-foreground">2026-05-08</span>
           </div>
