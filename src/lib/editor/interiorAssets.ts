@@ -66,6 +66,10 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
   if (asset.type === "shower") {
     // shower has no type-specific properties beyond common ones
   }
+  // bath has no type-specific properties beyond common ones
+  if (asset.type === "bath") {
+    // bath has no type-specific properties beyond common ones
+  }
   if (asset.doorType !== undefined) base.doorType = asset.doorType;
   if (asset.doorConstraint !== undefined) base.doorConstraint = asset.doorConstraint;
   if (asset.shape !== undefined) base.shape = asset.shape;
@@ -431,6 +435,48 @@ export function createCenteredDefaultShower(room: Room, id: string): RoomInterio
     yMm: center.y,
     widthMm: 800,
     depthMm: 800,
+    rotationDegrees: 0,
+    anchor: "floor",
+  };
+}
+
+export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  // Bath dimensions
+  const widthMm = 700;
+  const depthMm = 1600;
+
+  // Calculate room center
+  const roomCenter = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  // Calculate where top-left would be from room center
+  const topLeftX = roomCenter.x - widthMm / 2;
+  const topLeftY = roomCenter.y - depthMm / 2;
+
+  // Snap top-left corner to 100mm grid
+  const gridSizeMm = 100;
+  const snappedTopLeftX = snapToGrid(topLeftX, gridSizeMm);
+  const snappedTopLeftY = snapToGrid(topLeftY, gridSizeMm);
+
+  // Calculate center from snapped top-left
+  const center = {
+    x: snappedTopLeftX + widthMm / 2,
+    y: snappedTopLeftY + depthMm / 2,
+  };
+
+  return {
+    id,
+    type: "bath",
+    name: "Bath",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm,
+    depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -1028,5 +1074,6 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "sink": return "Sink";
     case "toilet": return "Toilet";
     case "shower": return "Shower";
+    case "bath": return "Bath";
   }
 }

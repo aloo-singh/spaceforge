@@ -5092,11 +5092,12 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables, toilets, and showers
+    // Skip rectangular bounding box for unselected round dining tables, toilets, showers, and baths
     const isCustomDetailAsset =
       (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
       displayedAsset.type === "toilet" ||
-      displayedAsset.type === "shower";
+      displayedAsset.type === "shower" ||
+      displayedAsset.type === "bath";
     const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
@@ -5659,6 +5660,115 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
+      if (displayedAsset.type === "bath") {
+        // Bath viewed from above (top-down floor plan):
+        // Outer rectangle boundary
+        // Inner oval (rounded rectangle) tub interior
+        // Circle plug hole at one end (bottom)
+
+        // Lerp helper
+        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // Fill layer for whole asset
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+
+        // 0. Outer rectangle boundary (main asset outline)
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.moveTo(backC1.x, backC1.y);
+        graphics.lineTo(backC2.x, backC2.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(frontC1.x, frontC1.y);
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+
+        // 1. Inner oval tub interior (secondary stroke, no fill)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+
+        // Fixed 40mm inset from edge
+        const insetMm = 40;
+        const insetPx = camera.pixelsPerMm * insetMm;
+
+        // Calculate unit vectors along edges for rotation-aware inset
+        const widthVec = { x: backC2.x - backC1.x, y: backC2.y - backC1.y };
+        const depthVec = { x: frontC1.x - backC1.x, y: frontC1.y - backC1.y };
+        const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
+        const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
+        const widthUnit = { x: widthVec.x / widthLen, y: widthVec.y / widthLen };
+        const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
+
+        // Inset each corner by fixed 40mm
+        const inner_tl = {
+          x: backC1.x + widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: backC1.y + widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_tr = {
+          x: backC2.x - widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: backC2.y - widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_br = {
+          x: frontC2.x - widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: frontC2.y - widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+        const inner_bl = {
+          x: frontC1.x + widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: frontC1.y + widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+
+        // Draw rounded rectangle for tub interior
+        const drawBathOval = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
+          const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
+          const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
+          // Fixed 80mm radius for tub curves (larger, doesn't scale with resize)
+          const radiusMm = 80;
+          const r = Math.max(3, camera.pixelsPerMm * radiusMm);
+          const rt = Math.min(r / w, 0.499);
+          const rs = Math.min(r / h, 0.499);
+          graphics.moveTo(lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y);
+          graphics.lineTo(lerpT(tr, tl, rt).x, lerpT(tr, tl, rt).y);
+          graphics.arcTo(tr.x, tr.y, lerpT(tr, br, rs).x, lerpT(tr, br, rs).y, r);
+          graphics.lineTo(lerpT(br, tr, rs).x, lerpT(br, tr, rs).y);
+          graphics.arcTo(br.x, br.y, lerpT(br, bl, rt).x, lerpT(br, bl, rt).y, r);
+          graphics.lineTo(lerpT(bl, br, rt).x, lerpT(bl, br, rt).y);
+          graphics.arcTo(bl.x, bl.y, lerpT(bl, tl, rs).x, lerpT(bl, tl, rs).y, r);
+          graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
+          graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
+          graphics.closePath();
+          graphics.stroke();
+        };
+
+        drawBathOval(inner_tl, inner_tr, inner_br, inner_bl);
+
+        // 2. Plug hole circle - centred on short side, 150mm from front edge
+        const plugOffsetMm = 150;
+        const plugOffsetPx = camera.pixelsPerMm * plugOffsetMm;
+
+        // Centre of the front edge (short side)
+        const frontMid_x = (inner_bl.x + inner_br.x) / 2;
+        const frontMid_y = (inner_bl.y + inner_br.y) / 2;
+
+        // Position 200mm from the front edge, moving towards the back
+        const plugCenter = {
+          x: frontMid_x - depthUnit.x * plugOffsetPx,
+          y: frontMid_y - depthUnit.y * plugOffsetPx,
+        };
+        const plugRadiusMm = 30;
+        const plugRadiusPx = Math.max(2, camera.pixelsPerMm * plugRadiusMm);
+        graphics.beginPath();
+        graphics.arc(plugCenter.x, plugCenter.y, plugRadiusPx, 0, Math.PI * 2);
+        graphics.stroke();
+      }
 
     }
 
