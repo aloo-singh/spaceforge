@@ -5474,7 +5474,6 @@ function drawRoomInteriorAssets(
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
-        graphics.setFillStyle({ color: "transparent", alpha: 0 });
 
         // Lerp helper (may be shared in a future refactor, defined locally for now)
         const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
@@ -5491,7 +5490,7 @@ function drawRoomInteriorAssets(
         const cis_bl = lerpT(backC1, backC2, cisternInsetW);
 
         // drawRoundedRectCorners is defined inside the sink block above; redefine inline:
-        const drawToiletRect = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12) => {
+        const drawToiletRect = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12, shouldFill = false) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
           const r = Math.max(3, Math.min(w, h) * radiusFrac);
@@ -5507,10 +5506,13 @@ function drawRoomInteriorAssets(
           graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
           graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
           graphics.closePath();
+          if (shouldFill) graphics.fill();
           graphics.stroke();
         };
 
-        drawToiletRect(cis_tl, cis_tr, cis_br, cis_bl, 0.08);
+        // Cistern with subtle fill
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        drawToiletRect(cis_tl, cis_tr, cis_br, cis_bl, 0.08, true);
 
         // 2. Outer bowl oval — from just below cistern to front inset, with side insets
         const bowlTopT  = cisternDepth + 0.03; // slight gap below cistern
@@ -5520,9 +5522,18 @@ function drawRoomInteriorAssets(
         const ob_tr = lerpT(lerpT(backC1, frontC1, bowlTopT), lerpT(backC2, frontC2, bowlTopT), 1 - bowlSideI);
         const ob_br = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), 1 - bowlSideI);
         const ob_bl = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), bowlSideI);
-        drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35);
+        
+        // Outer bowl with subtle fill
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35, true);
 
-        // 3. Inner hole oval — smaller, centred, nearer the cistern
+        // 3. Inner hole oval — smaller, centred, nearer the cistern (no fill, secondary stroke)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+        graphics.setFillStyle({ color: "transparent", alpha: 0 });
         const holeTopT  = cisternDepth + 0.11;
         const holeBotT  = 0.55;
         const holeSideI = 0.32;
@@ -5530,7 +5541,7 @@ function drawRoomInteriorAssets(
         const ih_tr = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), 1 - holeSideI);
         const ih_br = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), 1 - holeSideI);
         const ih_bl = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), holeSideI);
-        drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40);
+        drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40, false);
       }
 
       if (displayedAsset.type === "shower") {
