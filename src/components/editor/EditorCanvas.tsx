@@ -5572,22 +5572,49 @@ function drawRoomInteriorAssets(
         graphics.fill();
         graphics.stroke();
 
-        // 1. Large rounded rectangle interior detail (6% inset to keep it close to bounding box)
+        // 1. Large rounded rectangle interior detail (fixed 50mm inset from edge)
         graphics.setStrokeStyle({
           width: fgLineWidth * 0.8,
           color: fgColor,
           alpha: fgAlpha * 0.7,
         });
-        const innerInset = 0.06;
-        const inner_tl = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), innerInset);
-        const inner_tr = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), 1 - innerInset);
-        const inner_br = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), 1 - innerInset);
-        const inner_bl = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), innerInset);
 
-        const drawRoundedShowerFloor = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.15) => {
+        // Fixed 50mm inset from edge in world space
+        const insetMm = 50;
+        const insetPx = camera.pixelsPerMm * insetMm;
+        
+        // Calculate unit vectors along edges for rotation-aware inset
+        const widthVec = { x: backC2.x - backC1.x, y: backC2.y - backC1.y };
+        const depthVec = { x: frontC1.x - backC1.x, y: frontC1.y - backC1.y };
+        const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
+        const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
+        const widthUnit = { x: widthVec.x / widthLen, y: widthVec.y / widthLen };
+        const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
+        
+        // Inset each corner by fixed 50mm
+        const inner_tl = {
+          x: backC1.x + widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: backC1.y + widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_tr = {
+          x: backC2.x - widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: backC2.y - widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_br = {
+          x: frontC2.x - widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: frontC2.y - widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+        const inner_bl = {
+          x: frontC1.x + widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: frontC1.y + widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+
+        const drawRoundedShowerFloor = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
-          const r = Math.max(3, Math.min(w, h) * radiusFrac);
+          // Fixed 60mm radius regardless of shower size
+          const radiusMm = 60;
+          const r = Math.max(3, camera.pixelsPerMm * radiusMm);
           const rt = Math.min(r / w, 0.499);
           const rs = Math.min(r / h, 0.499);
           graphics.moveTo(lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y);
@@ -5603,13 +5630,17 @@ function drawRoomInteriorAssets(
           graphics.stroke();
         };
 
-        drawRoundedShowerFloor(inner_tl, inner_tr, inner_br, inner_bl, 0.12);
+        drawRoundedShowerFloor(inner_tl, inner_tr, inner_br, inner_bl);
 
-        // 2. Drain circle positioned deeper inside the top-left corner of the rounded rectangle
-        // Inset the circle center inward by ~18% of the interior dimensions (more inside)
-        const drainInset = 0.18;
-        const drainCenterOffsetT = drainInset;
-        const drainCenter = lerpT(lerpT(inner_tl, inner_tr, drainCenterOffsetT), lerpT(inner_bl, inner_br, drainCenterOffsetT), drainCenterOffsetT);
+        // 2. Drain circle positioned at fixed 90mm offset from inner rectangle corner
+        const drainOffsetMm = 90;
+        const drainOffsetPx = camera.pixelsPerMm * drainOffsetMm;
+        
+        // Offset 90mm along both width and depth axes from inner_tl
+        const drainCenter = {
+          x: inner_tl.x + widthUnit.x * drainOffsetPx + depthUnit.x * drainOffsetPx,
+          y: inner_tl.y + widthUnit.y * drainOffsetPx + depthUnit.y * drainOffsetPx,
+        };
         const drainRadiusMm = 60;
         const drainRadiusPx = Math.max(2, camera.pixelsPerMm * drainRadiusMm);
         graphics.beginPath();
