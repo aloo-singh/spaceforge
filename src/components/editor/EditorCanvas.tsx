@@ -5535,14 +5535,8 @@ function drawRoomInteriorAssets(
 
       if (displayedAsset.type === "shower") {
         // Shower viewed from above (top-down floor plan):
-        // Renders as a square with rounded inner square + circle in corner.
-        // Apply responsive stroke styling with selection feedback.
-        graphics.setStrokeStyle({
-          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
-          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-          alpha: isSelected ? 0.96 : 0.9,
-        });
-        graphics.setFillStyle({ color: "transparent", alpha: 0 });
+        // Large rounded rectangle interior detail (like hob burners pattern)
+        // Small drain circle in the inside corner.
 
         // Lerp helper
         const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
@@ -5550,22 +5544,36 @@ function drawRoomInteriorAssets(
           y: a.y + (b.y - a.y) * t,
         });
 
-        // 1. Outer square boundary
+        // Fill layer for whole asset (more subtle than default)
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+
+        // 0. Outer square boundary (main asset outline)
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
         graphics.moveTo(backC1.x, backC1.y);
         graphics.lineTo(backC2.x, backC2.y);
         graphics.lineTo(frontC2.x, frontC2.y);
         graphics.lineTo(frontC1.x, frontC1.y);
         graphics.closePath();
+        graphics.fill();
         graphics.stroke();
 
-        // 2. Inner rounded square — inset from all sides
-        const innerInset = 0.15; // 15% inset
+        // 1. Large rounded rectangle interior detail (6% inset to keep it close to bounding box)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+        const innerInset = 0.06;
         const inner_tl = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), innerInset);
         const inner_tr = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), 1 - innerInset);
         const inner_br = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), 1 - innerInset);
         const inner_bl = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), innerInset);
 
-        const drawRoundedInnerSquare = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.15) => {
+        const drawRoundedShowerFloor = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.15) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
           const r = Math.max(3, Math.min(w, h) * radiusFrac);
@@ -5584,14 +5592,17 @@ function drawRoomInteriorAssets(
           graphics.stroke();
         };
 
-        drawRoundedInnerSquare(inner_tl, inner_tr, inner_br, inner_bl, 0.2);
+        drawRoundedShowerFloor(inner_tl, inner_tr, inner_br, inner_bl, 0.12);
 
-        // 3. Drain circle in top-left corner
-        const cornerPos = inner_tl;
-        const radiusMm = 150; // Drain pipe placeholder
-        const radiusPx = Math.max(2, camera.pixelsPerMm * radiusMm);
+        // 2. Drain circle positioned deeper inside the top-left corner of the rounded rectangle
+        // Inset the circle center inward by ~18% of the interior dimensions (more inside)
+        const drainInset = 0.18;
+        const drainCenterOffsetT = drainInset;
+        const drainCenter = lerpT(lerpT(inner_tl, inner_tr, drainCenterOffsetT), lerpT(inner_bl, inner_br, drainCenterOffsetT), drainCenterOffsetT);
+        const drainRadiusMm = 60;
+        const drainRadiusPx = Math.max(2, camera.pixelsPerMm * drainRadiusMm);
         graphics.beginPath();
-        graphics.arc(cornerPos.x, cornerPos.y, radiusPx, 0, Math.PI * 2);
+        graphics.arc(drainCenter.x, drainCenter.y, drainRadiusPx, 0, Math.PI * 2);
         graphics.stroke();
       }
 
