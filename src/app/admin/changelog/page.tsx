@@ -10,6 +10,29 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.11</h2>
+            <span className="text-sm text-muted-foreground">2026-05-11</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added shower asset type with rounded rectangle and drain circle details, fixed dimensional offsets for consistent appearance at all sizes, three size presets (square 800×800mm, small 1200×800mm, large 1800×900mm), and top-left corner resize anchoring.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Applied width-swap rotation fix to toilet asset for correct rendering at 180° and 270° rotations, matching the pattern from architectural documentation.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.10</h2>
             <span className="text-sm text-muted-foreground">2026-05-11</span>
           </div>
