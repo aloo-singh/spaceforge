@@ -78,5 +78,6 @@ export {
   IconTrash as Trash2,
   IconWindow as WindowIcon,
   IconWash as IconWash,
+  IconToiletPaper as IconToiletPaper,
   IconX as X,
 } from "@tabler/icons-react";
