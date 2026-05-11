@@ -5422,12 +5422,15 @@ function drawRoomInteriorAssets(
           drawRoundedRectCorners(bowl_tl, bowl_tr, bowl_br, bowl_bl);
 
           // Drainer lines: parallel to the front edge (width axis), in the drain half
+          // drainDepthInset: padding top/bottom (along depth axis)
+          // drainWidthInset: padding toward bowl side and toward outer edge (along width axis)
           const lineCount = 5;
-          const drainInset = 0.08;
+          const drainDepthInset = 0.15;
+          const drainWidthInset = 0.12;
           for (let i = 0; i < lineCount; i++) {
-            const t = drainInset + (1 - 2 * drainInset) * (i / (lineCount - 1));
-            const ls = lerp(midF, midB, t);
-            const le = lerp(drainF, drainB, t);
+            const t = drainDepthInset + (1 - 2 * drainDepthInset) * (i / (lineCount - 1));
+            const ls = lerp(lerp(midF, drainF, drainWidthInset),  lerp(midB, drainB, drainWidthInset),  t);
+            const le = lerp(lerp(drainF, midF, drainWidthInset),  lerp(drainB, midB, drainWidthInset),  t);
             graphics.moveTo(ls.x, ls.y);
             graphics.lineTo(le.x, le.y);
             graphics.stroke();
