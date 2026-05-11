@@ -5092,10 +5092,11 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables
-    const isRoundDiningTable =
-      displayedAsset.type === "dining-table" && displayedAsset.shape === "round";
-    const shouldDrawBoundingBox = isSelected || !isRoundDiningTable;
+    // Skip rectangular bounding box for unselected round dining tables and toilets
+    const isCustomDetailAsset =
+      (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
+      displayedAsset.type === "toilet";
+    const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
       graphics.setFillStyle({
@@ -5466,8 +5467,13 @@ function drawRoomInteriorAssets(
         // frontC1/frontC2 edge = bowl front
         // Width axis (C1→C2) is symmetric — no needsWidthSwap required.
 
-        graphics.setStrokeStyle({ width: fgLineWidth * 0.9, color: fgColor, alpha: fgAlpha * 0.75 });
-        graphics.setFillStyle({ color: fgColor, alpha: 0 });
+        // Apply same styling as round dining table: responsive stroke width, selection feedback
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.setFillStyle({ color: "transparent", alpha: 0 });
 
         // Lerp helper (may be shared in a future refactor, defined locally for now)
         const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
