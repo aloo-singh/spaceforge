@@ -80,16 +80,6 @@ function FurnitureInspector({
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   
-  // Log whenever asset prop changes
-  React.useEffect(() => {
-    if (asset.type === "sink") {
-      console.log("FurnitureInspector sink asset changed:", {
-        bowlType: (asset as any).bowlType,
-        hasDefaultDrainer: (asset as any).hasDefaultDrainer,
-      });
-    }
-  }, [asset]);
-  
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
   const commitInteriorAssetRenameSession = useEditorStore((state) => state.commitInteriorAssetRenameSession);
@@ -103,9 +93,8 @@ function FurnitureInspector({
   const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
   
-  // Wrap drainer handler with logging
+  // Drainer handler
   const handleDrainerChange = React.useCallback((checked: boolean) => {
-    console.log("🔧 Drainer Switch clicked! checked =", checked);
     setSinkHasDefaultDrainer(checked);
   }, [setSinkHasDefaultDrainer]);
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
