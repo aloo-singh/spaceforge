@@ -402,6 +402,21 @@ export interface InteriorAssetSink extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Toilet: bathroom toilet fixture.
+ *
+ * Visual distinction:
+ * - Cistern: rectangle at the back (frontC1/frontC2 = cistern side)
+ * - Outer bowl: large oval spanning most of the remaining depth
+ * - Inner hole: smaller oval inside bowl, nearer the cistern
+ *
+ * Examples:
+ * - Standard: 400mm × 700mm
+ */
+export interface InteriorAssetToilet extends InteriorAssetCommonProperties {
+  type: "toilet";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -429,7 +444,7 @@ export interface InteriorAssetSink extends InteriorAssetCommonProperties {
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink | InteriorAssetToilet;
 
 /**
  * Type guard to safely extract stairs from discriminated union.

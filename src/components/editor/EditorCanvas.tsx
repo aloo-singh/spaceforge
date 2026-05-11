@@ -5460,6 +5460,72 @@ function drawRoomInteriorAssets(
         }
       }
 
+      if (displayedAsset.type === "toilet") {
+        // Toilet viewed from above (top-down floor plan):
+        // backC1/backC2 edge = cistern (wall) side
+        // frontC1/frontC2 edge = bowl front
+        // Width axis (C1→C2) is symmetric — no needsWidthSwap required.
+
+        graphics.setStrokeStyle({ width: fgLineWidth * 0.9, color: fgColor, alpha: fgAlpha * 0.75 });
+        graphics.setFillStyle({ color: fgColor, alpha: 0 });
+
+        // Lerp helper (may be shared in a future refactor, defined locally for now)
+        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // 1. Cistern rectangle — back 25% of depth, full width inset slightly
+        const cisternDepth = 0.25;
+        const cisternInsetW = 0.05;
+        const cis_tl = lerpT(lerpT(backC1, frontC1, cisternDepth), lerpT(backC2, frontC2, cisternDepth), cisternInsetW);
+        const cis_tr = lerpT(lerpT(backC1, frontC1, cisternDepth), lerpT(backC2, frontC2, cisternDepth), 1 - cisternInsetW);
+        const cis_br = lerpT(backC1, backC2, 1 - cisternInsetW);
+        const cis_bl = lerpT(backC1, backC2, cisternInsetW);
+
+        // drawRoundedRectCorners is defined inside the sink block above; redefine inline:
+        const drawToiletRect = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12) => {
+          const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
+          const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
+          const r = Math.max(3, Math.min(w, h) * radiusFrac);
+          const rt = Math.min(r / w, 0.499);
+          const rs = Math.min(r / h, 0.499);
+          graphics.moveTo(lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y);
+          graphics.lineTo(lerpT(tr, tl, rt).x, lerpT(tr, tl, rt).y);
+          graphics.arcTo(tr.x, tr.y, lerpT(tr, br, rs).x, lerpT(tr, br, rs).y, r);
+          graphics.lineTo(lerpT(br, tr, rs).x, lerpT(br, tr, rs).y);
+          graphics.arcTo(br.x, br.y, lerpT(br, bl, rt).x, lerpT(br, bl, rt).y, r);
+          graphics.lineTo(lerpT(bl, br, rt).x, lerpT(bl, br, rt).y);
+          graphics.arcTo(bl.x, bl.y, lerpT(bl, tl, rs).x, lerpT(bl, tl, rs).y, r);
+          graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
+          graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
+          graphics.closePath();
+          graphics.stroke();
+        };
+
+        drawToiletRect(cis_tl, cis_tr, cis_br, cis_bl, 0.08);
+
+        // 2. Outer bowl oval — from just below cistern to front inset, with side insets
+        const bowlTopT  = cisternDepth + 0.03; // slight gap below cistern
+        const bowlBotT  = 0.94;
+        const bowlSideI = 0.06;
+        const ob_tl = lerpT(lerpT(backC1, frontC1, bowlTopT), lerpT(backC2, frontC2, bowlTopT), bowlSideI);
+        const ob_tr = lerpT(lerpT(backC1, frontC1, bowlTopT), lerpT(backC2, frontC2, bowlTopT), 1 - bowlSideI);
+        const ob_br = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), 1 - bowlSideI);
+        const ob_bl = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), bowlSideI);
+        drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35);
+
+        // 3. Inner hole oval — smaller, centred, nearer the cistern
+        const holeTopT  = cisternDepth + 0.07;
+        const holeBotT  = 0.70;
+        const holeSideI = 0.18;
+        const ih_tl = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), holeSideI);
+        const ih_tr = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), 1 - holeSideI);
+        const ih_br = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), 1 - holeSideI);
+        const ih_bl = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), holeSideI);
+        drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40);
+      }
+
 
     }
 
