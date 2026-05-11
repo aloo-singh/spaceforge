@@ -5092,10 +5092,11 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables and toilets
+    // Skip rectangular bounding box for unselected round dining tables, toilets, and showers
     const isCustomDetailAsset =
       (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
-      displayedAsset.type === "toilet";
+      displayedAsset.type === "toilet" ||
+      displayedAsset.type === "shower";
     const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
@@ -5530,6 +5531,68 @@ function drawRoomInteriorAssets(
         const ih_br = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), 1 - holeSideI);
         const ih_bl = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), holeSideI);
         drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40);
+      }
+
+      if (displayedAsset.type === "shower") {
+        // Shower viewed from above (top-down floor plan):
+        // Renders as a square with rounded inner square + circle in corner.
+        // Apply responsive stroke styling with selection feedback.
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.setFillStyle({ color: "transparent", alpha: 0 });
+
+        // Lerp helper
+        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // 1. Outer square boundary
+        graphics.moveTo(backC1.x, backC1.y);
+        graphics.lineTo(backC2.x, backC2.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(frontC1.x, frontC1.y);
+        graphics.closePath();
+        graphics.stroke();
+
+        // 2. Inner rounded square — inset from all sides
+        const innerInset = 0.15; // 15% inset
+        const inner_tl = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), innerInset);
+        const inner_tr = lerpT(lerpT(backC1, frontC1, innerInset), lerpT(backC2, frontC2, innerInset), 1 - innerInset);
+        const inner_br = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), 1 - innerInset);
+        const inner_bl = lerpT(lerpT(backC1, frontC1, 1 - innerInset), lerpT(backC2, frontC2, 1 - innerInset), innerInset);
+
+        const drawRoundedInnerSquare = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.15) => {
+          const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
+          const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
+          const r = Math.max(3, Math.min(w, h) * radiusFrac);
+          const rt = Math.min(r / w, 0.499);
+          const rs = Math.min(r / h, 0.499);
+          graphics.moveTo(lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y);
+          graphics.lineTo(lerpT(tr, tl, rt).x, lerpT(tr, tl, rt).y);
+          graphics.arcTo(tr.x, tr.y, lerpT(tr, br, rs).x, lerpT(tr, br, rs).y, r);
+          graphics.lineTo(lerpT(br, tr, rs).x, lerpT(br, tr, rs).y);
+          graphics.arcTo(br.x, br.y, lerpT(br, bl, rt).x, lerpT(br, bl, rt).y, r);
+          graphics.lineTo(lerpT(bl, br, rt).x, lerpT(bl, br, rt).y);
+          graphics.arcTo(bl.x, bl.y, lerpT(bl, tl, rs).x, lerpT(bl, tl, rs).y, r);
+          graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
+          graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
+          graphics.closePath();
+          graphics.stroke();
+        };
+
+        drawRoundedInnerSquare(inner_tl, inner_tr, inner_br, inner_bl, 0.2);
+
+        // 3. Drain circle in top-left corner
+        const cornerPos = inner_tl;
+        const radiusMm = 150; // Drain pipe placeholder
+        const radiusPx = Math.max(2, camera.pixelsPerMm * radiusMm);
+        graphics.beginPath();
+        graphics.arc(cornerPos.x, cornerPos.y, radiusPx, 0, Math.PI * 2);
+        graphics.stroke();
       }
 
 

@@ -63,6 +63,9 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     (base as any).burnerCount = (asset as any).burnerCount;
   }
   // toilet has no type-specific properties beyond common ones
+  if (asset.type === "shower") {
+    // shower has no type-specific properties beyond common ones
+  }
   if (asset.doorType !== undefined) base.doorType = asset.doorType;
   if (asset.doorConstraint !== undefined) base.doorConstraint = asset.doorConstraint;
   if (asset.shape !== undefined) base.shape = asset.shape;
@@ -406,6 +409,28 @@ export function createCenteredDefaultToilet(room: Room, id: string): RoomInterio
     yMm: center.y,
     widthMm: 400,
     depthMm: 700,
+    rotationDegrees: 0,
+    anchor: "floor",
+  };
+}
+
+export function createCenteredDefaultShower(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  const center = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  return {
+    id,
+    type: "shower",
+    name: "Shower",
+    xMm: center.x,
+    yMm: center.y,
+    widthMm: 800,
+    depthMm: 800,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -1002,5 +1027,6 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "hob": return "Hob";
     case "sink": return "Sink";
     case "toilet": return "Toilet";
+    case "shower": return "Shower";
   }
 }

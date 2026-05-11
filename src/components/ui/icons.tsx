@@ -73,6 +73,7 @@ export {
   IconToolsKitchen2Filled as ToolsKitchen2Filled,
   IconTransfer as Transfer,
   IconFridge as IconFridge,
+  IconFountain as IconFountain,
   IconTriangle as IconTriangle,
   IconTriangleInverted as IconTriangleInverted,
   IconTrash as Trash2,
