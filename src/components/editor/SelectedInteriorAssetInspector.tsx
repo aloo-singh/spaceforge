@@ -87,6 +87,8 @@ function FurnitureInspector({
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const setSelectedInteriorAssetDoorType = useEditorStore((state) => state.setSelectedInteriorAssetDoorType);
   const setSelectedInteriorAssetShape = useEditorStore((state) => state.setSelectedInteriorAssetShape);
+  const setSinkBowlType = useEditorStore((state) => state.setSinkBowlType);
+  const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
@@ -316,9 +318,9 @@ function FurnitureInspector({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => useEditorStore.getState().setSinkBowlType("single")}
+                      onClick={() => setSinkBowlType("single")}
                       aria-label="Single bowl"
-                      aria-pressed={asset.bowlType !== "1.5"}
+                      aria-pressed={(asset as any).bowlType !== "1.5"}
                     >
                       Single
                     </Button>
@@ -328,9 +330,9 @@ function FurnitureInspector({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => useEditorStore.getState().setSinkBowlType("1.5")}
+                      onClick={() => setSinkBowlType("1.5")}
                       aria-label="1.5 bowl"
-                      aria-pressed={asset.bowlType === "1.5"}
+                      aria-pressed={(asset as any).bowlType === "1.5"}
                     >
                       1.5
                     </Button>
@@ -340,19 +342,12 @@ function FurnitureInspector({
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-sm font-medium">Drainer</p>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="drainer-checkbox"
-                  checked={asset.hasDefaultDrainer ?? false}
-                  onChange={(e) => useEditorStore.getState().setSinkHasDefaultDrainer(e.target.checked)}
-                  className="h-4 w-4"
-                  aria-label="Enable drainer"
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Drainer</p>
+                <Switch
+                  checked={(asset as any).hasDefaultDrainer ?? false}
+                  onCheckedChange={setSinkHasDefaultDrainer}
                 />
-                <label htmlFor="drainer-checkbox" className="text-sm font-medium">
-                  Add drainer
-                </label>
               </div>
             </div>
           </>

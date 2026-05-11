@@ -358,7 +358,7 @@ export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorA
     name: "Sink",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 600,
+    widthMm: 1200,
     depthMm: 600,
     rotationDegrees: 0,
     anchor: "floor",

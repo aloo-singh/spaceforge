@@ -5898,7 +5898,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSinkHasDefaultDrainer: (hasDefaultDrainer) =>
     set((state) => {
       const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
-        if (asset.hasDefaultDrainer === hasDefaultDrainer) return null;
+        const currentDrainer = asset.hasDefaultDrainer ?? false;
+        if (currentDrainer === hasDefaultDrainer) return null;
         return {
           ...cloneRoomInteriorAsset(asset),
           hasDefaultDrainer,
