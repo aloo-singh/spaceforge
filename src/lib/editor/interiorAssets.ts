@@ -54,6 +54,14 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
     base.arrowDirection = asset.arrowDirection ?? DEFAULT_STAIR_ARROW_DIRECTION;
     base.arrowLabel = asset.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL;
   }
+  if (asset.type === "sink") {
+    (base as any).bowlType = (asset as any).bowlType;
+    (base as any).hasDefaultDrainer = (asset as any).hasDefaultDrainer;
+    (base as any).drainerSide = (asset as any).drainerSide;
+  }
+  if (asset.type === "hob") {
+    (base as any).burnerCount = (asset as any).burnerCount;
+  }
   if (asset.doorType !== undefined) base.doorType = asset.doorType;
   if (asset.doorConstraint !== undefined) base.doorConstraint = asset.doorConstraint;
   if (asset.shape !== undefined) base.shape = asset.shape;
@@ -95,7 +103,15 @@ export function areRoomInteriorAssetsEqual(
           (assetB.arrowLabel ?? DEFAULT_STAIR_ARROW_LABEL)
       )) ||
       (assetA.doorType ?? null) !== (assetB.doorType ?? null) ||
-      (assetA.shape ?? null) !== (assetB.shape ?? null)
+      (assetA.shape ?? null) !== (assetB.shape ?? null) ||
+      ((assetA.type === "sink" || assetB.type === "sink") && (
+        ((assetA as any).bowlType ?? null) !== ((assetB as any).bowlType ?? null) ||
+        ((assetA as any).hasDefaultDrainer ?? false) !== ((assetB as any).hasDefaultDrainer ?? false) ||
+        ((assetA as any).drainerSide ?? "depth") !== ((assetB as any).drainerSide ?? "depth")
+      )) ||
+      ((assetA.type === "hob" || assetB.type === "hob") && (
+        ((assetA as any).burnerCount ?? null) !== ((assetB as any).burnerCount ?? null)
+      ))
     ) {
       return false;
     }
@@ -363,8 +379,9 @@ export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorA
     rotationDegrees: 0,
     anchor: "floor",
     bowlType: "single",
-    hasDefaultDrainer: false,
-  };
+    hasDefaultDrainer: true,
+    drainerSide: "depth",
+  } as RoomInteriorAsset;
 }
 
 export function findInteriorAssetAtScreenPoint(

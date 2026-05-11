@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { IconCaretUpFilled, IconCaretDownFilled, RotateCcw, RotateCw, Transfer, Trash2 } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,17 @@ function FurnitureInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  
+  // Log whenever asset prop changes
+  React.useEffect(() => {
+    if (asset.type === "sink") {
+      console.log("FurnitureInspector sink asset changed:", {
+        bowlType: (asset as any).bowlType,
+        hasDefaultDrainer: (asset as any).hasDefaultDrainer,
+      });
+    }
+  }, [asset]);
+  
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
   const commitInteriorAssetRenameSession = useEditorStore((state) => state.commitInteriorAssetRenameSession);
@@ -90,6 +102,12 @@ function FurnitureInspector({
   const setSinkBowlType = useEditorStore((state) => state.setSinkBowlType);
   const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
+  
+  // Wrap drainer handler with logging
+  const handleDrainerChange = React.useCallback((checked: boolean) => {
+    console.log("🔧 Drainer Switch clicked! checked =", checked);
+    setSinkHasDefaultDrainer(checked);
+  }, [setSinkHasDefaultDrainer]);
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
     const assetId = state.selectedInteriorAsset?.assetId;
@@ -346,7 +364,7 @@ function FurnitureInspector({
                 <p className="text-sm font-medium">Drainer</p>
                 <Switch
                   checked={(asset as any).hasDefaultDrainer ?? false}
-                  onCheckedChange={setSinkHasDefaultDrainer}
+                  onCheckedChange={handleDrainerChange}
                 />
               </div>
             </div>

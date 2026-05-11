@@ -398,6 +398,7 @@ export interface InteriorAssetSink extends InteriorAssetCommonProperties {
   type: "sink";
   bowlType?: "single" | "1.5";
   hasDefaultDrainer?: boolean;
+  drainerSide?: "depth" | "width";
 }
 
 /**

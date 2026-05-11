@@ -5357,8 +5357,9 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "sink") {
-        // Sink layout: left half bowl + right half drainage lines
+        // Sink layout: varies based on drainer setting
         const bowlType = displayedAsset.bowlType ?? "single";
+        const hasDefaultDrainer = displayedAsset.hasDefaultDrainer ?? true;
         const widthPx = Math.abs(bottomRight.x - topLeft.x);
         const heightPx = Math.abs(bottomRight.y - topLeft.y);
         const leftX = topLeft.x;
@@ -5381,41 +5382,60 @@ function drawRoomInteriorAssets(
         const cornerRadius = Math.max(3, Math.min(widthPx, heightPx) * 0.08);
         const halfWidth = widthPx / 2;
         
-        // Left half: rounded rectangle bowl
-        if (bowlType === "single") {
-          const bowlWidth = halfWidth * 0.9;
-          const bowlHeight = heightPx * 0.8;
-          const bowlX = leftX + (halfWidth - bowlWidth) / 2;
-          const bowlY = centerY - bowlHeight / 2;
-          graphics.roundRect(bowlX, bowlY, bowlWidth, bowlHeight, cornerRadius);
-          graphics.stroke();
-        } else if (bowlType === "1.5") {
-          // Main bowl
-          const mainBowlWidth = halfWidth * 0.65;
-          const mainBowlHeight = heightPx * 0.75;
-          const mainX = leftX + halfWidth * 0.1;
-          const mainY = centerY - mainBowlHeight / 2;
-          graphics.roundRect(mainX, mainY, mainBowlWidth, mainBowlHeight, cornerRadius);
-          graphics.stroke();
-        }
-        
-        // Right half: 5 parallel drainage lines
-        // 5 lines, 100mm apart in the depth dimension
-        // Lines should maintain consistent 100mm spacing regardless of width resizing
-        const mmToPixels = heightPx / (displayedAsset.depthMm ?? 600); // scale based on actual depth
-        const lineSpacingPx = 100 * mmToPixels;
-        
-        // Lines are centered vertically with 100mm spacing
-        const lineCount = 5;
-        const drainStartX = leftX + halfWidth;
-        const drainEndX = rightX;
-        
-        for (let i = 0; i < lineCount; i += 1) {
-          const yOffset = (i - (lineCount - 1) / 2) * lineSpacingPx;
-          const startY = centerY + yOffset;
-          graphics.moveTo(drainStartX, startY);
-          graphics.lineTo(drainEndX, startY);
-          graphics.stroke();
+        if (hasDefaultDrainer) {
+          // With drainer: left half bowl + right half drainage lines
+          // Left half: rounded rectangle bowl
+          if (bowlType === "single") {
+            const bowlWidth = halfWidth * 0.9;
+            const bowlHeight = heightPx * 0.8;
+            const bowlX = leftX + (halfWidth - bowlWidth) / 2;
+            const bowlY = centerY - bowlHeight / 2;
+            graphics.roundRect(bowlX, bowlY, bowlWidth, bowlHeight, cornerRadius);
+            graphics.stroke();
+          } else if (bowlType === "1.5") {
+            // Main bowl
+            const mainBowlWidth = halfWidth * 0.65;
+            const mainBowlHeight = heightPx * 0.75;
+            const mainX = leftX + halfWidth * 0.1;
+            const mainY = centerY - mainBowlHeight / 2;
+            graphics.roundRect(mainX, mainY, mainBowlWidth, mainBowlHeight, cornerRadius);
+            graphics.stroke();
+          }
+          
+          // Right half: 5 parallel drainage lines
+          // 5 lines, 100mm apart in the depth dimension
+          const mmToPixels = heightPx / (displayedAsset.depthMm ?? 600);
+          const lineSpacingPx = 100 * mmToPixels;
+          
+          const lineCount = 5;
+          const drainStartX = leftX + halfWidth;
+          const drainEndX = rightX;
+          
+          for (let i = 0; i < lineCount; i += 1) {
+            const yOffset = (i - (lineCount - 1) / 2) * lineSpacingPx;
+            const startY = centerY + yOffset;
+            graphics.moveTo(drainStartX, startY);
+            graphics.lineTo(drainEndX, startY);
+            graphics.stroke();
+          }
+        } else {
+          // Without drainer: only show rounded rectangle bowl, no drainage lines
+          if (bowlType === "single") {
+            const bowlWidth = widthPx * 0.9;
+            const bowlHeight = heightPx * 0.8;
+            const bowlX = leftX + (widthPx - bowlWidth) / 2;
+            const bowlY = centerY - bowlHeight / 2;
+            graphics.roundRect(bowlX, bowlY, bowlWidth, bowlHeight, cornerRadius);
+            graphics.stroke();
+          } else if (bowlType === "1.5") {
+            // Main bowl (takes up full width without drainer)
+            const mainBowlWidth = widthPx * 0.65;
+            const mainBowlHeight = heightPx * 0.75;
+            const mainX = leftX + (widthPx - mainBowlWidth) / 2;
+            const mainY = centerY - mainBowlHeight / 2;
+            graphics.roundRect(mainX, mainY, mainBowlWidth, mainBowlHeight, cornerRadius);
+            graphics.stroke();
+          }
         }
       }
 
