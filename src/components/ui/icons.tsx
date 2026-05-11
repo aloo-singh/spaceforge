@@ -13,6 +13,7 @@ export {
   IconArrowUpToArc as ArrowUpToLine,
   IconArrowsLeftRight as ArrowsLeftRight,
   IconArrowsShuffle as ArrowUpDown,
+  IconBath as IconBath,
   IconBedFilled as BedFilled,
   IconBlocks as Blocks,
   IconBorderAll as BorderAll,

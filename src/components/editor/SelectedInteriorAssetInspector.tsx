@@ -73,6 +73,8 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected toilet", description: "Adjust the toilet's position, size, and orientation." };
     case "shower":
       return { title: "Selected shower", description: "Adjust the shower's position, size, and orientation." };
+    case "bath":
+      return { title: "Selected bath", description: "Adjust the bath's position, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }

@@ -417,6 +417,30 @@ export interface InteriorAssetToilet extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Bath fixture with rectangular tub outline and drain details.
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Visual distinction:
+ * - Outer rectangle boundary
+ * - Inner oval (rounded rectangle) tub interior
+ * - Circle plug hole positioned at one end
+ *
+ * Examples:
+ * - Standard: 700mm × 1600mm
+ */
+export interface InteriorAssetBath extends InteriorAssetCommonProperties {
+  type: "bath";
+}
+
+/**
  * Shower fixture with placeholder representation (square with details).
  * No type-specific properties — uses common dimensions only.
  */
