@@ -5421,6 +5421,19 @@ function drawRoomInteriorAssets(
           const bowl_bl = lerp(lerp(bowlF, midF, iW),                          lerp(bowlB, midB, iW),                          1 - iD);
           drawRoundedRectCorners(bowl_tl, bowl_tr, bowl_br, bowl_bl);
 
+          // Half-bowl: small rounded rect in the gap between main bowl and midline
+          if (bowlType === "1.5") {
+            const hbL = bowlWidthEnd + 0.1;  // left edge: spaced away from main bowl
+            const hbR = 1.01 - 0.01;          // right edge: close to midline, clear of drainer
+            const hbT = 0.18;                 // top inset (along depth)
+            const hbBo = 1.0 - 0.18;          // bottom inset
+            const hb_tl = lerp(lerp(bowlF, midF, hbL), lerp(bowlB, midB, hbL), hbT);
+            const hb_tr = lerp(lerp(bowlF, midF, hbR), lerp(bowlB, midB, hbR), hbT);
+            const hb_br = lerp(lerp(bowlF, midF, hbR), lerp(bowlB, midB, hbR), hbBo);
+            const hb_bl = lerp(lerp(bowlF, midF, hbL), lerp(bowlB, midB, hbL), hbBo);
+            drawRoundedRectCorners(hb_tl, hb_tr, hb_br, hb_bl);
+          }
+
           // Drainer lines: parallel to the front edge (width axis), in the drain half
           // drainDepthInset: padding top/bottom (along depth axis)
           // drainWidthInset: padding toward bowl side and toward outer edge (along width axis)
