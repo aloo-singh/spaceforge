@@ -5730,8 +5730,8 @@ function drawRoomInteriorAssets(
         const drawBathOval = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
-          // Fixed 50mm radius for tub curves
-          const radiusMm = 50;
+          // Fixed 80mm radius for tub curves (larger, doesn't scale with resize)
+          const radiusMm = 80;
           const r = Math.max(3, camera.pixelsPerMm * radiusMm);
           const rt = Math.min(r / w, 0.499);
           const rs = Math.min(r / h, 0.499);
@@ -5750,14 +5750,18 @@ function drawRoomInteriorAssets(
 
         drawBathOval(inner_tl, inner_tr, inner_br, inner_bl);
 
-        // 2. Plug hole circle at bottom center
-        const plugOffsetMm = 80;
+        // 2. Plug hole circle - centred on short side, 150mm from front edge
+        const plugOffsetMm = 150;
         const plugOffsetPx = camera.pixelsPerMm * plugOffsetMm;
 
-        // Position at bottom (inner_br corner area)
+        // Centre of the front edge (short side)
+        const frontMid_x = (inner_bl.x + inner_br.x) / 2;
+        const frontMid_y = (inner_bl.y + inner_br.y) / 2;
+
+        // Position 200mm from the front edge, moving towards the back
         const plugCenter = {
-          x: inner_br.x - widthUnit.x * plugOffsetPx,
-          y: inner_br.y - widthUnit.y * plugOffsetPx,
+          x: frontMid_x - depthUnit.x * plugOffsetPx,
+          y: frontMid_y - depthUnit.y * plugOffsetPx,
         };
         const plugRadiusMm = 30;
         const plugRadiusPx = Math.max(2, camera.pixelsPerMm * plugRadiusMm);
