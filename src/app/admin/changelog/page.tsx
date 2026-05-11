@@ -10,6 +10,22 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.12</h2>
+            <span className="text-sm text-muted-foreground">2026-05-11</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added bath asset type with outer rectangle, inner rounded rectangle tub interior (80mm fixed corner radius), and circular plug hole detail. Grid-snapped placement (top-left corner snaps to 100mm grid while remaining centered in room). Two plug hole position presets: "At end" (700×1600mm, plug hole 150mm from front edge, centered laterally) and "Middle" (1600×700mm, same positioning rotated).</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.11</h2>
             <span className="text-sm text-muted-foreground">2026-05-11</span>
           </div>
