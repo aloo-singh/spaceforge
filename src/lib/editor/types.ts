@@ -101,7 +101,7 @@ export type StairDirection = "forward" | "reverse";
  * - Phase 4: kitchen-unit, kitchen-appliance, hob (new assets batch begins)
  * - Future: sink, toilet, range, island, shelving, armchair, etc.
  */
-export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table" | "kitchen-unit" | "kitchen-appliance" | "hob" | "sink" | "toilet";
+export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining-table" | "kitchen-unit" | "kitchen-appliance" | "hob" | "sink" | "toilet" | "shower";
 
 /**
  * Interior asset: a piece of furniture or fixture placed inside a room.

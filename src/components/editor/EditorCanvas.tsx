@@ -5092,10 +5092,11 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables and toilets
+    // Skip rectangular bounding box for unselected round dining tables, toilets, and showers
     const isCustomDetailAsset =
       (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
-      displayedAsset.type === "toilet";
+      displayedAsset.type === "toilet" ||
+      displayedAsset.type === "shower";
     const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
@@ -5473,7 +5474,6 @@ function drawRoomInteriorAssets(
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
-        graphics.setFillStyle({ color: "transparent", alpha: 0 });
 
         // Lerp helper (may be shared in a future refactor, defined locally for now)
         const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
@@ -5490,7 +5490,7 @@ function drawRoomInteriorAssets(
         const cis_bl = lerpT(backC1, backC2, cisternInsetW);
 
         // drawRoundedRectCorners is defined inside the sink block above; redefine inline:
-        const drawToiletRect = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12) => {
+        const drawToiletRect = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12, shouldFill = false) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
           const r = Math.max(3, Math.min(w, h) * radiusFrac);
@@ -5506,10 +5506,13 @@ function drawRoomInteriorAssets(
           graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
           graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
           graphics.closePath();
+          if (shouldFill) graphics.fill();
           graphics.stroke();
         };
 
-        drawToiletRect(cis_tl, cis_tr, cis_br, cis_bl, 0.08);
+        // Cistern with subtle fill
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        drawToiletRect(cis_tl, cis_tr, cis_br, cis_bl, 0.08, true);
 
         // 2. Outer bowl oval — from just below cistern to front inset, with side insets
         const bowlTopT  = cisternDepth + 0.03; // slight gap below cistern
@@ -5519,9 +5522,18 @@ function drawRoomInteriorAssets(
         const ob_tr = lerpT(lerpT(backC1, frontC1, bowlTopT), lerpT(backC2, frontC2, bowlTopT), 1 - bowlSideI);
         const ob_br = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), 1 - bowlSideI);
         const ob_bl = lerpT(lerpT(backC1, frontC1, bowlBotT), lerpT(backC2, frontC2, bowlBotT), bowlSideI);
-        drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35);
+        
+        // Outer bowl with subtle fill
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35, true);
 
-        // 3. Inner hole oval — smaller, centred, nearer the cistern
+        // 3. Inner hole oval — smaller, centred, nearer the cistern (no fill, secondary stroke)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+        graphics.setFillStyle({ color: "transparent", alpha: 0 });
         const holeTopT  = cisternDepth + 0.11;
         const holeBotT  = 0.55;
         const holeSideI = 0.32;
@@ -5529,7 +5541,122 @@ function drawRoomInteriorAssets(
         const ih_tr = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), 1 - holeSideI);
         const ih_br = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), 1 - holeSideI);
         const ih_bl = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), holeSideI);
-        drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40);
+        drawToiletRect(ih_tl, ih_tr, ih_br, ih_bl, 0.40, false);
+      }
+
+      if (displayedAsset.type === "shower") {
+        // Shower viewed from above (top-down floor plan):
+        // Large rounded rectangle interior detail (like hob burners pattern)
+        // Small drain circle in the inside corner.
+
+        // Lerp helper
+        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // Fill layer for whole asset (more subtle than default)
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+
+        // 0. Outer square boundary (main asset outline)
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.moveTo(backC1.x, backC1.y);
+        graphics.lineTo(backC2.x, backC2.y);
+        graphics.lineTo(frontC2.x, frontC2.y);
+        graphics.lineTo(frontC1.x, frontC1.y);
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+
+        // Width-axis swap fix for 180° and 270° rotations
+        // (shower details are asymmetric along width, so cardinal at-rest mapping reverses at -180° and -90°)
+        const needsWidthSwap = !anim && (() => {
+          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+          return r === -180 || r === -90;
+        })();
+        const leftF  = needsWidthSwap ? frontC2 : frontC1;
+        const leftB  = needsWidthSwap ? backC2  : backC1;
+        const rightF = needsWidthSwap ? frontC1 : frontC2;
+        const rightB = needsWidthSwap ? backC1  : backC2;
+
+        // 1. Large rounded rectangle interior detail (fixed 50mm inset from edge)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+
+        // Fixed 50mm inset from edge in world space
+        const insetMm = 50;
+        const insetPx = camera.pixelsPerMm * insetMm;
+        
+        // Calculate unit vectors along edges for rotation-aware inset
+        const widthVec = { x: rightB.x - leftB.x, y: rightB.y - leftB.y };
+        const depthVec = { x: leftF.x - leftB.x, y: leftF.y - leftB.y };
+        const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
+        const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
+        const widthUnit = { x: widthVec.x / widthLen, y: widthVec.y / widthLen };
+        const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
+        
+        // Inset each corner by fixed 50mm
+        const inner_tl = {
+          x: leftB.x + widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: leftB.y + widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_tr = {
+          x: rightB.x - widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: rightB.y - widthUnit.y * insetPx + depthUnit.y * insetPx,
+        };
+        const inner_br = {
+          x: rightF.x - widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: rightF.y - widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+        const inner_bl = {
+          x: leftF.x + widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: leftF.y + widthUnit.y * insetPx - depthUnit.y * insetPx,
+        };
+
+        const drawRoundedShowerFloor = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
+          const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
+          const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
+          // Fixed 60mm radius regardless of shower size
+          const radiusMm = 60;
+          const r = Math.max(3, camera.pixelsPerMm * radiusMm);
+          const rt = Math.min(r / w, 0.499);
+          const rs = Math.min(r / h, 0.499);
+          graphics.moveTo(lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y);
+          graphics.lineTo(lerpT(tr, tl, rt).x, lerpT(tr, tl, rt).y);
+          graphics.arcTo(tr.x, tr.y, lerpT(tr, br, rs).x, lerpT(tr, br, rs).y, r);
+          graphics.lineTo(lerpT(br, tr, rs).x, lerpT(br, tr, rs).y);
+          graphics.arcTo(br.x, br.y, lerpT(br, bl, rt).x, lerpT(br, bl, rt).y, r);
+          graphics.lineTo(lerpT(bl, br, rt).x, lerpT(bl, br, rt).y);
+          graphics.arcTo(bl.x, bl.y, lerpT(bl, tl, rs).x, lerpT(bl, tl, rs).y, r);
+          graphics.lineTo(lerpT(tl, bl, rs).x, lerpT(tl, bl, rs).y);
+          graphics.arcTo(tl.x, tl.y, lerpT(tl, tr, rt).x, lerpT(tl, tr, rt).y, r);
+          graphics.closePath();
+          graphics.stroke();
+        };
+
+        drawRoundedShowerFloor(inner_tl, inner_tr, inner_br, inner_bl);
+
+        // 2. Drain circle positioned at fixed 90mm offset from inner rectangle corner (top-left)
+        const drainOffsetMm = 90;
+        const drainOffsetPx = camera.pixelsPerMm * drainOffsetMm;
+        
+        // Offset 90mm along both width and depth axes from inner_tl
+        const drainCenter = {
+          x: inner_tl.x + widthUnit.x * drainOffsetPx + depthUnit.x * drainOffsetPx,
+          y: inner_tl.y + widthUnit.y * drainOffsetPx + depthUnit.y * drainOffsetPx,
+        };
+        const drainRadiusMm = 60;
+        const drainRadiusPx = Math.max(2, camera.pixelsPerMm * drainRadiusMm);
+        graphics.beginPath();
+        graphics.arc(drainCenter.x, drainCenter.y, drainRadiusPx, 0, Math.PI * 2);
+        graphics.stroke();
       }
 
 

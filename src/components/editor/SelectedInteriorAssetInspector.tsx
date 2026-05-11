@@ -71,6 +71,8 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
     case "toilet":
       return { title: "Selected toilet", description: "Adjust the toilet's position, size, and orientation." };
+    case "shower":
+      return { title: "Selected shower", description: "Adjust the shower's position, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }
@@ -94,6 +96,7 @@ function FurnitureInspector({
   const setSinkBowlType = useEditorStore((state) => state.setSinkBowlType);
   const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
+  const setSelectedShowerSizePreset = useEditorStore((state) => state.setSelectedShowerSizePreset);
   
   // Drainer handler
   const handleDrainerChange = React.useCallback((checked: boolean) => {
@@ -188,6 +191,41 @@ function FurnitureInspector({
                     size="sm"
                     onClick={() => setSelectedBedSizePreset(widthMm, depthMm, label)}
                     aria-label={`${label} bed`}
+                    aria-pressed={isActive}
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {asset.type === "shower" ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Size</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  { label: "Square", widthMm: 800, depthMm: 800 },
+                  { label: "Small", widthMm: 1200, depthMm: 800 },
+                  { label: "Large", widthMm: 1800, depthMm: 900 },
+                ] as const
+              ).map(({ label, widthMm, depthMm }) => {
+                // Account for rotation when comparing preset sizes
+                const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+                const isSideways = rotation === 90 || rotation === -90;
+                const [comparedWidth, comparedDepth] = isSideways ? [depthMm, widthMm] : [widthMm, depthMm];
+                const isActive = asset.widthMm === comparedWidth && asset.depthMm === comparedDepth;
+
+                return (
+                  <Button
+                    key={label}
+                    type="button"
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedShowerSizePreset(widthMm, depthMm, label)}
+                    aria-label={`${label} shower`}
                     aria-pressed={isActive}
                   >
                     {label}

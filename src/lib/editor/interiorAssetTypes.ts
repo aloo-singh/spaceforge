@@ -417,6 +417,14 @@ export interface InteriorAssetToilet extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Shower fixture with placeholder representation (square with details).
+ * No type-specific properties — uses common dimensions only.
+ */
+export interface InteriorAssetShower extends InteriorAssetCommonProperties {
+  type: "shower";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -444,7 +452,7 @@ export interface InteriorAssetToilet extends InteriorAssetCommonProperties {
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink | InteriorAssetToilet;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink | InteriorAssetToilet | InteriorAssetShower;
 
 /**
  * Type guard to safely extract stairs from discriminated union.
