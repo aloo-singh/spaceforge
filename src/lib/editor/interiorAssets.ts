@@ -444,9 +444,29 @@ export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorA
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
 
-  const center = {
+  // Bath dimensions
+  const widthMm = 700;
+  const depthMm = 1600;
+
+  // Calculate room center
+  const roomCenter = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
     y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  // Calculate where top-left would be from room center
+  const topLeftX = roomCenter.x - widthMm / 2;
+  const topLeftY = roomCenter.y - depthMm / 2;
+
+  // Snap top-left corner to 100mm grid
+  const gridSizeMm = 100;
+  const snappedTopLeftX = snapToGrid(topLeftX, gridSizeMm);
+  const snappedTopLeftY = snapToGrid(topLeftY, gridSizeMm);
+
+  // Calculate center from snapped top-left
+  const center = {
+    x: snappedTopLeftX + widthMm / 2,
+    y: snappedTopLeftY + depthMm / 2,
   };
 
   return {
@@ -455,8 +475,8 @@ export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorA
     name: "Bath",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 700,
-    depthMm: 1600,
+    widthMm,
+    depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
