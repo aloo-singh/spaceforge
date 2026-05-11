@@ -5516,9 +5516,9 @@ function drawRoomInteriorAssets(
         drawToiletRect(ob_tl, ob_tr, ob_br, ob_bl, 0.35);
 
         // 3. Inner hole oval — smaller, centred, nearer the cistern
-        const holeTopT  = cisternDepth + 0.07;
-        const holeBotT  = 0.70;
-        const holeSideI = 0.18;
+        const holeTopT  = cisternDepth + 0.11;
+        const holeBotT  = 0.55;
+        const holeSideI = 0.32;
         const ih_tl = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), holeSideI);
         const ih_tr = lerpT(lerpT(backC1, frontC1, holeTopT), lerpT(backC2, frontC2, holeTopT), 1 - holeSideI);
         const ih_br = lerpT(lerpT(backC1, frontC1, holeBotT), lerpT(backC2, frontC2, holeBotT), 1 - holeSideI);
