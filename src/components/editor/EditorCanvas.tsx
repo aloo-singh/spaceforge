@@ -5572,6 +5572,17 @@ function drawRoomInteriorAssets(
         graphics.fill();
         graphics.stroke();
 
+        // Width-axis swap fix for 180° and 270° rotations
+        // (shower details are asymmetric along width, so cardinal at-rest mapping reverses at -180° and -90°)
+        const needsWidthSwap = !anim && (() => {
+          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+          return r === -180 || r === -90;
+        })();
+        const leftF  = needsWidthSwap ? frontC2 : frontC1;
+        const leftB  = needsWidthSwap ? backC2  : backC1;
+        const rightF = needsWidthSwap ? frontC1 : frontC2;
+        const rightB = needsWidthSwap ? backC1  : backC2;
+
         // 1. Large rounded rectangle interior detail (fixed 50mm inset from edge)
         graphics.setStrokeStyle({
           width: fgLineWidth * 0.8,
@@ -5584,8 +5595,8 @@ function drawRoomInteriorAssets(
         const insetPx = camera.pixelsPerMm * insetMm;
         
         // Calculate unit vectors along edges for rotation-aware inset
-        const widthVec = { x: backC2.x - backC1.x, y: backC2.y - backC1.y };
-        const depthVec = { x: frontC1.x - backC1.x, y: frontC1.y - backC1.y };
+        const widthVec = { x: rightB.x - leftB.x, y: rightB.y - leftB.y };
+        const depthVec = { x: leftF.x - leftB.x, y: leftF.y - leftB.y };
         const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
         const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
         const widthUnit = { x: widthVec.x / widthLen, y: widthVec.y / widthLen };
@@ -5593,20 +5604,20 @@ function drawRoomInteriorAssets(
         
         // Inset each corner by fixed 50mm
         const inner_tl = {
-          x: backC1.x + widthUnit.x * insetPx + depthUnit.x * insetPx,
-          y: backC1.y + widthUnit.y * insetPx + depthUnit.y * insetPx,
+          x: leftB.x + widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: leftB.y + widthUnit.y * insetPx + depthUnit.y * insetPx,
         };
         const inner_tr = {
-          x: backC2.x - widthUnit.x * insetPx + depthUnit.x * insetPx,
-          y: backC2.y - widthUnit.y * insetPx + depthUnit.y * insetPx,
+          x: rightB.x - widthUnit.x * insetPx + depthUnit.x * insetPx,
+          y: rightB.y - widthUnit.y * insetPx + depthUnit.y * insetPx,
         };
         const inner_br = {
-          x: frontC2.x - widthUnit.x * insetPx - depthUnit.x * insetPx,
-          y: frontC2.y - widthUnit.y * insetPx - depthUnit.y * insetPx,
+          x: rightF.x - widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: rightF.y - widthUnit.y * insetPx - depthUnit.y * insetPx,
         };
         const inner_bl = {
-          x: frontC1.x + widthUnit.x * insetPx - depthUnit.x * insetPx,
-          y: frontC1.y + widthUnit.y * insetPx - depthUnit.y * insetPx,
+          x: leftF.x + widthUnit.x * insetPx - depthUnit.x * insetPx,
+          y: leftF.y + widthUnit.y * insetPx - depthUnit.y * insetPx,
         };
 
         const drawRoundedShowerFloor = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
@@ -5632,7 +5643,7 @@ function drawRoomInteriorAssets(
 
         drawRoundedShowerFloor(inner_tl, inner_tr, inner_br, inner_bl);
 
-        // 2. Drain circle positioned at fixed 90mm offset from inner rectangle corner
+        // 2. Drain circle positioned at fixed 90mm offset from inner rectangle corner (top-left)
         const drainOffsetMm = 90;
         const drainOffsetPx = camera.pixelsPerMm * drainOffsetMm;
         
