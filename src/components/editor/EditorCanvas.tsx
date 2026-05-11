@@ -5356,6 +5356,110 @@ function drawRoomInteriorAssets(
         }
       }
 
+      if (displayedAsset.type === "sink") {
+        // Uses frontC1/frontC2/backC1/backC2 like bed/sofa — rotates smoothly.
+        // front edge = wall-mount/tap side. back edge = far side.
+        // frontC1→frontC2 = width axis. frontC1→backC1 = depth axis.
+        // Bowl occupies one half along the width; drainer lines the other.
+        const bowlType = displayedAsset.bowlType ?? "single";
+        const hasDefaultDrainer = displayedAsset.hasDefaultDrainer ?? true;
+
+        graphics.setStrokeStyle({ width: fgLineWidth * 0.9, color: fgColor, alpha: fgAlpha * 0.75 });
+        graphics.setFillStyle({ color: fgColor, alpha: 0 });
+
+        // Lerp two screen points
+        const lerp = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // Draw a rounded rect given 4 screen-space corners (tl, tr, br, bl)
+        const drawRoundedRectCorners = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint, radiusFrac = 0.12) => {
+          const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
+          const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
+          const r = Math.max(3, Math.min(w, h) * radiusFrac);
+          const rt = Math.min(r / w, 0.499);
+          const rs = Math.min(r / h, 0.499);
+          graphics.moveTo(lerp(tl, tr, rt).x, lerp(tl, tr, rt).y);
+          graphics.lineTo(lerp(tr, tl, rt).x, lerp(tr, tl, rt).y);
+          graphics.arcTo(tr.x, tr.y, lerp(tr, br, rs).x, lerp(tr, br, rs).y, r);
+          graphics.lineTo(lerp(br, tr, rs).x, lerp(br, tr, rs).y);
+          graphics.arcTo(br.x, br.y, lerp(br, bl, rt).x, lerp(br, bl, rt).y, r);
+          graphics.lineTo(lerp(bl, br, rt).x, lerp(bl, br, rt).y);
+          graphics.arcTo(bl.x, bl.y, lerp(bl, tl, rs).x, lerp(bl, tl, rs).y, r);
+          graphics.lineTo(lerp(tl, bl, rs).x, lerp(tl, bl, rs).y);
+          graphics.arcTo(tl.x, tl.y, lerp(tl, tr, rt).x, lerp(tl, tr, rt).y, r);
+          graphics.closePath();
+          graphics.stroke();
+        };
+
+        // The bowl is at local x=0 (the frontC1 end at 0°/90°).
+        // During animation, frontC1=topLeft is always the local bowl corner — correct by definition.
+        // At rest, the cardinal mapping reverses the width axis at -180° and -90°, so frontC1 lands
+        // on the wrong (drainer) side. We detect this and swap bowl/drain corners accordingly.
+        const needsBowlSwap = !anim && (() => {
+          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+          return r === -180 || r === -90;
+        })();
+        const bowlF  = needsBowlSwap ? frontC2 : frontC1;
+        const bowlB  = needsBowlSwap ? backC2  : backC1;
+        const drainF = needsBowlSwap ? frontC1 : frontC2;
+        const drainB = needsBowlSwap ? backC1  : backC2;
+
+        // Midpoints of front and back edges (always the true centre regardless of swap)
+        const midF = lerp(frontC1, frontC2, 0.5);
+        const midB = lerp(backC1, backC2, 0.5);
+
+        if (hasDefaultDrainer) {
+          // Bowl half (bowlF side), inset slightly
+          const iW = 0.08;
+          const iD = 0.08;
+          const bowlWidthEnd = bowlType === "single" ? 1.0 : 0.65;
+          const bowl_tl = lerp(lerp(bowlF, midF, iW),                          lerp(bowlB, midB, iW),                          iD);
+          const bowl_tr = lerp(lerp(midF, bowlF, 1 - bowlWidthEnd),             lerp(midB, bowlB, 1 - bowlWidthEnd),             iD);
+          const bowl_br = lerp(lerp(midF, bowlF, 1 - bowlWidthEnd),             lerp(midB, bowlB, 1 - bowlWidthEnd),             1 - iD);
+          const bowl_bl = lerp(lerp(bowlF, midF, iW),                          lerp(bowlB, midB, iW),                          1 - iD);
+          drawRoundedRectCorners(bowl_tl, bowl_tr, bowl_br, bowl_bl);
+
+          // Half-bowl: small rounded rect in the gap between main bowl and midline
+          if (bowlType === "1.5") {
+            const hbL = bowlWidthEnd + 0.1;  // left edge: spaced away from main bowl
+            const hbR = 1.01 - 0.01;          // right edge: close to midline, clear of drainer
+            const hbT = 0.18;                 // top inset (along depth)
+            const hbBo = 1.0 - 0.18;          // bottom inset
+            const hb_tl = lerp(lerp(bowlF, midF, hbL), lerp(bowlB, midB, hbL), hbT);
+            const hb_tr = lerp(lerp(bowlF, midF, hbR), lerp(bowlB, midB, hbR), hbT);
+            const hb_br = lerp(lerp(bowlF, midF, hbR), lerp(bowlB, midB, hbR), hbBo);
+            const hb_bl = lerp(lerp(bowlF, midF, hbL), lerp(bowlB, midB, hbL), hbBo);
+            drawRoundedRectCorners(hb_tl, hb_tr, hb_br, hb_bl);
+          }
+
+          // Drainer lines: parallel to the front edge (width axis), in the drain half
+          // drainDepthInset: padding top/bottom (along depth axis)
+          // drainWidthInset: padding toward bowl side and toward outer edge (along width axis)
+          const lineCount = 5;
+          const drainDepthInset = 0.15;
+          const drainWidthInset = 0.12;
+          for (let i = 0; i < lineCount; i++) {
+            const t = drainDepthInset + (1 - 2 * drainDepthInset) * (i / (lineCount - 1));
+            const ls = lerp(lerp(midF, drainF, drainWidthInset),  lerp(midB, drainB, drainWidthInset),  t);
+            const le = lerp(lerp(drainF, midF, drainWidthInset),  lerp(drainB, midB, drainWidthInset),  t);
+            graphics.moveTo(ls.x, ls.y);
+            graphics.lineTo(le.x, le.y);
+            graphics.stroke();
+          }
+        } else {
+          // No drainer: full-width bowl (symmetric, no swap needed)
+          const iW = 0.05;
+          const iD = 0.08;
+          const bowl_tl = lerp(lerp(frontC1, frontC2, iW), lerp(backC1, backC2, iW),   iD);
+          const bowl_tr = lerp(lerp(frontC2, frontC1, iW), lerp(backC2, backC1, iW),   iD);
+          const bowl_br = lerp(lerp(frontC2, frontC1, iW), lerp(backC2, backC1, iW),   1 - iD);
+          const bowl_bl = lerp(lerp(frontC1, frontC2, iW), lerp(backC1, backC2, iW),   1 - iD);
+          drawRoundedRectCorners(bowl_tl, bowl_tr, bowl_br, bowl_bl);
+        }
+      }
+
 
     }
 

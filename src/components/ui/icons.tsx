@@ -77,5 +77,6 @@ export {
   IconTriangleInverted as IconTriangleInverted,
   IconTrash as Trash2,
   IconWindow as WindowIcon,
+  IconWash as IconWash,
   IconX as X,
 } from "@tabler/icons-react";

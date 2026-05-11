@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { IconCaretUpFilled, IconCaretDownFilled, RotateCcw, RotateCw, Transfer, Trash2 } from "@/components/ui/icons";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,8 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
     case "hob":
       return { title: "Selected hob", description: "Adjust the hob's position, size, and orientation." };
+    case "sink":
+      return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
     case "stairs":
       return { title: "Selected stair", description: "Review the current stair block and adjust its orientation." };
   }
@@ -76,6 +79,7 @@ function FurnitureInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
   const commitInteriorAssetRenameSession = useEditorStore((state) => state.commitInteriorAssetRenameSession);
@@ -85,7 +89,14 @@ function FurnitureInspector({
   const selectInteriorAssetById = useEditorStore((state) => state.selectInteriorAssetById);
   const setSelectedInteriorAssetDoorType = useEditorStore((state) => state.setSelectedInteriorAssetDoorType);
   const setSelectedInteriorAssetShape = useEditorStore((state) => state.setSelectedInteriorAssetShape);
+  const setSinkBowlType = useEditorStore((state) => state.setSinkBowlType);
+  const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
+  
+  // Drainer handler
+  const handleDrainerChange = React.useCallback((checked: boolean) => {
+    setSinkHasDefaultDrainer(checked);
+  }, [setSinkHasDefaultDrainer]);
   const canRotateSelectedInteriorAsset = useEditorStore((state) => {
     const roomId = state.selectedInteriorAsset?.roomId;
     const assetId = state.selectedInteriorAsset?.assetId;
@@ -301,6 +312,52 @@ function FurnitureInspector({
               </ButtonGroup>
             </ImmediateTooltipProvider>
           </div>
+        ) : null}
+
+        {asset.type === "sink" ? (
+          <>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Bowl type</p>
+              <ImmediateTooltipProvider>
+                <ButtonGroup>
+                  <InspectorIconTooltip groupItem content="Single bowl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSinkBowlType("single")}
+                      aria-label="Single bowl"
+                      aria-pressed={(asset as any).bowlType !== "1.5"}
+                    >
+                      Single
+                    </Button>
+                  </InspectorIconTooltip>
+                  <InspectorIconTooltip groupItem content="1.5 bowl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSinkBowlType("1.5")}
+                      aria-label="1.5 bowl"
+                      aria-pressed={(asset as any).bowlType === "1.5"}
+                    >
+                      1.5
+                    </Button>
+                  </InspectorIconTooltip>
+                </ButtonGroup>
+              </ImmediateTooltipProvider>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Drainer</p>
+                <Switch
+                  checked={(asset as any).hasDefaultDrainer ?? false}
+                  onCheckedChange={handleDrainerChange}
+                />
+              </div>
+            </div>
+          </>
         ) : null}
 
         <div className="flex justify-end">

@@ -79,6 +79,7 @@ import {
   createCenteredDefaultKitchenUnit,
   createCenteredDefaultKitchenAppliance,
   createCenteredDefaultHob,
+  createCenteredDefaultSink,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
   getRotatedInteriorAssetForRoom,
@@ -379,6 +380,8 @@ type EditorState = {
   updateSelectedInteriorAssetArrowLabel: (label: string) => void;
   setSelectedInteriorAssetDoorType: (doorType: "swing" | "sliding") => void;
   setSelectedInteriorAssetShape: (shape: "rectangular" | "round") => void;
+  setSinkBowlType: (bowlType: "single" | "1.5") => void;
+  setSinkHasDefaultDrainer: (hasDefaultDrainer: boolean) => void;
   setSelectedBedSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
@@ -1160,6 +1163,10 @@ function updateRoomInteriorAssetInDocument(
     doorConstraint?: number;
     shape?: "rectangular" | "round";
     sizePreset?: string;
+    bowlType?: "single" | "1.5";
+    hasDefaultDrainer?: boolean;
+    drainerSide?: "depth" | "width";
+    burnerCount?: 2 | 4 | 5 | 6;
   }
 ): DocumentState {
   const clonedAssetDefaults = (asset: Room["interiorAssets"][number]) => cloneRoomInteriorAsset(asset);
@@ -1188,6 +1195,10 @@ function updateRoomInteriorAssetInDocument(
                     doorConstraint: nextAsset.doorConstraint ?? clonedAssetDefaults(asset).doorConstraint,
                     shape: nextAsset.shape ?? clonedAssetDefaults(asset).shape,
                     sizePreset: nextAsset.sizePreset ?? clonedAssetDefaults(asset).sizePreset,
+                    ...(nextAsset.bowlType !== undefined && { bowlType: nextAsset.bowlType }),
+                    ...(nextAsset.hasDefaultDrainer !== undefined && { hasDefaultDrainer: nextAsset.hasDefaultDrainer }),
+                    ...(nextAsset.drainerSide !== undefined && { drainerSide: nextAsset.drainerSide }),
+                    ...(nextAsset.burnerCount !== undefined && { burnerCount: nextAsset.burnerCount }),
                   }
                 : asset
             ),
@@ -5662,6 +5673,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           asset = createCenteredDefaultHob(room, createInteriorAssetId());
           placedAssetTypeName = "Hob";
           break;
+        case "sink":
+          asset = createCenteredDefaultSink(room, createInteriorAssetId());
+          placedAssetTypeName = "Sink";
+          break;
       }
 
       if (!asset) return state;
@@ -5873,6 +5888,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...cloneRoomInteriorAsset(asset),
           shape,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSinkBowlType: (bowlType) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.bowlType === bowlType) return null;
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          bowlType,
+        };
+      });
+      return nextState ?? state;
+    }),
+  setSinkHasDefaultDrainer: (hasDefaultDrainer) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.type !== "sink") return null;
+        const currentDrainer = (asset as any).hasDefaultDrainer ?? false;
+        if (currentDrainer === hasDefaultDrainer) return null;
+        
+        // Adjust width and anchor to the left side (bowl side, away from drainer lines)
+        const currentWidth = asset.widthMm;
+        const leftEdge = asset.xMm - currentWidth / 2;
+        
+        // Calculate new width (halve when OFF, double when ON)
+        const newWidth = hasDefaultDrainer 
+          ? currentWidth * 2  // Double when turning ON
+          : Math.floor(currentWidth / 2 / 50) * 50;  // Halve and round down to 50mm grid
+        
+        // Keep left edge fixed, adjust center position
+        const newXMm = leftEdge + newWidth / 2;
+        
+        return {
+          ...cloneRoomInteriorAsset(asset),
+          hasDefaultDrainer,
+          widthMm: newWidth,
+          xMm: newXMm,
         };
       });
       return nextState ?? state;
