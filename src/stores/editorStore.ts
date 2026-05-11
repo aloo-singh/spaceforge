@@ -387,6 +387,7 @@ type EditorState = {
   setSinkHasDefaultDrainer: (hasDefaultDrainer: boolean) => void;
   setSelectedBedSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   setSelectedShowerSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
+  setSelectedBathPlugHolePosition: (widthMm: number, depthMm: number, presetName: string) => void;
   updateSelectedOpeningWidth: (widthMm: number) => void;
   updateSelectedDoorOpeningSide: (openingSide: DoorOpeningSide) => void;
   updateSelectedDoorHingeSide: (hingeSide: DoorHingeSide) => void;
@@ -6045,6 +6046,68 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           toast(`${presetName} shower moved to fit.`, { duration: 2500 });
         } else {
           toast(`${presetName} shower doesn't fit in this room.`, { duration: 3000 });
+          return state;
+        }
+      }
+
+      const command: EditorCommand = {
+        type: "update-interior-asset",
+        roomId: room.id,
+        previousAsset: cloneRoomInteriorAsset(asset),
+        nextAsset: cloneRoomInteriorAsset(nextAsset),
+      };
+
+      return {
+        document: updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset),
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  setSelectedBathPlugHolePosition: (widthMm, depthMm, presetName) =>
+    set((state) => {
+      const { selectedInteriorAsset } = state;
+      if (!selectedInteriorAsset) return state;
+
+      const room = state.document.rooms.find((r) => r.id === selectedInteriorAsset.roomId);
+      const asset = room?.interiorAssets.find((a) => a.id === selectedInteriorAsset.assetId);
+      if (!room || !asset || asset.type !== "bath") return state;
+
+      // Account for rotation when applying preset size
+      const rotation = normalizeCanvasRotationDegrees(asset.rotationDegrees ?? 0);
+      const isSideways = rotation === 90 || rotation === -90;
+      const [appliedWidth, appliedDepth] = isSideways ? [depthMm, widthMm] : [widthMm, depthMm];
+
+      if (asset.widthMm === appliedWidth && asset.depthMm === appliedDepth) return state;
+
+      // Calculate new center to resize from top-left corner
+      const topLeftX = asset.xMm - asset.widthMm / 2;
+      const topLeftY = asset.yMm - asset.depthMm / 2;
+      const newCenterX = topLeftX + appliedWidth / 2;
+      const newCenterY = topLeftY + appliedDepth / 2;
+
+      let nextAsset: RoomInteriorAsset = {
+        ...cloneRoomInteriorAsset(asset),
+        widthMm: appliedWidth,
+        depthMm: appliedDepth,
+        xMm: newCenterX,
+        yMm: newCenterY,
+        sizePreset: presetName,
+      };
+
+      if (!isInteriorAssetWithinRoom(room, nextAsset)) {
+        const constrained = constrainInteriorAssetCenter(room, nextAsset, {
+          x: nextAsset.xMm,
+          y: nextAsset.yMm,
+        });
+        if (constrained) {
+          nextAsset = { ...nextAsset, xMm: constrained.x, yMm: constrained.y };
+          toast(`${presetName} bath moved to fit.`, { duration: 2500 });
+        } else {
+          toast(`${presetName} bath doesn't fit in this room.`, { duration: 3000 });
           return state;
         }
       }
