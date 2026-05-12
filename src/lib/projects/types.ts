@@ -77,7 +77,8 @@ function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa"
     value === "sink" ||
     value === "toilet" ||
     value === "shower" ||
-    value === "bath"
+    value === "bath" ||
+    value === "basin"
   );
 }
 
