@@ -5790,30 +5790,42 @@ function drawRoomInteriorAssets(
         const centerX = (frontC1.x + frontC2.x + backC1.x + backC2.x) / 4;
         const centerY = (frontC1.y + frontC2.y + backC1.y + backC2.y) / 4;
 
+        // Basin details are asymmetric along the depth axis (shallow 50mm front, deep 100mm back).
+        // At cardinal rotations -180° and -90°, the cardinal mapping reverses the depth axis,
+        // so we swap the front/back corners to maintain local coordinate consistency.
+        const needsDepthSwap = !anim && (() => {
+          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+          return r === -180 || r === -90;
+        })();
+        const shallowC1 = needsDepthSwap ? backC1 : frontC1;
+        const shallowC2 = needsDepthSwap ? backC2 : frontC2;
+        const deepC1 = needsDepthSwap ? frontC1 : backC1;
+        const deepC2 = needsDepthSwap ? frontC2 : backC2;
+
         // Calculate radii from corners
-        const widthVec = { x: frontC2.x - frontC1.x, y: frontC2.y - frontC1.y };
-        const depthVec = { x: backC1.x - frontC1.x, y: backC1.y - frontC1.y };
+        const widthVec = { x: shallowC2.x - shallowC1.x, y: shallowC2.y - shallowC1.y };
+        const depthVec = { x: deepC1.x - shallowC1.x, y: deepC1.y - shallowC1.y };
         const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
         const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
         const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
         
-        // Asymmetric insets: 50mm from top, 100mm from bottom, 50mm from sides
-        const topInsetMm = 50;
-        const bottomInsetMm = 100;
+        // Asymmetric insets: 50mm from shallow end, 100mm from deep end, 50mm from sides
+        const shallowInsetMm = 50;
+        const deepInsetMm = 100;
         const sideInsetMm = 50;
-        const topInsetPx = camera.pixelsPerMm * topInsetMm;
-        const bottomInsetPx = camera.pixelsPerMm * bottomInsetMm;
+        const shallowInsetPx = camera.pixelsPerMm * shallowInsetMm;
+        const deepInsetPx = camera.pixelsPerMm * deepInsetMm;
         const sideInsetPx = camera.pixelsPerMm * sideInsetMm;
         
         // Width radius remains symmetric
         const radiusWidth = Math.max(3, widthLen / 2 - sideInsetPx);
         
         // Depth: new radius from asymmetric insets
-        const availableDepth = depthLen - topInsetPx - bottomInsetPx;
+        const availableDepth = depthLen - shallowInsetPx - deepInsetPx;
         const radiusDepth = Math.max(3, availableDepth / 2);
         
-        // Shift center towards back by (bottomInset - topInset) / 2
-        const depthCenterOffset = (bottomInsetPx - topInsetPx) / 2;
+        // Shift center towards deep end by (deepInset - shallowInset) / 2
+        const depthCenterOffset = (deepInsetPx - shallowInsetPx) / 2;
         const adjustedCenterX = centerX + depthUnit.x * depthCenterOffset;
         const adjustedCenterY = centerY + depthUnit.y * depthCenterOffset;
 
@@ -5833,7 +5845,7 @@ function drawRoomInteriorAssets(
         const circleRadiusMm = 25;
         const circleRadiusPx = Math.max(2, camera.pixelsPerMm * circleRadiusMm);
 
-        // Draw inner circle at center
+        // Draw inner circle at true center of bounding box
         graphics.beginPath();
         graphics.arc(centerX, centerY, circleRadiusPx, 0, Math.PI * 2);
         graphics.stroke();
