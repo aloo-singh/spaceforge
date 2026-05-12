@@ -5772,14 +5772,8 @@ function drawRoomInteriorAssets(
 
       if (displayedAsset.type === "basin") {
         // Basin viewed from above (top-down floor plan):
-        // Outer semicircular boundary
+        // Outer semicircular boundary with fill
         // Inner concentric semicircular detail
-
-        // Lerp helper
-        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
-          x: a.x + (b.x - a.x) * t,
-          y: a.y + (b.y - a.y) * t,
-        });
 
         // Fill layer for whole asset
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
@@ -5803,12 +5797,14 @@ function drawRoomInteriorAssets(
         const centerX = (backC1.x + backC2.x + frontC1.x + frontC2.x) / 4;
         const centerY = (backC1.y + backC2.y + frontC1.y + frontC2.y) / 4;
 
-        // Semicircle geometry: draw on the width axis (left-right) with depth as radius
+        // Semicircle geometry: arc spans from one end of the width to the other, with radius = half depth
         const radiusPx = depthLen / 2;
         const startAngle = Math.atan2(depthUnit.y, depthUnit.x);
         const endAngle = startAngle + Math.PI;
 
-        // Draw outer semicircle
+        // Draw outer semicircle: start at one diameter end, arc to other end, line back to start
+        graphics.beginPath();
+        graphics.moveTo(centerX + widthUnit.x * widthLen / 2, centerY + widthUnit.y * widthLen / 2);
         graphics.arc(centerX, centerY, radiusPx, startAngle, endAngle);
         graphics.lineTo(centerX - widthUnit.x * widthLen / 2, centerY - widthUnit.y * widthLen / 2);
         graphics.closePath();
@@ -5822,14 +5818,17 @@ function drawRoomInteriorAssets(
           alpha: fgAlpha * 0.7,
         });
 
-        // Fixed 30mm inset from outer edge
+        // Fixed 30mm inset from outer edges
         const insetMm = 30;
         const insetPx = camera.pixelsPerMm * insetMm;
         const innerRadiusPx = Math.max(3, radiusPx - insetPx);
+        const innerWidthLen = Math.max(3, widthLen - insetPx * 2);
 
-        // Draw inner semicircle
+        // Draw inner semicircle with inset
+        graphics.beginPath();
+        graphics.moveTo(centerX + widthUnit.x * innerWidthLen / 2, centerY + widthUnit.y * innerWidthLen / 2);
         graphics.arc(centerX, centerY, innerRadiusPx, startAngle, endAngle);
-        graphics.lineTo(centerX - widthUnit.x * (widthLen / 2 - insetPx), centerY - widthUnit.y * (widthLen / 2 - insetPx));
+        graphics.lineTo(centerX - widthUnit.x * innerWidthLen / 2, centerY - widthUnit.y * innerWidthLen / 2);
         graphics.closePath();
         graphics.stroke();
       }
