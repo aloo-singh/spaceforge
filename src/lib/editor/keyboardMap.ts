@@ -735,5 +735,6 @@ function getInteriorAssetTypeName(type: RoomInteriorAsset["type"]): string {
     case "toilet": return "toilet";
     case "shower": return "shower";
     case "bath": return "bath";
+    case "basin": return "basin";
   }
 }

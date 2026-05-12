@@ -449,6 +449,29 @@ export interface InteriorAssetShower extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Basin fixture with semicircular outer shape and concentric inner detail.
+ *
+ * Common behaviours:
+ * - Move: drag constrained inside room bounds
+ * - Resize: user-resizable (width × depth)
+ * - Rotate: supports cardinal rotation (0°, 90°, 180°, 270°)
+ * - Copy/paste: supported; creates duplicate
+ * - Cut/paste: supported; moves between rooms
+ * - Select: click or sidebar; shows inspector with dimensions
+ * - Delete: removes from room
+ *
+ * Visual distinction:
+ * - Outer semicircular boundary
+ * - Inner concentric semicircular detail
+ *
+ * Examples:
+ * - Standard: 500mm × 400mm
+ */
+export interface InteriorAssetBasin extends InteriorAssetCommonProperties {
+  type: "basin";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:

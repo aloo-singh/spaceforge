@@ -5770,6 +5770,70 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
+      if (displayedAsset.type === "basin") {
+        // Basin viewed from above (top-down floor plan):
+        // Outer semicircular boundary
+        // Inner concentric semicircular detail
+
+        // Lerp helper
+        const lerpT = (a: ScreenPoint, b: ScreenPoint, t: number): ScreenPoint => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+
+        // Fill layer for whole asset
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+
+        // 0. Outer semicircular boundary (main asset outline)
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+
+        // Calculate unit vectors for rotation-aware geometry
+        const widthVec = { x: backC2.x - backC1.x, y: backC2.y - backC1.y };
+        const depthVec = { x: frontC1.x - backC1.x, y: frontC1.y - backC1.y };
+        const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
+        const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
+        const widthUnit = { x: widthVec.x / widthLen, y: widthVec.y / widthLen };
+        const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
+
+        // Centre of the basin
+        const centerX = (backC1.x + backC2.x + frontC1.x + frontC2.x) / 4;
+        const centerY = (backC1.y + backC2.y + frontC1.y + frontC2.y) / 4;
+
+        // Semicircle geometry: draw on the width axis (left-right) with depth as radius
+        const radiusPx = depthLen / 2;
+        const startAngle = Math.atan2(depthUnit.y, depthUnit.x);
+        const endAngle = startAngle + Math.PI;
+
+        // Draw outer semicircle
+        graphics.arc(centerX, centerY, radiusPx, startAngle, endAngle);
+        graphics.lineTo(centerX - widthUnit.x * widthLen / 2, centerY - widthUnit.y * widthLen / 2);
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+
+        // 1. Inner concentric semicircle (secondary stroke, no fill)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+
+        // Fixed 30mm inset from outer edge
+        const insetMm = 30;
+        const insetPx = camera.pixelsPerMm * insetMm;
+        const innerRadiusPx = Math.max(3, radiusPx - insetPx);
+
+        // Draw inner semicircle
+        graphics.arc(centerX, centerY, innerRadiusPx, startAngle, endAngle);
+        graphics.lineTo(centerX - widthUnit.x * (widthLen / 2 - insetPx), centerY - widthUnit.y * (widthLen / 2 - insetPx));
+        graphics.closePath();
+        graphics.stroke();
+      }
+
     }
 
     // Stairs-specific visuals (tread lines and direction arrow)

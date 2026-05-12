@@ -15,6 +15,7 @@ export {
   IconArrowsShuffle as ArrowUpDown,
   IconBath as IconBath,
   IconBedFilled as BedFilled,
+  IconDroplet as IconDroplet,
   IconBlocks as Blocks,
   IconBorderAll as BorderAll,
   IconCalendarWeek as CalendarWeek,

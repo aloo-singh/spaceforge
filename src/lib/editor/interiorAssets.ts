@@ -70,6 +70,10 @@ export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAs
   if (asset.type === "bath") {
     // bath has no type-specific properties beyond common ones
   }
+  // basin has no type-specific properties beyond common ones
+  if (asset.type === "basin") {
+    // basin has no type-specific properties beyond common ones
+  }
   if (asset.doorType !== undefined) base.doorType = asset.doorType;
   if (asset.doorConstraint !== undefined) base.doorConstraint = asset.doorConstraint;
   if (asset.shape !== undefined) base.shape = asset.shape;
@@ -475,6 +479,37 @@ export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorA
     name: "Bath",
     xMm: center.x,
     yMm: center.y,
+    widthMm,
+    depthMm,
+    rotationDegrees: 0,
+    anchor: "floor",
+  };
+}
+
+export function createCenteredDefaultBasin(room: Room, id: string): RoomInteriorAsset | null {
+  const roomBounds = getPolygonBounds(room.points);
+  if (!roomBounds) return null;
+
+  // Basin dimensions
+  const widthMm = 500;
+  const depthMm = 400;
+
+  // Calculate room center
+  const roomCenter = {
+    x: (roomBounds.minX + roomBounds.maxX) / 2,
+    y: (roomBounds.minY + roomBounds.maxY) / 2,
+  };
+
+  // Calculate where center would be
+  const centerX = roomCenter.x;
+  const centerY = roomCenter.y;
+
+  return {
+    id,
+    type: "basin",
+    name: "Basin",
+    xMm: centerX,
+    yMm: centerY,
     widthMm,
     depthMm,
     rotationDegrees: 0,
@@ -1075,5 +1110,6 @@ export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): st
     case "toilet": return "Toilet";
     case "shower": return "Shower";
     case "bath": return "Bath";
+    case "basin": return "Basin";
   }
 }
