@@ -10,6 +10,37 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.13</h2>
+            <span className="text-sm text-muted-foreground">2026-05-13</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added basin asset type with asymmetric elliptical outer boundary (50mm inset top/sides, 100mm inset bottom) and concentric 50mm diameter circle detail. Proper rotation handling via parametric ellipse path with width-vector rotation angle.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Changed hob asset icon from ladle to flame for better semantic representation.</li>
+                <li>Added fill layer to round dining table rendering for visual consistency with other assets.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Documented</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added new "Asymmetric Depth-Axis Assets — Rotated Ellipse Pattern" section to editor architecture documentation, providing pattern and checklist for implementing rotated elliptical assets with asymmetric insets.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.12</h2>
             <span className="text-sm text-muted-foreground">2026-05-11</span>
           </div>
