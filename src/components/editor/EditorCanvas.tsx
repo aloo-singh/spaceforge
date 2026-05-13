@@ -5241,12 +5241,17 @@ function drawRoomInteriorAssets(
         const cy = (topLeft.y + bottomRight.y) / 2;
         const rX = Math.abs(bottomRight.x - topLeft.x) / 2;
         const rY = Math.abs(bottomRight.y - topLeft.y) / 2;
+        
+        // Fill layer
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        
         graphics.setStrokeStyle({
           width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
         graphics.ellipse(cx, cy, rX, rY);
+        graphics.fill();
         graphics.stroke();
       }
 
@@ -5767,6 +5772,106 @@ function drawRoomInteriorAssets(
         const plugRadiusPx = Math.max(2, camera.pixelsPerMm * plugRadiusMm);
         graphics.beginPath();
         graphics.arc(plugCenter.x, plugCenter.y, plugRadiusPx, 0, Math.PI * 2);
+        graphics.stroke();
+      }
+
+      if (displayedAsset.type === "basin") {
+        // Basin viewed from above (top-down floor plan):
+        // Outer elliptical boundary with fill
+        // Inner concentric elliptical detail
+        // Central drain circle
+
+        // Fill layer for whole asset
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+
+        // 0. Outer elliptical boundary (main asset outline)
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+
+        // Centre of the basin (center of bounding box)
+        const centerX = (frontC1.x + frontC2.x + backC1.x + backC2.x) / 4;
+        const centerY = (frontC1.y + frontC2.y + backC1.y + backC2.y) / 4;
+
+        // Basin details are asymmetric along the depth axis (shallow 50mm, deep 100mm).
+        // The corners rotate with the asset, so use them directly without swapping.
+        const shallowC1 = frontC1;
+        const shallowC2 = frontC2;
+        const deepC1 = backC1;
+        const deepC2 = backC2;
+
+        // Calculate radii from corners
+        const widthVec = { x: shallowC2.x - shallowC1.x, y: shallowC2.y - shallowC1.y };
+        const depthVec = { x: deepC1.x - shallowC1.x, y: deepC1.y - shallowC1.y };
+        const widthLen = Math.sqrt(widthVec.x ** 2 + widthVec.y ** 2);
+        const depthLen = Math.sqrt(depthVec.x ** 2 + depthVec.y ** 2);
+        const depthUnit = { x: depthVec.x / depthLen, y: depthVec.y / depthLen };
+        
+        // Asymmetric insets: 50mm from shallow end, 100mm from deep end, 50mm from sides
+        const shallowInsetMm = 50;
+        const deepInsetMm = 100;
+        const sideInsetMm = 50;
+        const shallowInsetPx = camera.pixelsPerMm * shallowInsetMm;
+        const deepInsetPx = camera.pixelsPerMm * deepInsetMm;
+        const sideInsetPx = camera.pixelsPerMm * sideInsetMm;
+        
+        // Width radius remains symmetric
+        const radiusWidth = Math.max(3, widthLen / 2 - sideInsetPx);
+        
+        // Depth: new radius from asymmetric insets
+        const availableDepth = depthLen - shallowInsetPx - deepInsetPx;
+        const radiusDepth = Math.max(3, availableDepth / 2);
+        
+        // Shift center towards deep end by (deepInset - shallowInset) / 2
+        const depthCenterOffset = (deepInsetPx - shallowInsetPx) / 2;
+        const adjustedCenterX = centerX + depthUnit.x * depthCenterOffset;
+        const adjustedCenterY = centerY + depthUnit.y * depthCenterOffset;
+
+        // Calculate rotation angle from width vector
+        const rotationAngle = Math.atan2(widthVec.y, widthVec.x);
+        const cosA = Math.cos(rotationAngle);
+        const sinA = Math.sin(rotationAngle);
+
+        // Draw outer ellipse as rotated path
+        graphics.beginPath();
+        const ellipseSegments = 64;
+        for (let i = 0; i <= ellipseSegments; i++) {
+          const angle = (i / ellipseSegments) * Math.PI * 2;
+          const x = radiusWidth * Math.cos(angle);
+          const y = radiusDepth * Math.sin(angle);
+          // Apply rotation
+          const rotX = x * cosA - y * sinA;
+          const rotY = x * sinA + y * cosA;
+          // Apply translation
+          const px = adjustedCenterX + rotX;
+          const py = adjustedCenterY + rotY;
+          
+          if (i === 0) {
+            graphics.moveTo(px, py);
+          } else {
+            graphics.lineTo(px, py);
+          }
+        }
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+
+        // 1. Inner circle detail (secondary stroke, no fill)
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+
+        // Fixed 50mm diameter circle (25mm radius)
+        const circleRadiusMm = 25;
+        const circleRadiusPx = Math.max(2, camera.pixelsPerMm * circleRadiusMm);
+
+        // Draw inner circle at true center of bounding box
+        graphics.beginPath();
+        graphics.arc(centerX, centerY, circleRadiusPx, 0, Math.PI * 2);
         graphics.stroke();
       }
 
