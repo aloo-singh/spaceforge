@@ -5878,6 +5878,7 @@ function drawRoomInteriorAssets(
 
       if (displayedAsset.type === "desk") {
         // Desk: rectangle surface + semicircle chair on one long side
+        // Uses width-swap rotation fix pattern: at -180° and -90°, the width axis reverses
         
         // 0. Rectangle (desk surface)
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
@@ -5894,34 +5895,43 @@ function drawRoomInteriorAssets(
         graphics.fill();
         graphics.stroke();
 
-        // 1. Semicircle chair (500mm diameter = 250mm radius) on bottom long side
-        // Calculate semicircle center on the midpoint of bottom edge
-        const bottomMidX = (bottomLeft.x + bottomRight.x) / 2;
-        const bottomMidY = (bottomLeft.y + bottomRight.y) / 2;
+        // 1. Semicircle chair (500mm diameter = 250mm radius) on correct long side
+        // Apply width-swap fix: at -180° and -90° rotations, the width axis reverses
+        const needsWidthSwap = (() => {
+          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+          return r === -180 || r === -90;
+        })();
+
+        // Select chair edge: normally on the bottom (depth-positive side)
+        // With swap, use top edge instead to maintain correct orientation
+        const chairEdgeStart = needsWidthSwap ? topLeft : bottomLeft;
+        const chairEdgeEnd = needsWidthSwap ? topRight : bottomRight;
+
+        // Calculate semicircle center on the midpoint of chair edge
+        const chairMidX = (chairEdgeStart.x + chairEdgeEnd.x) / 2;
+        const chairMidY = (chairEdgeStart.y + chairEdgeEnd.y) / 2;
         
-        // Calculate direction vector along bottom edge (width direction)
-        const bottomWidthVec = { x: bottomRight.x - bottomLeft.x, y: bottomRight.y - bottomLeft.y };
-        const bottomWidthLen = Math.sqrt(bottomWidthVec.x ** 2 + bottomWidthVec.y ** 2);
-        const bottomWidthUnit = { x: bottomWidthVec.x / bottomWidthLen, y: bottomWidthVec.y / bottomWidthLen };
+        // Calculate direction vector along chair edge (width direction)
+        const chairWidthVec = { x: chairEdgeEnd.x - chairEdgeStart.x, y: chairEdgeEnd.y - chairEdgeStart.y };
+        const chairWidthLen = Math.sqrt(chairWidthVec.x ** 2 + chairWidthVec.y ** 2);
+        const chairWidthUnit = { x: chairWidthVec.x / chairWidthLen, y: chairWidthVec.y / chairWidthLen };
         
-        // Direction perpendicular to bottom edge (points downward/away from desk)
-        const perpUnit = { x: -bottomWidthUnit.y, y: bottomWidthUnit.x };
+        // Direction perpendicular to chair edge (points outward from desk)
+        const perpUnit = { x: -chairWidthUnit.y, y: chairWidthUnit.x };
         
         // Semicircle radius (250mm for 500mm diameter)
         const chairRadiusMm = 250;
         const chairRadiusPx = Math.max(3, camera.pixelsPerMm * chairRadiusMm);
         
-        // Fill layer
+        // Fill and stroke layers
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
-        
-        // Primary stroke (selection-aware)
         graphics.setStrokeStyle({
           width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
         
-        // Draw semicircle extending outward from desk bottom
+        // Draw semicircle extending outward from desk
         graphics.beginPath();
         const semicircleSegments = 32;
         let firstPointX = 0, firstPointY = 0;
@@ -5932,8 +5942,8 @@ function drawRoomInteriorAssets(
           const localY = chairRadiusPx * Math.sin(angle);
           
           // Transform to world coords
-          const worldX = bottomMidX + bottomWidthUnit.x * localX + perpUnit.x * localY;
-          const worldY = bottomMidY + bottomWidthUnit.y * localX + perpUnit.y * localY;
+          const worldX = chairMidX + chairWidthUnit.x * localX + perpUnit.x * localY;
+          const worldY = chairMidY + chairWidthUnit.y * localX + perpUnit.y * localY;
           
           if (i === 0) {
             firstPointX = worldX;
