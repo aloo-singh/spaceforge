@@ -5896,16 +5896,40 @@ function drawRoomInteriorAssets(
         graphics.stroke();
 
         // 1. Semicircle chair (500mm diameter = 250mm radius) on correct long side
-        // Apply width-swap fix: at -180° and -90° rotations, the width axis reverses
-        const needsWidthSwap = (() => {
-          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
-          return r === -180 || r === -90;
-        })();
-
-        // Select chair edge: normally on the bottom (depth-positive side)
-        // With swap, use top edge instead to maintain correct orientation
-        const chairEdgeStart = needsWidthSwap ? topLeft : bottomLeft;
-        const chairEdgeEnd = needsWidthSwap ? topRight : bottomRight;
+        // The chair follows the long edge (1200mm) as the asset rotates
+        // At each cardinal angle (0°, 90°, 180°, 270°/-90°), the long edge is on a different side
+        const rotation = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+        
+        let chairEdgeStart: ScreenPoint;
+        let chairEdgeEnd: ScreenPoint;
+        
+        switch (rotation) {
+          case 0:
+            // 0°: Long edge on bottom (backC1 → backC2)
+            chairEdgeStart = bottomLeft;
+            chairEdgeEnd = bottomRight;
+            break;
+          case 90:
+            // 90°: Long edge on right (frontC2 → backC2)
+            chairEdgeStart = topRight;
+            chairEdgeEnd = bottomRight;
+            break;
+          case 180:
+          case -180:
+            // 180°/-180°: Long edge on top (frontC1 → frontC2)
+            chairEdgeStart = topLeft;
+            chairEdgeEnd = topRight;
+            break;
+          case -90:
+            // -90°/270°: Long edge on left (frontC1 → backC1)
+            chairEdgeStart = topLeft;
+            chairEdgeEnd = bottomLeft;
+            break;
+          default:
+            // Fallback to bottom (should not happen with cardinal rotation snapping)
+            chairEdgeStart = bottomLeft;
+            chairEdgeEnd = bottomRight;
+        }
 
         // Calculate semicircle center on the midpoint of chair edge
         const chairMidX = (chairEdgeStart.x + chairEdgeEnd.x) / 2;
