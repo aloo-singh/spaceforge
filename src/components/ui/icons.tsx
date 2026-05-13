@@ -35,6 +35,7 @@ export {
   IconDoor as DoorOpen,
   IconDownload as Download,
   IconEye as IconEye,
+  IconFlame as IconFlame,
   IconLadle as IconLadle,
   IconFilter2 as Filter2,
   IconFocus as Focus,
