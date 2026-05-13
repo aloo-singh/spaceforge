@@ -5092,12 +5092,13 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables, toilets, showers, and baths
+    // Skip rectangular bounding box for unselected round dining tables, toilets, showers, baths, and desks
     const isCustomDetailAsset =
       (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
       displayedAsset.type === "toilet" ||
       displayedAsset.type === "shower" ||
-      displayedAsset.type === "bath";
+      displayedAsset.type === "bath" ||
+      displayedAsset.type === "desk";
     const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
