@@ -5911,15 +5911,20 @@ function drawRoomInteriorAssets(
         const chairRadiusMm = 250;
         const chairRadiusPx = Math.max(3, camera.pixelsPerMm * chairRadiusMm);
         
+        // Fill layer
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        
+        // Primary stroke (selection-aware)
         graphics.setStrokeStyle({
-          width: fgLineWidth * 0.8,
-          color: fgColor,
-          alpha: fgAlpha * 0.7,
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
         });
         
         // Draw semicircle extending outward from desk bottom
         graphics.beginPath();
         const semicircleSegments = 32;
+        let firstPointX = 0, firstPointY = 0;
         for (let i = 0; i <= semicircleSegments; i++) {
           const angle = (i / semicircleSegments) * Math.PI;
           // Semicircle with diameter along width axis, opening perpendicular outward
@@ -5931,11 +5936,17 @@ function drawRoomInteriorAssets(
           const worldY = bottomMidY + bottomWidthUnit.y * localX + perpUnit.y * localY;
           
           if (i === 0) {
+            firstPointX = worldX;
+            firstPointY = worldY;
             graphics.moveTo(worldX, worldY);
           } else {
             graphics.lineTo(worldX, worldY);
           }
         }
+        // Close the shape by connecting back to the start point
+        graphics.lineTo(firstPointX, firstPointY);
+        graphics.closePath();
+        graphics.fill();
         graphics.stroke();
       }
 
