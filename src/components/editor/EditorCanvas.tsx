@@ -5241,12 +5241,17 @@ function drawRoomInteriorAssets(
         const cy = (topLeft.y + bottomRight.y) / 2;
         const rX = Math.abs(bottomRight.x - topLeft.x) / 2;
         const rY = Math.abs(bottomRight.y - topLeft.y) / 2;
+        
+        // Fill layer
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        
         graphics.setStrokeStyle({
           width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
         graphics.ellipse(cx, cy, rX, rY);
+        graphics.fill();
         graphics.stroke();
       }
 
