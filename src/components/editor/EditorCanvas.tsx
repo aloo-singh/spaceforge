@@ -5875,6 +5875,69 @@ function drawRoomInteriorAssets(
         graphics.stroke();
       }
 
+      if (displayedAsset.type === "desk") {
+        // Desk: rectangle surface + semicircle chair on one long side
+        
+        // 0. Rectangle (desk surface)
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.moveTo(topLeft.x, topLeft.y);
+        graphics.lineTo(topRight.x, topRight.y);
+        graphics.lineTo(bottomRight.x, bottomRight.y);
+        graphics.lineTo(bottomLeft.x, bottomLeft.y);
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+
+        // 1. Semicircle chair (500mm diameter = 250mm radius) on bottom long side
+        // Calculate semicircle center on the midpoint of bottom edge
+        const bottomMidX = (bottomLeft.x + bottomRight.x) / 2;
+        const bottomMidY = (bottomLeft.y + bottomRight.y) / 2;
+        
+        // Calculate direction vector along bottom edge (width direction)
+        const bottomWidthVec = { x: bottomRight.x - bottomLeft.x, y: bottomRight.y - bottomLeft.y };
+        const bottomWidthLen = Math.sqrt(bottomWidthVec.x ** 2 + bottomWidthVec.y ** 2);
+        const bottomWidthUnit = { x: bottomWidthVec.x / bottomWidthLen, y: bottomWidthVec.y / bottomWidthLen };
+        
+        // Direction perpendicular to bottom edge (points downward/away from desk)
+        const perpUnit = { x: -bottomWidthUnit.y, y: bottomWidthUnit.x };
+        
+        // Semicircle radius (250mm for 500mm diameter)
+        const chairRadiusMm = 250;
+        const chairRadiusPx = Math.max(3, camera.pixelsPerMm * chairRadiusMm);
+        
+        graphics.setStrokeStyle({
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
+        });
+        
+        // Draw semicircle extending outward from desk bottom
+        graphics.beginPath();
+        const semicircleSegments = 32;
+        for (let i = 0; i <= semicircleSegments; i++) {
+          const angle = (i / semicircleSegments) * Math.PI;
+          // Point on semicircle in local coords (angle 0 = left, PI = right, perpendicular out)
+          const localX = chairRadiusPx * Math.cos(angle) - chairRadiusPx;
+          const localY = chairRadiusPx * Math.sin(angle);
+          
+          // Transform to world coords
+          const worldX = bottomMidX + bottomWidthUnit.x * localX + perpUnit.x * localY;
+          const worldY = bottomMidY + bottomWidthUnit.y * localX + perpUnit.y * localY;
+          
+          if (i === 0) {
+            graphics.moveTo(worldX, worldY);
+          } else {
+            graphics.lineTo(worldX, worldY);
+          }
+        }
+        graphics.stroke();
+      }
+
     }
 
     // Stairs-specific visuals (tread lines and direction arrow)

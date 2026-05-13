@@ -84,6 +84,7 @@ import {
   createCenteredDefaultShower,
   createCenteredDefaultBath,
   createCenteredDefaultBasin,
+  createCenteredDefaultDesk,
   DEFAULT_STAIR_NAME,
   getAdjustedInteriorAssetForRoomResize,
   getRotatedInteriorAssetForRoom,
@@ -5698,6 +5699,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         case "basin":
           asset = createCenteredDefaultBasin(room, createInteriorAssetId());
           placedAssetTypeName = "Basin";
+          break;
+        case "desk":
+          asset = createCenteredDefaultDesk(room, createInteriorAssetId());
+          placedAssetTypeName = "Desk";
           break;
       }
 

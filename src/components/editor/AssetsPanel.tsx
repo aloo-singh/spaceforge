@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useLayoutEffect } from "react";
-import { Plus, BedFilled, Sofa, Hanger, ToolsKitchen2Filled, IconFridge, IconMicrowave, IconFlame, IconWash, IconToiletPaper, IconFountain, IconBath, IconDroplet } from "@/components/ui/icons";
+import { Plus, BedFilled, Sofa, Hanger, ToolsKitchen2Filled, IconFridge, IconMicrowave, IconFlame, IconWash, IconToiletPaper, IconFountain, IconBath, IconDroplet, IconLamp2 } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -58,6 +58,12 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         label: "Table",
         description: "Place a table",
         icon: <ToolsKitchen2Filled className="size-5" />,
+      },
+      {
+        type: "desk",
+        label: "Desk",
+        description: "Place a desk",
+        icon: <IconLamp2 className="size-5" />,
       },
       {
         type: "kitchen-unit",
