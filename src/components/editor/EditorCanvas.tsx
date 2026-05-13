@@ -5922,9 +5922,9 @@ function drawRoomInteriorAssets(
         const semicircleSegments = 32;
         for (let i = 0; i <= semicircleSegments; i++) {
           const angle = (i / semicircleSegments) * Math.PI;
-          // Point on semicircle in local coords (angle 0 = left, PI = right, perpendicular out)
-          const localX = chairRadiusPx * Math.cos(angle) - chairRadiusPx;
-          const localY = chairRadiusPx * Math.sin(angle);
+          // Semicircle with diameter along width axis, opening perpendicular
+          const localX = chairRadiusPx * Math.cos(angle);
+          const localY = -chairRadiusPx * Math.sin(angle);
           
           // Transform to world coords
           const worldX = bottomMidX + bottomWidthUnit.x * localX + perpUnit.x * localY;
