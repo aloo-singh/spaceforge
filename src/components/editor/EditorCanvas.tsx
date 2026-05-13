@@ -5790,17 +5790,12 @@ function drawRoomInteriorAssets(
         const centerX = (frontC1.x + frontC2.x + backC1.x + backC2.x) / 4;
         const centerY = (frontC1.y + frontC2.y + backC1.y + backC2.y) / 4;
 
-        // Basin details are asymmetric along the depth axis (shallow 50mm front, deep 100mm back).
-        // At cardinal rotations -180° and -90°, the cardinal mapping reverses the depth axis,
-        // so we swap the front/back corners to maintain local coordinate consistency.
-        const needsDepthSwap = !anim && (() => {
-          const r = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
-          return r === -180 || r === -90;
-        })();
-        const shallowC1 = needsDepthSwap ? backC1 : frontC1;
-        const shallowC2 = needsDepthSwap ? backC2 : frontC2;
-        const deepC1 = needsDepthSwap ? frontC1 : backC1;
-        const deepC2 = needsDepthSwap ? frontC2 : backC2;
+        // Basin details are asymmetric along the depth axis (shallow 50mm, deep 100mm).
+        // The corners rotate with the asset, so use them directly without swapping.
+        const shallowC1 = frontC1;
+        const shallowC2 = frontC2;
+        const deepC1 = backC1;
+        const deepC2 = backC2;
 
         // Calculate radii from corners
         const widthVec = { x: shallowC2.x - shallowC1.x, y: shallowC2.y - shallowC1.y };
@@ -5829,8 +5824,32 @@ function drawRoomInteriorAssets(
         const adjustedCenterX = centerX + depthUnit.x * depthCenterOffset;
         const adjustedCenterY = centerY + depthUnit.y * depthCenterOffset;
 
-        // Draw outer ellipse with adjusted center
-        graphics.ellipse(adjustedCenterX, adjustedCenterY, radiusWidth, radiusDepth);
+        // Calculate rotation angle from width vector
+        const rotationAngle = Math.atan2(widthVec.y, widthVec.x);
+        const cosA = Math.cos(rotationAngle);
+        const sinA = Math.sin(rotationAngle);
+
+        // Draw outer ellipse as rotated path
+        graphics.beginPath();
+        const ellipseSegments = 64;
+        for (let i = 0; i <= ellipseSegments; i++) {
+          const angle = (i / ellipseSegments) * Math.PI * 2;
+          const x = radiusWidth * Math.cos(angle);
+          const y = radiusDepth * Math.sin(angle);
+          // Apply rotation
+          const rotX = x * cosA - y * sinA;
+          const rotY = x * sinA + y * cosA;
+          // Apply translation
+          const px = adjustedCenterX + rotX;
+          const py = adjustedCenterY + rotY;
+          
+          if (i === 0) {
+            graphics.moveTo(px, py);
+          } else {
+            graphics.lineTo(px, py);
+          }
+        }
+        graphics.closePath();
         graphics.fill();
         graphics.stroke();
 
