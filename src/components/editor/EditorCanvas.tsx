@@ -5877,75 +5877,126 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "desk") {
-        // Desk: rectangle surface + semicircle chair on one long side
-        // Uses width-swap rotation fix pattern: at -180° and -90°, the width axis reverses
+        // Desk: two interior details within 1200×900 mm bounds
+        // - Rectangle (1200×600) for desktop surface
+        // - Semicircle (300mm radius = 600mm diameter) extending from one long edge
+        // Both rendered with fill layer and primary stroke, no outer boundary
         
-        // 0. Rectangle (desk surface)
+        // Asset bounds are 1200×900 (1200 width, 600 depth + 300 radius semicircle)
+        // We use the full corner points for calculation
+        const assetWidthMm = 1200;
+        const rectangleDepthMm = 600;
+        const semicircleRadiusMm = 300;
+        
+        // Determine which corners form the rectangle interior
+        // The rectangle occupies the upper portion (600mm) of the 850mm asset
+        // We need to calculate the rectangle's internal corners based on rotation
+        
+        const rotation = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
+        
+        let rectTopLeft: ScreenPoint,
+            rectTopRight: ScreenPoint,
+            rectBottomRight: ScreenPoint,
+            rectBottomLeft: ScreenPoint,
+            chairEdgeStart: ScreenPoint,
+            chairEdgeEnd: ScreenPoint;
+        
+        // At each rotation, the rectangle occupies 600mm of the 850mm depth,
+        // and the semicircle extends from the opposite end
+        switch (rotation) {
+          case 0:
+            // 0°: Rectangle at top (near topLeft/topRight), semicircle extends down from bottom
+            const topFrac = rectangleDepthMm / (rectangleDepthMm + semicircleRadiusMm); // 600/850
+            rectTopLeft = topLeft;
+            rectTopRight = topRight;
+            // Interpolate down from top toward bottom for rect bottom edge
+            rectBottomLeft = { x: topLeft.x + (bottomLeft.x - topLeft.x) * topFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * topFrac };
+            rectBottomRight = { x: topRight.x + (bottomRight.x - topRight.x) * topFrac, y: topRight.y + (bottomRight.y - topRight.y) * topFrac };
+            chairEdgeStart = rectBottomLeft;
+            chairEdgeEnd = rectBottomRight;
+            break;
+          case 90:
+            // 90°: Rectangle on left side, semicircle extends right
+            const leftFrac = rectangleDepthMm / (rectangleDepthMm + semicircleRadiusMm);
+            rectTopLeft = topLeft;
+            rectBottomLeft = bottomLeft;
+            rectTopRight = { x: topLeft.x + (topRight.x - topLeft.x) * leftFrac, y: topLeft.y + (topRight.y - topLeft.y) * leftFrac };
+            rectBottomRight = { x: bottomLeft.x + (bottomRight.x - bottomLeft.x) * leftFrac, y: bottomLeft.y + (bottomRight.y - bottomLeft.y) * leftFrac };
+            chairEdgeStart = rectTopRight;
+            chairEdgeEnd = rectBottomRight;
+            break;
+          case 180:
+          case -180:
+            // 180°: Rectangle at bottom, semicircle extends up
+            const botFrac = rectangleDepthMm / (rectangleDepthMm + semicircleRadiusMm);
+            rectBottomLeft = bottomLeft;
+            rectBottomRight = bottomRight;
+            rectTopLeft = { x: bottomLeft.x + (topLeft.x - bottomLeft.x) * botFrac, y: bottomLeft.y + (topLeft.y - bottomLeft.y) * botFrac };
+            rectTopRight = { x: bottomRight.x + (topRight.x - bottomRight.x) * botFrac, y: bottomRight.y + (topRight.y - bottomRight.y) * botFrac };
+            chairEdgeStart = rectTopLeft;
+            chairEdgeEnd = rectTopRight;
+            break;
+          case -90:
+            // -90°: Rectangle on right side, semicircle extends left
+            const rightFrac = rectangleDepthMm / (rectangleDepthMm + semicircleRadiusMm);
+            rectTopRight = topRight;
+            rectBottomRight = bottomRight;
+            rectTopLeft = { x: topRight.x + (topLeft.x - topRight.x) * rightFrac, y: topRight.y + (topLeft.y - topRight.y) * rightFrac };
+            rectBottomLeft = { x: bottomRight.x + (bottomLeft.x - bottomRight.x) * rightFrac, y: bottomRight.y + (bottomLeft.y - bottomRight.y) * rightFrac };
+            chairEdgeStart = rectBottomLeft;
+            chairEdgeEnd = rectTopLeft;
+            break;
+          default:
+            // Fallback
+            rectTopLeft = topLeft;
+            rectTopRight = topRight;
+            const fallbackFrac = rectangleDepthMm / (rectangleDepthMm + semicircleRadiusMm);
+            rectBottomLeft = { x: topLeft.x + (bottomLeft.x - topLeft.x) * fallbackFrac, y: topLeft.y + (bottomLeft.y - topLeft.y) * fallbackFrac };
+            rectBottomRight = { x: topRight.x + (bottomRight.x - topRight.x) * fallbackFrac, y: topRight.y + (bottomRight.y - topRight.y) * fallbackFrac };
+            chairEdgeStart = rectBottomLeft;
+            chairEdgeEnd = rectBottomRight;
+        }
+        
+        // 1. Draw rectangle (desktop surface)
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
         graphics.setStrokeStyle({
           width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
           color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
           alpha: isSelected ? 0.96 : 0.9,
         });
-        graphics.moveTo(topLeft.x, topLeft.y);
-        graphics.lineTo(topRight.x, topRight.y);
-        graphics.lineTo(bottomRight.x, bottomRight.y);
-        graphics.lineTo(bottomLeft.x, bottomLeft.y);
+        graphics.moveTo(rectTopLeft.x, rectTopLeft.y);
+        graphics.lineTo(rectTopRight.x, rectTopRight.y);
+        graphics.lineTo(rectBottomRight.x, rectBottomRight.y);
+        graphics.lineTo(rectBottomLeft.x, rectBottomLeft.y);
         graphics.closePath();
         graphics.fill();
         graphics.stroke();
-
-        // 1. Semicircle chair (500mm diameter = 250mm radius) on correct long side
-        // The chair follows the long edge (1200mm) as the asset rotates
-        // At each cardinal angle (0°, 90°, 180°, 270°/-90°), the long edge is on a different side
-        const rotation = snapToCardinalRotationDegrees(displayedAsset.rotationDegrees ?? 0);
         
-        let chairEdgeStart: ScreenPoint;
-        let chairEdgeEnd: ScreenPoint;
-        
-        switch (rotation) {
-          case 0:
-            // 0°: Long edge on bottom (backC1 → backC2)
-            chairEdgeStart = bottomLeft;
-            chairEdgeEnd = bottomRight;
-            break;
-          case 90:
-            // 90°: Long edge on right (frontC2 → backC2)
-            chairEdgeStart = topRight;
-            chairEdgeEnd = bottomRight;
-            break;
-          case 180:
-          case -180:
-            // 180°/-180°: Long edge on top (frontC1 → frontC2)
-            chairEdgeStart = topLeft;
-            chairEdgeEnd = topRight;
-            break;
-          case -90:
-            // -90°/270°: Long edge on left (frontC1 → backC1)
-            chairEdgeStart = topLeft;
-            chairEdgeEnd = bottomLeft;
-            break;
-          default:
-            // Fallback to bottom (should not happen with cardinal rotation snapping)
-            chairEdgeStart = bottomLeft;
-            chairEdgeEnd = bottomRight;
-        }
-
-        // Calculate semicircle center on the midpoint of chair edge
+        // 2. Draw semicircle chair
         const chairMidX = (chairEdgeStart.x + chairEdgeEnd.x) / 2;
         const chairMidY = (chairEdgeStart.y + chairEdgeEnd.y) / 2;
+        
+        // Desk center (for outward direction check)
+        const deskCenterX = (topLeft.x + topRight.x + bottomRight.x + bottomLeft.x) / 4;
+        const deskCenterY = (topLeft.y + topRight.y + bottomRight.y + bottomLeft.y) / 4;
         
         // Calculate direction vector along chair edge (width direction)
         const chairWidthVec = { x: chairEdgeEnd.x - chairEdgeStart.x, y: chairEdgeEnd.y - chairEdgeStart.y };
         const chairWidthLen = Math.sqrt(chairWidthVec.x ** 2 + chairWidthVec.y ** 2);
         const chairWidthUnit = { x: chairWidthVec.x / chairWidthLen, y: chairWidthVec.y / chairWidthLen };
         
-        // Direction perpendicular to chair edge (points outward from desk)
-        const perpUnit = { x: -chairWidthUnit.y, y: chairWidthUnit.x };
+        // Calculate perpendicular direction (should point away from desk center)
+        const perpCandidate = { x: -chairWidthUnit.y, y: chairWidthUnit.x };
         
-        // Semicircle radius (250mm for 500mm diameter)
-        const chairRadiusMm = 250;
-        const chairRadiusPx = Math.max(3, camera.pixelsPerMm * chairRadiusMm);
+        // Vector from desk center to chair edge midpoint
+        const fromCenterToChairMid = { x: chairMidX - deskCenterX, y: chairMidY - deskCenterY };
+        
+        // If perpendicular points toward center (dot product < 0), flip it
+        const dotProduct = perpCandidate.x * fromCenterToChairMid.x + perpCandidate.y * fromCenterToChairMid.y;
+        const perpUnit = dotProduct < 0 ? { x: -perpCandidate.x, y: -perpCandidate.y } : perpCandidate;
+        
+        // Semicircle radius (250mm)
+        const chairRadiusPx = Math.max(3, camera.pixelsPerMm * semicircleRadiusMm);
         
         // Fill and stroke layers
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });

@@ -525,9 +525,9 @@ export function createCenteredDefaultDesk(room: Room, id: string): RoomInteriorA
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
 
-  // Desk dimensions
+  // Desk dimensions: 1200×600 rectangle + 300mm radius semicircle = 1200×900 total
   const widthMm = 1200;
-  const depthMm = 600;
+  const depthMm = 900;
 
   // Calculate room center
   const roomCenter = {
