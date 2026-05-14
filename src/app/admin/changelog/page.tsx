@@ -10,6 +10,36 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.14</h2>
+            <span className="text-sm text-muted-foreground">2026-05-14</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added Desk asset type: 1200×900mm with rectangle desktop (1200×600) and semicircle chair (600mm diameter) on back edge. Fixed-size chair remains unaffected by resize operations.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Smooth rotation for desk at all cardinal angles (0°, 90°, 180°, -90°) with proper front/back geometry attachment. Semicircle remains centered on correct long edge throughout rotation.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Documented</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added new "Composite Front-Back Assets — Desk Pattern" section to editor architecture documentation, providing pattern and implementation checklist for multi-shape assets with front-back sections that rotate as cohesive units.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.13</h2>
             <span className="text-sm text-muted-foreground">2026-05-13</span>
           </div>

@@ -5092,12 +5092,13 @@ function drawRoomInteriorAssets(
     );
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
 
-    // Skip rectangular bounding box for unselected round dining tables, toilets, showers, and baths
+    // Skip rectangular bounding box for unselected round dining tables, toilets, showers, baths, and desks
     const isCustomDetailAsset =
       (displayedAsset.type === "dining-table" && displayedAsset.shape === "round") ||
       displayedAsset.type === "toilet" ||
       displayedAsset.type === "shower" ||
-      displayedAsset.type === "bath";
+      displayedAsset.type === "bath" ||
+      displayedAsset.type === "desk";
     const shouldDrawBoundingBox = isSelected || !isCustomDetailAsset;
 
     if (shouldDrawBoundingBox) {
@@ -5872,6 +5873,108 @@ function drawRoomInteriorAssets(
         // Draw inner circle at true center of bounding box
         graphics.beginPath();
         graphics.arc(centerX, centerY, circleRadiusPx, 0, Math.PI * 2);
+        graphics.stroke();
+      }
+
+      if (displayedAsset.type === "desk") {
+        // Desk: two interior details within 1200×900 mm bounds
+        // - Rectangle (1200×600) for desktop surface
+        // - Semicircle (300mm radius = 600mm diameter) extending from one long edge
+        // Both rendered with fill layer and primary stroke, no outer boundary
+        
+        // Use the pre-computed front/back mapping which handles animation correctly:
+        // During animation: front is topLeft/topRight (local space), back is bottomLeft/bottomRight
+        // At rest: front/back mapping changes based on cardinal rotation to maintain consistency
+        const rectangleDepthMm = 600;
+        const semicircleRadiusMm = 300;
+        const totalDepthMm = rectangleDepthMm + semicircleRadiusMm; // 900
+        const depthFraction = rectangleDepthMm / totalDepthMm; // 600/900 = 2/3
+        
+        // Rectangle occupies front portion (2/3 of depth), chair extends from back
+        const rectC1 = frontC1;
+        const rectC2 = frontC2;
+        const rectC3 = { x: frontC1.x + (backC1.x - frontC1.x) * depthFraction, y: frontC1.y + (backC1.y - frontC1.y) * depthFraction };
+        const rectC4 = { x: frontC2.x + (backC2.x - frontC2.x) * depthFraction, y: frontC2.y + (backC2.y - frontC2.y) * depthFraction };
+        
+        // Chair edge is on the back (extends from the far edge of rectangle toward back corner)
+        const chairEdgeStart = rectC3;
+        const chairEdgeEnd = rectC4;
+        
+        // 1. Draw rectangle (desktop surface)
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        graphics.moveTo(rectC1.x, rectC1.y);
+        graphics.lineTo(rectC2.x, rectC2.y);
+        graphics.lineTo(rectC4.x, rectC4.y);
+        graphics.lineTo(rectC3.x, rectC3.y);
+        graphics.closePath();
+        graphics.fill();
+        graphics.stroke();
+        
+        // 2. Draw semicircle chair
+        const chairMidX = (chairEdgeStart.x + chairEdgeEnd.x) / 2;
+        const chairMidY = (chairEdgeStart.y + chairEdgeEnd.y) / 2;
+        
+        // Desk center (for outward direction check)
+        const deskCenterX = (topLeft.x + topRight.x + bottomRight.x + bottomLeft.x) / 4;
+        const deskCenterY = (topLeft.y + topRight.y + bottomRight.y + bottomLeft.y) / 4;
+        
+        // Calculate direction vector along chair edge (width direction)
+        const chairWidthVec = { x: chairEdgeEnd.x - chairEdgeStart.x, y: chairEdgeEnd.y - chairEdgeStart.y };
+        const chairWidthLen = Math.sqrt(chairWidthVec.x ** 2 + chairWidthVec.y ** 2);
+        const chairWidthUnit = { x: chairWidthVec.x / chairWidthLen, y: chairWidthVec.y / chairWidthLen };
+        
+        // Calculate perpendicular direction (should point away from desk center)
+        const perpCandidate = { x: -chairWidthUnit.y, y: chairWidthUnit.x };
+        
+        // Vector from desk center to chair edge midpoint
+        const fromCenterToChairMid = { x: chairMidX - deskCenterX, y: chairMidY - deskCenterY };
+        
+        // If perpendicular points toward center (dot product < 0), flip it
+        const dotProduct = perpCandidate.x * fromCenterToChairMid.x + perpCandidate.y * fromCenterToChairMid.y;
+        const perpUnit = dotProduct < 0 ? { x: -perpCandidate.x, y: -perpCandidate.y } : perpCandidate;
+        
+        // Semicircle radius
+        const chairRadiusPx = Math.max(3, camera.pixelsPerMm * semicircleRadiusMm);
+        
+        // Fill and stroke layers
+        graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
+        graphics.setStrokeStyle({
+          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
+          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
+          alpha: isSelected ? 0.96 : 0.9,
+        });
+        
+        // Draw semicircle extending outward from desk
+        graphics.beginPath();
+        const semicircleSegments = 32;
+        let firstPointX = 0, firstPointY = 0;
+        for (let i = 0; i <= semicircleSegments; i++) {
+          const angle = (i / semicircleSegments) * Math.PI;
+          // Semicircle with diameter along width axis, opening perpendicular outward
+          const localX = chairRadiusPx * Math.cos(angle);
+          const localY = chairRadiusPx * Math.sin(angle);
+          
+          // Transform to world coords
+          const worldX = chairMidX + chairWidthUnit.x * localX + perpUnit.x * localY;
+          const worldY = chairMidY + chairWidthUnit.y * localX + perpUnit.y * localY;
+          
+          if (i === 0) {
+            firstPointX = worldX;
+            firstPointY = worldY;
+            graphics.moveTo(worldX, worldY);
+          } else {
+            graphics.lineTo(worldX, worldY);
+          }
+        }
+        // Close the shape by connecting back to the start point
+        graphics.lineTo(firstPointX, firstPointY);
+        graphics.closePath();
+        graphics.fill();
         graphics.stroke();
       }
 

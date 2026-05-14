@@ -472,6 +472,20 @@ export interface InteriorAssetBasin extends InteriorAssetCommonProperties {
 }
 
 /**
+ * Desk: Rectangular work surface with fixed-size semicircle chair on one long side.
+ *
+ * Visual representation:
+ * - Rectangle: desk surface (work plane)
+ * - Semicircle: fixed 500mm diameter chair, centred on one long side
+ *
+ * Examples:
+ * - Standard: 1200mm × 600mm, 500mm diameter chair
+ */
+export interface InteriorAssetDesk extends InteriorAssetCommonProperties {
+  type: "desk";
+}
+
+/**
  * Discriminated union of all interior asset types.
  *
  * Extends over time as new furniture is added:
@@ -499,7 +513,7 @@ export interface InteriorAssetBasin extends InteriorAssetCommonProperties {
  * }
  * ```
  */
-export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink | InteriorAssetToilet | InteriorAssetShower;
+export type InteriorAsset = InteriorAssetStairs | InteriorAssetWardrobe | InteriorAssetBed | InteriorAssetSofa | InteriorAssetDiningTable | InteriorAssetKitchenUnit | InteriorAssetKitchenAppliance | InteriorAssetHob | InteriorAssetSink | InteriorAssetToilet | InteriorAssetShower | InteriorAssetBath | InteriorAssetBasin | InteriorAssetDesk;
 
 /**
  * Type guard to safely extract stairs from discriminated union.

@@ -51,6 +51,7 @@ export {
   IconLayoutSidebarLeftExpand as PanelLeftExpand,
   IconLayoutSidebarRightCollapse as PanelRightCollapse,
   IconLayoutSidebarRightExpand as PanelRightExpand,
+  IconLamp2 as IconLamp2,
   IconLoader as LoaderCircle,
   IconLogout as LogOut,
   IconMail as Mail,

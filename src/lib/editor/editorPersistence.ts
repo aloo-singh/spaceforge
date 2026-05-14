@@ -254,7 +254,8 @@ function isInteriorAssetType(value: unknown): value is Room["interiorAssets"][nu
     value === "toilet" ||
     value === "shower" ||
     value === "bath" ||
-    value === "basin"
+    value === "basin" ||
+    value === "desk"
   );
 }
 
