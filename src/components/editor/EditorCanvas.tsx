@@ -5259,7 +5259,7 @@ function drawRoomInteriorAssets(
       if (displayedAsset.type === "kitchen-appliance") {
         // Dashed diagonal lines corner-to-corner (microwave-style X pattern)
         graphics.setStrokeStyle({
-          width: fgLineWidth * 0.65,
+          width: fgLineWidth * 0.85,
           color: fgColor,
           alpha: fgAlpha * 0.5,
         });
