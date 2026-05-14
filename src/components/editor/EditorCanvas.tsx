@@ -5785,11 +5785,11 @@ function drawRoomInteriorAssets(
         // Fill layer for whole asset
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
 
-        // 0. Outer elliptical boundary (main asset outline)
+        // 0. Outer elliptical boundary (secondary stroke detail)
         graphics.setStrokeStyle({
-          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
-          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-          alpha: isSelected ? 0.96 : 0.9,
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
         });
 
         // Centre of the basin (center of bounding box)
