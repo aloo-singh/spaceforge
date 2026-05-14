@@ -5324,43 +5324,45 @@ function drawRoomInteriorAssets(
         });
         
         // Burner positions based on count
-        const burnerPositions: Array<[number, number]> = [];
+        const burnerPositions: Array<[number, number, number]> = []; // [x, y, radiusMultiplier]
         if (burnerCount === 2) {
           // Linear 2-burner
           burnerPositions.push([
             centerX - widthPx * 0.25,
             centerY,
+            1,
           ]);
           burnerPositions.push([
             centerX + widthPx * 0.25,
             centerY,
+            1,
           ]);
         } else if (burnerCount === 4) {
           // 2x2 grid (standard)
-          burnerPositions.push([centerX - widthPx * 0.25, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX - widthPx * 0.25, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY + heightPx * 0.25]);
+          burnerPositions.push([centerX - widthPx * 0.25, centerY - heightPx * 0.25, 1]);
+          burnerPositions.push([centerX + widthPx * 0.25, centerY - heightPx * 0.25, 1]);
+          burnerPositions.push([centerX - widthPx * 0.25, centerY + heightPx * 0.25, 1]);
+          burnerPositions.push([centerX + widthPx * 0.25, centerY + heightPx * 0.25, 1]);
         } else if (burnerCount === 5) {
           // 4 corners + center (island)
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.3]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.3]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.3]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.3]);
-          burnerPositions.push([centerX, centerY]); // Center burner
+          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.3, 1]);
+          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.3, 1]);
+          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.3, 1]);
+          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.3, 1]);
+          burnerPositions.push([centerX, centerY, 1.4]); // Center burner larger
         } else if (burnerCount === 6) {
           // 2x3 grid
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.25]);
+          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.25, 1]);
+          burnerPositions.push([centerX, centerY - heightPx * 0.25, 1]);
+          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.25, 1]);
+          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.25, 1]);
+          burnerPositions.push([centerX, centerY + heightPx * 0.25, 1]);
+          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.25, 1]);
         }
         
         // Draw each burner as a circle
-        for (const [x, y] of burnerPositions) {
-          graphics.circle(x, y, burnerRadius);
+        for (const [x, y, radiusMultiplier] of burnerPositions) {
+          graphics.circle(x, y, burnerRadius * radiusMultiplier);
           graphics.stroke();
         }
       }
