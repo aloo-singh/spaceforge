@@ -5736,8 +5736,8 @@ function drawRoomInteriorAssets(
         const drawBathOval = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
-          // Fixed 80mm radius for tub curves (larger, doesn't scale with resize)
-          const radiusMm = 80;
+          // Fixed 100mm radius for tub curves (larger, doesn't scale with resize)
+          const radiusMm = 240;
           const r = Math.max(3, camera.pixelsPerMm * radiusMm);
           const rt = Math.min(r / w, 0.499);
           const rs = Math.min(r / h, 0.499);
