@@ -7,6 +7,16 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.78.14",
+    date: "2026-05-14",
+    title: "New Desk asset with attached chair",
+    items: [
+      "Add a desk to your floor plan from the Furniture panel—dimensions are 1200×900mm with a rectangular desktop and semicircle chair section.",
+      "Resize the desktop width and depth to fit your space; the chair remains a fixed size and always extends from the correct edge.",
+      "Desks rotate smoothly in all directions with geometry that rotates as a cohesive unit.",
+    ],
+  },
+  {
     version: "v0.78.0",
     date: "2026-05-08",
     title: "Browse projects your way",
