@@ -33,7 +33,7 @@ interface AssetItem {
 
 const ASSET_CATEGORIES: AssetCategory[] = [
   {
-    name: "Furniture",
+    name: "Bedroom",
     items: [
       {
         type: "bed",
@@ -42,23 +42,16 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         icon: <BedFilled className="size-5" />,
       },
       {
-        type: "sofa",
-        label: "Sofa",
-        description: "Place a sofa",
-        icon: <Sofa className="size-5" />,
-      },
-      {
         type: "wardrobe",
         label: "Wardrobe",
         description: "Place a wardrobe",
         icon: <Hanger className="size-5" />,
       },
-      {
-        type: "dining-table",
-        label: "Table",
-        description: "Place a table",
-        icon: <ToolsKitchen2Filled className="size-5" />,
-      },
+    ],
+  },
+  {
+    name: "Living",
+    items: [
       {
         type: "desk",
         label: "Desk",
@@ -66,10 +59,27 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         icon: <IconLamp2 className="size-5" />,
       },
       {
-        type: "kitchen-unit",
-        label: "Kitchen unit",
-        description: "Place a kitchen unit",
-        icon: <IconFridge className="size-5" />,
+        type: "sofa",
+        label: "Sofa",
+        description: "Place a sofa",
+        icon: <Sofa className="size-5" />,
+      },
+      {
+        type: "dining-table",
+        label: "Table",
+        description: "Place a table",
+        icon: <ToolsKitchen2Filled className="size-5" />,
+      },
+    ],
+  },
+  {
+    name: "Kitchen",
+    items: [
+      {
+        type: "hob",
+        label: "Hob",
+        description: "Place a hob/cooktop",
+        icon: <IconFlame className="size-5" />,
       },
       {
         type: "kitchen-appliance",
@@ -78,10 +88,10 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         icon: <IconMicrowave className="size-5" />,
       },
       {
-        type: "hob",
-        label: "Hob",
-        description: "Place a hob/cooktop",
-        icon: <IconFlame className="size-5" />,
+        type: "kitchen-unit",
+        label: "Kitchen unit",
+        description: "Place a kitchen unit",
+        icon: <IconFridge className="size-5" />,
       },
       {
         type: "sink",
@@ -89,17 +99,16 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         description: "Place a sink",
         icon: <IconWash className="size-5" />,
       },
+    ],
+  },
+  {
+    name: "Bathroom",
+    items: [
       {
-        type: "toilet",
-        label: "Toilet",
-        description: "Place a toilet",
-        icon: <IconToiletPaper className="size-5" />,
-      },
-      {
-        type: "shower",
-        label: "Shower",
-        description: "Place a shower",
-        icon: <IconFountain className="size-5 rotate-180" />,
+        type: "basin",
+        label: "Basin",
+        description: "Place a basin",
+        icon: <IconDroplet className="size-5" />,
       },
       {
         type: "bath",
@@ -108,10 +117,16 @@ const ASSET_CATEGORIES: AssetCategory[] = [
         icon: <IconBath className="size-5" />,
       },
       {
-        type: "basin",
-        label: "Basin",
-        description: "Place a basin",
-        icon: <IconDroplet className="size-5" />,
+        type: "shower",
+        label: "Shower",
+        description: "Place a shower",
+        icon: <IconFountain className="size-5 rotate-180" />,
+      },
+      {
+        type: "toilet",
+        label: "Toilet",
+        description: "Place a toilet",
+        icon: <IconToiletPaper className="size-5" />,
       },
     ],
   },
