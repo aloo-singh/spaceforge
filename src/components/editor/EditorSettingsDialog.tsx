@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
+import { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
   normalizeEditorExportSignature,
   shouldShowDimensions,
 } from "@/lib/editor/settings";
 import { saveGlobalSettings } from "@/lib/editor/globalSettings";
+import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -27,7 +29,9 @@ export function EditorSettingsDialog({
 }: EditorSettingsDialogProps) {
   const { theme, setTheme } = useTheme();
   const settings = useEditorStore((state) => state.settings);
+  const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
   const updateSettings = useEditorStore((state) => state.updateSettings);
+  const updateProjectRegion = useEditorStore((state) => state.updateProjectRegion);
   const keyboardShortcutFeedbackEnabled = useEditorStore(
     (state) => state.keyboardShortcutFeedbackEnabled
   );
@@ -49,6 +53,10 @@ export function EditorSettingsDialog({
   const isCompactSidebarDensity = settings.sidebarDensity === "compact";
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
+  const regionOptions: Array<{ value: ProjectRegion; label: string }> = [
+    { value: "metric", label: "Metric" },
+    { value: "imperial", label: "Imperial" },
+  ];
 
   return (
     <ResponsiveDialog
@@ -118,6 +126,51 @@ export function EditorSettingsDialog({
               Dark
             </Button>
           </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-regionalisation-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-regionalisation-title" className="text-sm font-medium text-foreground">
+                Regionalisation
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Choose the unit family for this project and future new projects.
+              </p>
+            </div>
+          </div>
+
+          <ImmediateTooltipProvider>
+            <div
+              className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+              role="radiogroup"
+              aria-label="Project region"
+            >
+              {regionOptions.map((option) => (
+                <Tooltip key={option.value}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      role="radio"
+                      variant={projectRegion === option.value ? "secondary" : "ghost"}
+                      aria-checked={projectRegion === option.value}
+                      onClick={() => updateProjectRegion(option.value)}
+                      className="min-w-24 flex-1 sm:flex-none"
+                    >
+                      {option.label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="center">
+                    Switch between metric and imperial units
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </ImmediateTooltipProvider>
         </div>
 
         <div

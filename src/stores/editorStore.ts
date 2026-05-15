@@ -119,6 +119,7 @@ import {
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
 import type {
@@ -271,6 +272,7 @@ type EditorState = {
   updateSettings: (settings: Partial<EditorSettings>) => void;
   setKeyboardShortcutFeedbackEnabled: (isEnabled: boolean) => void;
   updateExportPreferences: (preferences: Partial<EditorExportPreferences>) => void;
+  updateProjectRegion: (region: ProjectRegion) => void;
   updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
   selectNorthIndicator: () => void;
   clearNorthIndicatorSelection: () => void;
@@ -2731,6 +2733,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         exportPreferences: nextPreferences,
+      };
+    }),
+  updateProjectRegion: (region) =>
+    set((state) => {
+      const nextRegion = normalizeProjectRegion(region);
+      if (normalizeProjectRegion(state.document.region) === nextRegion) {
+        saveGlobalSettings({ lastUsedProjectRegion: nextRegion });
+        return state;
+      }
+
+      saveGlobalSettings({ lastUsedProjectRegion: nextRegion });
+
+      return {
+        document: {
+          ...state.document,
+          region: nextRegion,
+        },
       };
     }),
   updateProjectExportConfig: (config) =>
