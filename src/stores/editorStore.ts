@@ -387,6 +387,7 @@ type EditorState = {
   setSelectedInteriorAssetShape: (shape: "rectangular" | "round") => void;
   setSinkBowlType: (bowlType: "single" | "1.5") => void;
   setSinkHasDefaultDrainer: (hasDefaultDrainer: boolean) => void;
+  setSelectedHobBurnerCount: (burnerCount: 2 | 4 | 5 | 6) => void;
   setSelectedBedSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   setSelectedShowerSizePreset: (widthMm: number, depthMm: number, presetName: string) => void;
   setSelectedBathPlugHolePosition: (widthMm: number, depthMm: number, presetName: string) => void;
@@ -5955,6 +5956,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           widthMm: newWidth,
           xMm: newXMm,
         };
+      });
+      return nextState ?? state;
+    }),
+  setSelectedHobBurnerCount: (burnerCount) =>
+    set((state) => {
+      const nextState = updateSelectedInteriorAsset(state, (_, asset) => {
+        if (asset.type !== "hob") return null;
+        const currentBurnerCount = (asset as any).burnerCount ?? 4;
+        if (currentBurnerCount === burnerCount) return null;
+        
+        // Adjust depth: 4 burners = 600mm, 5 burners = 900mm
+        const newDepth = burnerCount === 5 ? 900 : 600;
+        const currentDepth = asset.depthMm;
+        
+        // If depth needs to change, adjust the Y center to keep top edge fixed
+        let newAsset: any = {
+          ...cloneRoomInteriorAsset(asset),
+          burnerCount,
+        };
+        
+        if (currentDepth !== newDepth) {
+          const topEdge = asset.yMm - currentDepth / 2;
+          newAsset.depthMm = newDepth;
+          newAsset.yMm = topEdge + newDepth / 2;
+        }
+        
+        return newAsset;
       });
       return nextState ?? state;
     }),

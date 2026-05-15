@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.78.15</h2>
+            <span className="text-sm text-muted-foreground">2026-05-15</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added 5-burner hob option (600×900mm) with four corner burners and a larger central burner. Selecting 5 burners auto-resizes depth to 900mm keeping the top edge fixed; switching back to 4 burners restores 600mm depth.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Hob burner circles now use bilinear frontC1/frontC2/backC1/backC2 interpolation, so all burner positions rotate correctly as a cohesive unit at all cardinal angles.</li>
+                <li>Asset dropdown reorganised into four labelled sections — Bedroom, Living, Kitchen, Bathroom — with assets alphabetically sorted within each section.</li>
+                <li>Bath interior rounded-rectangle corner radius increased for a more realistic plan-view appearance.</li>
+                <li>Basin outer ellipse rendered as a secondary lighter stroke to better distinguish it from the inner detail circle.</li>
+                <li>Kitchen appliance cross-hatch dashed lines rendered with increased line weight for improved legibility at small scales.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.14</h2>
             <span className="text-sm text-muted-foreground">2026-05-14</span>
           </div>

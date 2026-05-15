@@ -5259,7 +5259,7 @@ function drawRoomInteriorAssets(
       if (displayedAsset.type === "kitchen-appliance") {
         // Dashed diagonal lines corner-to-corner (microwave-style X pattern)
         graphics.setStrokeStyle({
-          width: fgLineWidth * 0.65,
+          width: fgLineWidth * 0.85,
           color: fgColor,
           alpha: fgAlpha * 0.5,
         });
@@ -5304,63 +5304,43 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "hob") {
-        // Burner circles for cooktop visualization
+        // Burner circles — positioned using frontC1/frontC2/backC1/backC2 bilinear
+        // interpolation so they rotate correctly with the hob at all cardinal angles.
         const burnerCount = displayedAsset.burnerCount ?? 4;
-        const widthPx = Math.abs(bottomRight.x - topLeft.x);
-        const heightPx = Math.abs(bottomRight.y - topLeft.y);
-        const centerX = (topLeft.x + bottomRight.x) / 2;
-        const centerY = (topLeft.y + bottomRight.y) / 2;
-        const burnerRadius = Math.max(3, Math.min(widthPx, heightPx) * 0.12); // ~12% of size
-        
+
+        // Lerp helper and bilinear place()
+        const lerpPt = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+        // wf = width fraction (frontC1→frontC2), df = depth fraction (front→back)
+        const place = (wf: number, df: number) =>
+          lerpPt(lerpPt(frontC1, frontC2, wf), lerpPt(backC1, backC2, wf), df);
+
+        const widthPx = Math.sqrt((frontC2.x - frontC1.x) ** 2 + (frontC2.y - frontC1.y) ** 2);
+        const depthPx = Math.sqrt((backC1.x - frontC1.x) ** 2 + (backC1.y - frontC1.y) ** 2);
+        const burnerRadius = Math.max(3, Math.min(widthPx, depthPx) * 0.12);
+
         graphics.setStrokeStyle({
           width: fgLineWidth * 0.8,
           color: fgColor,
           alpha: fgAlpha * 0.7,
         });
-        
-        graphics.setFillStyle({
-          color: fgColor,
-          alpha: 0,
-        });
-        
-        // Burner positions based on count
-        const burnerPositions: Array<[number, number]> = [];
-        if (burnerCount === 2) {
-          // Linear 2-burner
-          burnerPositions.push([
-            centerX - widthPx * 0.25,
-            centerY,
-          ]);
-          burnerPositions.push([
-            centerX + widthPx * 0.25,
-            centerY,
-          ]);
-        } else if (burnerCount === 4) {
-          // 2x2 grid (standard)
-          burnerPositions.push([centerX - widthPx * 0.25, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX - widthPx * 0.25, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY + heightPx * 0.25]);
-        } else if (burnerCount === 5) {
-          // 4 corners + center (island)
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.3]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.3]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.3]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.3]);
-          burnerPositions.push([centerX, centerY]); // Center burner
-        } else if (burnerCount === 6) {
-          // 2x3 grid
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.25]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX, centerY + heightPx * 0.25]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.25]);
-        }
-        
-        // Draw each burner as a circle
-        for (const [x, y] of burnerPositions) {
-          graphics.circle(x, y, burnerRadius);
+        graphics.setFillStyle({ color: fgColor, alpha: 0 });
+
+        // Burner definitions: [wf, df, radiusMultiplier]
+        const burnerDefs: Array<[number, number, number]> =
+          burnerCount === 2
+            ? [[0.25, 0.5, 1], [0.75, 0.5, 1]]
+            : burnerCount === 5
+            ? [[0.2, 0.2, 1], [0.8, 0.2, 1], [0.2, 0.8, 1], [0.8, 0.8, 1], [0.5, 0.5, 1.4]]
+            : burnerCount === 6
+            ? [[0.2, 0.25, 1], [0.5, 0.25, 1], [0.8, 0.25, 1], [0.2, 0.75, 1], [0.5, 0.75, 1], [0.8, 0.75, 1]]
+            : [[0.25, 0.25, 1], [0.75, 0.25, 1], [0.25, 0.75, 1], [0.75, 0.75, 1]]; // 4-burner default
+
+        for (const [wf, df, rm] of burnerDefs) {
+          const pt = place(wf, df);
+          graphics.circle(pt.x, pt.y, burnerRadius * rm);
           graphics.stroke();
         }
       }
@@ -5736,8 +5716,8 @@ function drawRoomInteriorAssets(
         const drawBathOval = (tl: ScreenPoint, tr: ScreenPoint, br: ScreenPoint, bl: ScreenPoint) => {
           const w = Math.sqrt((tr.x - tl.x) ** 2 + (tr.y - tl.y) ** 2);
           const h = Math.sqrt((bl.x - tl.x) ** 2 + (bl.y - tl.y) ** 2);
-          // Fixed 80mm radius for tub curves (larger, doesn't scale with resize)
-          const radiusMm = 80;
+          // Fixed 100mm radius for tub curves (larger, doesn't scale with resize)
+          const radiusMm = 240;
           const r = Math.max(3, camera.pixelsPerMm * radiusMm);
           const rt = Math.min(r / w, 0.499);
           const rs = Math.min(r / h, 0.499);
@@ -5785,11 +5765,11 @@ function drawRoomInteriorAssets(
         // Fill layer for whole asset
         graphics.setFillStyle({ color: fgColor, alpha: fgFillAlpha * 0.4 });
 
-        // 0. Outer elliptical boundary (main asset outline)
+        // 0. Outer elliptical boundary (secondary stroke detail)
         graphics.setStrokeStyle({
-          width: isSelected ? selectionStrokePx : Math.max(camera.pixelsPerMm * 14, 1.4),
-          color: isSelected ? theme.wallSelectionAccent : theme.roomOutline,
-          alpha: isSelected ? 0.96 : 0.9,
+          width: fgLineWidth * 0.8,
+          color: fgColor,
+          alpha: fgAlpha * 0.7,
         });
 
         // Centre of the basin (center of bounding box)
@@ -6362,6 +6342,7 @@ function drawFurnitureLabels(
       labelContainer.addChild(text);
     }
   }
+
 }
 
 function drawTransformDestinationPreview(

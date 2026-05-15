@@ -101,6 +101,7 @@ function FurnitureInspector({
   const setSelectedInteriorAssetShape = useEditorStore((state) => state.setSelectedInteriorAssetShape);
   const setSinkBowlType = useEditorStore((state) => state.setSinkBowlType);
   const setSinkHasDefaultDrainer = useEditorStore((state) => state.setSinkHasDefaultDrainer);
+  const setSelectedHobBurnerCount = useEditorStore((state) => state.setSelectedHobBurnerCount);
   const setSelectedBedSizePreset = useEditorStore((state) => state.setSelectedBedSizePreset);
   const setSelectedShowerSizePreset = useEditorStore((state) => state.setSelectedShowerSizePreset);
   const setSelectedBathPlugHolePosition = useEditorStore((state) => state.setSelectedBathPlugHolePosition);
@@ -439,6 +440,40 @@ function FurnitureInspector({
               </div>
             </div>
           </>
+        ) : null}
+
+        {asset.type === "hob" ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Burners</p>
+            <ImmediateTooltipProvider>
+              <ButtonGroup>
+                <InspectorIconTooltip groupItem content="4 burners (600×600mm)">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedHobBurnerCount(4)}
+                    aria-label="4 burners"
+                    aria-pressed={(asset as any).burnerCount !== 5}
+                  >
+                    4
+                  </Button>
+                </InspectorIconTooltip>
+                <InspectorIconTooltip groupItem content="5 burners (600×900mm)">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedHobBurnerCount(5)}
+                    aria-label="5 burners"
+                    aria-pressed={(asset as any).burnerCount === 5}
+                  >
+                    5
+                  </Button>
+                </InspectorIconTooltip>
+              </ButtonGroup>
+            </ImmediateTooltipProvider>
+          </div>
         ) : null}
 
         <div className="flex justify-end">
