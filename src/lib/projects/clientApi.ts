@@ -306,6 +306,10 @@ export function isSpecificProjectNotFoundError(error: unknown) {
   return error instanceof ProjectApiError && error.status === 404 && error.message === "Project not found.";
 }
 
+function isDuplicateProjectIdError(error: unknown) {
+  return error instanceof ProjectApiError && error.message.includes("duplicate key value violates unique constraint");
+}
+
 export async function createUnsavedProject(
   clientToken: string,
   input: {
@@ -349,6 +353,13 @@ export async function finalizeUnsavedProject(
     const payload = await readJson<{ project: ProjectRecord }>(response);
     return upsertCachedProject(clientToken, payload.project);
   } catch (error) {
+    if (isDuplicateProjectIdError(error)) {
+      return updateProject(clientToken, projectId, {
+        name: input.name,
+        document: normalizedDocument,
+      });
+    }
+
     warnProjectRecovery(
       "Project finalization failed remotely. Keeping project as local-only until synced.",
       error
