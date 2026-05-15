@@ -5304,65 +5304,43 @@ function drawRoomInteriorAssets(
       }
 
       if (displayedAsset.type === "hob") {
-        // Burner circles for cooktop visualization
+        // Burner circles — positioned using frontC1/frontC2/backC1/backC2 bilinear
+        // interpolation so they rotate correctly with the hob at all cardinal angles.
         const burnerCount = displayedAsset.burnerCount ?? 4;
-        const widthPx = Math.abs(bottomRight.x - topLeft.x);
-        const heightPx = Math.abs(bottomRight.y - topLeft.y);
-        const centerX = (topLeft.x + bottomRight.x) / 2;
-        const centerY = (topLeft.y + bottomRight.y) / 2;
-        const burnerRadius = Math.max(3, Math.min(widthPx, heightPx) * 0.12); // ~12% of size
-        
+
+        // Lerp helper and bilinear place()
+        const lerpPt = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+        });
+        // wf = width fraction (frontC1→frontC2), df = depth fraction (front→back)
+        const place = (wf: number, df: number) =>
+          lerpPt(lerpPt(frontC1, frontC2, wf), lerpPt(backC1, backC2, wf), df);
+
+        const widthPx = Math.sqrt((frontC2.x - frontC1.x) ** 2 + (frontC2.y - frontC1.y) ** 2);
+        const depthPx = Math.sqrt((backC1.x - frontC1.x) ** 2 + (backC1.y - frontC1.y) ** 2);
+        const burnerRadius = Math.max(3, Math.min(widthPx, depthPx) * 0.12);
+
         graphics.setStrokeStyle({
           width: fgLineWidth * 0.8,
           color: fgColor,
           alpha: fgAlpha * 0.7,
         });
-        
-        graphics.setFillStyle({
-          color: fgColor,
-          alpha: 0,
-        });
-        
-        // Burner positions based on count
-        const burnerPositions: Array<[number, number, number]> = []; // [x, y, radiusMultiplier]
-        if (burnerCount === 2) {
-          // Linear 2-burner
-          burnerPositions.push([
-            centerX - widthPx * 0.25,
-            centerY,
-            1,
-          ]);
-          burnerPositions.push([
-            centerX + widthPx * 0.25,
-            centerY,
-            1,
-          ]);
-        } else if (burnerCount === 4) {
-          // 2x2 grid (standard)
-          burnerPositions.push([centerX - widthPx * 0.25, centerY - heightPx * 0.25, 1]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY - heightPx * 0.25, 1]);
-          burnerPositions.push([centerX - widthPx * 0.25, centerY + heightPx * 0.25, 1]);
-          burnerPositions.push([centerX + widthPx * 0.25, centerY + heightPx * 0.25, 1]);
-        } else if (burnerCount === 5) {
-          // 4 corners + center (island)
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.3, 1]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.3, 1]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.3, 1]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.3, 1]);
-          burnerPositions.push([centerX, centerY, 1.4]); // Center burner larger
-        } else if (burnerCount === 6) {
-          // 2x3 grid
-          burnerPositions.push([centerX - widthPx * 0.3, centerY - heightPx * 0.25, 1]);
-          burnerPositions.push([centerX, centerY - heightPx * 0.25, 1]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY - heightPx * 0.25, 1]);
-          burnerPositions.push([centerX - widthPx * 0.3, centerY + heightPx * 0.25, 1]);
-          burnerPositions.push([centerX, centerY + heightPx * 0.25, 1]);
-          burnerPositions.push([centerX + widthPx * 0.3, centerY + heightPx * 0.25, 1]);
-        }
-        
-        // Draw each burner as a circle
-        for (const [x, y, radiusMultiplier] of burnerPositions) {
-          graphics.circle(x, y, burnerRadius * radiusMultiplier);
+        graphics.setFillStyle({ color: fgColor, alpha: 0 });
+
+        // Burner definitions: [wf, df, radiusMultiplier]
+        const burnerDefs: Array<[number, number, number]> =
+          burnerCount === 2
+            ? [[0.25, 0.5, 1], [0.75, 0.5, 1]]
+            : burnerCount === 5
+            ? [[0.2, 0.2, 1], [0.8, 0.2, 1], [0.2, 0.8, 1], [0.8, 0.8, 1], [0.5, 0.5, 1.4]]
+            : burnerCount === 6
+            ? [[0.2, 0.25, 1], [0.5, 0.25, 1], [0.8, 0.25, 1], [0.2, 0.75, 1], [0.5, 0.75, 1], [0.8, 0.75, 1]]
+            : [[0.25, 0.25, 1], [0.75, 0.25, 1], [0.25, 0.75, 1], [0.75, 0.75, 1]]; // 4-burner default
+
+        for (const [wf, df, rm] of burnerDefs) {
+          const pt = place(wf, df);
+          graphics.circle(pt.x, pt.y, burnerRadius * rm);
           graphics.stroke();
         }
       }
@@ -6364,6 +6342,56 @@ function drawFurnitureLabels(
       labelContainer.addChild(text);
     }
   }
+
+  // DEBUG: temporary burner number labels — remove when rotation is verified
+  for (const room of rooms) {
+    for (const asset of room.interiorAssets) {
+      if (asset.type !== "hob") continue;
+      const burnerCount = asset.burnerCount ?? 4;
+      const b = getRoomInteriorAssetBounds(asset);
+      const tl = worldToScreen({ x: b.left,  y: b.top    }, camera, viewport);
+      const tr = worldToScreen({ x: b.right, y: b.top    }, camera, viewport);
+      const bl = worldToScreen({ x: b.left,  y: b.bottom }, camera, viewport);
+      const br = worldToScreen({ x: b.right, y: b.bottom }, camera, viewport);
+      const closestCardinal = snapToCardinalRotationDegrees(asset.rotationDegrees ?? 0);
+      const [fc1, fc2, bc1, bc2] =
+        closestCardinal === 0    ? [tl, tr, bl, br]
+        : closestCardinal === 90   ? [tr, br, tl, bl]
+        : closestCardinal === -180 ? [bl, br, tl, tr]
+        : [tl, bl, tr, br]; // -90
+      const lerpPt = (a: { x: number; y: number }, b2: { x: number; y: number }, t: number) => ({
+        x: a.x + (b2.x - a.x) * t,
+        y: a.y + (b2.y - a.y) * t,
+      });
+      const placePt = (wf: number, df: number) =>
+        lerpPt(lerpPt(fc1, fc2, wf), lerpPt(bc1, bc2, wf), df);
+      const burnerDefs: Array<[number, number]> =
+        burnerCount === 2 ? [[0.25, 0.5], [0.75, 0.5]]
+        : burnerCount === 5 ? [[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8], [0.5, 0.5]]
+        : burnerCount === 6 ? [[0.2, 0.25], [0.5, 0.25], [0.8, 0.25], [0.2, 0.75], [0.5, 0.75], [0.8, 0.75]]
+        : [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];
+      const debugFontSizePx = Math.max(8, Math.min(fontSizePx * 0.85, camera.pixelsPerMm * 60));
+      for (let i = 0; i < burnerDefs.length; i++) {
+        const [wf, df] = burnerDefs[i];
+        const pt = placePt(wf, df);
+        const debugText = new Text({
+          text: String(i + 1),
+          resolution: textResolution,
+          style: {
+            fontFamily: ROOM_LABEL_AREA_FONT_FAMILY,
+            fontSize: debugFontSizePx,
+            fontWeight: "bold",
+            fill: 0xff4444,
+          },
+        });
+        debugText.roundPixels = true;
+        debugText.anchor.set(0.5);
+        debugText.position.set(snapToPixel(pt.x, textResolution), snapToPixel(pt.y, textResolution));
+        labelContainer.addChild(debugText);
+      }
+    }
+  }
+  // END DEBUG
 }
 
 function drawTransformDestinationPreview(
