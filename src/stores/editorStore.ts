@@ -2072,7 +2072,8 @@ function insertOpeningOnSelectedWall(
     hostRoom,
     state.selectedWall.wall,
     type,
-    createOpeningId()
+    createOpeningId(),
+    { unitOrigin: getDocumentUnitOrigin(state.document) }
   );
   if (!opening) return null;
   const openingWithUnitOrigin: RoomOpening = {
@@ -2108,7 +2109,9 @@ function insertDefaultStairOnSelectedRoom(
   const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
   if (!room) return null;
 
-  const asset = createCenteredDefaultStair(room, createInteriorAssetId());
+  const asset = createCenteredDefaultStair(room, createInteriorAssetId(), {
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  });
   if (!asset) return null;
   const assetWithUnitOrigin: RoomInteriorAsset = {
     ...asset,
@@ -5689,64 +5692,93 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       switch (assetType) {
         case "stairs":
-          asset = createCenteredDefaultStair(room, createInteriorAssetId());
+          asset = createCenteredDefaultStair(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Stairs";
           break;
         case "bed":
-          asset = createCenteredDefaultBed(room, createInteriorAssetId());
+          asset = createCenteredDefaultBed(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Bed";
           break;
         case "sofa":
-          asset = createCenteredDefaultSofa(room, createInteriorAssetId());
+          asset = createCenteredDefaultSofa(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Sofa";
           break;
         case "wardrobe":
-          asset = createCenteredDefaultWardrobe(room, createInteriorAssetId());
+          asset = createCenteredDefaultWardrobe(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Wardrobe";
           break;
         case "dining-table":
-          asset = createCenteredDefaultDiningTable(room, createInteriorAssetId());
+          asset = createCenteredDefaultDiningTable(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Table";
           break;
         case "kitchen-unit":
-          asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId());
+          asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Kitchen unit";
           break;
         case "kitchen-appliance":
-          asset = createCenteredDefaultKitchenAppliance(room, createInteriorAssetId());
+          asset = createCenteredDefaultKitchenAppliance(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Kitchen appliance";
           break;
         case "hob":
-          asset = createCenteredDefaultHob(room, createInteriorAssetId());
-          placedAssetTypeName = "Hob";
+          asset = createCenteredDefaultHob(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
+          placedAssetTypeName = "Stove top";
           break;
         case "sink":
-          asset = createCenteredDefaultSink(room, createInteriorAssetId());
+          asset = createCenteredDefaultSink(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Sink";
           break;
         case "toilet":
-          asset = createCenteredDefaultToilet(room, createInteriorAssetId());
+          asset = createCenteredDefaultToilet(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Toilet";
           break;
         case "shower":
-          asset = createCenteredDefaultShower(room, createInteriorAssetId());
+          asset = createCenteredDefaultShower(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Shower";
           break;
         case "bath":
-          asset = createCenteredDefaultBath(room, createInteriorAssetId());
+          asset = createCenteredDefaultBath(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Bath";
           break;
         case "basin":
-          asset = createCenteredDefaultBasin(room, createInteriorAssetId());
+          asset = createCenteredDefaultBasin(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Basin";
           break;
         case "desk":
-          asset = createCenteredDefaultDesk(room, createInteriorAssetId());
+          asset = createCenteredDefaultDesk(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Desk";
           break;
       }
 
       if (!asset) return state;
+      placedAssetTypeName = getInteriorAssetDisplayName(assetType, getDocumentUnitOrigin(state.document));
       const assetWithUnitOrigin: RoomInteriorAsset = {
         ...asset,
         unitOrigin: getDocumentUnitOrigin(state.document),

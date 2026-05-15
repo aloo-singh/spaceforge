@@ -11,7 +11,10 @@ import {
 } from "@/components/ui/popover";
 import { useMobile } from "@/lib/use-mobile";
 import { cn } from "@/lib/utils";
+import { getInteriorAssetDisplayName } from "@/lib/editor/interiorAssets";
 import type { InteriorAssetType } from "@/lib/editor/types";
+import { normalizeProjectRegion } from "@/lib/projects/region";
+import { useEditorStore } from "@/stores/editorStore";
 
 /**
  * Asset category for organizing furniture in the UI.
@@ -150,6 +153,7 @@ export function AssetsPanel({
   const [isOpen, setIsOpen] = useState(false);
   const { isMobile, isReady } = useMobile();
   const [mounted, setMounted] = useState(false);
+  const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") {
@@ -202,7 +206,7 @@ export function AssetsPanel({
                 )}
               >
                 <div className="text-muted-foreground">{item.icon}</div>
-                <span>{item.label}</span>
+                <span>{getInteriorAssetDisplayName(item.type, projectRegion)}</span>
               </button>
             ))}
           </div>
@@ -230,7 +234,7 @@ export function AssetsPanel({
                 )}
               >
                 <div className="text-muted-foreground">{item.icon}</div>
-                <span className="text-xs font-medium">{item.label}</span>
+                <span className="text-xs font-medium">{getInteriorAssetDisplayName(item.type, projectRegion)}</span>
               </button>
             ))}
           </div>

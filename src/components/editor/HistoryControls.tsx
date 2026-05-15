@@ -39,6 +39,7 @@ import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { getHistoryCommandActionLabel, generateBatchHistoryFeedbackMessage, showKeyboardShortcutFeedbackToast } from "@/lib/editor/keyboardMap";
 import { clearEditorSnapshot } from "@/lib/editor/editorPersistence";
 import { canPlaceDefaultStairInRoom } from "@/lib/editor/interiorAssets";
+import { normalizeProjectRegion } from "@/lib/projects/region";
 import { detectMacPlatform } from "@/lib/platform";
 import { resolveEditorThemeMode } from "@/lib/editor/theme";
 import { useEditorStore } from "@/stores/editorStore";
@@ -145,6 +146,7 @@ export function HistoryControls({
       ? state.document.rooms.find((room) => room.id === state.selectedRoomId) ?? null
       : null
   );
+  const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
   const selectedWall = useEditorStore((state) => state.selectedWall);
   const isRulerMode = useEditorStore((state) => state.isRulerMode);
   const setRulerMode = useEditorStore((state) => state.setRulerMode);
@@ -178,7 +180,10 @@ export function HistoryControls({
   const isUndoDisabled = !hasHydrated || !canUndo;
   const isRedoDisabled = !hasHydrated || !canRedo;
   const canInsertOpening = hasHydrated && selectedWall !== null;
-  const canInsertStair = hasHydrated && selectedRoom !== null && canPlaceDefaultStairInRoom(selectedRoom);
+  const canInsertStair =
+    hasHydrated &&
+    selectedRoom !== null &&
+    canPlaceDefaultStairInRoom(selectedRoom, { unitOrigin: projectRegion });
   const isExportButtonDisabled = !onExportPng || exportDisabled || isExportingPng;
   const exportButtonTitle = isExportButtonDisabled ? exportDisabledReason : undefined;
   const currentThemeLabel = resolveEditorThemeMode(resolvedTheme) === "light" ? "Light" : "Dark";

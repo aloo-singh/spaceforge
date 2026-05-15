@@ -14,7 +14,7 @@ import type {
   RoomWall,
   ViewportSize,
 } from "@/lib/editor/types";
-import { normalizeUnitOrigin } from "@/lib/projects/region";
+import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_DOOR_WIDTH_MM = 900;
 export const DEFAULT_WINDOW_WIDTH_MM = 1200;
@@ -24,6 +24,15 @@ export const MIN_OPENING_WIDTH_MM = 300;
 const OPENING_HIT_PADDING_PX = 10;
 const OPENING_HIT_DEPTH_PX = 18;
 const OPENING_WIDTH_HANDLE_HIT_RADIUS_PX = 10;
+const MM_PER_INCH = 25.4;
+
+type OpeningDefaultOptions = {
+  unitOrigin?: UnitOrigin;
+};
+
+function inchesToMm(inches: number) {
+  return Math.round(inches * MM_PER_INCH);
+}
 
 export type RoomWallSegment = {
   wall: RoomWall;
@@ -140,16 +149,19 @@ export function createCenteredRoomOpening(
   room: Room,
   wall: RoomWall,
   type: OpeningType,
-  id: string
+  id: string,
+  options?: OpeningDefaultOptions
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, wall);
   if (!segment || segment.lengthMm <= 0) return null;
+  const unitOrigin = normalizeUnitOrigin(options?.unitOrigin ?? room.unitOrigin);
 
-  const widthMm = Math.min(getDefaultOpeningWidth(type), segment.lengthMm);
+  const widthMm = Math.min(getDefaultOpeningWidth(type, unitOrigin), segment.lengthMm);
   if (widthMm <= 0) return null;
 
   return {
     id,
+    unitOrigin,
     type,
     wall,
     offsetMm: segment.lengthMm / 2,
@@ -682,7 +694,10 @@ function isProjectedPointWithinSegmentPadding(
   return t >= -paddingPx / Math.sqrt(lengthSquared) && t <= 1 + paddingPx / Math.sqrt(lengthSquared);
 }
 
-function getDefaultOpeningWidth(type: OpeningType) {
+function getDefaultOpeningWidth(type: OpeningType, unitOrigin: UnitOrigin) {
+  if (unitOrigin === "imperial") {
+    return type === "door" ? inchesToMm(36) : inchesToMm(48);
+  }
   return type === "door" ? DEFAULT_DOOR_WIDTH_MM : DEFAULT_WINDOW_WIDTH_MM;
 }
 

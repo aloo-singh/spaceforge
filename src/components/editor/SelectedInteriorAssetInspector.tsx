@@ -14,6 +14,7 @@ import {
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 
 import { 
+  getInteriorAssetDisplayName,
   getRotatedInteriorAssetForRoom,
   getStairRunLengthMm,
   DEFAULT_STAIR_TREAD_SPACING_MM,
@@ -51,7 +52,10 @@ function InspectorIconTooltip({
   );
 }
 
-function assetInspectorMeta(type: InteriorAssetType): { title: string; description: string } {
+function assetInspectorMeta(
+  type: InteriorAssetType,
+  unitOrigin: RoomInteriorAsset["unitOrigin"]
+): { title: string; description: string } {
   switch (type) {
     case "bed":
       return { title: "Selected bed", description: "Adjust the bed's position, size, and orientation." };
@@ -65,8 +69,10 @@ function assetInspectorMeta(type: InteriorAssetType): { title: string; descripti
       return { title: "Selected kitchen unit", description: "Adjust the kitchen unit's position, size, and orientation." };
     case "kitchen-appliance":
       return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
-    case "hob":
-      return { title: "Selected hob", description: "Adjust the hob's position, size, and orientation." };
+    case "hob": {
+      const label = getInteriorAssetDisplayName(type, unitOrigin).toLowerCase();
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
+    }
     case "sink":
       return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
     case "toilet":
@@ -122,7 +128,7 @@ function FurnitureInspector({
 
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
-  const { title, description } = assetInspectorMeta(asset.type);
+  const { title, description } = assetInspectorMeta(asset.type, asset.unitOrigin);
 
   return (
     <EditorInspectorSection title={title} description={description} className={className}>
