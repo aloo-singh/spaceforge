@@ -51,17 +51,17 @@ function getInteriorAssetDefaultDimensions(
     switch (type) {
       case "stairs": return { widthMm: inchesToMm(36), depthMm: inchesToMm(120) };
       case "bed": return { widthMm: inchesToMm(60), depthMm: inchesToMm(80) };
-      case "sofa": return { widthMm: inchesToMm(84), depthMm: inchesToMm(36) };
-      case "wardrobe": return { widthMm: inchesToMm(72), depthMm: inchesToMm(24), doorConstraint: inchesToMm(36) };
-      case "dining-table": return { widthMm: inchesToMm(72), depthMm: inchesToMm(36) };
-      case "kitchen-unit": return { widthMm: inchesToMm(24), depthMm: inchesToMm(24) };
-      case "kitchen-appliance": return { widthMm: inchesToMm(30), depthMm: inchesToMm(30) };
+      case "sofa": return { widthMm: inchesToMm(84), depthMm: inchesToMm(36), name: "Couch" };
+      case "wardrobe": return { widthMm: inchesToMm(72), depthMm: inchesToMm(24), name: "Closet", doorConstraint: inchesToMm(36) };
+      case "dining-table": return { widthMm: inchesToMm(72), depthMm: inchesToMm(36), name: "Dining table" };
+      case "kitchen-unit": return { widthMm: inchesToMm(24), depthMm: inchesToMm(24), name: "Base cabinet" };
+      case "kitchen-appliance": return { widthMm: inchesToMm(30), depthMm: inchesToMm(30), name: "Appliance" };
       case "hob": return { widthMm: inchesToMm(30), depthMm: inchesToMm(24), name: "Stove top" };
-      case "sink": return { widthMm: inchesToMm(33), depthMm: inchesToMm(22) };
+      case "sink": return { widthMm: inchesToMm(33), depthMm: inchesToMm(22), name: "Kitchen sink" };
       case "toilet": return { widthMm: inchesToMm(15), depthMm: inchesToMm(28) };
       case "shower": return { widthMm: inchesToMm(36), depthMm: inchesToMm(36) };
-      case "bath": return { widthMm: inchesToMm(30), depthMm: inchesToMm(60) };
-      case "basin": return { widthMm: inchesToMm(20), depthMm: inchesToMm(16) };
+      case "bath": return { widthMm: inchesToMm(30), depthMm: inchesToMm(60), name: "Bathtub" };
+      case "basin": return { widthMm: inchesToMm(20), depthMm: inchesToMm(16), name: "Bathroom sink" };
       case "desk": return { widthMm: inchesToMm(48), depthMm: inchesToMm(30) };
     }
   }
@@ -319,7 +319,7 @@ export function createCenteredDefaultSofa(
     id,
     unitOrigin,
     type: "sofa",
-    name: "Sofa",
+    name: dimensions.name ?? "Sofa",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -352,7 +352,7 @@ export function createCenteredDefaultWardrobe(
     id,
     unitOrigin,
     type: "wardrobe",
-    name: "Wardrobe",
+    name: dimensions.name ?? "Wardrobe",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -387,7 +387,7 @@ export function createCenteredDefaultDiningTable(
     id,
     unitOrigin,
     type: "dining-table",
-    name: "Table",
+    name: dimensions.name ?? "Table",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -421,7 +421,7 @@ export function createCenteredDefaultKitchenUnit(
     id,
     unitOrigin,
     type: "kitchen-unit",
-    name: "Kitchen unit",
+    name: dimensions.name ?? "Kitchen unit",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -454,7 +454,7 @@ export function createCenteredDefaultKitchenAppliance(
     id,
     unitOrigin,
     type: "kitchen-appliance",
-    name: "Kitchen appliance",
+    name: dimensions.name ?? "Kitchen appliance",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -521,7 +521,7 @@ export function createCenteredDefaultSink(
     id,
     unitOrigin,
     type: "sink",
-    name: "Sink",
+    name: dimensions.name ?? "Sink",
     xMm: center.x,
     yMm: center.y,
     widthMm: dimensions.widthMm,
@@ -635,7 +635,7 @@ export function createCenteredDefaultBath(
     id,
     unitOrigin,
     type: "bath",
-    name: "Bath",
+    name: dimensions.name ?? "Bath",
     xMm: center.x,
     yMm: center.y,
     widthMm,
@@ -673,7 +673,7 @@ export function createCenteredDefaultBasin(
     id,
     unitOrigin,
     type: "basin",
-    name: "Basin",
+    name: dimensions.name ?? "Basin",
     xMm: centerX,
     yMm: centerY,
     widthMm,
@@ -1311,17 +1311,17 @@ export function getInteriorAssetDisplayName(
   switch (type) {
     case "stairs": return "Stairs";
     case "bed": return "Bed";
-    case "sofa": return "Sofa";
-    case "wardrobe": return "Wardrobe";
-    case "dining-table": return "Table";
-    case "kitchen-unit": return "Kitchen unit";
-    case "kitchen-appliance": return "Kitchen appliance";
+    case "sofa": return normalizedUnitOrigin === "imperial" ? "Couch" : "Sofa";
+    case "wardrobe": return normalizedUnitOrigin === "imperial" ? "Closet" : "Wardrobe";
+    case "dining-table": return normalizedUnitOrigin === "imperial" ? "Dining table" : "Table";
+    case "kitchen-unit": return normalizedUnitOrigin === "imperial" ? "Base cabinet" : "Kitchen unit";
+    case "kitchen-appliance": return normalizedUnitOrigin === "imperial" ? "Appliance" : "Kitchen appliance";
     case "hob": return normalizedUnitOrigin === "imperial" ? "Stove top" : "Hob";
-    case "sink": return "Sink";
+    case "sink": return normalizedUnitOrigin === "imperial" ? "Kitchen sink" : "Sink";
     case "toilet": return "Toilet";
     case "shower": return "Shower";
-    case "bath": return "Bath";
-    case "basin": return "Basin";
+    case "bath": return normalizedUnitOrigin === "imperial" ? "Bathtub" : "Bath";
+    case "basin": return normalizedUnitOrigin === "imperial" ? "Bathroom sink" : "Basin";
     case "desk": return "Desk";
   }
 }

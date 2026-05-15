@@ -56,33 +56,32 @@ function assetInspectorMeta(
   type: InteriorAssetType,
   unitOrigin: RoomInteriorAsset["unitOrigin"]
 ): { title: string; description: string } {
+  const label = getInteriorAssetDisplayName(type, unitOrigin).toLowerCase();
   switch (type) {
     case "bed":
       return { title: "Selected bed", description: "Adjust the bed's position, size, and orientation." };
     case "sofa":
-      return { title: "Selected sofa", description: "Adjust the sofa's position, size, and orientation." };
-    case "wardrobe":
-      return { title: "Selected wardrobe", description: "Adjust the wardrobe's dimensions, door type, and orientation." };
-    case "dining-table":
-      return { title: "Selected table", description: "Adjust the table's shape, size, and orientation." };
-    case "kitchen-unit":
-      return { title: "Selected kitchen unit", description: "Adjust the kitchen unit's position, size, and orientation." };
-    case "kitchen-appliance":
-      return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
-    case "hob": {
-      const label = getInteriorAssetDisplayName(type, unitOrigin).toLowerCase();
       return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
-    }
+    case "wardrobe":
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s dimensions, door type, and orientation.` };
+    case "dining-table":
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s shape, size, and orientation.` };
+    case "kitchen-unit":
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
+    case "kitchen-appliance":
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
+    case "hob":
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "sink":
-      return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "toilet":
       return { title: "Selected toilet", description: "Adjust the toilet's position, size, and orientation." };
     case "shower":
       return { title: "Selected shower", description: "Adjust the shower's position, size, and orientation." };
     case "bath":
-      return { title: "Selected bath", description: "Adjust the bath's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "basin":
-      return { title: "Selected basin", description: "Adjust the basin's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "desk":
       return { title: "Selected desk", description: "Adjust the desk's position, size, and orientation." };
     case "stairs":

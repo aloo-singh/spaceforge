@@ -5475,7 +5475,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       // Capture asset type name for toast before deletion
-      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+      const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
 
       // Show deletion toast on next tick with undo action
       setTimeout(() => {
@@ -5919,7 +5919,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, room.id, nextAsset.id, deltaDegrees);
 
       // Show rotation toast on next tick
-      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+      const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
       const direction = deltaDegrees > 0 ? "right" : "left";
       setTimeout(() => {
         toast(`${assetTypeName} rotated ${direction} 90°`, { duration: 3200 });
@@ -6737,7 +6737,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Show resize toast on next tick
       if (previousAsset.widthMm !== nextAsset.widthMm || previousAsset.depthMm !== nextAsset.depthMm) {
         setTimeout(() => {
-          const assetTypeName = getInteriorAssetDisplayName(asset.type);
+          const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
           toast(`${assetTypeName} resized`, { duration: 3200 });
         }, 0);
       }
