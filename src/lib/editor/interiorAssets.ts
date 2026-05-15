@@ -53,7 +53,7 @@ function getInteriorAssetDefaultDimensions(
       case "bed": return { widthMm: inchesToMm(60), depthMm: inchesToMm(80) };
       case "sofa": return { widthMm: inchesToMm(84), depthMm: inchesToMm(36), name: "Couch" };
       case "wardrobe": return { widthMm: inchesToMm(72), depthMm: inchesToMm(24), name: "Closet", doorConstraint: inchesToMm(36) };
-      case "dining-table": return { widthMm: inchesToMm(72), depthMm: inchesToMm(36), name: "Dining table" };
+      case "dining-table": return { widthMm: inchesToMm(72), depthMm: inchesToMm(36) };
       case "kitchen-unit": return { widthMm: inchesToMm(24), depthMm: inchesToMm(24), name: "Base cabinet" };
       case "kitchen-appliance": return { widthMm: inchesToMm(30), depthMm: inchesToMm(30), name: "Appliance" };
       case "hob": return { widthMm: inchesToMm(30), depthMm: inchesToMm(24), name: "Stove top" };
@@ -1313,7 +1313,7 @@ export function getInteriorAssetDisplayName(
     case "bed": return "Bed";
     case "sofa": return normalizedUnitOrigin === "imperial" ? "Couch" : "Sofa";
     case "wardrobe": return normalizedUnitOrigin === "imperial" ? "Closet" : "Wardrobe";
-    case "dining-table": return normalizedUnitOrigin === "imperial" ? "Dining table" : "Table";
+    case "dining-table": return "Table";
     case "kitchen-unit": return normalizedUnitOrigin === "imperial" ? "Base cabinet" : "Kitchen unit";
     case "kitchen-appliance": return normalizedUnitOrigin === "imperial" ? "Appliance" : "Kitchen appliance";
     case "hob": return normalizedUnitOrigin === "imperial" ? "Stove top" : "Hob";
