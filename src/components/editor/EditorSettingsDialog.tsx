@@ -14,6 +14,8 @@ import {
 } from "@/lib/editor/settings";
 import { saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+import { getFeatureConfig } from "@/lib/subscription/features";
+import { getTierConfig } from "@/lib/subscription/tiers";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -32,6 +34,7 @@ export function EditorSettingsDialog({
   const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
   const updateSettings = useEditorStore((state) => state.updateSettings);
   const updateProjectRegion = useEditorStore((state) => state.updateProjectRegion);
+  const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const keyboardShortcutFeedbackEnabled = useEditorStore(
     (state) => state.keyboardShortcutFeedbackEnabled
   );
@@ -41,6 +44,7 @@ export function EditorSettingsDialog({
   const dimensionsVisible = shouldShowDimensions(settings);
   const isLargeMeasurementText = settings.measurementFontSize === "large";
   const isWallMeasurementInside = settings.wallMeasurementPosition === "inside";
+  const areUnitOriginHighlightsVisible = settings.showUnitOriginHighlights;
   const isCanvasHudVisible = settings.showCanvasHud;
   const isMiniMapVisible = settings.showMiniMap;
   const areRoomNamesVisible = settings.showRoomNames;
@@ -53,6 +57,14 @@ export function EditorSettingsDialog({
   const isCompactSidebarDensity = settings.sidebarDensity === "compact";
   const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
+  const canShowUnitOriginHighlights = getTierConfig(devSubscriptionTier).hasUnitOriginHighlight;
+  const unitOriginHighlightsActive =
+    canShowUnitOriginHighlights && areUnitOriginHighlightsVisible;
+  const unitOriginHighlightFeature = getFeatureConfig(devSubscriptionTier, "unitOriginHighlight");
+  const unitOriginHighlightTooltip = canShowUnitOriginHighlights
+    ? "Highlight metric-origin elements yellow and imperial-origin elements cyan"
+    : unitOriginHighlightFeature?.upsellMessage("Pro", 1) ??
+      "Upgrade to Pro to highlight metric and imperial-origin elements";
   const regionOptions: Array<{ value: ProjectRegion; label: string }> = [
     { value: "metric", label: "Metric" },
     { value: "imperial", label: "Imperial" },
@@ -217,6 +229,42 @@ export function EditorSettingsDialog({
           <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
             Hold Alt/Option to temporarily invert this while drawing or resizing.
           </p>
+
+          <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+            <div>
+              <h4 className="text-xs font-medium text-foreground">Unit origin highlight</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Softly color-code elements by the unit family they were created with.
+              </p>
+            </div>
+
+            <ImmediateTooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex w-full sm:w-auto">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={unitOriginHighlightsActive ? "secondary" : "outline"}
+                      aria-pressed={unitOriginHighlightsActive}
+                      disabled={!canShowUnitOriginHighlights}
+                      onClick={() =>
+                        updateSettings({
+                          showUnitOriginHighlights: !areUnitOriginHighlightsVisible,
+                        })
+                      }
+                      className="min-w-32 flex-1 sm:flex-none disabled:cursor-not-allowed"
+                    >
+                      {unitOriginHighlightsActive ? "Highlights on" : "Highlights off"}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="center">
+                  {unitOriginHighlightTooltip}
+                </TooltipContent>
+              </Tooltip>
+            </ImmediateTooltipProvider>
+          </div>
 
           <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
             <div>

@@ -117,6 +117,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `Upgrade to ${nextTier} to export editable SVG files for vector workflows.`,
       terminalMessage: "Free tier doesn't include SVG export. Upgrade for editable vector output.",
     },
+    unitOriginHighlight: {
+      name: "Unit Origin Highlight",
+      label: "Metric / imperial canvas highlight",
+      description: "Color-code metric-origin and imperial-origin elements on the canvas.",
+      limit: 0,
+      singularLabel: "highlight mode",
+      pluralLabel: "highlight modes",
+      upsellMessage: (nextTier) =>
+        `Upgrade to ${nextTier} to highlight metric and imperial-origin elements while reviewing mixed-unit plans.`,
+      terminalMessage: "Free includes regional defaults and display units. Pro unlocks mixed-unit highlighting.",
+    },
   },
 
   Pro: {
@@ -196,6 +207,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: (nextTier) =>
         `Upgrade to ${nextTier} to export editable SVG files for vector workflows.`,
       terminalMessage: "Pro includes PDF export. Studio unlocks editable SVG export.",
+    },
+    unitOriginHighlight: {
+      name: "Unit Origin Highlight",
+      label: "Metric / imperial canvas highlight",
+      description: "Color-code metric-origin and imperial-origin elements on the canvas.",
+      limit: 1,
+      singularLabel: "highlight mode",
+      pluralLabel: "highlight modes",
+      upsellMessage: () =>
+        `You've unlocked metric and imperial-origin highlighting on Pro.`,
+      terminalMessage: "Metric and imperial-origin highlighting is available on Pro.",
     },
   },
 
@@ -277,6 +299,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
         `You've unlocked editable SVG export on Studio.`,
       terminalMessage: "You've unlocked editable SVG export on Studio.",
     },
+    unitOriginHighlight: {
+      name: "Unit Origin Highlight",
+      label: "Metric / imperial canvas highlight",
+      description: "Color-code metric-origin and imperial-origin elements on the canvas.",
+      limit: 1,
+      singularLabel: "highlight mode",
+      pluralLabel: "highlight modes",
+      upsellMessage: () =>
+        `You've unlocked metric and imperial-origin highlighting on Studio.`,
+      terminalMessage: "Metric and imperial-origin highlighting is available on Studio.",
+    },
   },
 
   Education: {
@@ -356,6 +389,17 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, Record<string, Gate
       upsellMessage: () =>
         `You're on Education tier with editable SVG export unlocked.`,
       terminalMessage: "Editable SVG export is available on Education.",
+    },
+    unitOriginHighlight: {
+      name: "Unit Origin Highlight",
+      label: "Metric / imperial canvas highlight",
+      description: "Color-code metric-origin and imperial-origin elements on the canvas.",
+      limit: 1,
+      singularLabel: "highlight mode",
+      pluralLabel: "highlight modes",
+      upsellMessage: () =>
+        `You're on Education tier with metric and imperial-origin highlighting unlocked.`,
+      terminalMessage: "Metric and imperial-origin highlighting is available on Education.",
     },
   },
 };

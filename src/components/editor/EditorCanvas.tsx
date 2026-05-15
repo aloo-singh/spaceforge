@@ -175,6 +175,7 @@ import type {
   RoomInteriorAssetSelection,
   RoomOpening,
   RoomOpeningSelection,
+  RulerMeasurement,
   SharedSelectionItem,
   RoomWall,
   RoomWallSelection,
@@ -230,7 +231,8 @@ import {
 } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { EditorCommand } from "@/lib/editor/history";
-import type { UnitOrigin } from "@/lib/projects/region";
+import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
+import { getTierConfig } from "@/lib/subscription/tiers";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -304,6 +306,13 @@ const OPENING_SELECTION_STROKE_WORLD_MM = 28;
 const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
+const METRIC_UNIT_ORIGIN_HIGHLIGHT_COLOR = 0xfacc15;
+const IMPERIAL_UNIT_ORIGIN_HIGHLIGHT_COLOR = 0x22d3ee;
+const UNIT_ORIGIN_ROOM_FILL_ALPHA = 0.075;
+const UNIT_ORIGIN_ROOM_STROKE_ALPHA = 0.38;
+const UNIT_ORIGIN_ASSET_FILL_ALPHA = 0.095;
+const UNIT_ORIGIN_ASSET_STROKE_ALPHA = 0.48;
+const UNIT_ORIGIN_LINEAR_ALPHA = 0.56;
 const WALL_SPLIT_HANDLE_PLUS_SIZE_PX = 8;
 const WALL_SPLIT_TOOLTIP_TEXT = "Split wall here";
 const WALL_SPLIT_TOOLTIP_FONT_SIZE_PX = 11;
@@ -4176,6 +4185,19 @@ function drawScene(
     transformFeedback,
     theme
   );
+  if (
+    state.settings.showUnitOriginHighlights &&
+    getTierConfig(state.devSubscriptionTier).hasUnitOriginHighlight
+  ) {
+    drawUnitOriginHighlights(
+      wallOverlayGraphics,
+      renderedRooms,
+      state.document.rulerMeasurements,
+      state.camera,
+      state.viewport,
+      state.settings.showAssets
+    );
+  }
   drawRoomLabels(
     roomLabelContainer,
     renderedLabelRooms,
@@ -4761,6 +4783,97 @@ function drawWallInteractionOverlay(
     if (transformFeedback?.roomId === selectedRoom.id) continue;
     drawSelectedWallHighlight(graphics, selectedRoom, wallSelection.wall, camera, viewport, theme);
   }
+}
+
+function drawUnitOriginHighlights(
+  graphics: Graphics,
+  rooms: Room[],
+  rulers: RulerMeasurement[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  showAssets: boolean
+) {
+  for (const room of rooms) {
+    if (room.points.length < 3) continue;
+    const roomColor = getUnitOriginHighlightColor(room.unitOrigin);
+    drawRoomShape(
+      graphics,
+      room.points,
+      camera,
+      viewport,
+      roomColor,
+      UNIT_ORIGIN_ROOM_FILL_ALPHA,
+      2.25,
+      UNIT_ORIGIN_ROOM_STROKE_ALPHA
+    );
+
+    for (const opening of room.openings) {
+      const layout = getResolvedRoomOpeningLayout(room, opening);
+      if (!layout) continue;
+      const start = worldToScreen(layout.start, camera, viewport);
+      const end = worldToScreen(layout.end, camera, viewport);
+      graphics.setStrokeStyle({
+        width: Math.max(camera.pixelsPerMm * 72, 3),
+        color: getUnitOriginHighlightColor(opening.unitOrigin),
+        alpha: UNIT_ORIGIN_LINEAR_ALPHA,
+        cap: "round",
+      });
+      graphics.moveTo(start.x, start.y);
+      graphics.lineTo(end.x, end.y);
+      graphics.stroke();
+    }
+
+    for (const asset of room.interiorAssets) {
+      if (asset.type !== "stairs" && !showAssets) continue;
+      const bounds = getRoomInteriorAssetBounds(asset);
+      const corners = [
+        worldToScreen({ x: bounds.left, y: bounds.top }, camera, viewport),
+        worldToScreen({ x: bounds.right, y: bounds.top }, camera, viewport),
+        worldToScreen({ x: bounds.right, y: bounds.bottom }, camera, viewport),
+        worldToScreen({ x: bounds.left, y: bounds.bottom }, camera, viewport),
+      ];
+      const color = getUnitOriginHighlightColor(asset.unitOrigin);
+      graphics.setFillStyle({ color, alpha: UNIT_ORIGIN_ASSET_FILL_ALPHA });
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let index = 1; index < corners.length; index += 1) {
+        graphics.lineTo(corners[index].x, corners[index].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+      graphics.setStrokeStyle({
+        width: Math.max(camera.pixelsPerMm * 34, 2),
+        color,
+        alpha: UNIT_ORIGIN_ASSET_STROKE_ALPHA,
+      });
+      graphics.moveTo(corners[0].x, corners[0].y);
+      for (let index = 1; index < corners.length; index += 1) {
+        graphics.lineTo(corners[index].x, corners[index].y);
+      }
+      graphics.closePath();
+      graphics.stroke();
+    }
+  }
+
+  for (const ruler of rulers) {
+    if (ruler.hidden) continue;
+    const start = worldToScreen(ruler.start, camera, viewport);
+    const end = worldToScreen(ruler.end, camera, viewport);
+    graphics.setStrokeStyle({
+      width: Math.max(camera.pixelsPerMm * 38, 2),
+      color: getUnitOriginHighlightColor(ruler.unitOrigin),
+      alpha: UNIT_ORIGIN_LINEAR_ALPHA,
+      cap: "round",
+    });
+    graphics.moveTo(start.x, start.y);
+    graphics.lineTo(end.x, end.y);
+    graphics.stroke();
+  }
+}
+
+function getUnitOriginHighlightColor(unitOrigin: UnitOrigin | undefined): number {
+  return normalizeUnitOrigin(unitOrigin) === "imperial"
+    ? IMPERIAL_UNIT_ORIGIN_HIGHLIGHT_COLOR
+    : METRIC_UNIT_ORIGIN_HIGHLIGHT_COLOR;
 }
 
 function getRenderedRoomsForTransform(rooms: Room[], transformFeedback: TransformFeedback | null): Room[] {
