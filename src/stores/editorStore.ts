@@ -119,7 +119,7 @@ import {
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
-import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
 import type {
@@ -777,6 +777,7 @@ function buildConnectedFloorDocument(
       : [...document.floors, createdFloor];
   const connectedRoom: Room = {
     id: createdRoomId,
+    unitOrigin: getDocumentUnitOrigin(document),
     floorId: createdFloorId,
     name: room.name,
     points: room.points.map((point) => ({ ...point })),
@@ -785,6 +786,7 @@ function buildConnectedFloorDocument(
       {
         ...cloneRoomInteriorAsset(asset),
         id: createdAssetId,
+        unitOrigin: getDocumentUnitOrigin(document),
         connectionId,
         arrowEnabled: true,
         arrowLabel: connectedArrowLabel,
@@ -826,12 +828,17 @@ function buildConnectedFloorDocument(
 function cloneRoom(room: Room): Room {
   return {
     id: room.id,
+    unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId,
     name: room.name,
     points: room.points.map((point) => ({ ...point })),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
   };
+}
+
+function getDocumentUnitOrigin(document: Pick<DocumentState, "region">) {
+  return normalizeUnitOrigin(document.region);
 }
 
 function getDuplicatedInteriorAssetCenter(
@@ -2068,19 +2075,23 @@ function insertOpeningOnSelectedWall(
     createOpeningId()
   );
   if (!opening) return null;
+  const openingWithUnitOrigin: RoomOpening = {
+    ...opening,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
 
   const command: EditorCommand = {
     type: "add-opening",
     roomId: hostRoom.id,
-    opening,
+    opening: openingWithUnitOrigin,
   };
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
     selectedWall: null,
-    selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
+    selectedOpening: { roomId: hostRoom.id, openingId: openingWithUnitOrigin.id },
     selectedInteriorAsset: null,
-    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: opening.id }],
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: openingWithUnitOrigin.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2099,19 +2110,23 @@ function insertDefaultStairOnSelectedRoom(
 
   const asset = createCenteredDefaultStair(room, createInteriorAssetId());
   if (!asset) return null;
+  const assetWithUnitOrigin: RoomInteriorAsset = {
+    ...asset,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
 
   const command: EditorCommand = {
     type: "add-interior-asset",
     roomId: room.id,
-    asset,
+    asset: assetWithUnitOrigin,
   };
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
-    selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+    selectedInteriorAsset: { roomId: room.id, assetId: assetWithUnitOrigin.id },
     selectedOpening: null,
     selectedWall: null,
-    selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
+    selection: [{ type: "asset" as const, roomId: room.id, id: assetWithUnitOrigin.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2343,12 +2358,14 @@ function getSafePersistedHistorySnapshot(
           northBearingDegrees: document.northBearingDegrees,
           rulerMeasurements: document.rulerMeasurements.map((ruler) => ({
             id: ruler.id,
+            unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
             start: { ...ruler.start },
             end: { ...ruler.end },
             ...(ruler.hidden ? { hidden: true } : {}),
           })),
           rooms: document.rooms.map((room) => ({
             id: room.id,
+            unitOrigin: normalizeUnitOrigin(room.unitOrigin),
             floorId: room.floorId,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
@@ -3270,6 +3287,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const ruler: RulerMeasurement = {
         id: createRulerMeasurementId(),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         start: { ...state.rulerDraft.start },
         end: { ...resolvedPoint },
       };
@@ -3438,6 +3456,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const nextRuler: RulerMeasurement = {
         ...ruler,
+        unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
         start: { ...ruler.start },
         end: { ...ruler.end },
         hidden: !ruler.hidden,
@@ -5728,6 +5747,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       if (!asset) return state;
+      const assetWithUnitOrigin: RoomInteriorAsset = {
+        ...asset,
+        unitOrigin: getDocumentUnitOrigin(state.document),
+      };
       
       // Show toast on next tick to allow state update first
       if (placedAssetTypeName) {
@@ -5739,16 +5762,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "add-interior-asset",
         roomId: room.id,
-        asset,
+        asset: assetWithUnitOrigin,
       };
 
       return {
         ...state,
         document: applyEditorCommand(state.document, command, "redo"),
-        selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+        selectedInteriorAsset: { roomId: room.id, assetId: assetWithUnitOrigin.id },
         selectedOpening: null,
         selectedWall: null,
-        selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
+        selection: [{ type: "asset" as const, roomId: room.id, id: assetWithUnitOrigin.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -7447,6 +7470,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
 
   const room: Room = {
     id: createRoomId(),
+    unitOrigin: getDocumentUnitOrigin(state.document),
     floorId: getNormalizedActiveFloorId(state.document),
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),

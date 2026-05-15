@@ -15,7 +15,7 @@ import {
 } from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
-import { normalizeProjectRegion } from "@/lib/projects/region";
+import { normalizeProjectRegion, normalizeUnitOrigin } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
@@ -38,6 +38,7 @@ function areRulerMeasurementsEqual(a: RulerMeasurement[], b: RulerMeasurement[])
     const rulerB = b[i];
     if (
       rulerA.id !== rulerB.id ||
+      normalizeUnitOrigin(rulerA.unitOrigin) !== normalizeUnitOrigin(rulerB.unitOrigin) ||
       rulerA.start.x !== rulerB.start.x ||
       rulerA.start.y !== rulerB.start.y ||
       rulerA.end.x !== rulerB.end.x ||
@@ -97,6 +98,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     const roomB = b.rooms[i];
     if (
       roomA.id !== roomB.id ||
+      normalizeUnitOrigin(roomA.unitOrigin) !== normalizeUnitOrigin(roomB.unitOrigin) ||
       roomA.name !== roomB.name ||
       getRoomFloorId(roomA, a) !== getRoomFloorId(roomB, b)
     ) {
@@ -128,6 +130,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
@@ -401,6 +404,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "delete-room",
       room: {
         id: deletedRoom.id,
+        unitOrigin: normalizeUnitOrigin(deletedRoom.unitOrigin),
         floorId: getRoomFloorId(deletedRoom, previous),
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
@@ -445,6 +449,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "complete-room",
       room: {
         id: addedRooms[0].id,
+        unitOrigin: normalizeUnitOrigin(addedRooms[0].unitOrigin),
         floorId: getRoomFloorId(addedRooms[0], next),
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),

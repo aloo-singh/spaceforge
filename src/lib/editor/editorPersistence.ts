@@ -33,7 +33,13 @@ import {
   type EditorExportPreferences,
 } from "@/lib/editor/exportPreferences";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
-import { isProjectRegion, normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+import {
+  isProjectRegion,
+  isUnitOrigin,
+  normalizeProjectRegion,
+  normalizeUnitOrigin,
+  type ProjectRegion,
+} from "@/lib/projects/region";
 
 // Browser persistence schema for the editor.
 // Compatibility rules:
@@ -50,10 +56,11 @@ import { isProjectRegion, normalizeProjectRegion, type ProjectRegion } from "@/l
 // - v11 payloads also persist floors and the active floor.
 // - v12 payloads also persist ruler measurements.
 // - v13 payloads also persist the project region.
+// - v14 payloads also persist unit origin tags on dimensioned objects.
 // - Unknown versions or malformed layout payloads are rejected entirely.
 // - Malformed history inside an otherwise valid payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 13;
+export const EDITOR_PERSISTENCE_VERSION = 14;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 function warnEditorPersistence(message: string, details?: unknown) {
@@ -64,6 +71,7 @@ type PersistedPoint = Point;
 
 type PersistedRoom = {
   id: string;
+  unitOrigin?: Room["unitOrigin"];
   floorId?: string;
   name: string;
   points: PersistedPoint[];
@@ -219,6 +227,7 @@ function isPoint(value: unknown): value is Point {
 function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
   return {
     id: ruler.id,
+    unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
     ...(ruler.name !== undefined ? { name: ruler.name } : {}),
     start: { ...ruler.start },
     end: { ...ruler.end },
@@ -229,6 +238,7 @@ function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
 function isRulerMeasurement(value: unknown): value is RulerMeasurement {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (!isPoint(value.start) || !isPoint(value.end)) return false;
   if (value.hidden !== undefined && typeof value.hidden !== "boolean") return false;
   return true;
@@ -265,6 +275,7 @@ function isInteriorAssetType(value: unknown): value is Room["interiorAssets"][nu
 function isRoomOpening(value: unknown): value is Room["openings"][number] {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (!isOpeningType(value.type)) return false;
   const isLegacyRectWall =
     value.wall === "left" ||
@@ -293,6 +304,7 @@ function isRoomOpening(value: unknown): value is Room["openings"][number] {
 function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][number] {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (!isInteriorAssetType(value.type)) return false;
   if (value.connectionId !== undefined && value.connectionId !== null && typeof value.connectionId !== "string") {
     return false;
@@ -322,6 +334,7 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
 function isRoom(value: unknown): value is PersistedRoom {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points)) return false;
@@ -409,6 +422,7 @@ function clonePoint(point: Point): Point {
 function cloneRoom(room: PersistedRoom | Room): Room {
   return {
     id: room.id,
+    unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId ?? DEFAULT_FLOOR_ID,
     name: room.name,
     points: room.points.map(clonePoint),
@@ -557,6 +571,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 10 &&
         parsed.version !== 11 &&
         parsed.version !== 12 &&
+        parsed.version !== 13 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {

@@ -14,6 +14,7 @@ import type {
   RoomWall,
   ViewportSize,
 } from "@/lib/editor/types";
+import { normalizeUnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_DOOR_WIDTH_MM = 900;
 export const DEFAULT_WINDOW_WIDTH_MM = 1200;
@@ -26,6 +27,7 @@ const OPENING_WIDTH_HANDLE_HIT_RADIUS_PX = 10;
 
 export type RoomWallSegment = {
   wall: RoomWall;
+  unitOrigin?: Room["unitOrigin"];
   segmentIndex: number;
   axis: "horizontal" | "vertical" | "diagonal";
   start: Point;
@@ -59,6 +61,7 @@ export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
 
   return {
     id: normalizedOpening.id,
+    unitOrigin: normalizeUnitOrigin(normalizedOpening.unitOrigin),
     type: normalizedOpening.type,
     wall: normalizedOpening.wall,
     offsetMm: normalizedOpening.offsetMm,
@@ -78,6 +81,7 @@ export function areRoomOpeningsEqual(a: RoomOpening[], b: RoomOpening[]): boolea
   for (let i = 0; i < a.length; i += 1) {
     if (
       a[i].id !== b[i].id ||
+      normalizeUnitOrigin(a[i].unitOrigin) !== normalizeUnitOrigin(b[i].unitOrigin) ||
       a[i].type !== b[i].type ||
       a[i].wall !== b[i].wall ||
       a[i].offsetMm !== b[i].offsetMm ||
@@ -113,6 +117,7 @@ export function getRoomWallSegment(room: Room, wall: RoomWall): RoomWallSegment 
 
   return {
     wall,
+    unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     segmentIndex,
     axis,
     start,

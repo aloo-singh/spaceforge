@@ -13,7 +13,7 @@ import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
   PROJECT_EXPORT_TITLE_MAX_LENGTH,
 } from "@/lib/projects/exportConfig";
-import { isProjectRegion, normalizeProjectRegion } from "@/lib/projects/region";
+import { isProjectRegion, isUnitOrigin, normalizeProjectRegion } from "@/lib/projects/region";
 
 export type AppUser = {
   id: string;
@@ -87,6 +87,7 @@ function isInteriorAssetType(value: unknown): value is "stairs" | "bed" | "sofa"
 function isRoomOpening(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (!isOpeningType(value.type)) return false;
 
   const isLegacyRectWall =
@@ -110,6 +111,7 @@ function isRoomOpening(value: unknown): boolean {
 function isRoomInteriorAsset(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (!isInteriorAssetType(value.type)) return false;
   if (value.connectionId !== undefined && value.connectionId !== null && typeof value.connectionId !== "string") {
     return false;
@@ -139,6 +141,7 @@ function isRoomInteriorAsset(value: unknown): boolean {
 function isRoom(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
@@ -153,6 +156,15 @@ function isRoom(value: unknown): boolean {
     return false;
   }
 
+  return true;
+}
+
+function isRulerMeasurement(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
+  if (!isPoint(value.start) || !isPoint(value.end)) return false;
+  if (value.hidden !== undefined && typeof value.hidden !== "boolean") return false;
   return true;
 }
 
@@ -175,6 +187,12 @@ export function isProjectDocument(value: unknown): value is EditorDocumentState 
   }
   if (!Array.isArray(value.rooms)) return false;
   if (!value.rooms.every(isRoom)) return false;
+  if (
+    value.rulerMeasurements !== undefined &&
+    (!Array.isArray(value.rulerMeasurements) || !value.rulerMeasurements.every(isRulerMeasurement))
+  ) {
+    return false;
+  }
   if (
     value.northBearingDegrees !== undefined &&
     (!isFiniteNumber(value.northBearingDegrees) || !Number.isFinite(value.northBearingDegrees))

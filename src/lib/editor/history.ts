@@ -14,7 +14,12 @@ import {
   DEFAULT_PROJECT_EXPORT_CONFIG,
   type ProjectExportConfig,
 } from "@/lib/projects/exportConfig";
-import { DEFAULT_PROJECT_REGION, normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+import {
+  DEFAULT_PROJECT_REGION,
+  normalizeProjectRegion,
+  normalizeUnitOrigin,
+  type ProjectRegion,
+} from "@/lib/projects/region";
 
 export const DEFAULT_FLOOR_ID = "floor-1";
 export const DEFAULT_FLOOR_NAME = "Floor 1";
@@ -476,7 +481,16 @@ export function applyEditorCommand(
 
     return {
       ...document,
-      rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
+      rooms: [
+        ...document.rooms.filter((room) => room.id !== command.room.id),
+        {
+          ...command.room,
+          unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
+          points: command.room.points.map((point) => ({ ...point })),
+          openings: cloneRoomOpenings(command.room.openings),
+          interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
+        },
+      ],
     };
   }
 
@@ -507,6 +521,7 @@ export function applyEditorCommand(
       const nextRooms = [...roomsWithoutDeletedRoom];
       nextRooms.splice(command.previousIndex, 0, {
         id: command.room.id,
+        unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
         floorId: command.room.floorId,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
@@ -1247,6 +1262,7 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
     activeFloorId: getNormalizedActiveFloorId(document),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
@@ -1263,6 +1279,7 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
 export function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
   return {
     id: ruler.id,
+    unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
     ...(ruler.name !== undefined ? { name: ruler.name } : {}),
     start: { ...ruler.start },
     end: { ...ruler.end },

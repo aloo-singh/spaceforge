@@ -12,6 +12,7 @@ import type {
   RoomInteriorAssetSelection,
   ViewportSize,
 } from "@/lib/editor/types";
+import { normalizeUnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_STAIR_WIDTH_MM = 1200;
 export const DEFAULT_STAIR_DEPTH_MM = 2700;
@@ -39,6 +40,7 @@ export type InteriorAssetResizeCorner = RectCorner;
 export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAsset {
   const base: RoomInteriorAsset = {
     id: asset.id,
+    unitOrigin: normalizeUnitOrigin(asset.unitOrigin),
     type: asset.type,
     name: asset.name ?? DEFAULT_STAIR_NAME,
     xMm: asset.xMm,
@@ -101,6 +103,7 @@ export function areRoomInteriorAssetsEqual(
     const assetB = b[index];
     if (
       assetA.id !== assetB.id ||
+      normalizeUnitOrigin(assetA.unitOrigin) !== normalizeUnitOrigin(assetB.unitOrigin) ||
       assetA.type !== assetB.type ||
       (assetA.connectionId ?? null) !== (assetB.connectionId ?? null) ||
       assetA.name !== assetB.name ||

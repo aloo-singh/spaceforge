@@ -35,7 +35,7 @@ import { cloneProjectDocument } from "@/lib/projects/types";
 
 const PROJECT_DOCUMENTS_DB_NAME = "spaceforge.projects.v1";
 const PROJECT_DOCUMENTS_STORE_NAME = "documents";
-const PROJECT_DOCUMENTS_VERSION = 2;
+const PROJECT_DOCUMENTS_VERSION = 3;
 const PROJECT_DOCUMENTS_LOCAL_STORAGE_KEY = "spaceforge.projects.documents.v1";
 const PROJECT_HISTORY_STATE_LIMIT = 100;
 
@@ -82,7 +82,7 @@ function parseProjectDocumentsPayload(raw: string): ProjectDocumentsStoragePaylo
     const parsed = JSON.parse(raw) as unknown;
     if (
       !isObject(parsed) ||
-      (parsed.version !== 1 && parsed.version !== PROJECT_DOCUMENTS_VERSION) ||
+      (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== PROJECT_DOCUMENTS_VERSION) ||
       !Array.isArray(parsed.projects)
     ) {
       warnProjectPersistence("Ignoring invalid project documents payload.");
