@@ -24,8 +24,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  formatMetricRoomArea,
-  formatMetricRoomAreaForRoom,
+  formatRoomArea,
+  formatRoomAreaForRoom,
   getRoomAreaSquareMillimetres,
 } from "@/lib/editor/measurements";
 import { resolveRoomWallSegmentIndex } from "@/lib/editor/openings";
@@ -136,6 +136,7 @@ export function EditorSidebarRoomsList() {
     () => false
   );
   const document = useEditorStore((state) => state.document);
+  const displayUnitOrigin = document.region;
   const maxFloors = useEditorStore((state) => state.maxFloors);
   const floors = document.floors;
   const canAddFloor = floors.length < maxFloors;
@@ -380,7 +381,10 @@ export function EditorSidebarRoomsList() {
                   (totalArea, room) => totalArea + getRoomAreaSquareMillimetres(room),
                   0
                 );
-                const floorAreaLabel = formatMetricRoomArea(floorAreaSquareMillimetres);
+                const floorAreaLabel = formatRoomArea(
+                  floorAreaSquareMillimetres,
+                  displayUnitOrigin
+                );
                 const isFloorExpanded = !collapsedFloorIds.includes(floor.id);
                 return (
                   <div key={floor.id} className="rounded-lg border border-transparent">
@@ -546,7 +550,7 @@ export function EditorSidebarRoomsList() {
                 const roomItem: SharedSelectionItem = { type: "room", id: room.id };
                 const isInMultiSelection = isItemInSelection(roomItem, selection) && !isSelected;
                 const isRenaming = activeRenameRoomId === room.id && sidebarRenameRoomId === room.id;
-                const areaLabel = formatMetricRoomAreaForRoom(room);
+                const areaLabel = formatRoomAreaForRoom(room, displayUnitOrigin);
                 const roomWalls = getRoomWalls(room);
                 const isRoomExpanded = expandedRoomIds.includes(room.id);
                 const hasInteriorAssets = room.interiorAssets.length > 0;

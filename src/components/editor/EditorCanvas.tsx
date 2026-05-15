@@ -112,8 +112,8 @@ import {
   type RectWall,
 } from "@/lib/editor/rectRoomResize";
 import {
-  formatMetricRoomAreaForRoom,
-  formatMetricWallDimension,
+  formatRoomAreaForRoom,
+  formatWallDimension,
   getEdgeLengthMillimetres,
   getRoomEdgeMeasurements,
   getRectResizeMeasurements,
@@ -230,6 +230,7 @@ import {
 } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { EditorCommand } from "@/lib/editor/history";
+import type { UnitOrigin } from "@/lib/projects/region";
 
 const EMPTY_ROOM_RESIZE_UI = {
   hoveredWall: null,
@@ -944,6 +945,7 @@ export default function EditorCanvas({
     () => false
   );
   const editorDocument = useEditorStore((state) => state.document);
+  const displayUnitOrigin = editorDocument.region;
   const rooms = useMemo(() => getRoomsForActiveFloor(editorDocument), [editorDocument]);
   const roomCount = rooms.length;
   const roomDraftPointCount = useEditorStore((state) => state.roomDraft.points.length);
@@ -1547,7 +1549,7 @@ export default function EditorCanvas({
         (0 - exportCamera.xMm) * exportCamera.pixelsPerMm + exportViewport.width / 2;
       const exportGridOriginYPx =
         (0 - exportCamera.yMm) * exportCamera.pixelsPerMm + exportViewport.height / 2;
-      const exportScaleOverlay = getScaleOverlayState(exportCamera);
+      const exportScaleOverlay = getScaleOverlayState(exportCamera, state.document.region);
       const exportStage = new Container();
       const exportRoomGraphics = new Graphics();
       const exportOpeningGraphics = new Graphics();
@@ -1611,7 +1613,7 @@ export default function EditorCanvas({
         state.settings.showRoomNames,
         exportAssetMode !== "none",
         state.settings.showAssetLabels,
-        { includeStairDirectionLabels: false }
+        { includeStairDirectionLabels: false, displayUnitOrigin: state.document.region }
       );
       drawDraft(
         exportDraftGraphics,
@@ -1708,15 +1710,16 @@ export default function EditorCanvas({
         : "";
     const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
     const effectiveScaleBarPosition = request.showScaleBar ? request.scaleBarPosition : "none";
+    const state = useEditorStore.getState();
     const scopedRooms = getRoomsForEditorExportScope(
-      useEditorStore.getState().document,
+      state.document,
       request.exportScope
     );
     const exportLegendItems =
       effectiveLegendPosition !== "none"
         ? scopedRooms.map((room, index) => ({
             name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
-            area: formatMetricRoomAreaForRoom(room),
+            area: formatRoomAreaForRoom(room, state.document.region),
           }))
         : undefined;
     const shouldShowScaleBar = effectiveScaleBarPosition === "bottom-left";
@@ -1779,7 +1782,7 @@ export default function EditorCanvas({
           effectiveLegendPosition !== "none"
             ? scopedRooms.map((room, index) => ({
                 name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
-                area: formatMetricRoomAreaForRoom(room),
+                area: formatRoomAreaForRoom(room, state.document.region),
               }))
             : undefined;
         const filename = buildEditorExportFilename({
@@ -1806,6 +1809,7 @@ export default function EditorCanvas({
               : undefined,
           signatureText: exportSignatureText || undefined,
           signatureLines: exportSignatureLines,
+          displayUnitOrigin: state.document.region,
         });
         const blob =
           request.exportFormat === "pdf"
@@ -3010,7 +3014,10 @@ export default function EditorCanvas({
           },
     [camera, hasHydratedClient]
   );
-  const scaleOverlay = useMemo(() => getScaleOverlayState(overlayCamera), [overlayCamera]);
+  const scaleOverlay = useMemo(
+    () => getScaleOverlayState(overlayCamera, displayUnitOrigin),
+    [overlayCamera, displayUnitOrigin]
+  );
   const activeSnapStepMm = useMemo(() => getActiveSnapStepMm(overlayCamera), [overlayCamera]);
   const snappingEnabled = useEditorStore((state) => state.settings.snappingEnabled);
   const hydratedSnappingEnabled = hasHydratedClient
@@ -3522,8 +3529,8 @@ export default function EditorCanvas({
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {hydratedSnappingEnabled
-                    ? `Grid ${formatMetricWallDimension(activeSnapStepMm)} · Magnet On`
-                    : `Grid ${formatMetricWallDimension(activeSnapStepMm)}`}
+                    ? `Grid ${formatWallDimension(activeSnapStepMm, displayUnitOrigin)} · Magnet On`
+                    : `Grid ${formatWallDimension(activeSnapStepMm, displayUnitOrigin)}`}
                 </div>
               </CanvasHudCard>
               <NorthIndicatorControl
@@ -4184,7 +4191,7 @@ function drawScene(
     state.settings.showRoomNames,
     state.settings.showAssets,
     state.settings.showAssetLabels,
-    { includeStairDirectionLabels: true }
+    { includeStairDirectionLabels: true, displayUnitOrigin: state.document.region }
   );
   clearContainerChildren(dimensionOverlayContainer);
   drawOpeningMoveDimensions(
@@ -4194,7 +4201,8 @@ function drawScene(
     state.camera,
     state.viewport,
     state.settings,
-    theme
+    theme,
+    state.document.region
   );
   if (showDimensions) {
     drawSelectedRoomDimensions(
@@ -4206,7 +4214,8 @@ function drawScene(
       state.camera,
       state.viewport,
       state.settings,
-      theme
+      theme,
+      state.document.region
     );
     drawActiveResizeDimensions(
       dimensionOverlayContainer,
@@ -4215,7 +4224,8 @@ function drawScene(
       state.camera,
       state.viewport,
       state.settings,
-      theme
+      theme,
+      state.document.region
     );
     drawDraftDimensions(
       dimensionOverlayContainer,
@@ -4226,7 +4236,8 @@ function drawScene(
       activeSnapStepMm,
       draftConstraintMode,
       state.settings,
-      theme
+      theme,
+      state.document.region
     );
   }
   drawRulerDimensionLabels(
@@ -4236,7 +4247,8 @@ function drawScene(
     state.camera,
     state.viewport,
     state.settings,
-    theme
+    theme,
+    state.document.region
   );
   drawWallSplitHoverAffordance(
     dimensionOverlayContainer,
@@ -6565,6 +6577,7 @@ function drawRoomLabels(
   showAssetLabels: boolean = true,
   options?: {
     includeStairDirectionLabels?: boolean;
+    displayUnitOrigin?: UnitOrigin;
   }
 ) {
   clearContainerChildren(labelContainer);
@@ -6574,6 +6587,7 @@ function drawRoomLabels(
   for (const room of rooms) {
     const layout = getRoomLabelLayout(room, camera, viewport, settings, {
       showArea: showDimensions,
+      displayUnitOrigin: options?.displayUnitOrigin,
     });
     if (!layout) continue;
     if (!showRoomNames) continue;
@@ -6734,7 +6748,8 @@ function drawOpeningMoveDimensions(
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize">,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  displayUnitOrigin?: UnitOrigin
 ) {
   if (!openingMoveUi) return;
 
@@ -6840,7 +6855,7 @@ function drawOpeningMoveDimensions(
     drawDoubleEndedDimensionArrow(arrowGraphics, arrowStart, arrowEnd, tangent, settings, theme);
     labelLayouts.push(
       createOpeningMoveDimensionLabelLayout(
-        formatMetricWallDimension(span.lengthMillimetres),
+        formatWallDimension(span.lengthMillimetres, displayUnitOrigin),
         {
           x: (arrowStart.x + arrowEnd.x) / 2,
           y: (arrowStart.y + arrowEnd.y) / 2,
@@ -6997,7 +7012,8 @@ function drawActiveResizeDimensions(
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize">,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  displayUnitOrigin?: UnitOrigin
 ) {
   if (!roomResizeUi.activeRoomId) return;
   if (
@@ -7015,6 +7031,7 @@ function drawActiveResizeDimensions(
   const bounds = getAxisAlignedRoomBounds(activeRoom);
   const roomLabelLayout = getRoomLabelLayout(activeRoom, camera, viewport, settings, {
     showArea: true,
+    displayUnitOrigin,
   });
   const labelSpecs = getResizeDimensionLabelSpecs(
     activeRoom,
@@ -7025,7 +7042,8 @@ function drawActiveResizeDimensions(
     roomResizeUi.activeWallSegmentIndex,
     camera,
     viewport,
-    settings
+    settings,
+    displayUnitOrigin
   );
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
     labelSpecs,
@@ -7052,7 +7070,8 @@ function drawSelectedRoomDimensions(
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize" | "wallMeasurementPosition">,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  displayUnitOrigin?: UnitOrigin
 ) {
   if (roomResizeUi.activeRoomId || roomResizeUi.activeWall || roomResizeUi.activeCorner) return;
 
@@ -7064,9 +7083,17 @@ function drawSelectedRoomDimensions(
 
   const roomLabelLayout = getRoomLabelLayout(selectedRoom, camera, viewport, settings, {
     showArea: true,
+    displayUnitOrigin,
   });
   const labelLayouts = getResolvedResizeDimensionLabelLayouts(
-    getSelectedRoomDimensionLabelSpecs(selectedRoom, selectedWall, camera, viewport, settings),
+    getSelectedRoomDimensionLabelSpecs(
+      selectedRoom,
+      selectedWall,
+      camera,
+      viewport,
+      settings,
+      displayUnitOrigin
+    ),
     roomLabelLayout,
     viewport,
     getSelectedRoomDimensionAvoidRects(selectedRoom, camera, viewport),
@@ -7084,7 +7111,8 @@ function drawDraftDimensions(
   activeSnapStepMm: number | null,
   constraintMode: "orthogonal" | "diagonal45",
   settings: Pick<EditorSettings, "measurementFontSize">,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  displayUnitOrigin?: UnitOrigin
 ) {
   const activeSegmentLabelSpec = getDraftActiveSegmentDimensionLabelSpec(
     draftPoints,
@@ -7092,7 +7120,8 @@ function drawDraftDimensions(
     camera,
     viewport,
     activeSnapStepMm,
-    constraintMode
+    constraintMode,
+    displayUnitOrigin
   );
   if (activeSegmentLabelSpec) {
     const labelLayouts = getResolvedResizeDimensionLabelLayouts(
@@ -7129,7 +7158,8 @@ function drawDraftDimensions(
         bounds,
         camera,
         viewport,
-        settings
+        settings,
+        displayUnitOrigin
       ),
       createDimensionLabelSpecForWallMeasurement(
         draftDimensionWalls.verticalWall,
@@ -7137,7 +7167,8 @@ function drawDraftDimensions(
         bounds,
         camera,
         viewport,
-        settings
+        settings,
+        displayUnitOrigin
       ),
     ],
     null,
@@ -7213,14 +7244,17 @@ function drawRulerDimensionLabels(
   camera: CameraState,
   viewport: ViewportSize,
   settings: Pick<EditorSettings, "measurementFontSize">,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  displayUnitOrigin?: UnitOrigin
 ) {
   const labelSpecs = [
     ...rulers
       .filter((ruler) => !ruler.hidden)
-      .map((ruler) => createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport)),
+      .map((ruler) =>
+        createRulerDimensionLabelSpec(ruler.start, ruler.end, camera, viewport, displayUnitOrigin)
+      ),
     draft.start && draft.end
-      ? createRulerDimensionLabelSpec(draft.start, draft.end, camera, viewport)
+      ? createRulerDimensionLabelSpec(draft.start, draft.end, camera, viewport, displayUnitOrigin)
       : null,
   ].filter((labelSpec): labelSpec is ResizeDimensionLabelSpec => labelSpec !== null);
 
@@ -7244,7 +7278,8 @@ function createRulerDimensionLabelSpec(
   start: Point,
   end: Point,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec | null {
   if (pointsEqual(start, end)) return null;
 
@@ -7261,7 +7296,7 @@ function createRulerDimensionLabelSpec(
   const upwardNormal = normal.y > 0 ? { x: -normal.x, y: -normal.y } : normal;
 
   return {
-    text: formatMetricWallDimension(getEdgeLengthMillimetres(start, end)),
+    text: formatWallDimension(getEdgeLengthMillimetres(start, end), displayUnitOrigin),
     wall: "top",
     axis: Math.abs(tangent.x) >= Math.abs(tangent.y) ? "horizontal" : "vertical",
     center: {
@@ -7643,7 +7678,8 @@ function getResizeDimensionLabelSpecs(
   activeWallSegmentIndex: number | null,
   camera: CameraState,
   viewport: ViewportSize,
-  settings: Pick<EditorSettings, "measurementFontSize">
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec[] {
   if (activeWall) {
     if (!bounds) return [];
@@ -7658,7 +7694,8 @@ function getResizeDimensionLabelSpecs(
         bounds,
         camera,
         viewport,
-        settings
+        settings,
+        displayUnitOrigin
       )
     );
   }
@@ -7677,7 +7714,8 @@ function getResizeDimensionLabelSpecs(
         bounds,
         camera,
         viewport,
-        settings
+        settings,
+        displayUnitOrigin
       ),
       createDimensionLabelSpecForWallMeasurement(
         verticalWall,
@@ -7685,13 +7723,20 @@ function getResizeDimensionLabelSpecs(
         bounds,
         camera,
         viewport,
-        settings
+        settings,
+        displayUnitOrigin
       ),
     ];
   }
 
   if (activeVertexIndex !== null) {
-    return getResizeDimensionLabelSpecsForVertex(room, activeVertexIndex, camera, viewport);
+    return getResizeDimensionLabelSpecsForVertex(
+      room,
+      activeVertexIndex,
+      camera,
+      viewport,
+      displayUnitOrigin
+    );
   }
 
   if (activeWallSegmentIndex !== null) {
@@ -7699,7 +7744,8 @@ function getResizeDimensionLabelSpecs(
       room,
       activeWallSegmentIndex,
       camera,
-      viewport
+      viewport,
+      displayUnitOrigin
     );
   }
 
@@ -7746,7 +7792,8 @@ function getResizeDimensionLabelSpecsForOrthogonalWallSegment(
   room: Room,
   wallSegmentIndex: number,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec[] {
   if (room.points.length < 4) return [];
 
@@ -7765,7 +7812,8 @@ function getResizeDimensionLabelSpecsForOrthogonalWallSegment(
       wallMeasurement,
       camera,
       viewport,
-      { wallMeasurementPosition: "outside" }
+      { wallMeasurementPosition: "outside" },
+      displayUnitOrigin
     );
     return labelSpec ? [labelSpec] : [];
   });
@@ -7775,7 +7823,8 @@ function getResizeDimensionLabelSpecsForVertex(
   room: Room,
   vertexIndex: number,
   camera: CameraState,
-  viewport: ViewportSize
+  viewport: ViewportSize,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec[] {
   if (room.points.length < 4) return [];
 
@@ -7794,7 +7843,8 @@ function getResizeDimensionLabelSpecsForVertex(
       wallMeasurement,
       camera,
       viewport,
-      { wallMeasurementPosition: "outside" }
+      { wallMeasurementPosition: "outside" },
+      displayUnitOrigin
     );
     return labelSpec ? [labelSpec] : [];
   });
@@ -7806,10 +7856,11 @@ function createDimensionLabelSpecForWallMeasurement(
   bounds: { minX: number; maxX: number; minY: number; maxY: number },
   camera: CameraState,
   viewport: ViewportSize,
-  settings: Pick<EditorSettings, "measurementFontSize">
+  settings: Pick<EditorSettings, "measurementFontSize">,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec {
   return {
-    text: formatMetricWallDimension(lengthMillimetres),
+    text: formatWallDimension(lengthMillimetres, displayUnitOrigin),
     wall,
     axis: wall === "top" || wall === "bottom" ? "horizontal" : "vertical",
     normalPlacement: "center",
@@ -7886,7 +7937,8 @@ function getSelectedRoomDimensionLabelSpecs(
   selectedWall: RoomWallSelection | null,
   camera: CameraState,
   viewport: ViewportSize,
-  settings: Pick<EditorSettings, "wallMeasurementPosition">
+  settings: Pick<EditorSettings, "wallMeasurementPosition">,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec[] {
   if (selectedWall) {
     const wallMeasurement = getRoomWallMeasurement(room, selectedWall.wall);
@@ -7897,7 +7949,8 @@ function getSelectedRoomDimensionLabelSpecs(
       wallMeasurement,
       camera,
       viewport,
-      settings
+      settings,
+      displayUnitOrigin
     );
     return labelSpec ? [labelSpec] : [];
   }
@@ -7908,7 +7961,8 @@ function getSelectedRoomDimensionLabelSpecs(
       edge,
       camera,
       viewport,
-      settings
+      settings,
+      displayUnitOrigin
     );
     return labelSpec ? [labelSpec] : [];
   });
@@ -7919,7 +7973,8 @@ function createDimensionLabelSpecForEdgeMeasurement(
   edge: { start: Point; end: Point; lengthMillimetres: number },
   camera: CameraState,
   viewport: ViewportSize,
-  settings: Pick<EditorSettings, "wallMeasurementPosition">
+  settings: Pick<EditorSettings, "wallMeasurementPosition">,
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec | null {
   const midpoint = {
     x: (edge.start.x + edge.end.x) / 2,
@@ -7950,7 +8005,7 @@ function createDimensionLabelSpecForEdgeMeasurement(
   const isNonRectangularRoom = !isAxisAlignedRectangle(room.points);
 
   return {
-    text: formatMetricWallDimension(edge.lengthMillimetres),
+    text: formatWallDimension(edge.lengthMillimetres, displayUnitOrigin),
     wall: edge.start.y === edge.end.y ? "top" : "left",
     axis: edge.start.y === edge.end.y ? "horizontal" : "vertical",
     center: midpointScreen,
@@ -8343,7 +8398,8 @@ function getDraftActiveSegmentDimensionLabelSpec(
   camera: CameraState,
   viewport: ViewportSize,
   activeSnapStepMm: number | null,
-  constraintMode: "orthogonal" | "diagonal45"
+  constraintMode: "orthogonal" | "diagonal45",
+  displayUnitOrigin?: UnitOrigin
 ): ResizeDimensionLabelSpec | null {
   if (!cursorWorld || draftPoints.length === 0) return null;
 
@@ -8366,7 +8422,10 @@ function getDraftActiveSegmentDimensionLabelSpec(
         : "left";
 
   return {
-    text: formatMetricWallDimension(getEdgeLengthMillimetres(anchorPoint, previewPoint)),
+    text: formatWallDimension(
+      getEdgeLengthMillimetres(anchorPoint, previewPoint),
+      displayUnitOrigin
+    ),
     wall,
     axis: isHorizontal ? "horizontal" : "vertical",
     normalPlacement: "center",

@@ -6,7 +6,7 @@ import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenam
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { IconEye, RulerMeasure2, Trash2 } from "@/components/ui/icons";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { formatMetricWallDimension, getEdgeLengthMillimetres } from "@/lib/editor/measurements";
+import { formatWallDimension, getEdgeLengthMillimetres } from "@/lib/editor/measurements";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ export function RulerInspector({ className }: RulerInspectorProps) {
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const rulerDraft = useEditorStore((state) => state.rulerDraft);
   const rulers = useEditorStore((state) => state.document.rulerMeasurements);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   const selectedRulerId = useEditorStore((state) => state.selectedRulerId);
   const rulerRenameSession = useEditorStore((state) => state.rulerRenameSession);
   const selectRulerById = useEditorStore((state) => state.selectRulerById);
@@ -30,7 +31,10 @@ export function RulerInspector({ className }: RulerInspectorProps) {
   const cancelRulerRenameSession = useEditorStore((state) => state.cancelRulerRenameSession);
   const liveDistance =
     rulerDraft.start && rulerDraft.end
-      ? formatMetricWallDimension(getEdgeLengthMillimetres(rulerDraft.start, rulerDraft.end))
+      ? formatWallDimension(
+          getEdgeLengthMillimetres(rulerDraft.start, rulerDraft.end),
+          displayUnitOrigin
+        )
       : null;
 
   return (
@@ -77,8 +81,9 @@ export function RulerInspector({ className }: RulerInspectorProps) {
         ) : (
           <div className="space-y-2">
             {rulers.map((ruler, index) => {
-              const distance = formatMetricWallDimension(
-                getEdgeLengthMillimetres(ruler.start, ruler.end)
+              const distance = formatWallDimension(
+                getEdgeLengthMillimetres(ruler.start, ruler.end),
+                displayUnitOrigin
               );
               const isSelected = selectedRulerId === ruler.id;
 

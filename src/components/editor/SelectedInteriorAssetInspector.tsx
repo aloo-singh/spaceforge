@@ -20,7 +20,7 @@ import {
   DEFAULT_STAIR_TREAD_SPACING_MM,
 } from "@/lib/editor/interiorAssets";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import type { InteriorAssetType, RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -94,6 +94,7 @@ function FurnitureInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
@@ -174,7 +175,8 @@ function FurnitureInspector({
         <div className="space-y-1.5">
           <p className="text-sm font-medium">Dimensions</p>
           <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-            {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+            {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}
+            {formatWallDimension(asset.depthMm, displayUnitOrigin)}
           </div>
         </div>
 
@@ -517,6 +519,7 @@ function StairsInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   const startInteriorAssetRenameSession = useEditorStore(
     (state) => state.startInteriorAssetRenameSession
   );
@@ -647,7 +650,8 @@ function StairsInspector({
           <p className="text-sm font-medium">Dimensions</p>
           <div className="space-y-2">
             <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-              {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+              {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}
+              {formatWallDimension(asset.depthMm, displayUnitOrigin)}
             </div>
             <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
               {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM)} {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM) === 1 ? "stair" : "stairs"}

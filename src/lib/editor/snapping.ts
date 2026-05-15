@@ -1,7 +1,8 @@
 import { snapToGrid } from "@/lib/editor/geometry";
 import type { CameraState, Point, Room } from "@/lib/editor/types";
-import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import type { EditorSettings } from "@/lib/editor/settings";
+import type { UnitOrigin } from "@/lib/projects/region";
 
 export const ADAPTIVE_SNAP_STEP_LARGE_MM = 1_000;
 export const ADAPTIVE_SNAP_STEP_MEDIUM_MM = 500;
@@ -312,7 +313,10 @@ export function isSupportedDrawPointPath(
   return true;
 }
 
-export function getScaleOverlayState(camera: Pick<CameraState, "pixelsPerMm">): {
+export function getScaleOverlayState(
+  camera: Pick<CameraState, "pixelsPerMm">,
+  displayUnitOrigin?: UnitOrigin
+): {
   widthPx: number;
   label: string;
 } {
@@ -323,7 +327,7 @@ export function getScaleOverlayState(camera: Pick<CameraState, "pixelsPerMm">): 
 
   return {
     widthPx: resolvedWorldMm * camera.pixelsPerMm,
-    label: formatMetricWallDimension(resolvedWorldMm),
+    label: formatWallDimension(resolvedWorldMm, displayUnitOrigin),
   };
 }
 
