@@ -15,6 +15,7 @@ import {
 } from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { normalizeProjectRegion } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
@@ -65,6 +66,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
   const exportConfigB = normalizeProjectExportConfig(b.exportConfig);
 
   if (
+    normalizeProjectRegion(a.region) !== normalizeProjectRegion(b.region) ||
     exportConfigA.title !== exportConfigB.title ||
     exportConfigA.description !== exportConfigB.description ||
     exportConfigA.titlePosition !== exportConfigB.titlePosition ||
@@ -112,6 +114,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
   const exportConfig = normalizeProjectExportConfig(document.exportConfig);
 
   return {
+    region: normalizeProjectRegion(document.region),
     floors: getNormalizedFloors(document),
     activeFloorId: getNormalizedActiveFloorId(document),
     exportConfig: {

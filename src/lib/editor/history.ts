@@ -14,6 +14,7 @@ import {
   DEFAULT_PROJECT_EXPORT_CONFIG,
   type ProjectExportConfig,
 } from "@/lib/projects/exportConfig";
+import { DEFAULT_PROJECT_REGION, normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 
 export const DEFAULT_FLOOR_ID = "floor-1";
 export const DEFAULT_FLOOR_NAME = "Floor 1";
@@ -66,6 +67,7 @@ export function getRoomsForActiveFloor(document: EditorDocumentState): Room[] {
 }
 
 export type EditorDocumentState = {
+  region: ProjectRegion;
   floors: Floor[];
   activeFloorId: string | null;
   rooms: Room[];
@@ -1227,6 +1229,7 @@ export function applyEditorCommand(
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
+    region: DEFAULT_PROJECT_REGION,
     floors: [createDefaultFloor()],
     activeFloorId: DEFAULT_FLOOR_ID,
     rooms: [],
@@ -1239,6 +1242,7 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
 
 function cloneEditorDocumentState(document: EditorDocumentState): EditorDocumentState {
   return {
+    region: normalizeProjectRegion(document.region),
     floors: getNormalizedFloors(document),
     activeFloorId: getNormalizedActiveFloorId(document),
     rooms: document.rooms.map((room) => ({

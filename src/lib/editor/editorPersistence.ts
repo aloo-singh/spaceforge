@@ -33,6 +33,7 @@ import {
   type EditorExportPreferences,
 } from "@/lib/editor/exportPreferences";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { isProjectRegion, normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 
 // Browser persistence schema for the editor.
 // Compatibility rules:
@@ -48,10 +49,11 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 // - v10 payloads also persist canvas rotation with document + camera state.
 // - v11 payloads also persist floors and the active floor.
 // - v12 payloads also persist ruler measurements.
+// - v13 payloads also persist the project region.
 // - Unknown versions or malformed layout payloads are rejected entirely.
 // - Malformed history inside an otherwise valid payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 12;
+export const EDITOR_PERSISTENCE_VERSION = 13;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 function warnEditorPersistence(message: string, details?: unknown) {
@@ -70,6 +72,7 @@ type PersistedRoom = {
 };
 
 type PersistedDocument = {
+  region?: ProjectRegion;
   floors?: Floor[];
   activeFloorId?: string | null;
   rooms: PersistedRoom[];
@@ -350,6 +353,9 @@ function isCameraState(value: unknown): value is CameraState {
 
 function isPersistedDocument(value: unknown): value is PersistedDocument {
   if (!isObject(value)) return false;
+  if (value.region !== undefined && !isProjectRegion(value.region)) {
+    return false;
+  }
   if (value.floors !== undefined && (!Array.isArray(value.floors) || !value.floors.every(isFloor))) {
     return false;
   }
@@ -419,6 +425,7 @@ function cloneDocument(document: PersistedDocument | EditorDocumentState): Edito
   });
 
   return {
+    region: normalizeProjectRegion(document.region),
     floors,
     activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
@@ -481,6 +488,7 @@ function normalizeDocumentForSegmentAnchoring(
   });
 
   return {
+    region: normalizeProjectRegion(document.region),
     floors,
     activeFloorId,
     exportConfig: normalizeProjectExportConfig(document.exportConfig),
@@ -548,6 +556,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 9 &&
         parsed.version !== 10 &&
         parsed.version !== 11 &&
+        parsed.version !== 12 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -556,7 +565,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
       };
     }
 
-    const shouldMigrateNumericSegmentOffsets = parsed.version < EDITOR_PERSISTENCE_VERSION;
+    const shouldMigrateNumericSegmentOffsets = parsed.version < 12;
     const normalizedDocument = normalizeDocumentForSegmentAnchoring(parsed.document, {
       migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
     });

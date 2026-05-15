@@ -13,6 +13,7 @@ import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
   PROJECT_EXPORT_TITLE_MAX_LENGTH,
 } from "@/lib/projects/exportConfig";
+import { isProjectRegion, normalizeProjectRegion } from "@/lib/projects/region";
 
 export type AppUser = {
   id: string;
@@ -157,6 +158,7 @@ function isRoom(value: unknown): boolean {
 
 export function isProjectDocument(value: unknown): value is EditorDocumentState {
   if (!isObject(value)) return false;
+  if (value.region !== undefined && !isProjectRegion(value.region)) return false;
   if (value.floors !== undefined) {
     if (!Array.isArray(value.floors)) return false;
     if (
@@ -254,6 +256,7 @@ export function resolveProjectMaxFloors(value: unknown): number {
 export function cloneProjectDocument(document: EditorDocumentState): EditorDocumentState {
   return cloneDocumentState({
     ...document,
+    region: normalizeProjectRegion(document.region),
     canvasRotationDegrees: normalizeCanvasRotationDegrees(
       document.canvasRotationDegrees ?? DEFAULT_CANVAS_ROTATION_DEGREES
     ),

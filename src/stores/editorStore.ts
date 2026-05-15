@@ -2324,6 +2324,7 @@ function getSafePersistedHistorySnapshot(
     buildPersistedHistorySnapshot(document, history, PERSISTED_HISTORY_STATE_LIMIT) ?? {
       historyStack: [
         {
+          region: document.region,
           floors: document.floors.map((floor) => ({
             id: floor.id,
             name: floor.name,
