@@ -3,6 +3,7 @@
 import type { EditorDocumentState } from "@/lib/editor/history";
 import type { ProjectCatalogEntry } from "@/lib/projects/types";
 import { addOrUpdateCatalogEntry } from "@/lib/projects/catalog";
+import { cloneProjectDocument } from "@/lib/projects/types";
 
 /**
  * Project Document Persistence Layer
@@ -34,7 +35,7 @@ import { addOrUpdateCatalogEntry } from "@/lib/projects/catalog";
 
 const PROJECT_DOCUMENTS_DB_NAME = "spaceforge.projects.v1";
 const PROJECT_DOCUMENTS_STORE_NAME = "documents";
-const PROJECT_DOCUMENTS_VERSION = 1;
+const PROJECT_DOCUMENTS_VERSION = 3;
 const PROJECT_DOCUMENTS_LOCAL_STORAGE_KEY = "spaceforge.projects.documents.v1";
 const PROJECT_HISTORY_STATE_LIMIT = 100;
 
@@ -68,17 +69,29 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizePersistedProjectDocument(projectDoc: PersistedProjectDocument): PersistedProjectDocument {
+  return {
+    ...projectDoc,
+    document: cloneProjectDocument(projectDoc.document),
+    historyStack: projectDoc.historyStack.map((document) => cloneProjectDocument(document)),
+  };
+}
+
 function parseProjectDocumentsPayload(raw: string): ProjectDocumentsStoragePayload | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isObject(parsed) || parsed.version !== PROJECT_DOCUMENTS_VERSION || !Array.isArray(parsed.projects)) {
+    if (
+      !isObject(parsed) ||
+      (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== PROJECT_DOCUMENTS_VERSION) ||
+      !Array.isArray(parsed.projects)
+    ) {
       warnProjectPersistence("Ignoring invalid project documents payload.");
       return null;
     }
     // Note: Full validation of documents would happen during recovery flow
     return {
       version: PROJECT_DOCUMENTS_VERSION,
-      projects: parsed.projects,
+      projects: (parsed.projects as PersistedProjectDocument[]).map(normalizePersistedProjectDocument),
     };
   } catch (error) {
     warnProjectPersistence("Failed to parse project documents payload.", error);
@@ -186,9 +199,9 @@ export async function saveProjectDocument(
 
   const projectDoc: PersistedProjectDocument = {
     id: projectId,
-    document,
+    document: cloneProjectDocument(document),
     lastModified: now,
-    historyStack: cappedHistoryStack,
+    historyStack: cappedHistoryStack.map((historyDocument) => cloneProjectDocument(historyDocument)),
     historyIndex: cappedHistoryIndex,
   };
 
@@ -204,7 +217,7 @@ export async function saveProjectDocument(
     name: projectName,
     lastModified: now,
     thumbnailDataUrl,
-    documentVersion: 1, // TODO: increment based on actual version in step 4
+    documentVersion: PROJECT_DOCUMENTS_VERSION,
     recoveryBlobId: null, // TODO: set when implementing blob storage
   };
 
@@ -254,7 +267,7 @@ export async function loadProjectDocument(projectId: string): Promise<PersistedP
         };
       });
 
-      if (doc) return doc;
+      if (doc) return normalizePersistedProjectDocument(doc);
     } catch (error) {
       warnProjectPersistence("Error loading project from IndexedDB.", error);
     }

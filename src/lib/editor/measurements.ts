@@ -1,9 +1,13 @@
 import type { RectCorner, RectWall } from "@/lib/editor/rectRoomResize";
 import { getAxisAlignedRectangleBounds } from "@/lib/editor/roomGeometry";
 import type { Point, Room } from "@/lib/editor/types";
+import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
 
 const MILLIMETRES_PER_METRE = 1_000;
+const MILLIMETRES_PER_INCH = 25.4;
+const INCHES_PER_FOOT = 12;
 const SQUARE_MILLIMETRES_PER_SQUARE_METRE = 1_000_000;
+const SQUARE_MILLIMETRES_PER_SQUARE_FOOT = 304.8 * 304.8;
 const WALL_DIMENSION_DISPLAY_STEP_METRES = 0.1;
 const WALL_DIMENSION_DISPLAY_MAX_FRACTION_DIGITS = 1;
 const ROOM_AREA_DISPLAY_STEP_SQUARE_METRES = 0.1;
@@ -83,6 +87,29 @@ export function formatMetricWallDimension(lengthMillimetres: number): string {
     .replace(/\.0$/, "")} m`;
 }
 
+export function convertMillimetresToInches(lengthMillimetres: number): number {
+  return lengthMillimetres / MILLIMETRES_PER_INCH;
+}
+
+export function formatImperialWallDimension(lengthMillimetres: number): string {
+  const totalInches = Math.max(0, Math.round(convertMillimetresToInches(lengthMillimetres)));
+  const feet = Math.floor(totalInches / INCHES_PER_FOOT);
+  const inches = totalInches % INCHES_PER_FOOT;
+
+  if (feet > 0 && inches > 0) return `${feet}' ${inches}"`;
+  if (feet > 0) return `${feet}'`;
+  return `${inches}"`;
+}
+
+export function formatWallDimension(
+  lengthMillimetres: number,
+  unitOrigin?: UnitOrigin
+): string {
+  return normalizeUnitOrigin(unitOrigin) === "imperial"
+    ? formatImperialWallDimension(lengthMillimetres)
+    : formatMetricWallDimension(lengthMillimetres);
+}
+
 export function getRectResizeMeasurements(room: Room): RectResizeMeasurements | null {
   const bounds = getAxisAlignedRectangleBounds(room.points);
   if (!bounds) return null;
@@ -138,8 +165,33 @@ export function formatMetricRoomArea(areaSquareMillimetres: number): string {
   return `${roundedSquareMetres.toFixed(ROOM_AREA_DISPLAY_MAX_FRACTION_DIGITS).replace(/\.0$/, "")} m²`;
 }
 
+export function convertSquareMillimetresToSquareFeet(areaSquareMillimetres: number): number {
+  return areaSquareMillimetres / SQUARE_MILLIMETRES_PER_SQUARE_FOOT;
+}
+
+export function formatImperialRoomArea(areaSquareMillimetres: number): string {
+  const roundedSquareFeet = Math.round(
+    convertSquareMillimetresToSquareFeet(areaSquareMillimetres)
+  );
+
+  return `${roundedSquareFeet} sq ft`;
+}
+
+export function formatRoomArea(
+  areaSquareMillimetres: number,
+  unitOrigin?: UnitOrigin
+): string {
+  return normalizeUnitOrigin(unitOrigin) === "imperial"
+    ? formatImperialRoomArea(areaSquareMillimetres)
+    : formatMetricRoomArea(areaSquareMillimetres);
+}
+
 export function formatMetricRoomAreaForRoom(room: Room): string {
   return formatMetricRoomArea(getRoomAreaSquareMillimetres(room));
+}
+
+export function formatRoomAreaForRoom(room: Room, unitOrigin?: UnitOrigin): string {
+  return formatRoomArea(getRoomAreaSquareMillimetres(room), unitOrigin);
 }
 
 export function shouldShowRoomArea(room: Room): boolean {

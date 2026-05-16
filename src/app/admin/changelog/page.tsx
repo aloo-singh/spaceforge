@@ -10,6 +10,60 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.79.1</h2>
+            <span className="text-sm text-muted-foreground">2026-05-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Projects page area stats now respect each project document’s metric or imperial region, showing m² for metric projects and sq ft for imperial projects.</li>
+                <li>Projects page updated and created dates now follow the same project region, using UK-style dates for metric projects and US-style dates for imperial projects.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.79.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-16</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added project-level region support for metric and imperial projects, including persistence migration for existing documents and safe defaults for newly created projects.</li>
+                <li>Added the project settings region toggle, first-run region choice dialog, and remembered last-used region preference for future project creation.</li>
+                <li>Added unitOrigin tagging for rooms, wall segments, openings, interior assets, and ruler measurements, with migration treating existing elements as metric.</li>
+                <li>Added imperial display formatting for dimensions, ruler labels, room areas, and inspector measurements while keeping internal storage in metric units.</li>
+                <li>Added Pro-gated unit-origin canvas highlighting and inspector badges: yellow for metric-origin elements and magenta for imperial-origin elements.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Imperial projects now use US-style defaults for new rooms and assets, while metric projects keep UK-oriented labels and defaults.</li>
+                <li>Element edits, moves, resizes, and rotations now retag affected dimensioned objects to the current project region as part of the normal undoable history command.</li>
+                <li>Project settings copy now explains the region choice more clearly, and the first-run region dialog uses a calmer mandatory selection flow.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Opening highlight colours now replace the normal amber opening colour with yellow or magenta when unit highlighting is enabled.</li>
+                <li>Adjusted the first-run region dialog option layout so the Metric and Imperial descriptions wrap inside their buttons.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.78.15</h2>
             <span className="text-sm text-muted-foreground">2026-05-15</span>
           </div>

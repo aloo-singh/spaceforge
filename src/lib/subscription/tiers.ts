@@ -25,6 +25,7 @@ export interface TierConfig {
   /** Measurement & precision */
   hasAdvancedMeasurements: boolean;
   hasRegionalSettings: boolean;
+  hasUnitOriginHighlight: boolean;
 
   /** 2D / 2.5D visualisation */
   has2DPlanView: boolean;
@@ -88,6 +89,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     // Measurements
     hasAdvancedMeasurements: false,
     hasRegionalSettings: true,
+    hasUnitOriginHighlight: false,
 
     // 2D / 2.5D
     has2DPlanView: true,
@@ -139,6 +141,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     // Measurements
     hasAdvancedMeasurements: true,
     hasRegionalSettings: true,
+    hasUnitOriginHighlight: true,
 
     // 2D / 2.5D
     has2DPlanView: true,
@@ -190,6 +193,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     // Measurements
     hasAdvancedMeasurements: true,
     hasRegionalSettings: true,
+    hasUnitOriginHighlight: true,
 
     // 2D / 2.5D
     has2DPlanView: true,
@@ -241,6 +245,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
     // Measurements
     hasAdvancedMeasurements: true,
     hasRegionalSettings: true,
+    hasUnitOriginHighlight: true,
 
     // 2D / 2.5D
     has2DPlanView: true,

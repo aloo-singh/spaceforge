@@ -32,9 +32,11 @@
  * This ensures data is never silently lost while keeping the editor in a valid state.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { areDocumentsEqual, cloneDocumentState, buildPersistedHistorySnapshot } from "@/lib/editor/persistedHistory";
 import {
   createOrFetchAnonymousUser,
@@ -57,7 +59,9 @@ import {
   INITIAL_PIXELS_PER_MM,
   NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
+import { loadGlobalSettings, saveGlobalSettings } from "@/lib/editor/globalSettings";
 import type { ProjectRecord } from "@/lib/projects/types";
+import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { saveProjectDocument, checkForCachedProjectRecovery } from "@/lib/projects/projectDocumentPersistence";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -68,6 +72,10 @@ const PROJECT_HISTORY_STATE_LIMIT = 100;
 const NEW_PROJECT_OPEN_CAMERA_OPTIONS = {
   emptyLayoutPixelsPerMm: NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } as const;
+
+type RegionPreferencePromptState = {
+  resolve: (region: ProjectRegion) => void;
+};
 
 function isFreshEmptyProjectBootstrapState(
   document: ReturnType<typeof cloneDocumentState>,
@@ -89,6 +97,84 @@ function getThumbnailDocumentSignature(document: ReturnType<typeof cloneDocument
   return JSON.stringify({
     rooms: document.rooms,
   });
+}
+
+function hasStoredDocumentRegion(document: unknown) {
+  return (
+    typeof document === "object" &&
+    document !== null &&
+    "region" in document &&
+    ((document as { region?: unknown }).region === "metric" ||
+      (document as { region?: unknown }).region === "imperial")
+  );
+}
+
+function shouldPromptForRegionPreference(document: ReturnType<typeof cloneDocumentState>, rawDocument: unknown) {
+  return (
+    !hasStoredDocumentRegion(rawDocument) ||
+    (!loadGlobalSettings().hasConfirmedProjectRegionPreference && document.rooms.length === 0)
+  );
+}
+
+function FirstProjectRegionDialog({
+  open,
+  onChoose,
+}: {
+  open: boolean;
+  onChoose: (region: ProjectRegion) => void;
+}) {
+  const options: Array<{
+    value: ProjectRegion;
+    title: string;
+    description: string;
+  }> = [
+    {
+      value: "metric",
+      title: "Metric",
+      description: "Metres and millimetres for new rooms and objects.",
+    },
+    {
+      value: "imperial",
+      title: "Imperial",
+      description: "Feet and inches for new rooms and objects.",
+    },
+  ];
+
+  return (
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={() => {
+        // Required first-run choice: no outside click, Esc, or close button should dismiss it.
+      }}
+      title="Set the project’s native language"
+      description="Rooms feel easier to judge when their numbers sound familiar. Pick the measurement system this project should start with; you can change it later in Settings."
+      className="sm:w-[min(100%,30rem)]"
+      contentClassName="space-y-3"
+      surfaceOverride="dialog"
+    >
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            variant="outline"
+            onClick={() => onChoose(option.value)}
+            className="min-h-28 whitespace-normal rounded-lg border-border/70 bg-background/80 p-4 text-left hover:bg-muted/55"
+          >
+            <span className="flex w-full min-w-0 flex-col items-start gap-1.5">
+              <span className="text-sm font-semibold text-foreground">{option.title}</span>
+              <span className="block max-w-full text-wrap text-xs font-normal leading-relaxed text-muted-foreground">
+                {option.description}
+              </span>
+            </span>
+          </Button>
+        ))}
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        This sets the region for the project and the defaults for new rooms and assets.
+      </p>
+    </ResponsiveDialog>
+  );
 }
 
 function scheduleIdleTask(callback: () => void) {
@@ -168,6 +254,8 @@ export function EditorProjectBootstrap({
   const loadProjectDocument = useEditorStore((state) => state.loadProjectDocument);
   const resetCanvas = useEditorStore((state) => state.resetCanvas);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [regionPreferencePrompt, setRegionPreferencePrompt] =
+    useState<RegionPreferencePromptState | null>(null);
   const clientTokenRef = useRef<string | null>(null);
   const lastSyncedSignatureRef = useRef<string | null>(null);
   const lastSyncedThumbnailSignatureRef = useRef<string | null>(null);
@@ -178,6 +266,29 @@ export function EditorProjectBootstrap({
   const generateThumbnailDataUrlRef = useRef(generateThumbnailDataUrl);
   const onProjectResolvedRef = useRef(onProjectResolved);
   const onBootstrapStateChangeRef = useRef(onBootstrapStateChange);
+
+  const requestRegionPreference = useCallback(() => {
+    const globalSettings = loadGlobalSettings();
+    if (globalSettings.hasConfirmedProjectRegionPreference) {
+      return Promise.resolve(normalizeProjectRegion(globalSettings.lastUsedProjectRegion));
+    }
+
+    return new Promise<ProjectRegion>((resolve) => {
+      setRegionPreferencePrompt({ resolve });
+    });
+  }, []);
+
+  const chooseRegionPreference = useCallback((region: ProjectRegion) => {
+    const nextRegion = normalizeProjectRegion(region);
+    saveGlobalSettings({
+      lastUsedProjectRegion: nextRegion,
+      hasConfirmedProjectRegionPreference: true,
+    });
+    setRegionPreferencePrompt((currentPrompt) => {
+      currentPrompt?.resolve(nextRegion);
+      return null;
+    });
+  }, []);
 
   useEffect(() => {
     generateThumbnailDataUrlRef.current = generateThumbnailDataUrl;
@@ -228,6 +339,12 @@ export function EditorProjectBootstrap({
             if (isCancelled) return;
 
             let fallbackDocument = cloneDocumentState(fallbackProject.document);
+            if (shouldPromptForRegionPreference(fallbackDocument, fallbackProject.document)) {
+              fallbackDocument = {
+                ...fallbackDocument,
+                region: await requestRegionPreference(),
+              };
+            }
 
             // Check for recovery from local persistence
             const fallbackRecovery = await attemptProjectRecovery(
@@ -274,7 +391,13 @@ export function EditorProjectBootstrap({
             return;
           }
 
-          const localDocument = cloneDocumentState(useEditorStore.getState().document);
+          const selectedRegion = await requestRegionPreference();
+          if (isCancelled) return;
+
+          const localDocument = {
+            ...cloneDocumentState(useEditorStore.getState().document),
+            region: selectedRegion,
+          };
           const project = await ensureFirstProject(clientToken, localDocument);
           if (isCancelled) return;
 
@@ -307,6 +430,12 @@ export function EditorProjectBootstrap({
         }
 
         let nextDocument = cloneDocumentState(selectedProject.document);
+        if (shouldPromptForRegionPreference(nextDocument, selectedProject.document)) {
+          nextDocument = {
+            ...nextDocument,
+            region: await requestRegionPreference(),
+          };
+        }
 
         // Check for recovery from local persistence
         const selectedRecovery = await attemptProjectRecovery(
@@ -388,7 +517,7 @@ export function EditorProjectBootstrap({
     return () => {
       isCancelled = true;
     };
-  }, [fitCameraOnProjectOpen, loadProjectDocument, projectId, resetCanvas, router]);
+  }, [fitCameraOnProjectOpen, loadProjectDocument, projectId, requestRegionPreference, resetCanvas, router]);
 
   useEffect(() => {
     const clientToken = clientTokenRef.current;
@@ -532,5 +661,10 @@ export function EditorProjectBootstrap({
     previousRoomCountRef.current = currentRoomCount;
   }, [document]);
 
-  return null;
+  return (
+    <FirstProjectRegionDialog
+      open={regionPreferencePrompt !== null}
+      onChoose={chooseRegionPreference}
+    />
+  );
 }

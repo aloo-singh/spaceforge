@@ -14,6 +14,7 @@ import type {
   RoomWall,
   ViewportSize,
 } from "@/lib/editor/types";
+import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_DOOR_WIDTH_MM = 900;
 export const DEFAULT_WINDOW_WIDTH_MM = 1200;
@@ -23,9 +24,19 @@ export const MIN_OPENING_WIDTH_MM = 300;
 const OPENING_HIT_PADDING_PX = 10;
 const OPENING_HIT_DEPTH_PX = 18;
 const OPENING_WIDTH_HANDLE_HIT_RADIUS_PX = 10;
+const MM_PER_INCH = 25.4;
+
+type OpeningDefaultOptions = {
+  unitOrigin?: UnitOrigin;
+};
+
+function inchesToMm(inches: number) {
+  return Math.round(inches * MM_PER_INCH);
+}
 
 export type RoomWallSegment = {
   wall: RoomWall;
+  unitOrigin?: Room["unitOrigin"];
   segmentIndex: number;
   axis: "horizontal" | "vertical" | "diagonal";
   start: Point;
@@ -59,6 +70,7 @@ export function cloneRoomOpening(opening: RoomOpening): RoomOpening {
 
   return {
     id: normalizedOpening.id,
+    unitOrigin: normalizeUnitOrigin(normalizedOpening.unitOrigin),
     type: normalizedOpening.type,
     wall: normalizedOpening.wall,
     offsetMm: normalizedOpening.offsetMm,
@@ -78,6 +90,7 @@ export function areRoomOpeningsEqual(a: RoomOpening[], b: RoomOpening[]): boolea
   for (let i = 0; i < a.length; i += 1) {
     if (
       a[i].id !== b[i].id ||
+      normalizeUnitOrigin(a[i].unitOrigin) !== normalizeUnitOrigin(b[i].unitOrigin) ||
       a[i].type !== b[i].type ||
       a[i].wall !== b[i].wall ||
       a[i].offsetMm !== b[i].offsetMm ||
@@ -113,6 +126,7 @@ export function getRoomWallSegment(room: Room, wall: RoomWall): RoomWallSegment 
 
   return {
     wall,
+    unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     segmentIndex,
     axis,
     start,
@@ -135,16 +149,19 @@ export function createCenteredRoomOpening(
   room: Room,
   wall: RoomWall,
   type: OpeningType,
-  id: string
+  id: string,
+  options?: OpeningDefaultOptions
 ): RoomOpening | null {
   const segment = getRoomWallSegment(room, wall);
   if (!segment || segment.lengthMm <= 0) return null;
+  const unitOrigin = normalizeUnitOrigin(options?.unitOrigin ?? room.unitOrigin);
 
-  const widthMm = Math.min(getDefaultOpeningWidth(type), segment.lengthMm);
+  const widthMm = Math.min(getDefaultOpeningWidth(type, unitOrigin), segment.lengthMm);
   if (widthMm <= 0) return null;
 
   return {
     id,
+    unitOrigin,
     type,
     wall,
     offsetMm: segment.lengthMm / 2,
@@ -497,6 +514,7 @@ export function normalizeRoomOpening(opening: RoomOpening): RoomOpening {
     wall: opening.wall,
     offsetMm: opening.offsetMm,
     widthMm: opening.widthMm,
+    unitOrigin: normalizeUnitOrigin(opening.unitOrigin),
     openingSide:
       opening.openingSide === "exterior" ? "exterior" : DEFAULT_DOOR_OPENING_SIDE,
     hingeSide: opening.hingeSide === "end" ? "end" : DEFAULT_DOOR_HINGE_SIDE,
@@ -677,7 +695,10 @@ function isProjectedPointWithinSegmentPadding(
   return t >= -paddingPx / Math.sqrt(lengthSquared) && t <= 1 + paddingPx / Math.sqrt(lengthSquared);
 }
 
-function getDefaultOpeningWidth(type: OpeningType) {
+function getDefaultOpeningWidth(type: OpeningType, unitOrigin: UnitOrigin) {
+  if (unitOrigin === "imperial") {
+    return type === "door" ? inchesToMm(36) : inchesToMm(48);
+  }
   return type === "door" ? DEFAULT_DOOR_WIDTH_MM : DEFAULT_WINDOW_WIDTH_MM;
 }
 

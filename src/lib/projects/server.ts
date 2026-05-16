@@ -68,6 +68,10 @@ async function supabaseRequest(pathname: string, init: RequestInit, searchParams
   return response;
 }
 
+function isDuplicateKeyError(error: unknown) {
+  return error instanceof Error && error.message.includes("duplicate key value violates unique constraint");
+}
+
 function mapAppUser(row: SupabaseAppUserRow): AppUser {
   return {
     id: row.id,
@@ -175,18 +179,34 @@ export async function createProjectForClientToken(
   }
 ): Promise<ProjectRecord> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
-  const response = await supabaseRequest("projects", {
-    method: "POST",
-    headers: {
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify({
-      id: input.projectId,
-      user_id: user.id,
+  let response: Response;
+  try {
+    response = await supabaseRequest("projects", {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        id: input.projectId,
+        user_id: user.id,
+        name: input.name,
+        document: cloneProjectDocument(input.document),
+      }),
+    });
+  } catch (error) {
+    if (!input.projectId || !isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    const existingProject = await updateProjectForClientToken(clientToken, input.projectId, {
       name: input.name,
-      document: cloneProjectDocument(input.document),
-    }),
-  });
+      document: input.document,
+    });
+    if (!existingProject) {
+      throw error;
+    }
+    return existingProject;
+  }
   const rows = (await response.json()) as SupabaseProjectRow[];
   const row = rows[0];
   if (!row) {

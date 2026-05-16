@@ -12,6 +12,7 @@ import type {
   RoomInteriorAssetSelection,
   ViewportSize,
 } from "@/lib/editor/types";
+import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_STAIR_WIDTH_MM = 1200;
 export const DEFAULT_STAIR_DEPTH_MM = 2700;
@@ -25,6 +26,67 @@ export const DEFAULT_STAIR_ARROW_ENABLED = true;
 export const DEFAULT_STAIR_ARROW_DIRECTION: StairDirection = "forward";
 export const DEFAULT_STAIR_ARROW_LABEL = "UP";
 const INTERIOR_ASSET_HIT_PADDING_PX = 10;
+const MM_PER_INCH = 25.4;
+
+type InteriorAssetDefaultOptions = {
+  unitOrigin?: UnitOrigin;
+};
+
+type InteriorAssetDefaultDimensions = {
+  widthMm: number;
+  depthMm: number;
+  name?: string;
+  doorConstraint?: number;
+};
+
+function inchesToMm(inches: number) {
+  return Math.round(inches * MM_PER_INCH);
+}
+
+function getInteriorAssetDefaultDimensions(
+  type: RoomInteriorAsset["type"],
+  unitOrigin: UnitOrigin
+): InteriorAssetDefaultDimensions {
+  if (unitOrigin === "imperial") {
+    switch (type) {
+      case "stairs": return { widthMm: inchesToMm(36), depthMm: inchesToMm(120) };
+      case "bed": return { widthMm: inchesToMm(60), depthMm: inchesToMm(80) };
+      case "sofa": return { widthMm: inchesToMm(84), depthMm: inchesToMm(36), name: "Couch" };
+      case "wardrobe": return { widthMm: inchesToMm(72), depthMm: inchesToMm(24), name: "Closet", doorConstraint: inchesToMm(36) };
+      case "dining-table": return { widthMm: inchesToMm(72), depthMm: inchesToMm(36) };
+      case "kitchen-unit": return { widthMm: inchesToMm(24), depthMm: inchesToMm(24), name: "Base cabinet" };
+      case "kitchen-appliance": return { widthMm: inchesToMm(30), depthMm: inchesToMm(30), name: "Appliance" };
+      case "hob": return { widthMm: inchesToMm(30), depthMm: inchesToMm(24), name: "Stove top" };
+      case "sink": return { widthMm: inchesToMm(33), depthMm: inchesToMm(22), name: "Kitchen sink" };
+      case "toilet": return { widthMm: inchesToMm(15), depthMm: inchesToMm(28) };
+      case "shower": return { widthMm: inchesToMm(36), depthMm: inchesToMm(36) };
+      case "bath": return { widthMm: inchesToMm(30), depthMm: inchesToMm(60), name: "Bathtub" };
+      case "basin": return { widthMm: inchesToMm(20), depthMm: inchesToMm(16), name: "Bathroom sink" };
+      case "desk": return { widthMm: inchesToMm(48), depthMm: inchesToMm(30) };
+    }
+  }
+
+  switch (type) {
+    case "stairs": return { widthMm: DEFAULT_STAIR_WIDTH_MM, depthMm: DEFAULT_STAIR_DEPTH_MM };
+    case "bed": return { widthMm: 1350, depthMm: 1900 };
+    case "sofa": return { widthMm: 2000, depthMm: 900 };
+    case "wardrobe": return { widthMm: 1600, depthMm: 600, doorConstraint: 800 };
+    case "dining-table": return { widthMm: 1600, depthMm: 900 };
+    case "kitchen-unit": return { widthMm: 600, depthMm: 600 };
+    case "kitchen-appliance": return { widthMm: 600, depthMm: 600 };
+    case "hob": return { widthMm: 600, depthMm: 600, name: "Hob" };
+    case "sink": return { widthMm: 1200, depthMm: 600 };
+    case "toilet": return { widthMm: 400, depthMm: 700 };
+    case "shower": return { widthMm: 800, depthMm: 800 };
+    case "bath": return { widthMm: 700, depthMm: 1600 };
+    case "basin": return { widthMm: 500, depthMm: 400 };
+    case "desk": return { widthMm: 1200, depthMm: 900 };
+  }
+}
+
+function resolveDefaultUnitOrigin(room: Room, options?: InteriorAssetDefaultOptions): UnitOrigin {
+  return normalizeUnitOrigin(options?.unitOrigin ?? room.unitOrigin);
+}
 
 export type RoomInteriorAssetBounds = {
   left: number;
@@ -39,6 +101,7 @@ export type InteriorAssetResizeCorner = RectCorner;
 export function cloneRoomInteriorAsset(asset: RoomInteriorAsset): RoomInteriorAsset {
   const base: RoomInteriorAsset = {
     id: asset.id,
+    unitOrigin: normalizeUnitOrigin(asset.unitOrigin),
     type: asset.type,
     name: asset.name ?? DEFAULT_STAIR_NAME,
     xMm: asset.xMm,
@@ -101,6 +164,7 @@ export function areRoomInteriorAssetsEqual(
     const assetB = b[index];
     if (
       assetA.id !== assetB.id ||
+      normalizeUnitOrigin(assetA.unitOrigin) !== normalizeUnitOrigin(assetB.unitOrigin) ||
       assetA.type !== assetB.type ||
       (assetA.connectionId ?? null) !== (assetB.connectionId ?? null) ||
       assetA.name !== assetB.name ||
@@ -160,23 +224,37 @@ export function isInteriorAssetWithinRoom(room: Room, asset: RoomInteriorAsset):
   );
 }
 
-export function canPlaceDefaultStairInRoom(room: Room): boolean {
-  return findDefaultStairPlacement(room) !== null;
+export function canPlaceDefaultStairInRoom(
+  room: Room,
+  options?: InteriorAssetDefaultOptions
+): boolean {
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  return findDefaultStairPlacement(
+    room,
+    getInteriorAssetDefaultDimensions("stairs", unitOrigin)
+  ) !== null;
 }
 
-export function createCenteredDefaultStair(room: Room, id: string): RoomInteriorAsset | null {
-  const center = findDefaultStairPlacement(room);
+export function createCenteredDefaultStair(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("stairs", unitOrigin);
+  const center = findDefaultStairPlacement(room, dimensions);
   if (!center) return null;
 
   return {
     id,
+    unitOrigin,
     type: "stairs",
     connectionId: null,
     name: DEFAULT_STAIR_NAME,
     xMm: center.x,
     yMm: center.y,
-    widthMm: DEFAULT_STAIR_WIDTH_MM,
-    depthMm: DEFAULT_STAIR_DEPTH_MM,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
     arrowEnabled: DEFAULT_STAIR_ARROW_ENABLED,
@@ -189,9 +267,15 @@ export function createCenteredDefaultStair(room: Room, id: string): RoomInterior
  * Create a centered default bed in the given room.
  * Standard double bed dimensions: 1350mm × 1900mm
  */
-export function createCenteredDefaultBed(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultBed(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("bed", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -200,12 +284,13 @@ export function createCenteredDefaultBed(room: Room, id: string): RoomInteriorAs
 
   return {
     id,
+    unitOrigin,
     type: "bed",
     name: "Bed",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 1350, // Double bed width
-    depthMm: 1900, // Double bed depth
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -215,9 +300,15 @@ export function createCenteredDefaultBed(room: Room, id: string): RoomInteriorAs
  * Create a centered default sofa in the given room.
  * Standard 3-seater sofa dimensions: 2000mm × 900mm
  */
-export function createCenteredDefaultSofa(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultSofa(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("sofa", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -226,12 +317,13 @@ export function createCenteredDefaultSofa(room: Room, id: string): RoomInteriorA
 
   return {
     id,
+    unitOrigin,
     type: "sofa",
-    name: "Sofa",
+    name: dimensions.name ?? "Sofa",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 2000, // 3-seater width
-    depthMm: 900, // Standard depth
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -241,9 +333,15 @@ export function createCenteredDefaultSofa(room: Room, id: string): RoomInteriorA
  * Create a centered default wardrobe in the given room.
  * Standard wardrobe dimensions: 1600mm × 600mm with swing doors
  */
-export function createCenteredDefaultWardrobe(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultWardrobe(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("wardrobe", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -252,16 +350,17 @@ export function createCenteredDefaultWardrobe(room: Room, id: string): RoomInter
 
   return {
     id,
+    unitOrigin,
     type: "wardrobe",
-    name: "Wardrobe",
+    name: dimensions.name ?? "Wardrobe",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 1600,
-    depthMm: 600,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
     doorType: "swing",
-    doorConstraint: 800,
+    doorConstraint: dimensions.doorConstraint,
   };
 }
 
@@ -269,9 +368,15 @@ export function createCenteredDefaultWardrobe(room: Room, id: string): RoomInter
  * Create a centered default dining table in the given room.
  * Standard rectangular dining table: 1600mm × 900mm
  */
-export function createCenteredDefaultDiningTable(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultDiningTable(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("dining-table", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -280,12 +385,13 @@ export function createCenteredDefaultDiningTable(room: Room, id: string): RoomIn
 
   return {
     id,
+    unitOrigin,
     type: "dining-table",
-    name: "Table",
+    name: dimensions.name ?? "Table",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 1600,
-    depthMm: 900,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
     shape: "rectangular",
@@ -296,9 +402,15 @@ export function createCenteredDefaultDiningTable(room: Room, id: string): RoomIn
  * Create a centered default kitchen unit in the given room.
  * Standard kitchen unit dimensions: 900mm × 600mm
  */
-export function createCenteredDefaultKitchenUnit(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultKitchenUnit(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("kitchen-unit", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -307,12 +419,13 @@ export function createCenteredDefaultKitchenUnit(room: Room, id: string): RoomIn
 
   return {
     id,
+    unitOrigin,
     type: "kitchen-unit",
-    name: "Kitchen unit",
+    name: dimensions.name ?? "Kitchen unit",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 600,
-    depthMm: 600,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -322,9 +435,15 @@ export function createCenteredDefaultKitchenUnit(room: Room, id: string): RoomIn
  * Create a centered default kitchen appliance in the given room.
  * Standard kitchen appliance dimensions: 600mm × 600mm
  */
-export function createCenteredDefaultKitchenAppliance(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultKitchenAppliance(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("kitchen-appliance", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -333,12 +452,13 @@ export function createCenteredDefaultKitchenAppliance(room: Room, id: string): R
 
   return {
     id,
+    unitOrigin,
     type: "kitchen-appliance",
-    name: "Kitchen appliance",
+    name: dimensions.name ?? "Kitchen appliance",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 600,
-    depthMm: 600,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
@@ -348,9 +468,15 @@ export function createCenteredDefaultKitchenAppliance(room: Room, id: string): R
  * Create a centered default hob in the given room.
  * Standard 4-burner hob dimensions: 600mm × 600mm
  */
-export function createCenteredDefaultHob(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultHob(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("hob", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -359,12 +485,13 @@ export function createCenteredDefaultHob(room: Room, id: string): RoomInteriorAs
 
   return {
     id,
+    unitOrigin,
     type: "hob",
-    name: "Hob",
+    name: dimensions.name ?? "Hob",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 600,
-    depthMm: 600,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
     burnerCount: 4,
@@ -375,9 +502,15 @@ export function createCenteredDefaultHob(room: Room, id: string): RoomInteriorAs
  * Create a centered default sink in the given room.
  * Standard single bowl sink dimensions: 600mm × 600mm
  */
-export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultSink(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("sink", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -386,12 +519,13 @@ export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorA
 
   return {
     id,
+    unitOrigin,
     type: "sink",
-    name: "Sink",
+    name: dimensions.name ?? "Sink",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 1200,
-    depthMm: 600,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
     bowlType: "single",
@@ -404,9 +538,15 @@ export function createCenteredDefaultSink(room: Room, id: string): RoomInteriorA
  * Create a centered default toilet in the given room.
  * Standard toilet dimensions: 400mm × 700mm
  */
-export function createCenteredDefaultToilet(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultToilet(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("toilet", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -415,20 +555,27 @@ export function createCenteredDefaultToilet(room: Room, id: string): RoomInterio
 
   return {
     id,
+    unitOrigin,
     type: "toilet",
     name: "Toilet",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 400,
-    depthMm: 700,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
 }
 
-export function createCenteredDefaultShower(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultShower(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("shower", unitOrigin);
 
   const center = {
     x: (roomBounds.minX + roomBounds.maxX) / 2,
@@ -437,24 +584,31 @@ export function createCenteredDefaultShower(room: Room, id: string): RoomInterio
 
   return {
     id,
+    unitOrigin,
     type: "shower",
     name: "Shower",
     xMm: center.x,
     yMm: center.y,
-    widthMm: 800,
-    depthMm: 800,
+    widthMm: dimensions.widthMm,
+    depthMm: dimensions.depthMm,
     rotationDegrees: 0,
     anchor: "floor",
   };
 }
 
-export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultBath(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("bath", unitOrigin);
 
   // Bath dimensions
-  const widthMm = 700;
-  const depthMm = 1600;
+  const widthMm = dimensions.widthMm;
+  const depthMm = dimensions.depthMm;
 
   // Calculate room center
   const roomCenter = {
@@ -479,8 +633,9 @@ export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorA
 
   return {
     id,
+    unitOrigin,
     type: "bath",
-    name: "Bath",
+    name: dimensions.name ?? "Bath",
     xMm: center.x,
     yMm: center.y,
     widthMm,
@@ -490,13 +645,19 @@ export function createCenteredDefaultBath(room: Room, id: string): RoomInteriorA
   };
 }
 
-export function createCenteredDefaultBasin(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultBasin(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("basin", unitOrigin);
 
   // Basin dimensions
-  const widthMm = 500;
-  const depthMm = 400;
+  const widthMm = dimensions.widthMm;
+  const depthMm = dimensions.depthMm;
 
   // Calculate room center
   const roomCenter = {
@@ -510,8 +671,9 @@ export function createCenteredDefaultBasin(room: Room, id: string): RoomInterior
 
   return {
     id,
+    unitOrigin,
     type: "basin",
-    name: "Basin",
+    name: dimensions.name ?? "Basin",
     xMm: centerX,
     yMm: centerY,
     widthMm,
@@ -521,13 +683,19 @@ export function createCenteredDefaultBasin(room: Room, id: string): RoomInterior
   };
 }
 
-export function createCenteredDefaultDesk(room: Room, id: string): RoomInteriorAsset | null {
+export function createCenteredDefaultDesk(
+  room: Room,
+  id: string,
+  options?: InteriorAssetDefaultOptions
+): RoomInteriorAsset | null {
   const roomBounds = getPolygonBounds(room.points);
   if (!roomBounds) return null;
+  const unitOrigin = resolveDefaultUnitOrigin(room, options);
+  const dimensions = getInteriorAssetDefaultDimensions("desk", unitOrigin);
 
   // Desk dimensions: 1200×600 rectangle + 300mm radius semicircle = 1200×900 total
-  const widthMm = 1200;
-  const depthMm = 900;
+  const widthMm = dimensions.widthMm;
+  const depthMm = dimensions.depthMm;
 
   // Calculate room center
   const roomCenter = {
@@ -541,6 +709,7 @@ export function createCenteredDefaultDesk(room: Room, id: string): RoomInteriorA
 
   return {
     id,
+    unitOrigin,
     type: "desk",
     name: "Desk",
     xMm: centerX,
@@ -826,12 +995,15 @@ export function getResizedStairForCornerDrag(
   return getConstrainedResizedStair(room, asset, nextBounds);
 }
 
-function findDefaultStairPlacement(room: Room): Point | null {
+function findDefaultStairPlacement(
+  room: Room,
+  dimensions = getInteriorAssetDefaultDimensions("stairs", normalizeUnitOrigin(room.unitOrigin))
+): Point | null {
   const anchor = getRoomInteriorAssetAnchor(room);
   return findConstrainedInteriorAssetCenter(
     room,
-    DEFAULT_STAIR_WIDTH_MM,
-    DEFAULT_STAIR_DEPTH_MM,
+    dimensions.widthMm,
+    dimensions.depthMm,
     anchor
   );
 }
@@ -1131,21 +1303,25 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export function getInteriorAssetDisplayName(type: RoomInteriorAsset["type"]): string {
+export function getInteriorAssetDisplayName(
+  type: RoomInteriorAsset["type"],
+  unitOrigin?: UnitOrigin
+): string {
+  const normalizedUnitOrigin = normalizeUnitOrigin(unitOrigin);
   switch (type) {
     case "stairs": return "Stairs";
     case "bed": return "Bed";
-    case "sofa": return "Sofa";
-    case "wardrobe": return "Wardrobe";
+    case "sofa": return normalizedUnitOrigin === "imperial" ? "Couch" : "Sofa";
+    case "wardrobe": return normalizedUnitOrigin === "imperial" ? "Closet" : "Wardrobe";
     case "dining-table": return "Table";
-    case "kitchen-unit": return "Kitchen unit";
-    case "kitchen-appliance": return "Kitchen appliance";
-    case "hob": return "Hob";
-    case "sink": return "Sink";
+    case "kitchen-unit": return normalizedUnitOrigin === "imperial" ? "Base cabinet" : "Kitchen unit";
+    case "kitchen-appliance": return normalizedUnitOrigin === "imperial" ? "Appliance" : "Kitchen appliance";
+    case "hob": return normalizedUnitOrigin === "imperial" ? "Stove top" : "Hob";
+    case "sink": return normalizedUnitOrigin === "imperial" ? "Kitchen sink" : "Sink";
     case "toilet": return "Toilet";
     case "shower": return "Shower";
-    case "bath": return "Bath";
-    case "basin": return "Basin";
+    case "bath": return normalizedUnitOrigin === "imperial" ? "Bathtub" : "Bath";
+    case "basin": return normalizedUnitOrigin === "imperial" ? "Bathroom sink" : "Basin";
     case "desk": return "Desk";
   }
 }

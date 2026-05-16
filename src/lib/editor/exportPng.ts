@@ -19,9 +19,11 @@ import type {
   EditorExportResolution,
 } from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { Floor, Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
+import type { UnitOrigin } from "@/lib/projects/region";
 
 export type EditorExportScope = {
   type: "floor" | "room";
@@ -156,6 +158,7 @@ export type SvgExportOptions = {
   legendPosition?: "bottom" | "right-side";
   signatureText?: string;
   signatureLines?: string[];
+  displayUnitOrigin?: UnitOrigin;
 };
 
 export type SvgPdfExportMetadata = {
@@ -242,6 +245,7 @@ export function exportToSVG({
   legendPosition,
   signatureText,
   signatureLines,
+  displayUnitOrigin,
 }: SvgExportOptions): string {
   const exportRooms = exportScope
     ? getRoomsForEditorExportScope({ rooms, floors, activeFloorId }, exportScope)
@@ -417,7 +421,13 @@ export function exportToSVG({
   elements.push(...roomElements, ...assetElements, ...openingElements, ...labelElements);
 
   const bottomLeftStartY = exportHeight - SVG_EXPORT_PADDING_PX - bottomLeftHeight;
-  const scaleBar = buildSvgScaleBar(scale, exportHeight, formatNumber, bottomLeftStartY);
+  const scaleBar = buildSvgScaleBar(
+    scale,
+    exportHeight,
+    formatNumber,
+    bottomLeftStartY,
+    displayUnitOrigin
+  );
 
   const northIndicator = buildSvgNorthIndicator(northBearingDegrees, exportWidth, formatNumber);
   if (northIndicator) {
@@ -736,7 +746,8 @@ function buildSvgScaleBar(
   scale: number,
   exportHeight: number,
   formatNumber: (value: number) => string,
-  startY?: number
+  startY?: number,
+  displayUnitOrigin?: UnitOrigin
 ): string | null {
   const niceLengthsMm = [100, 250, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000];
   const targetLengthMm = 180 / scale;
@@ -749,7 +760,7 @@ function buildSvgScaleBar(
   const widthPx = lengthMm * scale;
   const x = SVG_EXPORT_PADDING_PX;
   const y = startY === undefined ? exportHeight - SVG_EXPORT_PADDING_PX + 14 : startY + 14;
-  const label = lengthMm >= 1_000 ? `${formatNumber(lengthMm / 1_000)} m` : `${lengthMm} mm`;
+  const label = formatWallDimension(lengthMm, displayUnitOrigin);
 
   return [
     `<g aria-label="Scale bar">`,

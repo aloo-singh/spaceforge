@@ -7,6 +7,17 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.79.0",
+    date: "2026-05-16",
+    title: "Metric and imperial project support",
+    items: [
+      "New projects can now start in either Metric or Imperial, with a first-run choice and a clearer setting for changing the project region later.",
+      "Plans keep their internal precision while showing measurements in the project’s chosen units, including room sizes, rulers, areas, and inspector dimensions.",
+      "New rooms, openings, rulers, and furniture remember whether they began as metric or imperial, with calm inspector badges and an optional Pro highlight mode.",
+      "This release also includes the recent kitchen and furniture polish: 5-burner hobs, clearer asset grouping, improved basin and bath details, and more legible appliance hatching.",
+    ],
+  },
+  {
     version: "v0.78.14",
     date: "2026-05-14",
     title: "New Desk asset with attached chair",

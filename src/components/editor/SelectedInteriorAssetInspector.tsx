@@ -12,14 +12,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 
 import { 
+  getInteriorAssetDisplayName,
   getRotatedInteriorAssetForRoom,
   getStairRunLengthMm,
   DEFAULT_STAIR_TREAD_SPACING_MM,
 } from "@/lib/editor/interiorAssets";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
-import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import type { InteriorAssetType, RoomInteriorAsset } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 
@@ -51,32 +53,36 @@ function InspectorIconTooltip({
   );
 }
 
-function assetInspectorMeta(type: InteriorAssetType): { title: string; description: string } {
+function assetInspectorMeta(
+  type: InteriorAssetType,
+  unitOrigin: RoomInteriorAsset["unitOrigin"]
+): { title: string; description: string } {
+  const label = getInteriorAssetDisplayName(type, unitOrigin).toLowerCase();
   switch (type) {
     case "bed":
       return { title: "Selected bed", description: "Adjust the bed's position, size, and orientation." };
     case "sofa":
-      return { title: "Selected sofa", description: "Adjust the sofa's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "wardrobe":
-      return { title: "Selected wardrobe", description: "Adjust the wardrobe's dimensions, door type, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s dimensions, door type, and orientation.` };
     case "dining-table":
-      return { title: "Selected table", description: "Adjust the table's shape, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s shape, size, and orientation.` };
     case "kitchen-unit":
-      return { title: "Selected kitchen unit", description: "Adjust the kitchen unit's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "kitchen-appliance":
-      return { title: "Selected kitchen appliance", description: "Adjust the kitchen appliance's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "hob":
-      return { title: "Selected hob", description: "Adjust the hob's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "sink":
-      return { title: "Selected sink", description: "Adjust the sink's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "toilet":
       return { title: "Selected toilet", description: "Adjust the toilet's position, size, and orientation." };
     case "shower":
       return { title: "Selected shower", description: "Adjust the shower's position, size, and orientation." };
     case "bath":
-      return { title: "Selected bath", description: "Adjust the bath's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "basin":
-      return { title: "Selected basin", description: "Adjust the basin's position, size, and orientation." };
+      return { title: `Selected ${label}`, description: `Adjust the ${label}'s position, size, and orientation.` };
     case "desk":
       return { title: "Selected desk", description: "Adjust the desk's position, size, and orientation." };
     case "stairs":
@@ -89,6 +95,7 @@ function FurnitureInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   
   const startInteriorAssetRenameSession = useEditorStore((state) => state.startInteriorAssetRenameSession);
   const updateInteriorAssetRenameDraft = useEditorStore((state) => state.updateInteriorAssetRenameDraft);
@@ -122,7 +129,7 @@ function FurnitureInspector({
 
   const selectedAssetRoomId = selectedInteriorAsset?.roomId ?? null;
   const selectedAssetId = selectedInteriorAsset?.assetId ?? null;
-  const { title, description } = assetInspectorMeta(asset.type);
+  const { title, description } = assetInspectorMeta(asset.type, asset.unitOrigin);
 
   return (
     <EditorInspectorSection title={title} description={description} className={className}>
@@ -167,9 +174,13 @@ function FurnitureInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Dimensions</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={asset.unitOrigin} />
+          </div>
           <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-            {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+            {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}
+            {formatWallDimension(asset.depthMm, displayUnitOrigin)}
           </div>
         </div>
 
@@ -512,6 +523,7 @@ function StairsInspector({
   className,
 }: SelectedInteriorAssetInspectorProps) {
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   const startInteriorAssetRenameSession = useEditorStore(
     (state) => state.startInteriorAssetRenameSession
   );
@@ -639,10 +651,14 @@ function StairsInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Dimensions</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={asset.unitOrigin} />
+          </div>
           <div className="space-y-2">
             <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
-              {formatMetricWallDimension(asset.widthMm)} × {formatMetricWallDimension(asset.depthMm)}
+              {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}
+              {formatWallDimension(asset.depthMm, displayUnitOrigin)}
             </div>
             <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
               {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM)} {Math.floor(getStairRunLengthMm(asset) / DEFAULT_STAIR_TREAD_SPACING_MM) === 1 ? "stair" : "stairs"}

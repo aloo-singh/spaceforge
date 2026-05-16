@@ -7,6 +7,7 @@ import {
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -14,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { RoomOpening } from "@/lib/editor/types";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import { useEditorStore } from "@/stores/editorStore";
 
 type SelectedOpeningInspectorProps = {
@@ -58,6 +60,7 @@ export function SelectedOpeningInspector({
 }: SelectedOpeningInspectorProps) {
   const floors = useEditorStore((state) => state.document.floors);
   const rooms = useEditorStore((state) => state.document.rooms);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   const selection = useEditorStore((state) => state.selection);
   const updateSelectedOpeningWidth = useEditorStore((state) => state.updateSelectedOpeningWidth);
   const updateSelectedDoorOpeningSide = useEditorStore(
@@ -96,9 +99,18 @@ export function SelectedOpeningInspector({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="opening-width-input" className="text-sm font-medium">
-            Width (mm)
-          </label>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={opening.unitOrigin} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="opening-width-input" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Width
+            </label>
+            <span className="font-mono text-xs text-muted-foreground">
+              {formatWallDimension(opening.widthMm, displayUnitOrigin)}
+            </span>
+          </div>
           <Input
             id="opening-width-input"
             key={`${opening.id}-${opening.widthMm}`}

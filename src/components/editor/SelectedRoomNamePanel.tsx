@@ -9,18 +9,20 @@ import { Toggle } from "@/components/ui/toggle";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import {
   ImmediateTooltipProvider,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import { getPolygonBounds } from "@/lib/editor/roomGeometry";
 import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
+import type { UnitOrigin } from "@/lib/projects/region";
 
 type SelectedRoomNamePanelProps = {
   className?: string;
@@ -45,7 +47,13 @@ function InspectorIconTooltip({
   );
 }
 
-function RoomDimensionsDisplay({ room }: { room: Room }) {
+function RoomDimensionsDisplay({
+  room,
+  displayUnitOrigin,
+}: {
+  room: Room;
+  displayUnitOrigin?: UnitOrigin;
+}) {
   const bounds = getPolygonBounds(room.points);
   if (!bounds) return null;
 
@@ -54,15 +62,18 @@ function RoomDimensionsDisplay({ room }: { room: Room }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="text-sm font-medium">Dimensions</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">Dimensions</p>
+        <UnitOriginTag unitOrigin={room.unitOrigin} />
+      </div>
       <div className="space-y-2">
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure2 className="size-4 shrink-0" />
-          <span>{formatMetricWallDimension(length)}</span>
+          <span>{formatWallDimension(length, displayUnitOrigin)}</span>
         </div>
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure className="size-4 shrink-0" />
-          <span>{formatMetricWallDimension(width)}</span>
+          <span>{formatWallDimension(width, displayUnitOrigin)}</span>
         </div>
       </div>
     </div>
@@ -79,6 +90,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
     (state) => state.shouldFocusSelectedRoomNameInput
   );
   const rooms = useEditorStore((state) => state.document.rooms);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   const selectedOpening = useEditorStore((state) => state.selectedOpening);
   const selectedInteriorAsset = useEditorStore((state) => state.selectedInteriorAsset);
   const isCanvasInteractionActive = useEditorStore((state) => state.isCanvasInteractionActive);
@@ -288,7 +300,7 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
             </p>
           ) : null}
           <div className="mt-4">
-            <RoomDimensionsDisplay room={selectedRoom} />
+            <RoomDimensionsDisplay room={selectedRoom} displayUnitOrigin={displayUnitOrigin} />
           </div>
           <div className="mt-4 flex justify-between gap-2">
             <ImmediateTooltipProvider>

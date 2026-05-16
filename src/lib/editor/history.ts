@@ -14,6 +14,13 @@ import {
   DEFAULT_PROJECT_EXPORT_CONFIG,
   type ProjectExportConfig,
 } from "@/lib/projects/exportConfig";
+import {
+  DEFAULT_PROJECT_REGION,
+  normalizeProjectRegion,
+  normalizeUnitOrigin,
+  type ProjectRegion,
+  type UnitOrigin,
+} from "@/lib/projects/region";
 
 export const DEFAULT_FLOOR_ID = "floor-1";
 export const DEFAULT_FLOOR_NAME = "Floor 1";
@@ -66,6 +73,7 @@ export function getRoomsForActiveFloor(document: EditorDocumentState): Room[] {
 }
 
 export type EditorDocumentState = {
+  region: ProjectRegion;
   floors: Floor[];
   activeFloorId: string | null;
   rooms: Room[];
@@ -147,6 +155,8 @@ export type EditorCommand =
       nextPoints: Room["points"];
       editKind?: "wall-split" | "vertex-delete";
       roomName?: string;
+      previousUnitOrigin?: UnitOrigin;
+      nextUnitOrigin?: UnitOrigin;
       previousInteriorAssets?: RoomInteriorAsset[];
       nextInteriorAssets?: RoomInteriorAsset[];
     }
@@ -155,6 +165,8 @@ export type EditorCommand =
       roomId: string;
       previousPoints: Room["points"];
       nextPoints: Room["points"];
+      previousUnitOrigin?: UnitOrigin;
+      nextUnitOrigin?: UnitOrigin;
     }
   | {
       type: "bulk-move-rooms";
@@ -194,6 +206,8 @@ export type EditorCommand =
       openingType: "door" | "window";
       previousOffsetMm: number;
       nextOffsetMm: number;
+      previousUnitOrigin?: UnitOrigin;
+      nextUnitOrigin?: UnitOrigin;
     }
   | {
       type: "bulk-move-openings";
@@ -216,6 +230,8 @@ export type EditorCommand =
       previousYmm: number;
       nextXmm: number;
       nextYmm: number;
+      previousUnitOrigin?: UnitOrigin;
+      nextUnitOrigin?: UnitOrigin;
     }
   | {
       type: "update-interior-asset";
@@ -324,6 +340,8 @@ export type EditorCommand =
         previousYmm: number;
         nextXmm: number;
         nextYmm: number;
+        previousUnitOrigin?: UnitOrigin;
+        nextUnitOrigin?: UnitOrigin;
       }>;
     }
   | {
@@ -474,7 +492,16 @@ export function applyEditorCommand(
 
     return {
       ...document,
-      rooms: [...document.rooms.filter((room) => room.id !== command.room.id), command.room],
+      rooms: [
+        ...document.rooms.filter((room) => room.id !== command.room.id),
+        {
+          ...command.room,
+          unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
+          points: command.room.points.map((point) => ({ ...point })),
+          openings: cloneRoomOpenings(command.room.openings),
+          interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
+        },
+      ],
     };
   }
 
@@ -505,6 +532,7 @@ export function applyEditorCommand(
       const nextRooms = [...roomsWithoutDeletedRoom];
       nextRooms.splice(command.previousIndex, 0, {
         id: command.room.id,
+        unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
         floorId: command.room.floorId,
         name: command.room.name,
         points: command.room.points.map((point) => ({ ...point })),
@@ -526,6 +554,8 @@ export function applyEditorCommand(
 
   if (command.type === "resize-room") {
     const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
+    const commandUnitOrigin =
+      direction === "undo" ? command.previousUnitOrigin : command.nextUnitOrigin;
     const nextInteriorAssets =
       direction === "undo"
         ? command.previousInteriorAssets
@@ -536,6 +566,7 @@ export function applyEditorCommand(
         room.id === command.roomId
           ? {
               ...room,
+              unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
               points: nextPoints.map((point) => ({ ...point })),
               interiorAssets: nextInteriorAssets
                 ? cloneRoomInteriorAssets(nextInteriorAssets)
@@ -549,6 +580,8 @@ export function applyEditorCommand(
   if (command.type === "move-room") {
     const nextPoints = direction === "undo" ? command.previousPoints : command.nextPoints;
     const previousPoints = direction === "undo" ? command.nextPoints : command.previousPoints;
+    const commandUnitOrigin =
+      direction === "undo" ? command.previousUnitOrigin : command.nextUnitOrigin;
     const delta = getTranslationDelta(previousPoints, nextPoints);
     return {
       ...document,
@@ -556,6 +589,7 @@ export function applyEditorCommand(
         room.id === command.roomId
           ? {
               ...room,
+              unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
               points: nextPoints.map((point) => ({ ...point })),
               interiorAssets: room.interiorAssets.map((asset) => ({
                 ...cloneRoomInteriorAsset(asset),
@@ -651,6 +685,8 @@ export function applyEditorCommand(
   if (command.type === "move-opening") {
     const nextOffsetMm =
       direction === "undo" ? command.previousOffsetMm : command.nextOffsetMm;
+    const commandUnitOrigin =
+      direction === "undo" ? command.previousUnitOrigin : command.nextUnitOrigin;
 
     return {
       ...document,
@@ -663,6 +699,7 @@ export function applyEditorCommand(
             opening.id === command.openingId
               ? {
                   ...opening,
+                  unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? opening.unitOrigin),
                   offsetMm: nextOffsetMm,
                 }
               : opening
@@ -675,6 +712,8 @@ export function applyEditorCommand(
   if (command.type === "move-interior-asset") {
     const nextXmm = direction === "undo" ? command.previousXmm : command.nextXmm;
     const nextYmm = direction === "undo" ? command.previousYmm : command.nextYmm;
+    const commandUnitOrigin =
+      direction === "undo" ? command.previousUnitOrigin : command.nextUnitOrigin;
 
     return {
       ...document,
@@ -687,6 +726,7 @@ export function applyEditorCommand(
             asset.id === command.assetId
               ? {
                   ...asset,
+                  unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? asset.unitOrigin),
                   xMm: nextXmm,
                   yMm: nextYmm,
                 }
@@ -1092,9 +1132,12 @@ export function applyEditorCommand(
 
           const nextXmm = direction === "undo" ? moveCmd.previousXmm : moveCmd.nextXmm;
           const nextYmm = direction === "undo" ? moveCmd.previousYmm : moveCmd.nextYmm;
+          const commandUnitOrigin =
+            direction === "undo" ? moveCmd.previousUnitOrigin : moveCmd.nextUnitOrigin;
 
           return {
             ...asset,
+            unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? asset.unitOrigin),
             xMm: nextXmm,
             yMm: nextYmm,
           };
@@ -1227,6 +1270,7 @@ export function applyEditorCommand(
 
 export function createEmptyEditorDocumentState(): EditorDocumentState {
   return {
+    region: DEFAULT_PROJECT_REGION,
     floors: [createDefaultFloor()],
     activeFloorId: DEFAULT_FLOOR_ID,
     rooms: [],
@@ -1239,10 +1283,12 @@ export function createEmptyEditorDocumentState(): EditorDocumentState {
 
 function cloneEditorDocumentState(document: EditorDocumentState): EditorDocumentState {
   return {
+    region: normalizeProjectRegion(document.region),
     floors: getNormalizedFloors(document),
     activeFloorId: getNormalizedActiveFloorId(document),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
@@ -1259,6 +1305,7 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
 export function cloneRulerMeasurement(ruler: RulerMeasurement): RulerMeasurement {
   return {
     id: ruler.id,
+    unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
     ...(ruler.name !== undefined ? { name: ruler.name } : {}),
     start: { ...ruler.start },
     end: { ...ruler.end },

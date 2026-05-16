@@ -15,6 +15,7 @@ export type EditorSettings = {
   showRoomNames: boolean;
   showAssets: boolean;
   showAssetLabels: boolean;
+  showUnitOriginHighlights: boolean;
   showGuidelines: boolean;
   snappingEnabled: boolean;
   showFloorFootprint: boolean;
@@ -34,6 +35,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showRoomNames: true,
   showAssets: true,
   showAssetLabels: true,
+  showUnitOriginHighlights: false,
   showGuidelines: true,
   snappingEnabled: true,
   showFloorFootprint: true,
@@ -54,6 +56,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showRoomNames: settings.showRoomNames,
     showAssets: settings.showAssets,
     showAssetLabels: settings.showAssetLabels,
+    showUnitOriginHighlights: settings.showUnitOriginHighlights,
     showGuidelines: settings.showGuidelines,
     snappingEnabled: settings.snappingEnabled,
     showFloorFootprint: settings.showFloorFootprint,
@@ -75,6 +78,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showRoomNames === b.showRoomNames &&
     a.showAssets === b.showAssets &&
     a.showAssetLabels === b.showAssetLabels &&
+    a.showUnitOriginHighlights === b.showUnitOriginHighlights &&
     a.showGuidelines === b.showGuidelines &&
     a.snappingEnabled === b.snappingEnabled &&
     a.showFloorFootprint === b.showFloorFootprint &&
@@ -169,6 +173,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showAssetLabels" in value && typeof value.showAssetLabels === "boolean"
         ? value.showAssetLabels
         : DEFAULT_EDITOR_SETTINGS.showAssetLabels,
+    showUnitOriginHighlights:
+      "showUnitOriginHighlights" in value && typeof value.showUnitOriginHighlights === "boolean"
+        ? value.showUnitOriginHighlights
+        : DEFAULT_EDITOR_SETTINGS.showUnitOriginHighlights,
     showGuidelines:
       "showGuidelines" in value && typeof value.showGuidelines === "boolean"
         ? value.showGuidelines

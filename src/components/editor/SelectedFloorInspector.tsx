@@ -12,13 +12,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatMetricWallDimension } from "@/lib/editor/measurements";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import { getPolygonBounds } from "@/lib/editor/roomGeometry";
 import { getRoomsForFloor } from "@/lib/editor/history";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
 import { cn } from "@/lib/utils";
 import type { Room, SharedSelectionItem } from "@/lib/editor/types";
+import type { UnitOrigin } from "@/lib/projects/region";
 
 type SelectedFloorInspectorProps = {
   className?: string;
@@ -43,7 +44,13 @@ function InspectorIconTooltip({
   );
 }
 
-function FloorDimensionsDisplay({ rooms }: { rooms: Room[] }) {
+function FloorDimensionsDisplay({
+  rooms,
+  displayUnitOrigin,
+}: {
+  rooms: Room[];
+  displayUnitOrigin?: UnitOrigin;
+}) {
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -76,11 +83,11 @@ function FloorDimensionsDisplay({ rooms }: { rooms: Room[] }) {
       <div className="space-y-2">
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure2 className="size-4 shrink-0" />
-          <span>{formatMetricWallDimension(length)}</span>
+          <span>{formatWallDimension(length, displayUnitOrigin)}</span>
         </div>
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure className="size-4 shrink-0" />
-          <span>{formatMetricWallDimension(width)}</span>
+          <span>{formatWallDimension(width, displayUnitOrigin)}</span>
         </div>
       </div>
     </div>
@@ -93,6 +100,7 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
   const [isCompactLandscapeViewport, setIsCompactLandscapeViewport] = useState(false);
   const editorDocument = useEditorStore((state) => state.document);
   const floors = editorDocument.floors;
+  const displayUnitOrigin = editorDocument.region;
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -225,7 +233,10 @@ export function SelectedFloorInspector({ className }: SelectedFloorInspectorProp
           ) : null}
           {selectedFloorRooms.length > 0 ? (
             <div className="mt-4">
-              <FloorDimensionsDisplay rooms={selectedFloorRooms} />
+              <FloorDimensionsDisplay
+                rooms={selectedFloorRooms}
+                displayUnitOrigin={displayUnitOrigin}
+              />
             </div>
           ) : null}
           <div className="mt-4 flex justify-end">

@@ -1,9 +1,12 @@
 "use client";
 
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
+import { formatWallDimension } from "@/lib/editor/measurements";
 import type { Room, RoomWall } from "@/lib/editor/types";
 import { getRoomWallSegment } from "@/lib/editor/openings";
 import { getWallLabel } from "@/lib/editor/breadcrumbs";
+import { useEditorStore } from "@/stores/editorStore";
 
 type SelectedWallInspectorProps = {
   room: Room;
@@ -17,13 +20,13 @@ export function SelectedWallInspector({
   className,
 }: SelectedWallInspectorProps) {
   const wallSegment = getRoomWallSegment(room, wall);
+  const displayUnitOrigin = useEditorStore((state) => state.document.region);
   
   if (!wallSegment) {
     return null;
   }
 
   const wallName = getWallLabel(room, wall);
-  const lengthM = (wallSegment.lengthMm / 1000).toFixed(2);
   
   // Count doors and windows on this wall
   const doorsAndWindows = room.openings.filter((opening) => opening.wall === wall);
@@ -44,11 +47,14 @@ export function SelectedWallInspector({
           <p className="mt-2 text-sm font-medium text-foreground">{wallName}</p>
         </div>
 
-        <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
-            Length
-          </label>
-          <p className="mt-2 text-sm font-medium text-foreground">{lengthM} m</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={wallSegment.unitOrigin} />
+          </div>
+          <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+            {formatWallDimension(wallSegment.lengthMm, displayUnitOrigin)}
+          </div>
         </div>
 
         <div>

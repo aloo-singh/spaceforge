@@ -119,6 +119,7 @@ import {
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
 import { ConnectedFloorPromptToast } from "@/components/editor/ConnectedFloorPromptToast";
 import type {
@@ -271,6 +272,7 @@ type EditorState = {
   updateSettings: (settings: Partial<EditorSettings>) => void;
   setKeyboardShortcutFeedbackEnabled: (isEnabled: boolean) => void;
   updateExportPreferences: (preferences: Partial<EditorExportPreferences>) => void;
+  updateProjectRegion: (region: ProjectRegion) => void;
   updateProjectExportConfig: (config: Partial<DocumentState["exportConfig"]>) => void;
   selectNorthIndicator: () => void;
   clearNorthIndicatorSelection: () => void;
@@ -775,6 +777,7 @@ function buildConnectedFloorDocument(
       : [...document.floors, createdFloor];
   const connectedRoom: Room = {
     id: createdRoomId,
+    unitOrigin: getDocumentUnitOrigin(document),
     floorId: createdFloorId,
     name: room.name,
     points: room.points.map((point) => ({ ...point })),
@@ -783,6 +786,7 @@ function buildConnectedFloorDocument(
       {
         ...cloneRoomInteriorAsset(asset),
         id: createdAssetId,
+        unitOrigin: getDocumentUnitOrigin(document),
         connectionId,
         arrowEnabled: true,
         arrowLabel: connectedArrowLabel,
@@ -824,12 +828,17 @@ function buildConnectedFloorDocument(
 function cloneRoom(room: Room): Room {
   return {
     id: room.id,
+    unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId,
     name: room.name,
     points: room.points.map((point) => ({ ...point })),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
   };
+}
+
+function getDocumentUnitOrigin(document: Pick<DocumentState, "region">) {
+  return normalizeUnitOrigin(document.region);
 }
 
 function getDuplicatedInteriorAssetCenter(
@@ -989,7 +998,8 @@ function updateInteriorAssetNameInDocument(
 function updateRoomPointsInDocument(
   document: DocumentState,
   roomId: string,
-  nextPoints: Point[]
+  nextPoints: Point[],
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   return {
     ...document,
@@ -997,6 +1007,7 @@ function updateRoomPointsInDocument(
       room.id === roomId
         ? {
             ...room,
+            unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
             points: nextPoints.map((point) => ({ ...point })),
           }
         : room
@@ -1008,7 +1019,8 @@ function updateResizedRoomInDocument(
   document: DocumentState,
   roomId: string,
   nextPoints: Point[],
-  nextInteriorAssets?: Room["interiorAssets"]
+  nextInteriorAssets?: Room["interiorAssets"],
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   return {
     ...document,
@@ -1016,6 +1028,7 @@ function updateResizedRoomInDocument(
       room.id === roomId
         ? {
             ...room,
+            unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
             points: nextPoints.map((point) => ({ ...point })),
             interiorAssets: nextInteriorAssets
               ? cloneRoomInteriorAssets(nextInteriorAssets)
@@ -1030,7 +1043,8 @@ function updateMovedRoomInDocument(
   document: DocumentState,
   roomId: string,
   previousPoints: Point[],
-  nextPoints: Point[]
+  nextPoints: Point[],
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   const delta = getRoomTranslationDelta(previousPoints, nextPoints);
 
@@ -1040,6 +1054,7 @@ function updateMovedRoomInDocument(
       room.id === roomId
         ? {
             ...room,
+            unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
             points: nextPoints.map((point) => ({ ...point })),
             interiorAssets: room.interiorAssets.map((asset) => ({
               ...cloneRoomInteriorAsset(asset),
@@ -1056,7 +1071,8 @@ function updateRoomOpeningOffsetInDocument(
   document: DocumentState,
   roomId: string,
   openingId: string,
-  nextOffsetMm: number
+  nextOffsetMm: number,
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   return {
     ...document,
@@ -1068,6 +1084,7 @@ function updateRoomOpeningOffsetInDocument(
               opening.id === openingId
                 ? {
                     ...cloneRoomOpening(opening),
+                    unitOrigin: normalizeUnitOrigin(unitOrigin ?? opening.unitOrigin),
                     offsetMm: nextOffsetMm,
                   }
                 : opening
@@ -1102,7 +1119,8 @@ function updateRoomInteriorAssetPositionInDocument(
   document: DocumentState,
   roomId: string,
   assetId: string,
-  nextCenter: Point
+  nextCenter: Point,
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   const nextDocument = {
     ...document,
@@ -1114,6 +1132,7 @@ function updateRoomInteriorAssetPositionInDocument(
               asset.id === assetId
                 ? {
                     ...cloneRoomInteriorAsset(asset),
+                    unitOrigin: normalizeUnitOrigin(unitOrigin ?? asset.unitOrigin),
                     xMm: nextCenter.x,
                     yMm: nextCenter.y,
                   }
@@ -1163,6 +1182,7 @@ function updateRoomInteriorAssetInDocument(
     depthMm: number;
     xMm: number;
     yMm: number;
+    unitOrigin?: UnitOrigin;
     rotationDegrees?: number;
     arrowEnabled?: boolean;
     arrowDirection?: Room["interiorAssets"][number]["arrowDirection"];
@@ -1188,6 +1208,7 @@ function updateRoomInteriorAssetInDocument(
               asset.id === nextAsset.id
                 ? {
                     ...clonedAssetDefaults(asset),
+                    unitOrigin: normalizeUnitOrigin(nextAsset.unitOrigin ?? clonedAssetDefaults(asset).unitOrigin),
                     widthMm: nextAsset.widthMm,
                     depthMm: nextAsset.depthMm,
                     xMm: nextAsset.xMm,
@@ -1250,7 +1271,10 @@ function syncConnectedStairTransformInDocument(
               ...candidateRoom,
               interiorAssets: candidateRoom.interiorAssets.map((candidateAsset) =>
                 candidateAsset.id === connectedPeer.asset.id
-                  ? rotatedPeerAsset
+                  ? {
+                      ...rotatedPeerAsset,
+                      unitOrigin: normalizeUnitOrigin(asset.unitOrigin),
+                    }
                   : candidateAsset
               ),
             }
@@ -1269,6 +1293,7 @@ function syncConnectedStairTransformInDocument(
                 candidateAsset.id === connectedPeer.asset.id
                   ? {
                       ...cloneRoomInteriorAsset(candidateAsset),
+                      unitOrigin: normalizeUnitOrigin(asset.unitOrigin),
                       widthMm: asset.widthMm,
                       depthMm: asset.depthMm,
                       xMm: asset.xMm,
@@ -1295,8 +1320,14 @@ function updateSelectedInteriorAsset(
   const asset = room?.interiorAssets.find((candidate) => candidate.id === selectedInteriorAsset.assetId);
   if (!room || !asset) return null;
 
-  const nextAsset = updater(room, asset);
-  if (!nextAsset || areRoomInteriorAssetsEqual([asset], [nextAsset])) return null;
+  const updatedAsset = updater(room, asset);
+  if (!updatedAsset) return null;
+
+  const nextAsset = {
+    ...updatedAsset,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
+  if (areRoomInteriorAssetsEqual([asset], [nextAsset])) return null;
 
   const didTransformConnectedStair =
     (asset.connectionId ?? null) !== null &&
@@ -1349,7 +1380,8 @@ function updateRoomOpeningWidthInDocument(
   document: DocumentState,
   roomId: string,
   openingId: string,
-  nextWidthMm: number
+  nextWidthMm: number,
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   return {
     ...document,
@@ -1361,6 +1393,7 @@ function updateRoomOpeningWidthInDocument(
               opening.id === openingId
                 ? {
                     ...cloneRoomOpening(opening),
+                    unitOrigin: normalizeUnitOrigin(unitOrigin ?? opening.unitOrigin),
                     widthMm: nextWidthMm,
                   }
                 : opening
@@ -1376,7 +1409,8 @@ function updateRoomOpeningWidthAndOffsetInDocument(
   roomId: string,
   openingId: string,
   nextWidthMm: number,
-  nextOffsetMm: number
+  nextOffsetMm: number,
+  unitOrigin?: UnitOrigin
 ): DocumentState {
   return {
     ...document,
@@ -1388,6 +1422,7 @@ function updateRoomOpeningWidthAndOffsetInDocument(
               opening.id === openingId
                 ? {
                     ...cloneRoomOpening(opening),
+                    unitOrigin: normalizeUnitOrigin(unitOrigin ?? opening.unitOrigin),
                     widthMm: nextWidthMm,
                     offsetMm: nextOffsetMm,
                   }
@@ -2063,22 +2098,27 @@ function insertOpeningOnSelectedWall(
     hostRoom,
     state.selectedWall.wall,
     type,
-    createOpeningId()
+    createOpeningId(),
+    { unitOrigin: getDocumentUnitOrigin(state.document) }
   );
   if (!opening) return null;
+  const openingWithUnitOrigin: RoomOpening = {
+    ...opening,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
 
   const command: EditorCommand = {
     type: "add-opening",
     roomId: hostRoom.id,
-    opening,
+    opening: openingWithUnitOrigin,
   };
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
     selectedWall: null,
-    selectedOpening: { roomId: hostRoom.id, openingId: opening.id },
+    selectedOpening: { roomId: hostRoom.id, openingId: openingWithUnitOrigin.id },
     selectedInteriorAsset: null,
-    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: opening.id }],
+    selection: [{ type: "opening" as const, roomId: hostRoom.id, openingId: openingWithUnitOrigin.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2095,21 +2135,27 @@ function insertDefaultStairOnSelectedRoom(
   const room = state.document.rooms.find((candidate) => candidate.id === state.selectedRoomId);
   if (!room) return null;
 
-  const asset = createCenteredDefaultStair(room, createInteriorAssetId());
+  const asset = createCenteredDefaultStair(room, createInteriorAssetId(), {
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  });
   if (!asset) return null;
+  const assetWithUnitOrigin: RoomInteriorAsset = {
+    ...asset,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
 
   const command: EditorCommand = {
     type: "add-interior-asset",
     roomId: room.id,
-    asset,
+    asset: assetWithUnitOrigin,
   };
 
   return {
     document: applyEditorCommand(state.document, command, "redo"),
-    selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+    selectedInteriorAsset: { roomId: room.id, assetId: assetWithUnitOrigin.id },
     selectedOpening: null,
     selectedWall: null,
-    selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
+    selection: [{ type: "asset" as const, roomId: room.id, id: assetWithUnitOrigin.id }],
     history: {
       past: pushToPast(state.history.past, command),
       future: [],
@@ -2295,8 +2341,14 @@ function updateSelectedOpening(
   const opening = room?.openings.find((candidate) => candidate.id === selectedOpening.openingId);
   if (!room || !opening) return null;
 
-  const nextOpening = updater(room, opening);
-  if (!nextOpening || areRoomOpeningsEqual([opening], [nextOpening])) return null;
+  const updatedOpening = updater(room, opening);
+  if (!updatedOpening) return null;
+
+  const nextOpening = {
+    ...updatedOpening,
+    unitOrigin: getDocumentUnitOrigin(state.document),
+  };
+  if (areRoomOpeningsEqual([opening], [nextOpening])) return null;
 
   const command: EditorCommand = {
     type: "update-opening",
@@ -2324,6 +2376,7 @@ function getSafePersistedHistorySnapshot(
     buildPersistedHistorySnapshot(document, history, PERSISTED_HISTORY_STATE_LIMIT) ?? {
       historyStack: [
         {
+          region: document.region,
           floors: document.floors.map((floor) => ({
             id: floor.id,
             name: floor.name,
@@ -2340,12 +2393,14 @@ function getSafePersistedHistorySnapshot(
           northBearingDegrees: document.northBearingDegrees,
           rulerMeasurements: document.rulerMeasurements.map((ruler) => ({
             id: ruler.id,
+            unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
             start: { ...ruler.start },
             end: { ...ruler.end },
             ...(ruler.hidden ? { hidden: true } : {}),
           })),
           rooms: document.rooms.map((room) => ({
             id: room.id,
+            unitOrigin: normalizeUnitOrigin(room.unitOrigin),
             floorId: room.floorId,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
@@ -2730,6 +2785,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         exportPreferences: nextPreferences,
+      };
+    }),
+  updateProjectRegion: (region) =>
+    set((state) => {
+      const nextRegion = normalizeProjectRegion(region);
+      if (normalizeProjectRegion(state.document.region) === nextRegion) {
+        saveGlobalSettings({
+          lastUsedProjectRegion: nextRegion,
+          hasConfirmedProjectRegionPreference: true,
+        });
+        return state;
+      }
+
+      saveGlobalSettings({
+        lastUsedProjectRegion: nextRegion,
+        hasConfirmedProjectRegionPreference: true,
+      });
+
+      return {
+        document: {
+          ...state.document,
+          region: nextRegion,
+        },
       };
     }),
   updateProjectExportConfig: (config) =>
@@ -3250,6 +3328,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const ruler: RulerMeasurement = {
         id: createRulerMeasurementId(),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         start: { ...state.rulerDraft.start },
         end: { ...resolvedPoint },
       };
@@ -3343,7 +3422,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "update-ruler",
         previousRuler,
-        nextRuler,
+        nextRuler: {
+          ...nextRuler,
+          unitOrigin: getDocumentUnitOrigin(state.document),
+        },
       };
 
       return {
@@ -3397,7 +3479,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "update-ruler",
         previousRuler,
-        nextRuler,
+        nextRuler: {
+          ...nextRuler,
+          unitOrigin: getDocumentUnitOrigin(state.document),
+        },
       };
 
       return {
@@ -3418,6 +3503,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const nextRuler: RulerMeasurement = {
         ...ruler,
+        unitOrigin: normalizeUnitOrigin(ruler.unitOrigin),
         start: { ...ruler.start },
         end: { ...ruler.end },
         hidden: !ruler.hidden,
@@ -5235,7 +5321,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!didNameChange) return { rulerRenameSession: null };
 
       const previousRuler: RulerMeasurement = { ...ruler, name: session.initialName };
-      const nextRuler: RulerMeasurement = { ...ruler };
+      const nextRuler: RulerMeasurement = {
+        ...ruler,
+        unitOrigin: getDocumentUnitOrigin(state.document),
+      };
       const command: EditorCommand = {
         type: "update-ruler",
         previousRuler,
@@ -5433,7 +5522,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
       // Capture asset type name for toast before deletion
-      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+      const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
 
       // Show deletion toast on next tick with undo action
       setTimeout(() => {
@@ -5650,64 +5739,97 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       switch (assetType) {
         case "stairs":
-          asset = createCenteredDefaultStair(room, createInteriorAssetId());
+          asset = createCenteredDefaultStair(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Stairs";
           break;
         case "bed":
-          asset = createCenteredDefaultBed(room, createInteriorAssetId());
+          asset = createCenteredDefaultBed(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Bed";
           break;
         case "sofa":
-          asset = createCenteredDefaultSofa(room, createInteriorAssetId());
+          asset = createCenteredDefaultSofa(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Sofa";
           break;
         case "wardrobe":
-          asset = createCenteredDefaultWardrobe(room, createInteriorAssetId());
+          asset = createCenteredDefaultWardrobe(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Wardrobe";
           break;
         case "dining-table":
-          asset = createCenteredDefaultDiningTable(room, createInteriorAssetId());
+          asset = createCenteredDefaultDiningTable(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Table";
           break;
         case "kitchen-unit":
-          asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId());
+          asset = createCenteredDefaultKitchenUnit(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Kitchen unit";
           break;
         case "kitchen-appliance":
-          asset = createCenteredDefaultKitchenAppliance(room, createInteriorAssetId());
+          asset = createCenteredDefaultKitchenAppliance(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Kitchen appliance";
           break;
         case "hob":
-          asset = createCenteredDefaultHob(room, createInteriorAssetId());
-          placedAssetTypeName = "Hob";
+          asset = createCenteredDefaultHob(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
+          placedAssetTypeName = "Stove top";
           break;
         case "sink":
-          asset = createCenteredDefaultSink(room, createInteriorAssetId());
+          asset = createCenteredDefaultSink(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Sink";
           break;
         case "toilet":
-          asset = createCenteredDefaultToilet(room, createInteriorAssetId());
+          asset = createCenteredDefaultToilet(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Toilet";
           break;
         case "shower":
-          asset = createCenteredDefaultShower(room, createInteriorAssetId());
+          asset = createCenteredDefaultShower(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Shower";
           break;
         case "bath":
-          asset = createCenteredDefaultBath(room, createInteriorAssetId());
+          asset = createCenteredDefaultBath(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Bath";
           break;
         case "basin":
-          asset = createCenteredDefaultBasin(room, createInteriorAssetId());
+          asset = createCenteredDefaultBasin(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Basin";
           break;
         case "desk":
-          asset = createCenteredDefaultDesk(room, createInteriorAssetId());
+          asset = createCenteredDefaultDesk(room, createInteriorAssetId(), {
+            unitOrigin: getDocumentUnitOrigin(state.document),
+          });
           placedAssetTypeName = "Desk";
           break;
       }
 
       if (!asset) return state;
+      placedAssetTypeName = getInteriorAssetDisplayName(assetType, getDocumentUnitOrigin(state.document));
+      const assetWithUnitOrigin: RoomInteriorAsset = {
+        ...asset,
+        unitOrigin: getDocumentUnitOrigin(state.document),
+      };
       
       // Show toast on next tick to allow state update first
       if (placedAssetTypeName) {
@@ -5719,16 +5841,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "add-interior-asset",
         roomId: room.id,
-        asset,
+        asset: assetWithUnitOrigin,
       };
 
       return {
         ...state,
         document: applyEditorCommand(state.document, command, "redo"),
-        selectedInteriorAsset: { roomId: room.id, assetId: asset.id },
+        selectedInteriorAsset: { roomId: room.id, assetId: assetWithUnitOrigin.id },
         selectedOpening: null,
         selectedWall: null,
-        selection: [{ type: "asset" as const, roomId: room.id, id: asset.id }],
+        selection: [{ type: "asset" as const, roomId: room.id, id: assetWithUnitOrigin.id }],
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -5839,12 +5961,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const nextAsset = getRotatedInteriorAssetForRoom(room, asset, deltaDegrees);
       if (!nextAsset) return state;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
+      const retaggedNextAsset: RoomInteriorAsset = {
+        ...nextAsset,
+        unitOrigin: currentUnitOrigin,
+      };
 
-      const updatedDocument = updateRoomInteriorAssetInDocument(state.document, room.id, nextAsset);
-      const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, room.id, nextAsset.id, deltaDegrees);
+      const updatedDocument = updateRoomInteriorAssetInDocument(state.document, room.id, retaggedNextAsset);
+      const nextDocument = syncConnectedStairTransformInDocument(updatedDocument, room.id, retaggedNextAsset.id, deltaDegrees);
 
       // Show rotation toast on next tick
-      const assetTypeName = getInteriorAssetDisplayName(asset.type);
+      const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
       const direction = deltaDegrees > 0 ? "right" : "left";
       setTimeout(() => {
         toast(`${assetTypeName} rotated ${direction} 90°`, { duration: 3200 });
@@ -5854,7 +5981,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "update-interior-asset",
         roomId: room.id,
         previousAsset: cloneRoomInteriorAsset(asset),
-        nextAsset: cloneRoomInteriorAsset(nextAsset),
+        nextAsset: cloneRoomInteriorAsset(retaggedNextAsset),
       };
 
       return {
@@ -6005,6 +6132,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       let nextAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         widthMm: appliedWidth,
         depthMm: appliedDepth,
         sizePreset: presetName,
@@ -6067,6 +6195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       let nextAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         widthMm: appliedWidth,
         depthMm: appliedDepth,
         xMm: newCenterX,
@@ -6129,6 +6258,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       let nextAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         widthMm: appliedWidth,
         depthMm: appliedDepth,
         xMm: newCenterX,
@@ -6239,6 +6369,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
       if (previousWidthMm === nextWidthMm && previousOffsetMm === nextOffsetMm) return state;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
 
       const command: EditorCommand = {
         type: "update-opening",
@@ -6250,6 +6381,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
         nextOpening: {
           ...cloneRoomOpening(opening),
+          unitOrigin: currentUnitOrigin,
           widthMm: nextWidthMm,
           offsetMm: nextOffsetMm ?? opening.offsetMm,
         },
@@ -6262,9 +6394,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               roomId,
               openingId,
               nextWidthMm,
-              nextOffsetMm
+              nextOffsetMm,
+              currentUnitOrigin
             )
-          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm);
+          : updateRoomOpeningWidthInDocument(state.document, roomId, openingId, nextWidthMm, currentUnitOrigin);
 
       return {
         document: updatedDocument,
@@ -6293,6 +6426,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const opening = room?.openings.find((candidate) => candidate.id === openingId);
       if (!room || !opening) return state;
       if (previousOffsetMm === nextOffsetMm) return state;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
 
       const command: EditorCommand = {
         type: "move-opening",
@@ -6301,10 +6435,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         openingType: opening.type,
         previousOffsetMm,
         nextOffsetMm,
+        previousUnitOrigin: normalizeUnitOrigin(opening.unitOrigin),
+        nextUnitOrigin: currentUnitOrigin,
       };
 
       return {
-        document: updateRoomOpeningOffsetInDocument(state.document, roomId, openingId, nextOffsetMm),
+        document: updateRoomOpeningOffsetInDocument(state.document, roomId, openingId, nextOffsetMm, currentUnitOrigin),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6318,7 +6454,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const validMoves = moves.filter((move) => move.previousOffsetMm !== move.nextOffsetMm);
       if (validMoves.length === 0) return state;
 
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
       let previousDocument = state.document;
+      let nextDocument = state.document;
       const movedOpenings: Extract<EditorCommand, { type: "bulk-move-openings" }>["movedOpenings"] = [];
 
       for (const move of validMoves) {
@@ -6331,6 +6469,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           move.roomId,
           move.openingId,
           move.previousOffsetMm
+        );
+        nextDocument = updateRoomOpeningOffsetInDocument(
+          nextDocument,
+          move.roomId,
+          move.openingId,
+          move.nextOffsetMm,
+          currentUnitOrigin
         );
         movedOpenings.push({
           roomId: move.roomId,
@@ -6346,12 +6491,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "bulk-move-openings",
         previousDocument: cloneDocumentState(previousDocument),
-        nextDocument: cloneDocumentState(state.document),
+        nextDocument: cloneDocumentState(nextDocument),
         movedOpenings,
       };
 
       return {
-        document: state.document,
+        document: nextDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6377,6 +6522,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const asset = room?.interiorAssets.find((candidate) => candidate.id === assetId);
       if (!room || !asset) return state;
       if (previousCenter.x === nextCenter.x && previousCenter.y === nextCenter.y) return state;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
 
       if ((asset.connectionId ?? null) !== null) {
         const previousDocument = updateRoomInteriorAssetPositionInDocument(
@@ -6389,7 +6535,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           state.document,
           roomId,
           assetId,
-          nextCenter
+          nextCenter,
+          currentUnitOrigin
         );
         const command: EditorCommand = {
           type: "sync-connected-stairs",
@@ -6417,10 +6564,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousYmm: previousCenter.y,
         nextXmm: nextCenter.x,
         nextYmm: nextCenter.y,
+        previousUnitOrigin: normalizeUnitOrigin(asset.unitOrigin),
+        nextUnitOrigin: currentUnitOrigin,
       };
 
       return {
-        document: updateRoomInteriorAssetPositionInDocument(state.document, roomId, assetId, nextCenter),
+        document: updateRoomInteriorAssetPositionInDocument(state.document, roomId, assetId, nextCenter, currentUnitOrigin),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6459,6 +6608,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const movedAsset: RoomInteriorAsset = {
         ...cloneRoomInteriorAsset(asset),
+        unitOrigin: getDocumentUnitOrigin(state.document),
         xMm: finalCenter.x,
         yMm: finalCenter.y,
       };
@@ -6513,6 +6663,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         move.previousCenter.y !== move.nextCenter.y
       );
       if (validMoves.length === 0) return state;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
 
       // Build the bulk move command
       const movedAssets: Array<{
@@ -6523,6 +6674,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previousYmm: number;
         nextXmm: number;
         nextYmm: number;
+        previousUnitOrigin?: UnitOrigin;
+        nextUnitOrigin?: UnitOrigin;
       }> = [];
       let nextDocument = state.document;
 
@@ -6539,13 +6692,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           previousYmm: move.previousCenter.y,
           nextXmm: move.nextCenter.x,
           nextYmm: move.nextCenter.y,
+          previousUnitOrigin: normalizeUnitOrigin(asset.unitOrigin),
+          nextUnitOrigin: currentUnitOrigin,
         });
 
         nextDocument = updateRoomInteriorAssetPositionInDocument(
           nextDocument,
           move.roomId,
           move.assetId,
-          move.nextCenter
+          move.nextCenter,
+          currentUnitOrigin
         );
       }
 
@@ -6607,6 +6763,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       if ((asset.connectionId ?? null) !== null) {
+        const currentUnitOrigin = getDocumentUnitOrigin(state.document);
         const previousDocument = syncConnectedStairTransformInDocument(
           updateRoomInteriorAssetInDocument(state.document, roomId, {
             ...previousAsset,
@@ -6619,6 +6776,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           updateRoomInteriorAssetInDocument(state.document, roomId, {
             ...nextAsset,
             id: assetId,
+            unitOrigin: currentUnitOrigin,
           }),
           roomId,
           assetId
@@ -6652,6 +6810,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
         nextAsset: {
           ...cloneRoomInteriorAsset(asset),
+          unitOrigin: getDocumentUnitOrigin(state.document),
           widthMm: nextAsset.widthMm,
           depthMm: nextAsset.depthMm,
           xMm: nextAsset.xMm,
@@ -6662,7 +6821,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Show resize toast on next tick
       if (previousAsset.widthMm !== nextAsset.widthMm || previousAsset.depthMm !== nextAsset.depthMm) {
         setTimeout(() => {
-          const assetTypeName = getInteriorAssetDisplayName(asset.type);
+          const assetTypeName = getInteriorAssetDisplayName(asset.type, asset.unitOrigin);
           toast(`${assetTypeName} resized`, { duration: 3200 });
         }, 0);
       }
@@ -6671,6 +6830,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: updateRoomInteriorAssetInDocument(state.document, roomId, {
           ...nextAsset,
           id: assetId,
+          unitOrigin: getDocumentUnitOrigin(state.document),
         }),
         history: {
           past: pushToPast(state.history.past, command),
@@ -6696,6 +6856,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomId,
         previousPoints: room.points.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
+        previousUnitOrigin: normalizeUnitOrigin(room.unitOrigin),
+        nextUnitOrigin: getDocumentUnitOrigin(state.document),
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
 
@@ -6730,10 +6892,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
+        previousUnitOrigin: normalizeUnitOrigin(room.unitOrigin),
+        nextUnitOrigin: getDocumentUnitOrigin(state.document),
       };
 
       return {
-        document: updateMovedRoomInDocument(state.document, roomId, previousPoints, nextPoints),
+        document: updateMovedRoomInDocument(
+          state.document,
+          roomId,
+          previousPoints,
+          nextPoints,
+          getDocumentUnitOrigin(state.document)
+        ),
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6750,6 +6920,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (validMoves.length === 0) return state;
 
       let previousDocument = state.document;
+      let nextDocument = state.document;
+      const currentUnitOrigin = getDocumentUnitOrigin(state.document);
       const movedRooms: Extract<EditorCommand, { type: "bulk-move-rooms" }>["movedRooms"] = [];
 
       for (const move of validMoves) {
@@ -6761,6 +6933,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           move.roomId,
           move.nextPoints,
           move.previousPoints
+        );
+        nextDocument = updateMovedRoomInDocument(
+          nextDocument,
+          move.roomId,
+          move.previousPoints,
+          move.nextPoints,
+          currentUnitOrigin
         );
         movedRooms.push({
           roomId: move.roomId,
@@ -6774,12 +6953,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const command: EditorCommand = {
         type: "bulk-move-rooms",
         previousDocument: cloneDocumentState(previousDocument),
-        nextDocument: cloneDocumentState(state.document),
+        nextDocument: cloneDocumentState(nextDocument),
         movedRooms,
       };
 
       return {
-        document: state.document,
+        document: nextDocument,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -6815,6 +6994,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
         nextPoints: nextPoints.map((point) => ({ ...point })),
+        previousUnitOrigin: normalizeUnitOrigin(room.unitOrigin),
+        nextUnitOrigin: getDocumentUnitOrigin(state.document),
         ...(isWallSplit ? { editKind: "wall-split" as const, roomName: room.name } : {}),
         ...(isVertexDelete ? { editKind: "vertex-delete" as const, roomName: room.name } : {}),
         previousInteriorAssets: didAdjust ? cloneRoomInteriorAssets(room.interiorAssets) : undefined,
@@ -6824,7 +7005,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         state.document,
         roomId,
         nextPoints,
-        didAdjust ? nextInteriorAssets : undefined
+        didAdjust ? nextInteriorAssets : undefined,
+        getDocumentUnitOrigin(state.document)
       );
 
       if (didAdjust) {
@@ -7427,6 +7609,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
 
   const room: Room = {
     id: createRoomId(),
+    unitOrigin: getDocumentUnitOrigin(state.document),
     floorId: getNormalizedActiveFloorId(state.document),
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),

@@ -1,3 +1,5 @@
+import { DEFAULT_PROJECT_REGION, normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+
 /**
  * Global Editor UI Settings
  * 
@@ -8,6 +10,8 @@
 export type GlobalEditorUISettings = {
   sidebarDensity: "comfortable" | "compact";
   keyboardShortcutFeedbackEnabled: boolean;
+  lastUsedProjectRegion: ProjectRegion;
+  hasConfirmedProjectRegionPreference: boolean;
 };
 
 const GLOBAL_SETTINGS_STORAGE_KEY = "spaceforge-global-ui-settings";
@@ -15,6 +19,8 @@ const GLOBAL_SETTINGS_STORAGE_KEY = "spaceforge-global-ui-settings";
 const DEFAULT_GLOBAL_SETTINGS: GlobalEditorUISettings = {
   sidebarDensity: "comfortable",
   keyboardShortcutFeedbackEnabled: true,
+  lastUsedProjectRegion: DEFAULT_PROJECT_REGION,
+  hasConfirmedProjectRegionPreference: false,
 };
 
 export function loadGlobalSettings(): GlobalEditorUISettings {
@@ -34,6 +40,11 @@ export function loadGlobalSettings(): GlobalEditorUISettings {
       keyboardShortcutFeedbackEnabled: validateKeyboardShortcutFeedback(
         parsed.keyboardShortcutFeedbackEnabled
       ),
+      lastUsedProjectRegion: normalizeProjectRegion(parsed.lastUsedProjectRegion),
+      hasConfirmedProjectRegionPreference:
+        typeof parsed.hasConfirmedProjectRegionPreference === "boolean"
+          ? parsed.hasConfirmedProjectRegionPreference
+          : parsed.lastUsedProjectRegion !== undefined,
     };
   } catch (error) {
     console.error("Failed to load global settings from localStorage", error);

@@ -15,6 +15,7 @@ import {
 } from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
+import { normalizeProjectRegion, normalizeUnitOrigin } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
@@ -37,6 +38,7 @@ function areRulerMeasurementsEqual(a: RulerMeasurement[], b: RulerMeasurement[])
     const rulerB = b[i];
     if (
       rulerA.id !== rulerB.id ||
+      normalizeUnitOrigin(rulerA.unitOrigin) !== normalizeUnitOrigin(rulerB.unitOrigin) ||
       rulerA.start.x !== rulerB.start.x ||
       rulerA.start.y !== rulerB.start.y ||
       rulerA.end.x !== rulerB.end.x ||
@@ -65,6 +67,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
   const exportConfigB = normalizeProjectExportConfig(b.exportConfig);
 
   if (
+    normalizeProjectRegion(a.region) !== normalizeProjectRegion(b.region) ||
     exportConfigA.title !== exportConfigB.title ||
     exportConfigA.description !== exportConfigB.description ||
     exportConfigA.titlePosition !== exportConfigB.titlePosition ||
@@ -95,6 +98,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
     const roomB = b.rooms[i];
     if (
       roomA.id !== roomB.id ||
+      normalizeUnitOrigin(roomA.unitOrigin) !== normalizeUnitOrigin(roomB.unitOrigin) ||
       roomA.name !== roomB.name ||
       getRoomFloorId(roomA, a) !== getRoomFloorId(roomB, b)
     ) {
@@ -112,6 +116,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
   const exportConfig = normalizeProjectExportConfig(document.exportConfig);
 
   return {
+    region: normalizeProjectRegion(document.region),
     floors: getNormalizedFloors(document),
     activeFloorId: getNormalizedActiveFloorId(document),
     exportConfig: {
@@ -125,6 +130,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
     northBearingDegrees: normalizeNorthBearingDegrees(document.northBearingDegrees),
     rooms: document.rooms.map((room) => ({
       id: room.id,
+      unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
@@ -398,6 +404,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "delete-room",
       room: {
         id: deletedRoom.id,
+        unitOrigin: normalizeUnitOrigin(deletedRoom.unitOrigin),
         floorId: getRoomFloorId(deletedRoom, previous),
         name: deletedRoom.name,
         points: deletedRoom.points.map((point) => ({ ...point })),
@@ -442,6 +449,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       type: "complete-room",
       room: {
         id: addedRooms[0].id,
+        unitOrigin: normalizeUnitOrigin(addedRooms[0].unitOrigin),
         floorId: getRoomFloorId(addedRooms[0], next),
         name: addedRooms[0].name,
         points: addedRooms[0].points.map((point) => ({ ...point })),
@@ -498,6 +506,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         roomId: changedRoom.next.id,
         previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
         nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+        previousUnitOrigin: normalizeUnitOrigin(changedRoom.previous.unitOrigin),
+        nextUnitOrigin: normalizeUnitOrigin(changedRoom.next.unitOrigin),
       };
     }
 
@@ -506,6 +516,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       roomId: changedRoom.next.id,
       previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
       nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+      previousUnitOrigin: normalizeUnitOrigin(changedRoom.previous.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(changedRoom.next.unitOrigin),
       previousInteriorAssets: cloneRoomInteriorAssets(changedRoom.previous.interiorAssets ?? []),
       nextInteriorAssets: cloneRoomInteriorAssets(changedRoom.next.interiorAssets ?? []),
     };
@@ -548,6 +560,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         openingType: movedOpening.openingType,
         previousOffsetMm: movedOpening.previousOffsetMm,
         nextOffsetMm: movedOpening.nextOffsetMm,
+        previousUnitOrigin: movedOpening.previousUnitOrigin,
+        nextUnitOrigin: movedOpening.nextUnitOrigin,
       };
     }
 
@@ -604,6 +618,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         previousYmm: movedAsset.previousYmm,
         nextXmm: movedAsset.nextXmm,
         nextYmm: movedAsset.nextYmm,
+        previousUnitOrigin: movedAsset.previousUnitOrigin,
+        nextUnitOrigin: movedAsset.nextUnitOrigin,
       };
     }
 
@@ -694,11 +710,25 @@ function inferDeletedOpening(
 function inferMovedOpening(
   previousOpenings: RoomOpening[],
   nextOpenings: RoomOpening[]
-): { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null {
+): {
+  openingId: string;
+  openingType: "door" | "window";
+  previousOffsetMm: number;
+  nextOffsetMm: number;
+  previousUnitOrigin: RoomOpening["unitOrigin"];
+  nextUnitOrigin: RoomOpening["unitOrigin"];
+} | null {
   if (previousOpenings.length !== nextOpenings.length) return null;
 
   const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
-  let movedOpening: { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null = null;
+  let movedOpening: {
+    openingId: string;
+    openingType: "door" | "window";
+    previousOffsetMm: number;
+    nextOffsetMm: number;
+    previousUnitOrigin: RoomOpening["unitOrigin"];
+    nextUnitOrigin: RoomOpening["unitOrigin"];
+  } | null = null;
 
   for (const previousOpening of previousOpenings) {
     const nextOpening = nextById.get(previousOpening.id);
@@ -720,6 +750,8 @@ function inferMovedOpening(
       openingType: nextOpening.type,
       previousOffsetMm: previousOpening.offsetMm,
       nextOffsetMm: nextOpening.offsetMm,
+      previousUnitOrigin: normalizeUnitOrigin(previousOpening.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(nextOpening.unitOrigin),
     };
   }
 
@@ -763,6 +795,8 @@ function inferMovedInteriorAsset(
       previousYmm: number;
       nextXmm: number;
       nextYmm: number;
+      previousUnitOrigin: RoomInteriorAsset["unitOrigin"];
+      nextUnitOrigin: RoomInteriorAsset["unitOrigin"];
     }
   | null {
   if (previousAssets.length !== nextAssets.length) return null;
@@ -776,6 +810,8 @@ function inferMovedInteriorAsset(
         previousYmm: number;
         nextXmm: number;
         nextYmm: number;
+        previousUnitOrigin: RoomInteriorAsset["unitOrigin"];
+        nextUnitOrigin: RoomInteriorAsset["unitOrigin"];
       }
     | null = null;
 
@@ -800,6 +836,8 @@ function inferMovedInteriorAsset(
       previousYmm: previousAsset.yMm,
       nextXmm: nextAsset.xMm,
       nextYmm: nextAsset.yMm,
+      previousUnitOrigin: normalizeUnitOrigin(previousAsset.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(nextAsset.unitOrigin),
     };
   }
 

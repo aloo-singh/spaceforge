@@ -1,3 +1,5 @@
+import type { UnitOrigin } from "@/lib/projects/region";
+
 export type Point = {
   x: number;
   y: number;
@@ -38,6 +40,7 @@ export type DoorHingeSide = "start" | "end";
 
 export type RoomOpening = {
   id: string;
+  unitOrigin?: UnitOrigin;
   type: OpeningType;
   wall: RoomWall;
   /**
@@ -62,12 +65,14 @@ export type RoomOpening = {
 
 export type Wall = {
   id: string;
+  unitOrigin?: UnitOrigin;
   a: Point;
   b: Point;
 };
 
 export type RulerMeasurement = {
   id: string;
+  unitOrigin?: UnitOrigin;
   name?: string;
   start: Point;
   end: Point;
@@ -144,6 +149,7 @@ export type InteriorAssetType = "stairs" | "wardrobe" | "bed" | "sofa" | "dining
  */
 export type RoomInteriorAsset = {
   id: string;
+  unitOrigin?: UnitOrigin;
   type: InteriorAssetType;
   connectionId?: string | null;
   name: string;
@@ -189,6 +195,7 @@ export type Floor = {
  */
 export type Room = {
   id: string;
+  unitOrigin?: UnitOrigin;
   floorId: string;
   name: string;
   points: Point[];
