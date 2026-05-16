@@ -146,8 +146,8 @@ function FirstProjectRegionDialog({
       onOpenChange={() => {
         // Required first-run choice: no outside click, Esc, or close button should dismiss it.
       }}
-      title="Pick the ruler your brain already uses"
-      description="A floor plan feels easier when the numbers arrive in the accent you expect. Choose once; you can change it later in Settings."
+      title="Set the project’s native language"
+      description="Rooms feel easier to judge when their numbers sound familiar. Pick the measurement system this project should start with; you can change it later in Settings."
       className="sm:w-[min(100%,30rem)]"
       contentClassName="space-y-3"
       surfaceOverride="dialog"
