@@ -131,12 +131,12 @@ function FirstProjectRegionDialog({
     {
       value: "metric",
       title: "Metric",
-      description: "Metres and millimetres. The sensible shoes of floor planning.",
+      description: "Metres and millimetres for new rooms and objects.",
     },
     {
       value: "imperial",
       title: "Imperial",
-      description: "Feet and inches. Familiar rooms, familiar furniture, fewer tiny conversions.",
+      description: "Feet and inches for new rooms and objects.",
     },
   ];
 
@@ -159,11 +159,13 @@ function FirstProjectRegionDialog({
             type="button"
             variant="outline"
             onClick={() => onChoose(option.value)}
-            className="h-auto flex-col items-start gap-1 rounded-lg border-border/70 bg-background/80 p-3 text-left hover:bg-muted/55"
+            className="min-h-28 whitespace-normal rounded-lg border-border/70 bg-background/80 p-4 text-left hover:bg-muted/55"
           >
-            <span className="text-sm font-semibold text-foreground">{option.title}</span>
-            <span className="text-xs font-normal leading-relaxed text-muted-foreground">
-              {option.description}
+            <span className="flex w-full min-w-0 flex-col items-start gap-1.5">
+              <span className="text-sm font-semibold text-foreground">{option.title}</span>
+              <span className="block max-w-full text-wrap text-xs font-normal leading-relaxed text-muted-foreground">
+                {option.description}
+              </span>
             </span>
           </Button>
         ))}
