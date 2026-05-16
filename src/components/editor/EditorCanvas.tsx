@@ -307,7 +307,7 @@ const OPENING_WIDTH_HANDLE_SIZE_PX = 8;
 const OPENING_WIDTH_HANDLE_HALO_SIZE_PX = 12;
 const OPENING_WIDTH_HANDLE_STROKE_PX = 1.5;
 const METRIC_UNIT_ORIGIN_HIGHLIGHT_COLOR = 0xfacc15;
-const IMPERIAL_UNIT_ORIGIN_HIGHLIGHT_COLOR = 0x22d3ee;
+const IMPERIAL_UNIT_ORIGIN_HIGHLIGHT_COLOR = 0xd946ef;
 const UNIT_ORIGIN_ROOM_FILL_ALPHA = 0.075;
 const UNIT_ORIGIN_ROOM_STROKE_ALPHA = 0.38;
 const UNIT_ORIGIN_ASSET_FILL_ALPHA = 0.095;
@@ -4814,7 +4814,7 @@ function drawUnitOriginHighlights(
       const end = worldToScreen(layout.end, camera, viewport);
       graphics.setStrokeStyle({
         width: Math.max(camera.pixelsPerMm * 72, 3),
-        color: getUnitOriginHighlightColor(opening.unitOrigin),
+        color: getUnitOriginHighlightColor(opening.unitOrigin ?? room.unitOrigin),
         alpha: UNIT_ORIGIN_LINEAR_ALPHA,
         cap: "round",
       });

@@ -514,6 +514,7 @@ export function normalizeRoomOpening(opening: RoomOpening): RoomOpening {
     wall: opening.wall,
     offsetMm: opening.offsetMm,
     widthMm: opening.widthMm,
+    unitOrigin: normalizeUnitOrigin(opening.unitOrigin),
     openingSide:
       opening.openingSide === "exterior" ? "exterior" : DEFAULT_DOOR_OPENING_SIDE,
     hingeSide: opening.hingeSide === "end" ? "end" : DEFAULT_DOOR_HINGE_SIDE,
