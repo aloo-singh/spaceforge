@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
 import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
-import { formatMetricRoomArea } from "@/lib/editor/measurements";
+import { formatRoomArea } from "@/lib/editor/measurements";
+import { normalizeProjectRegion } from "@/lib/projects/region";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,10 +57,12 @@ function formatProjectCreatedDate(value: string) {
 }
 
 function getProjectCardStats(project: ProjectListItem) {
+  const projectRegion = normalizeProjectRegion(project.stats?.region);
+
   return {
     roomCount: project.stats?.roomCount ?? 0,
     floorCount: project.stats?.floorCount ?? 1,
-    totalArea: formatMetricRoomArea(project.stats?.totalAreaSquareMillimetres ?? 0),
+    totalArea: formatRoomArea(project.stats?.totalAreaSquareMillimetres ?? 0, projectRegion),
     createdDate: formatProjectCreatedDate(project.createdAt),
   };
 }
