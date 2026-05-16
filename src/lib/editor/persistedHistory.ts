@@ -506,6 +506,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         roomId: changedRoom.next.id,
         previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
         nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+        previousUnitOrigin: normalizeUnitOrigin(changedRoom.previous.unitOrigin),
+        nextUnitOrigin: normalizeUnitOrigin(changedRoom.next.unitOrigin),
       };
     }
 
@@ -514,6 +516,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       roomId: changedRoom.next.id,
       previousPoints: changedRoom.previous.points.map((point) => ({ ...point })),
       nextPoints: changedRoom.next.points.map((point) => ({ ...point })),
+      previousUnitOrigin: normalizeUnitOrigin(changedRoom.previous.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(changedRoom.next.unitOrigin),
       previousInteriorAssets: cloneRoomInteriorAssets(changedRoom.previous.interiorAssets ?? []),
       nextInteriorAssets: cloneRoomInteriorAssets(changedRoom.next.interiorAssets ?? []),
     };
@@ -556,6 +560,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         openingType: movedOpening.openingType,
         previousOffsetMm: movedOpening.previousOffsetMm,
         nextOffsetMm: movedOpening.nextOffsetMm,
+        previousUnitOrigin: movedOpening.previousUnitOrigin,
+        nextUnitOrigin: movedOpening.nextUnitOrigin,
       };
     }
 
@@ -612,6 +618,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         previousYmm: movedAsset.previousYmm,
         nextXmm: movedAsset.nextXmm,
         nextYmm: movedAsset.nextYmm,
+        previousUnitOrigin: movedAsset.previousUnitOrigin,
+        nextUnitOrigin: movedAsset.nextUnitOrigin,
       };
     }
 
@@ -702,11 +710,25 @@ function inferDeletedOpening(
 function inferMovedOpening(
   previousOpenings: RoomOpening[],
   nextOpenings: RoomOpening[]
-): { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null {
+): {
+  openingId: string;
+  openingType: "door" | "window";
+  previousOffsetMm: number;
+  nextOffsetMm: number;
+  previousUnitOrigin: RoomOpening["unitOrigin"];
+  nextUnitOrigin: RoomOpening["unitOrigin"];
+} | null {
   if (previousOpenings.length !== nextOpenings.length) return null;
 
   const nextById = new Map(nextOpenings.map((opening) => [opening.id, opening]));
-  let movedOpening: { openingId: string; openingType: "door" | "window"; previousOffsetMm: number; nextOffsetMm: number } | null = null;
+  let movedOpening: {
+    openingId: string;
+    openingType: "door" | "window";
+    previousOffsetMm: number;
+    nextOffsetMm: number;
+    previousUnitOrigin: RoomOpening["unitOrigin"];
+    nextUnitOrigin: RoomOpening["unitOrigin"];
+  } | null = null;
 
   for (const previousOpening of previousOpenings) {
     const nextOpening = nextById.get(previousOpening.id);
@@ -728,6 +750,8 @@ function inferMovedOpening(
       openingType: nextOpening.type,
       previousOffsetMm: previousOpening.offsetMm,
       nextOffsetMm: nextOpening.offsetMm,
+      previousUnitOrigin: normalizeUnitOrigin(previousOpening.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(nextOpening.unitOrigin),
     };
   }
 
@@ -771,6 +795,8 @@ function inferMovedInteriorAsset(
       previousYmm: number;
       nextXmm: number;
       nextYmm: number;
+      previousUnitOrigin: RoomInteriorAsset["unitOrigin"];
+      nextUnitOrigin: RoomInteriorAsset["unitOrigin"];
     }
   | null {
   if (previousAssets.length !== nextAssets.length) return null;
@@ -784,6 +810,8 @@ function inferMovedInteriorAsset(
         previousYmm: number;
         nextXmm: number;
         nextYmm: number;
+        previousUnitOrigin: RoomInteriorAsset["unitOrigin"];
+        nextUnitOrigin: RoomInteriorAsset["unitOrigin"];
       }
     | null = null;
 
@@ -808,6 +836,8 @@ function inferMovedInteriorAsset(
       previousYmm: previousAsset.yMm,
       nextXmm: nextAsset.xMm,
       nextYmm: nextAsset.yMm,
+      previousUnitOrigin: normalizeUnitOrigin(previousAsset.unitOrigin),
+      nextUnitOrigin: normalizeUnitOrigin(nextAsset.unitOrigin),
     };
   }
 
