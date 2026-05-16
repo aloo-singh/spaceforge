@@ -1,5 +1,6 @@
 import { createEmptyEditorDocumentState, type EditorDocumentState } from "@/lib/editor/history";
 import { loadGlobalSettings } from "@/lib/editor/globalSettings";
+import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 
 const DEFAULT_PROJECT_NAME_OPTIONS = [
   "My first layout",
@@ -24,9 +25,9 @@ export function getDefaultProjectName({ existingProjectCount = 0 }: { existingPr
   return secondaryNames[nextIndex];
 }
 
-export function createEmptyProjectDocument(): EditorDocumentState {
+export function createEmptyProjectDocument(options: { region?: ProjectRegion } = {}): EditorDocumentState {
   return {
     ...createEmptyEditorDocumentState(),
-    region: loadGlobalSettings().lastUsedProjectRegion,
+    region: normalizeProjectRegion(options.region ?? loadGlobalSettings().lastUsedProjectRegion),
   };
 }

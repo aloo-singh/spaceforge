@@ -62,7 +62,7 @@ export function EditorSettingsDialog({
     canShowUnitOriginHighlights && areUnitOriginHighlightsVisible;
   const unitOriginHighlightFeature = getFeatureConfig(devSubscriptionTier, "unitOriginHighlight");
   const unitOriginHighlightTooltip = canShowUnitOriginHighlights
-    ? "Highlight metric-origin elements yellow and imperial-origin elements cyan"
+    ? "Highlight metric-origin elements yellow and imperial-origin elements magenta"
     : unitOriginHighlightFeature?.upsellMessage("Pro", 1) ??
       "Upgrade to Pro to highlight metric and imperial-origin elements";
   const regionOptions: Array<{ value: ProjectRegion; label: string }> = [
@@ -142,22 +142,26 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-regionalisation-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-sm"
         >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div>
               <h3 id="editor-settings-regionalisation-title" className="text-sm font-medium text-foreground">
-                Regionalisation
+                Project region
               </h3>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Choose the unit family for this project and future new projects.
+                Pick the measurement language for new rooms, openings, rulers, and assets in this project.
+                Existing objects keep their origin until you edit them.
               </p>
             </div>
+            <span className="w-fit shrink-0 rounded-md border border-border/70 bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Defaults
+            </span>
           </div>
 
           <ImmediateTooltipProvider>
             <div
-              className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+              className="mt-4 grid w-full grid-cols-2 rounded-lg border border-border/70 bg-background/90 p-1"
               role="radiogroup"
               aria-label="Project region"
             >
@@ -171,7 +175,7 @@ export function EditorSettingsDialog({
                       variant={projectRegion === option.value ? "secondary" : "ghost"}
                       aria-checked={projectRegion === option.value}
                       onClick={() => updateProjectRegion(option.value)}
-                      className="min-w-24 flex-1 sm:flex-none"
+                      className="min-w-0"
                     >
                       {option.label}
                     </Button>
@@ -183,6 +187,9 @@ export function EditorSettingsDialog({
               ))}
             </div>
           </ImmediateTooltipProvider>
+          <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+            This is not a conversion switch for old work. It tells [s]paceforge which assumptions to make next.
+          </p>
         </div>
 
         <div

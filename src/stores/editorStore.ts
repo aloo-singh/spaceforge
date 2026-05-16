@@ -2791,11 +2791,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const nextRegion = normalizeProjectRegion(region);
       if (normalizeProjectRegion(state.document.region) === nextRegion) {
-        saveGlobalSettings({ lastUsedProjectRegion: nextRegion });
+        saveGlobalSettings({
+          lastUsedProjectRegion: nextRegion,
+          hasConfirmedProjectRegionPreference: true,
+        });
         return state;
       }
 
-      saveGlobalSettings({ lastUsedProjectRegion: nextRegion });
+      saveGlobalSettings({
+        lastUsedProjectRegion: nextRegion,
+        hasConfirmedProjectRegionPreference: true,
+      });
 
       return {
         document: {
