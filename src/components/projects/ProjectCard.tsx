@@ -16,7 +16,7 @@ import {
   X,
 } from "@/components/ui/icons";
 import type { ProjectListItem } from "@/lib/projects/types";
-import { formatProjectUpdatedAt } from "@/lib/projects/formatting";
+import { formatProjectCreatedAt, formatProjectUpdatedAt } from "@/lib/projects/formatting";
 import { formatRoomArea } from "@/lib/editor/measurements";
 import { normalizeProjectRegion } from "@/lib/projects/region";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,19 +43,6 @@ type ProjectCardProps = {
   layout?: "grid-small" | "grid-large" | "list";
 };
 
-function formatProjectCreatedDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Recent";
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
 function getProjectCardStats(project: ProjectListItem) {
   const projectRegion = normalizeProjectRegion(project.stats?.region);
 
@@ -63,7 +50,8 @@ function getProjectCardStats(project: ProjectListItem) {
     roomCount: project.stats?.roomCount ?? 0,
     floorCount: project.stats?.floorCount ?? 1,
     totalArea: formatRoomArea(project.stats?.totalAreaSquareMillimetres ?? 0, projectRegion),
-    createdDate: formatProjectCreatedDate(project.createdAt),
+    createdDate: formatProjectCreatedAt(project.createdAt, projectRegion),
+    projectRegion,
   };
 }
 
@@ -392,7 +380,7 @@ export function ProjectCard({
               ) : (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock3 className="size-3.5" />
-                  <span>{formatProjectUpdatedAt(project.updatedAt)}</span>
+                  <span>{formatProjectUpdatedAt(project.updatedAt, stats.projectRegion)}</span>
                 </p>
               )}
               </div>
