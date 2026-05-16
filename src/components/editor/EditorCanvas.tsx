@@ -4169,7 +4169,13 @@ function drawScene(
     state.viewport,
     theme,
     state.settings.showAssets,
-    { includeStairDirectionVisuals: true },
+    {
+      includeStairDirectionVisuals: true,
+      showUnitOriginHighlights:
+        state.settings.showUnitOriginHighlights &&
+        getTierConfig(state.devSubscriptionTier).hasUnitOriginHighlight,
+      displayUnitOrigin: state.document.region,
+    },
     animations
   );
   drawWallInteractionOverlay(
@@ -4697,6 +4703,8 @@ function drawOpenings(
   showAssets: boolean = true,
   options?: {
     includeStairDirectionVisuals?: boolean;
+    showUnitOriginHighlights?: boolean;
+    displayUnitOrigin?: UnitOrigin;
   },
   animations: ReadonlyMap<string, AssetRotationAnimation> = new Map()
 ) {
@@ -4704,7 +4712,10 @@ function drawOpenings(
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
-    drawRoomOpenings(graphics, room, selectedOpening, selection, camera, viewport, theme);
+    drawRoomOpenings(graphics, room, selectedOpening, selection, camera, viewport, theme, {
+      showUnitOriginHighlights: options?.showUnitOriginHighlights,
+      displayUnitOrigin: options?.displayUnitOrigin,
+    });
     drawRoomInteriorAssets(graphics, room, selection, camera, viewport, theme, animations, showAssets);
   }
 }
@@ -4806,22 +4817,6 @@ function drawUnitOriginHighlights(
       2.25,
       UNIT_ORIGIN_ROOM_STROKE_ALPHA
     );
-
-    for (const opening of room.openings) {
-      const layout = getResolvedRoomOpeningLayout(room, opening);
-      if (!layout) continue;
-      const start = worldToScreen(layout.start, camera, viewport);
-      const end = worldToScreen(layout.end, camera, viewport);
-      graphics.setStrokeStyle({
-        width: Math.max(camera.pixelsPerMm * 72, 3),
-        color: getUnitOriginHighlightColor(opening.unitOrigin ?? room.unitOrigin),
-        alpha: UNIT_ORIGIN_LINEAR_ALPHA,
-        cap: "round",
-      });
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
-    }
 
     for (const asset of room.interiorAssets) {
       if (asset.type !== "stairs" && !showAssets) continue;
@@ -5009,7 +5004,11 @@ function drawRoomOpenings(
   selection: SharedSelectionItem[],
   camera: CameraState,
   viewport: ViewportSize,
-  theme: EditorCanvasTheme
+  theme: EditorCanvasTheme,
+  options?: {
+    showUnitOriginHighlights?: boolean;
+    displayUnitOrigin?: UnitOrigin;
+  }
 ) {
   const selectedOpeningCount = selection.filter((item) => item.type === "opening").length;
   const handleOpening = getSingleOpeningSelectionForHandles(selectedOpening, selection);
@@ -5046,7 +5045,15 @@ function drawRoomOpenings(
     const cutoutStrokePx = Math.max(camera.pixelsPerMm * OPENING_CUTOUT_WORLD_MM, 2.25);
     const symbolStrokePx = Math.max(camera.pixelsPerMm * OPENING_SYMBOL_WORLD_MM, 1.2);
     const selectionStrokePx = Math.max(camera.pixelsPerMm * OPENING_SELECTION_STROKE_WORLD_MM, 2);
-    const selectionColor = theme.wallSelectionAccent;
+    const originHighlightColor = getUnitOriginHighlightColor(
+      opening.unitOrigin ?? room.unitOrigin ?? options?.displayUnitOrigin
+    );
+    const openingColor = options?.showUnitOriginHighlights
+      ? originHighlightColor
+      : theme.roomOutline;
+    const selectionColor = options?.showUnitOriginHighlights
+      ? originHighlightColor
+      : theme.wallSelectionAccent;
 
     graphics.setStrokeStyle({
       width: cutoutStrokePx,
@@ -5094,7 +5101,7 @@ function drawRoomOpenings(
       const shouldDrawArcAnticlockwise =
         hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x < 0;
 
-      const doorSymbolColor = isSelected ? selectionColor : theme.roomOutline;
+      const doorSymbolColor = isSelected ? selectionColor : openingColor;
       graphics.setStrokeStyle({
         width: isSelected ? selectionStrokePx : symbolStrokePx,
         color: doorSymbolColor,
@@ -5133,7 +5140,7 @@ function drawRoomOpenings(
         for (const offset of [-windowLineSeparationPx / 2, windowLineSeparationPx / 2]) {
           graphics.setStrokeStyle({
             width: isSelected ? selectionStrokePx : symbolStrokePx,
-            color: isSelected ? selectionColor : theme.roomOutline,
+            color: isSelected ? selectionColor : openingColor,
             alpha: isSelected ? 1 : 0.92,
             cap: "round",
           });

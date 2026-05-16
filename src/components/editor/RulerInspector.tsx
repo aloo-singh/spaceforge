@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { EditorSidebarRenameInput } from "@/components/editor/EditorSidebarRenameInput";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { IconEye, RulerMeasure2, Trash2 } from "@/components/ui/icons";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -160,9 +161,12 @@ export function RulerInspector({ className }: RulerInspectorProps) {
                         </span>
                       ) : null}
                     </div>
-                    <p className="font-mono text-sm text-lime-500 dark:text-lime-400">
-                      {distance}
-                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="font-mono text-sm text-lime-500 dark:text-lime-400">
+                        {distance}
+                      </p>
+                      <UnitOriginTag unitOrigin={ruler.unitOrigin} />
+                    </div>
                   </div>
 
                   <ButtonGroup className="shrink-0">

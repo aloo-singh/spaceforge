@@ -9,6 +9,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { SelectedInteriorAssetInspector } from "@/components/editor/SelectedInteriorAssetInspector";
 import { SelectedOpeningInspector } from "@/components/editor/SelectedOpeningInspector";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -61,7 +62,10 @@ function RoomDimensionsDisplay({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-sm font-medium">Dimensions</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">Dimensions</p>
+        <UnitOriginTag unitOrigin={room.unitOrigin} />
+      </div>
       <div className="space-y-2">
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure2 className="size-4 shrink-0" />

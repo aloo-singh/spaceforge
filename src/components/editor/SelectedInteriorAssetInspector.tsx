@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 
 import { 
   getInteriorAssetDisplayName,
@@ -173,7 +174,10 @@ function FurnitureInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Dimensions</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={asset.unitOrigin} />
+          </div>
           <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
             {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}
             {formatWallDimension(asset.depthMm, displayUnitOrigin)}
@@ -647,7 +651,10 @@ function StairsInspector({
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">Dimensions</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={asset.unitOrigin} />
+          </div>
           <div className="space-y-2">
             <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
               {formatWallDimension(asset.widthMm, displayUnitOrigin)} ×{" "}

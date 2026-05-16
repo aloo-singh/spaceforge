@@ -7,6 +7,7 @@ import {
 import { Button, ButtonGroup } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
+import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import {
   ImmediateTooltipProvider,
   Tooltip,
@@ -99,7 +100,11 @@ export function SelectedOpeningInspector({
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
-            <label htmlFor="opening-width-input" className="text-sm font-medium">
+            <p className="text-sm font-medium">Dimensions</p>
+            <UnitOriginTag unitOrigin={opening.unitOrigin} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="opening-width-input" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Width
             </label>
             <span className="font-mono text-xs text-muted-foreground">
