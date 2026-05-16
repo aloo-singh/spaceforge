@@ -12,6 +12,7 @@ type UnitOriginTagProps = {
 export function UnitOriginTag({ unitOrigin, className }: UnitOriginTagProps) {
   const normalizedUnitOrigin = normalizeUnitOrigin(unitOrigin);
   const isImperial = normalizedUnitOrigin === "imperial";
+  const label = isImperial ? "Imperial" : "Metric";
 
   return (
     <Badge
@@ -24,7 +25,7 @@ export function UnitOriginTag({ unitOrigin, className }: UnitOriginTagProps) {
         className
       )}
     >
-      {normalizedUnitOrigin}
+      {label}
     </Badge>
   );
 }
