@@ -82,6 +82,7 @@ export {
   IconTriangleInverted as IconTriangleInverted,
   IconTrash as Trash2,
   IconWindow as WindowIcon,
+  IconWorld as World,
   IconWash as IconWash,
   IconToiletPaper as IconToiletPaper,
   IconX as X,

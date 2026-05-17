@@ -3,9 +3,11 @@
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BorderAll, Download, Stars, World } from "@/components/ui/icons";
 import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
@@ -77,7 +79,7 @@ export function EditorSettingsDialog({
       onOpenChange={onOpenChange}
       title="Editor settings"
       description="A focused home for editor preferences."
-      className="sm:w-[min(100%,32rem)] sm:p-4"
+      className="sm:w-[min(100%,56rem)] sm:p-5"
       footer={
         <Button
           type="button"
@@ -89,7 +91,28 @@ export function EditorSettingsDialog({
         </Button>
       }
     >
-      <section className="space-y-3">
+      <Tabs defaultValue="appearance" className="gap-4">
+        <TabsList className="!grid h-auto !w-full grid-cols-2 gap-1 bg-background/60 p-1 sm:grid-cols-4">
+          <TabsTrigger value="appearance" className="min-h-9 gap-2 text-xs sm:text-sm">
+            <Stars className="size-4" aria-hidden="true" />
+            Appearance
+          </TabsTrigger>
+          <TabsTrigger value="canvas" className="min-h-9 gap-2 text-xs sm:text-sm">
+            <BorderAll className="size-4" aria-hidden="true" />
+            Canvas
+          </TabsTrigger>
+          <TabsTrigger value="regional" className="min-h-9 gap-2 text-xs sm:text-sm">
+            <World className="size-4" aria-hidden="true" />
+            Regional
+          </TabsTrigger>
+          <TabsTrigger value="export" className="min-h-9 gap-2 text-xs sm:text-sm">
+            <Download className="size-4" aria-hidden="true" />
+            Export
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="appearance" className="mt-0">
+          <section className="grid gap-3 lg:grid-cols-2">
         <div
           aria-labelledby="editor-settings-appearance-title"
           className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
@@ -883,7 +906,13 @@ export function EditorSettingsDialog({
             </p>
           </div>
         </div>
-      </section>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="canvas" className="mt-0 min-h-48" />
+        <TabsContent value="regional" className="mt-0 min-h-48" />
+        <TabsContent value="export" className="mt-0 min-h-48" />
+      </Tabs>
     </ResponsiveDialog>
   );
 }
