@@ -1,14 +1,33 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { BorderAll, Download, Stars, World } from "@/components/ui/icons";
+import {
+  BorderAll,
+  Download,
+  IconBath,
+  IconDroplet,
+  IconFlame,
+  IconFountain,
+  IconFridge,
+  IconLamp2,
+  IconMicrowave,
+  IconToiletPaper,
+  IconWash,
+  Stars,
+  World,
+} from "@/components/ui/icons";
 import { Kbd } from "@/components/ui/kbd";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { shouldShowDimensions } from "@/lib/editor/settings";
 import { saveGlobalSettings } from "@/lib/editor/globalSettings";
+import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
+import { getFeatureConfig } from "@/lib/subscription/features";
+import { getTierConfig } from "@/lib/subscription/tiers";
 import { useEditorStore } from "@/stores/editorStore";
 
 type EditorSettingsDialogProps = {
@@ -17,6 +36,80 @@ type EditorSettingsDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+type RegionalAssetDefault = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  metricSize: string;
+  imperialSize: string;
+};
+
+const REGIONAL_ASSET_DEFAULTS: RegionalAssetDefault[] = [
+  {
+    key: "kitchen-unit",
+    label: "Kitchen unit",
+    icon: <IconFridge className="size-4" />,
+    metricSize: "600 x 600 mm",
+    imperialSize: "24 x 24 in",
+  },
+  {
+    key: "kitchen-appliance",
+    label: "Appliance",
+    icon: <IconMicrowave className="size-4" />,
+    metricSize: "600 x 600 mm",
+    imperialSize: "30 x 30 in",
+  },
+  {
+    key: "hob",
+    label: "Hob",
+    icon: <IconFlame className="size-4" />,
+    metricSize: "600 x 600 mm",
+    imperialSize: "30 x 24 in",
+  },
+  {
+    key: "sink",
+    label: "Sink",
+    icon: <IconWash className="size-4" />,
+    metricSize: "1200 x 600 mm",
+    imperialSize: "33 x 22 in",
+  },
+  {
+    key: "toilet",
+    label: "Toilet",
+    icon: <IconToiletPaper className="size-4" />,
+    metricSize: "400 x 700 mm",
+    imperialSize: "15 x 28 in",
+  },
+  {
+    key: "shower",
+    label: "Shower",
+    icon: <IconFountain className="size-4 rotate-180" />,
+    metricSize: "800 x 800 mm",
+    imperialSize: "36 x 36 in",
+  },
+  {
+    key: "bath",
+    label: "Bath",
+    icon: <IconBath className="size-4" />,
+    metricSize: "700 x 1600 mm",
+    imperialSize: "30 x 60 in",
+  },
+  {
+    key: "basin",
+    label: "Basin",
+    icon: <IconDroplet className="size-4" />,
+    metricSize: "500 x 400 mm",
+    imperialSize: "20 x 16 in",
+  },
+  {
+    key: "desk",
+    label: "Desk",
+    icon: <IconLamp2 className="size-4" />,
+    metricSize: "1200 x 900 mm",
+    imperialSize: "48 x 30 in",
+  },
+];
+
 export function EditorSettingsDialog({
   contentId,
   open,
@@ -24,7 +117,10 @@ export function EditorSettingsDialog({
 }: EditorSettingsDialogProps) {
   const { theme, setTheme } = useTheme();
   const settings = useEditorStore((state) => state.settings);
+  const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
   const updateSettings = useEditorStore((state) => state.updateSettings);
+  const updateProjectRegion = useEditorStore((state) => state.updateProjectRegion);
+  const devSubscriptionTier = useEditorStore((state) => state.devSubscriptionTier);
   const keyboardShortcutFeedbackEnabled = useEditorStore(
     (state) => state.keyboardShortcutFeedbackEnabled
   );
@@ -45,6 +141,19 @@ export function EditorSettingsDialog({
   const floorFootprintOpacity = settings.floorFootprintOpacity;
   const isCompactSidebarDensity = settings.sidebarDensity === "compact";
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
+  const areUnitOriginHighlightsVisible = settings.showUnitOriginHighlights;
+  const canShowUnitOriginHighlights = getTierConfig(devSubscriptionTier).hasUnitOriginHighlight;
+  const unitOriginHighlightsActive =
+    canShowUnitOriginHighlights && areUnitOriginHighlightsVisible;
+  const unitOriginHighlightFeature = getFeatureConfig(devSubscriptionTier, "unitOriginHighlight");
+  const unitOriginHighlightTooltip = canShowUnitOriginHighlights
+    ? "Highlight metric-origin elements yellow and imperial-origin elements magenta"
+    : unitOriginHighlightFeature?.upsellMessage("Pro", 1) ??
+      "Upgrade to Pro to highlight metric and imperial-origin elements";
+  const regionOptions: Array<{ value: ProjectRegion; label: string }> = [
+    { value: "metric", label: "Metric" },
+    { value: "imperial", label: "Imperial" },
+  ];
 
   return (
     <ResponsiveDialog
@@ -752,7 +861,141 @@ export function EditorSettingsDialog({
           </section>
         </TabsContent>
 
-        <TabsContent value="regional" className="mt-0 min-h-48" />
+        <TabsContent value="regional" className="mt-0">
+          <section className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+            <div className="space-y-3">
+              <div
+                aria-labelledby="editor-settings-regionalisation-title"
+                className="rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div>
+                    <h3 id="editor-settings-regionalisation-title" className="text-sm font-medium text-foreground">
+                      Project region
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Pick the measurement language for new rooms, openings, rulers, and assets in this project.
+                    </p>
+                  </div>
+                  <span className="w-fit shrink-0 rounded-md border border-border/70 bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Defaults
+                  </span>
+                </div>
+
+                <ImmediateTooltipProvider>
+                  <div
+                    className="mt-4 grid w-full grid-cols-2 rounded-lg border border-border/70 bg-background/90 p-1"
+                    role="radiogroup"
+                    aria-label="Project region"
+                  >
+                    {regionOptions.map((option) => (
+                      <Tooltip key={option.value}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            role="radio"
+                            variant={projectRegion === option.value ? "secondary" : "ghost"}
+                            aria-checked={projectRegion === option.value}
+                            onClick={() => updateProjectRegion(option.value)}
+                            className="min-w-0"
+                          >
+                            {option.label}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          Switch between metric and imperial defaults
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </ImmediateTooltipProvider>
+                <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                  This is not a conversion switch for old work. It tells [s]paceforge which assumptions to make next.
+                </p>
+              </div>
+
+              <div
+                aria-labelledby="editor-settings-unit-origin-title"
+                className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+              >
+                <div>
+                  <h3 id="editor-settings-unit-origin-title" className="text-sm font-medium text-foreground">
+                    Unit origin highlight
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Softly color-code elements by the unit family they were created with.
+                  </p>
+                </div>
+
+                <ImmediateTooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="mt-3 inline-flex w-full sm:w-auto">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={unitOriginHighlightsActive ? "secondary" : "outline"}
+                          aria-pressed={unitOriginHighlightsActive}
+                          disabled={!canShowUnitOriginHighlights}
+                          onClick={() =>
+                            updateSettings({
+                              showUnitOriginHighlights: !areUnitOriginHighlightsVisible,
+                            })
+                          }
+                          className="min-w-32 flex-1 sm:flex-none disabled:cursor-not-allowed"
+                        >
+                          {unitOriginHighlightsActive ? "Highlights on" : "Highlights off"}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center">
+                      {unitOriginHighlightTooltip}
+                    </TooltipContent>
+                  </Tooltip>
+                </ImmediateTooltipProvider>
+              </div>
+            </div>
+
+            <div
+              aria-labelledby="editor-settings-asset-defaults-title"
+              className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <div>
+                  <h3 id="editor-settings-asset-defaults-title" className="text-sm font-medium text-foreground">
+                    Asset defaults
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    New assets use these starting dimensions when the project region is {projectRegion}.
+                  </p>
+                </div>
+                <span className="w-fit shrink-0 rounded-md border border-border/70 bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  {projectRegion}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {REGIONAL_ASSET_DEFAULTS.map((asset) => (
+                  <div
+                    key={asset.key}
+                    className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/70 p-2.5"
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground">
+                      {asset.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-foreground">{asset.label}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                        {projectRegion === "imperial" ? asset.imperialSize : asset.metricSize}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </TabsContent>
         <TabsContent value="export" className="mt-0 min-h-48" />
       </Tabs>
     </ResponsiveDialog>
