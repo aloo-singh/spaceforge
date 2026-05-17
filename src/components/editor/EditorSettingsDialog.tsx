@@ -353,7 +353,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-measurements-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-1"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -437,7 +437,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-measurement-font-size-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-3"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -489,7 +489,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-canvas-hud-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-5"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -537,7 +537,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-mini-map-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-6"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -580,7 +580,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-room-names-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-7"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -623,7 +623,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-assets-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-2"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -704,7 +704,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-guidelines-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-8"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -752,7 +752,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-snapping-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-9"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
@@ -800,7 +800,7 @@ export function EditorSettingsDialog({
 
         <div
           aria-labelledby="editor-settings-floor-footprint-title"
-          className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-4"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
