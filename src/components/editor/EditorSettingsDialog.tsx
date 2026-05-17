@@ -175,20 +175,20 @@ export function EditorSettingsDialog({
       }
     >
       <Tabs defaultValue="appearance" className="gap-4">
-        <TabsList className="!grid h-auto !w-full grid-cols-2 gap-1 bg-background/60 p-1 sm:grid-cols-4">
-          <TabsTrigger value="appearance" className="min-h-9 gap-2 text-xs sm:text-sm">
+        <TabsList className="!grid h-auto !w-full grid-cols-2 sm:h-9 sm:grid-cols-4">
+          <TabsTrigger value="appearance">
             <Stars className="size-4" aria-hidden="true" />
             Appearance
           </TabsTrigger>
-          <TabsTrigger value="canvas" className="min-h-9 gap-2 text-xs sm:text-sm">
+          <TabsTrigger value="canvas">
             <BorderAll className="size-4" aria-hidden="true" />
             Canvas
           </TabsTrigger>
-          <TabsTrigger value="regional" className="min-h-9 gap-2 text-xs sm:text-sm">
+          <TabsTrigger value="regional">
             <World className="size-4" aria-hidden="true" />
             Regional
           </TabsTrigger>
-          <TabsTrigger value="export" className="min-h-9 gap-2 text-xs sm:text-sm">
+          <TabsTrigger value="export">
             <Download className="size-4" aria-hidden="true" />
             Export
           </TabsTrigger>
