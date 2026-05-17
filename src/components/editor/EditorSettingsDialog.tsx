@@ -23,7 +23,9 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getInteriorAssetDisplayName } from "@/lib/editor/interiorAssets";
 import { shouldShowDimensions } from "@/lib/editor/settings";
+import type { InteriorAssetType } from "@/lib/editor/types";
 import { saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { getFeatureConfig } from "@/lib/subscription/features";
@@ -37,8 +39,7 @@ type EditorSettingsDialogProps = {
 };
 
 type RegionalAssetDefault = {
-  key: string;
-  label: string;
+  type: InteriorAssetType;
   icon: ReactNode;
   metricSize: string;
   imperialSize: string;
@@ -46,64 +47,55 @@ type RegionalAssetDefault = {
 
 const REGIONAL_ASSET_DEFAULTS: RegionalAssetDefault[] = [
   {
-    key: "kitchen-unit",
-    label: "Kitchen unit",
+    type: "kitchen-unit",
     icon: <IconFridge className="size-4" />,
     metricSize: "600 x 600 mm",
     imperialSize: "24 x 24 in",
   },
   {
-    key: "kitchen-appliance",
-    label: "Appliance",
+    type: "kitchen-appliance",
     icon: <IconMicrowave className="size-4" />,
     metricSize: "600 x 600 mm",
     imperialSize: "30 x 30 in",
   },
   {
-    key: "hob",
-    label: "Hob",
+    type: "hob",
     icon: <IconFlame className="size-4" />,
     metricSize: "600 x 600 mm",
     imperialSize: "30 x 24 in",
   },
   {
-    key: "sink",
-    label: "Sink",
+    type: "sink",
     icon: <IconWash className="size-4" />,
     metricSize: "1200 x 600 mm",
     imperialSize: "33 x 22 in",
   },
   {
-    key: "toilet",
-    label: "Toilet",
+    type: "toilet",
     icon: <IconToiletPaper className="size-4" />,
     metricSize: "400 x 700 mm",
     imperialSize: "15 x 28 in",
   },
   {
-    key: "shower",
-    label: "Shower",
+    type: "shower",
     icon: <IconFountain className="size-4 rotate-180" />,
     metricSize: "800 x 800 mm",
     imperialSize: "36 x 36 in",
   },
   {
-    key: "bath",
-    label: "Bath",
+    type: "bath",
     icon: <IconBath className="size-4" />,
     metricSize: "700 x 1600 mm",
     imperialSize: "30 x 60 in",
   },
   {
-    key: "basin",
-    label: "Basin",
+    type: "basin",
     icon: <IconDroplet className="size-4" />,
     metricSize: "500 x 400 mm",
     imperialSize: "20 x 16 in",
   },
   {
-    key: "desk",
-    label: "Desk",
+    type: "desk",
     icon: <IconLamp2 className="size-4" />,
     metricSize: "1200 x 900 mm",
     imperialSize: "48 x 30 in",
@@ -978,14 +970,16 @@ export function EditorSettingsDialog({
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {REGIONAL_ASSET_DEFAULTS.map((asset) => (
                   <div
-                    key={asset.key}
+                    key={asset.type}
                     className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/70 p-2.5"
                   >
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground">
                       {asset.icon}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-foreground">{asset.label}</p>
+                      <p className="truncate text-xs font-medium text-foreground">
+                        {getInteriorAssetDisplayName(asset.type, projectRegion)}
+                      </p>
                       <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                         {projectRegion === "imperial" ? asset.imperialSize : asset.metricSize}
                       </p>
