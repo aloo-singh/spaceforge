@@ -554,43 +554,43 @@ export function EditorSettingsDialog({
             </Button>
           </div>
 
-          {areAssetsVisible && (
-            <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
-              <div>
-                <h4 className="text-xs font-medium text-foreground">Show asset labels</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Display labels on furniture and fixtures for quick item identification.
-                </p>
-              </div>
-
-              <div
-                className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
-                role="group"
-                aria-label="Show asset labels"
-              >
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={areAssetLabelsVisible ? "secondary" : "ghost"}
-                  aria-pressed={areAssetLabelsVisible}
-                  onClick={() => updateSettings({ showAssetLabels: true })}
-                  className="min-w-20 flex-1 sm:flex-none"
-                >
-                  On
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={!areAssetLabelsVisible ? "secondary" : "ghost"}
-                  aria-pressed={!areAssetLabelsVisible}
-                  onClick={() => updateSettings({ showAssetLabels: false })}
-                  className="min-w-20 flex-1 sm:flex-none"
-                >
-                  Off
-                </Button>
-              </div>
+          <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+            <div>
+              <h4 className="text-xs font-medium text-foreground">Show asset labels</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Display labels on furniture and fixtures for quick item identification.
+              </p>
             </div>
-          )}
+
+            <div
+              className="flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+              role="group"
+              aria-label="Show asset labels"
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant={areAssetLabelsVisible ? "secondary" : "ghost"}
+                aria-pressed={areAssetLabelsVisible}
+                disabled={!areAssetsVisible}
+                onClick={() => updateSettings({ showAssetLabels: true })}
+                className="min-w-20 flex-1 sm:flex-none disabled:cursor-not-allowed"
+              >
+                On
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={!areAssetLabelsVisible ? "secondary" : "ghost"}
+                aria-pressed={!areAssetLabelsVisible}
+                disabled={!areAssetsVisible}
+                onClick={() => updateSettings({ showAssetLabels: false })}
+                className="min-w-20 flex-1 sm:flex-none disabled:cursor-not-allowed"
+              >
+                Off
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div
@@ -731,23 +731,22 @@ export function EditorSettingsDialog({
             </Button>
           </div>
 
-          {isFloorFootprintVisible && (
-            <div className="mt-4 space-y-2">
-              <label htmlFor="floor-footprint-opacity" className="flex items-center justify-between text-xs font-medium text-foreground">
-                <span>Opacity</span>
-                <span className="text-muted-foreground">{Math.round(floorFootprintOpacity * 100)}%</span>
-              </label>
-              <Slider
-                id="floor-footprint-opacity"
-                min={0}
-                max={1}
-                step={0.05}
-                value={[floorFootprintOpacity]}
-                onValueChange={(value) => updateSettings({ floorFootprintOpacity: value[0] })}
-                className="w-full"
-              />
-            </div>
-          )}
+          <div className="mt-4 space-y-2">
+            <label htmlFor="floor-footprint-opacity" className="flex items-center justify-between text-xs font-medium text-foreground">
+              <span>Opacity</span>
+              <span className="text-muted-foreground">{Math.round(floorFootprintOpacity * 100)}%</span>
+            </label>
+            <Slider
+              id="floor-footprint-opacity"
+              min={0}
+              max={1}
+              step={0.05}
+              value={[floorFootprintOpacity]}
+              disabled={!isFloorFootprintVisible}
+              onValueChange={(value) => updateSettings({ floorFootprintOpacity: value[0] })}
+              className="w-full data-disabled:cursor-not-allowed"
+            />
+          </div>
         </div>
 
           </section>
