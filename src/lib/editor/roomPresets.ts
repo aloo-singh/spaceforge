@@ -8,6 +8,18 @@ export type RoomPreset = {
   color: string;
 };
 
+export const ROOM_PRESET_COLORS = {
+  zinc500: "#71717a",
+  amber300: "#fcd34d",
+  violet400: "#a78bfa",
+  blue400: "#60a5fa",
+  slate400: "#94a3b8",
+  sky400: "#38bdf8",
+  green300: "#86efac",
+  blue500: "#3b82f6",
+  blue600: "#2563eb",
+} as const;
+
 export const ROOM_PRESETS = [
   {
     id: "hall-landing",
@@ -19,7 +31,7 @@ export const ROOM_PRESETS = [
       metric: "Hall",
       imperial: "Hall",
     },
-    color: "#71717a",
+    color: ROOM_PRESET_COLORS.zinc500,
   },
   {
     id: "lounge",
@@ -31,7 +43,7 @@ export const ROOM_PRESETS = [
       metric: "Lounge",
       imperial: "Living Room",
     },
-    color: "#d8b58a",
+    color: ROOM_PRESET_COLORS.amber300,
   },
   {
     id: "study",
@@ -43,7 +55,7 @@ export const ROOM_PRESETS = [
       metric: "Study",
       imperial: "Office",
     },
-    color: "#a78bfa",
+    color: ROOM_PRESET_COLORS.violet400,
   },
   {
     id: "kitchen",
@@ -55,7 +67,7 @@ export const ROOM_PRESETS = [
       metric: "Kitchen",
       imperial: "Kitchen",
     },
-    color: "#60a5fa",
+    color: ROOM_PRESET_COLORS.blue400,
   },
   {
     id: "utility",
@@ -67,7 +79,7 @@ export const ROOM_PRESETS = [
       metric: "Utility",
       imperial: "Laundry",
     },
-    color: "#94a3b8",
+    color: ROOM_PRESET_COLORS.slate400,
   },
   {
     id: "wc",
@@ -79,7 +91,7 @@ export const ROOM_PRESETS = [
       metric: "WC",
       imperial: "Half Bath",
     },
-    color: "#38bdf8",
+    color: ROOM_PRESET_COLORS.sky400,
   },
   {
     id: "bedroom",
@@ -91,7 +103,7 @@ export const ROOM_PRESETS = [
       metric: "Bedroom",
       imperial: "Bedroom",
     },
-    color: "#86efac",
+    color: ROOM_PRESET_COLORS.green300,
   },
   {
     id: "bathroom",
@@ -103,7 +115,7 @@ export const ROOM_PRESETS = [
       metric: "Bathroom",
       imperial: "Bathroom",
     },
-    color: "#3b82f6",
+    color: ROOM_PRESET_COLORS.blue500,
   },
   {
     id: "ensuite",
@@ -115,7 +127,7 @@ export const ROOM_PRESETS = [
       metric: "En-suite",
       imperial: "En-suite",
     },
-    color: "#2563eb",
+    color: ROOM_PRESET_COLORS.blue600,
   },
 ] as const satisfies readonly RoomPreset[];
 

@@ -517,14 +517,15 @@ function RoomPresetPickerOverlay({
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
-              "absolute left-1/2 top-1/2 flex items-center justify-center rounded-full border border-border/80 bg-background/94 px-2 text-center text-[10px] leading-tight font-semibold text-foreground/72 shadow-[0_8px_22px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,background-color,color,border-color] duration-150 hover:scale-[1.04] hover:border-foreground/20 hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:bg-zinc-950/90 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)]",
+              "absolute left-1/2 top-1/2 flex items-center justify-center rounded-full border px-2 text-center text-[10px] leading-tight font-semibold text-zinc-950/78 shadow-[0_8px_22px_rgba(15,23,42,0.12)] transition-[transform,color,border-color,filter] duration-150 hover:scale-[1.04] hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)]",
               compact ? "text-[9px]" : "text-[10px]"
             )}
             style={{
               width: `${buttonSize}px`,
               height: `${buttonSize}px`,
-              borderColor: `${preset.color}99`,
-              boxShadow: `0 8px 22px rgba(15, 23, 42, 0.12), inset 0 -10px 20px ${preset.color}1f`,
+              backgroundColor: preset.color,
+              borderColor: `${preset.color}cc`,
+              boxShadow: "0 8px 22px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.42)",
               transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
               fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
             }}
