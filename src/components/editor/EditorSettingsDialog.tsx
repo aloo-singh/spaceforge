@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   BorderAll,
   Download,
@@ -23,20 +24,28 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImmediateTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion";
 import { getInteriorAssetDisplayName } from "@/lib/editor/interiorAssets";
-import { shouldShowDimensions } from "@/lib/editor/settings";
+import {
+  EDITOR_EXPORT_SIGNATURE_MAX_LENGTH,
+  normalizeEditorExportSignature,
+  shouldShowDimensions,
+} from "@/lib/editor/settings";
 import type { InteriorAssetType } from "@/lib/editor/types";
 import { saveGlobalSettings } from "@/lib/editor/globalSettings";
 import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { getFeatureConfig } from "@/lib/subscription/features";
 import { getTierConfig } from "@/lib/subscription/tiers";
 import { useEditorStore } from "@/stores/editorStore";
+import { cn } from "@/lib/utils";
 
 type EditorSettingsDialogProps = {
   contentId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
+
+type SettingsTab = "appearance" | "canvas" | "regional" | "export";
 
 type RegionalAssetDefault = {
   type: InteriorAssetType;
@@ -108,6 +117,10 @@ export function EditorSettingsDialog({
   onOpenChange,
 }: EditorSettingsDialogProps) {
   const { theme, setTheme } = useTheme();
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+  const [measuredContentHeight, setMeasuredContentHeight] = useState<number | null>(null);
+  const tabPanelRef = useRef<HTMLDivElement | null>(null);
   const settings = useEditorStore((state) => state.settings);
   const projectRegion = useEditorStore((state) => normalizeProjectRegion(state.document.region));
   const updateSettings = useEditorStore((state) => state.updateSettings);
@@ -132,6 +145,7 @@ export function EditorSettingsDialog({
   const isFloorFootprintVisible = settings.showFloorFootprint;
   const floorFootprintOpacity = settings.floorFootprintOpacity;
   const isCompactSidebarDensity = settings.sidebarDensity === "compact";
+  const normalizedExportSignature = normalizeEditorExportSignature(settings.exportSignatureText);
   const selectedAppearance = theme === "light" || theme === "dark" ? theme : "system";
   const areUnitOriginHighlightsVisible = settings.showUnitOriginHighlights;
   const canShowUnitOriginHighlights = getTierConfig(devSubscriptionTier).hasUnitOriginHighlight;
@@ -146,6 +160,32 @@ export function EditorSettingsDialog({
     { value: "metric", label: "Metric" },
     { value: "imperial", label: "Imperial" },
   ];
+  const tabContentClassName = cn(
+    "mt-0",
+    !prefersReducedMotion &&
+      "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-1 data-[state=active]:duration-150"
+  );
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || !open) return;
+
+    const panel = tabPanelRef.current;
+    if (!panel) return;
+
+    const updateContentHeight = () => {
+      setMeasuredContentHeight(panel.getBoundingClientRect().height);
+    };
+
+    const frame = requestAnimationFrame(updateContentHeight);
+
+    const resizeObserver = new ResizeObserver(updateContentHeight);
+    resizeObserver.observe(panel);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+    };
+  }, [activeTab, open, prefersReducedMotion]);
 
   return (
     <ResponsiveDialog
@@ -166,7 +206,11 @@ export function EditorSettingsDialog({
         </Button>
       }
     >
-      <Tabs defaultValue="appearance" className="gap-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as SettingsTab)}
+        className="gap-4"
+      >
         <TabsList className="!grid h-auto !w-full grid-cols-2 sm:h-9 sm:grid-cols-4">
           <TabsTrigger value="appearance">
             <Stars className="size-4" aria-hidden="true" />
@@ -186,7 +230,24 @@ export function EditorSettingsDialog({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="appearance" className="mt-0">
+        <div
+          className={cn(
+            "overflow-hidden",
+            !prefersReducedMotion && "transition-[height] duration-200 ease-out"
+          )}
+          style={
+            !prefersReducedMotion && measuredContentHeight !== null
+              ? { height: measuredContentHeight }
+              : undefined
+          }
+        >
+          <div
+            ref={tabPanelRef}
+            className={cn(
+              !prefersReducedMotion && "transition-opacity duration-150 ease-out"
+            )}
+          >
+        <TabsContent value="appearance" className={tabContentClassName}>
           <section className="grid gap-3 lg:grid-cols-2">
         <div
           aria-labelledby="editor-settings-appearance-title"
@@ -340,7 +401,7 @@ export function EditorSettingsDialog({
           </section>
         </TabsContent>
 
-        <TabsContent value="canvas" className="mt-0">
+        <TabsContent value="canvas" className={tabContentClassName}>
           <section className="grid gap-3 lg:grid-cols-2">
 
         <div
@@ -853,7 +914,7 @@ export function EditorSettingsDialog({
           </section>
         </TabsContent>
 
-        <TabsContent value="regional" className="mt-0">
+        <TabsContent value="regional" className={tabContentClassName}>
           <section className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
             <div className="space-y-3">
               <div
@@ -990,7 +1051,73 @@ export function EditorSettingsDialog({
             </div>
           </section>
         </TabsContent>
-        <TabsContent value="export" className="mt-0 min-h-48" />
+        <TabsContent value="export" className={tabContentClassName}>
+          <section className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div
+              aria-labelledby="editor-settings-export-title"
+              className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+            >
+              <div>
+                <h3 id="editor-settings-export-title" className="text-sm font-medium text-foreground">
+                  Export signature
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Add an optional designer credit to exported PNGs without keeping a text field in the toolbar.
+                </p>
+              </div>
+
+              <div className="mt-3 space-y-2.5">
+                <label
+                  htmlFor="editor-settings-export-signature"
+                  className="text-xs font-medium text-foreground"
+                >
+                  Designed by
+                </label>
+                <Input
+                  id="editor-settings-export-signature"
+                  type="text"
+                  value={settings.exportSignatureText}
+                  onChange={(event) => updateSettings({ exportSignatureText: event.target.value })}
+                  maxLength={EDITOR_EXPORT_SIGNATURE_MAX_LENGTH}
+                  placeholder="Your name or studio"
+                  aria-describedby="editor-settings-export-signature-help"
+                  className="h-9"
+                />
+                <p
+                  id="editor-settings-export-signature-help"
+                  className="text-xs leading-relaxed text-muted-foreground"
+                >
+                  Exported images will show{" "}
+                  <span className="font-medium text-foreground/90">
+                    {`"Designed by ${normalizedExportSignature || "your name"}"`}
+                  </span>{" "}
+                  when this field is filled in.
+                </p>
+              </div>
+            </div>
+
+            <div
+              aria-labelledby="editor-settings-export-details-title"
+              className="rounded-xl border border-border/70 bg-muted/25 p-3.5"
+            >
+              <h3 id="editor-settings-export-details-title" className="text-sm font-medium text-foreground">
+                Export details
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Exported images include the current canvas view and any optional signature configured here.
+              </p>
+              <div className="mt-3 rounded-lg border border-border/60 bg-background/70 p-2.5">
+                <p className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+                  Designed with [s]paceforge
+                  <br />
+                  spaceforge.app
+                </p>
+              </div>
+            </div>
+          </section>
+        </TabsContent>
+          </div>
+        </div>
       </Tabs>
     </ResponsiveDialog>
   );
