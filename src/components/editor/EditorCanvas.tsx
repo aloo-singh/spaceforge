@@ -87,6 +87,7 @@ import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnai
 import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
   findRoomAtPoint,
+  getPolygonLabelAnchor,
   isAxisAlignedRectangle,
   isPointInPolygon,
   isSimplePolygon,
@@ -219,6 +220,7 @@ import {
 import { Toggle } from "@/components/ui/toggle";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useMobile } from "@/lib/use-mobile";
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
@@ -274,6 +276,22 @@ const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
 const MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS = "min(22rem, 42vh)";
 const MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX = 44;
+const ROOM_PRESET_PICKER_RADIUS_PX = 124;
+const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 104;
+const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 76;
+const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 64;
+const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
+const ROOM_PRESET_PICKER_OPTION_LABELS = [
+  "Living",
+  "Kitchen",
+  "Bedroom",
+  "Bath",
+  "Dining",
+  "Office",
+  "Hall",
+  "Utility",
+  "Garage",
+] as const;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -449,6 +467,83 @@ function CanvasHudCard({ children, className }: { children: ReactNode; className
       className
     )}>
       {children}
+    </div>
+  );
+}
+
+function RoomPresetPickerOverlay({
+  center,
+  compact,
+  prefersReducedMotion,
+  onOther,
+}: {
+  center: ScreenPoint;
+  compact: boolean;
+  prefersReducedMotion: boolean;
+  onOther: () => void;
+}) {
+  const radius = compact ? ROOM_PRESET_PICKER_COMPACT_RADIUS_PX : ROOM_PRESET_PICKER_RADIUS_PX;
+  const buttonSize = compact
+    ? ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX
+    : ROOM_PRESET_PICKER_BUTTON_SIZE_PX;
+
+  return (
+    <div
+      className={cn(
+        "pointer-events-auto absolute z-20",
+        prefersReducedMotion
+          ? "opacity-100"
+          : "motion-safe:animate-[roomPresetPickerSpring_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
+      )}
+      style={{
+        left: `${center.x}px`,
+        top: `${center.y}px`,
+        width: `${radius * 2 + buttonSize}px`,
+        height: `${radius * 2 + buttonSize}px`,
+        transform: "translate(-50%, -50%)",
+      }}
+      aria-label="Room preset picker"
+    >
+      {ROOM_PRESET_PICKER_OPTION_LABELS.map((label, index) => {
+        const angle = -Math.PI / 2 + (index / ROOM_PRESET_PICKER_OPTION_LABELS.length) * Math.PI * 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+
+        return (
+          <button
+            key={label}
+            type="button"
+            aria-label={`Preset placeholder ${label}`}
+            className={cn(
+              "absolute left-1/2 top-1/2 flex items-center justify-center rounded-full border border-border/80 bg-background/94 px-2 text-center text-[10px] leading-tight font-semibold text-foreground/72 shadow-[0_8px_22px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,background-color,color,border-color] duration-150 hover:scale-[1.04] hover:border-foreground/20 hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:bg-zinc-950/90 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)]",
+              compact ? "text-[9px]" : "text-[10px]"
+            )}
+            style={{
+              width: `${buttonSize}px`,
+              height: `${buttonSize}px`,
+              transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+              fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onOther}
+        className={cn(
+          "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-900/12 bg-zinc-950 px-2 text-center text-[10px] leading-tight font-semibold text-zinc-50 shadow-[0_10px_28px_rgba(15,23,42,0.18)] transition-[transform,background-color] duration-150 hover:scale-[1.03] hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:border-zinc-100/16 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200",
+          compact ? "text-[9px]" : "text-[10px]"
+        )}
+        style={{
+          width: `${buttonSize}px`,
+          height: `${buttonSize}px`,
+          fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+        }}
+      >
+        Other
+      </button>
     </div>
   );
 }
@@ -964,6 +1059,8 @@ export default function EditorCanvas({
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const [roomPresetPickerRoomId, setRoomPresetPickerRoomId] = useState<string | null>(null);
+  const previousRoomIdsRef = useRef<Set<string> | null>(null);
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -990,6 +1087,7 @@ export default function EditorCanvas({
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
+  const prefersReducedMotion = usePrefersReducedMotion();
   const showFloorFootprint = useEditorStore((state) => state.settings.showFloorFootprint);
   const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
   const [previousActiveFloorId, setPreviousActiveFloorId] = useState<string | null>(null);
@@ -1085,6 +1183,51 @@ export default function EditorCanvas({
     roomCount,
     roomDraftPointCount,
   ]);
+
+  useEffect(() => {
+    const currentRoomIds = new Set(rooms.map((room) => room.id));
+    const previousRoomIds = previousRoomIdsRef.current;
+    previousRoomIdsRef.current = currentRoomIds;
+
+    if (!previousRoomIds) return;
+    const newRoom = rooms.find((room) => !previousRoomIds.has(room.id));
+    if (!newRoom || newRoom.id !== selectedRoomId || roomDraftPointCount > 0) return;
+
+    setRoomPresetPickerRoomId(newRoom.id);
+  }, [roomDraftPointCount, rooms, selectedRoomId]);
+
+  useEffect(() => {
+    if (!roomPresetPickerRoomId) return;
+    const roomStillVisible = rooms.some((room) => room.id === roomPresetPickerRoomId);
+    const shouldDismiss =
+      !roomStillVisible ||
+      selectedRoomId !== roomPresetPickerRoomId ||
+      roomDraftPointCount > 0 ||
+      isRulerMode ||
+      selectedNorthIndicator;
+
+    if (shouldDismiss) {
+      setRoomPresetPickerRoomId(null);
+    }
+  }, [
+    isRulerMode,
+    roomDraftPointCount,
+    roomPresetPickerRoomId,
+    rooms,
+    selectedNorthIndicator,
+    selectedRoomId,
+  ]);
+
+  const handleRoomPresetPickerOther = useCallback(() => {
+    setRoomPresetPickerRoomId(null);
+    window.requestAnimationFrame(() => {
+      const inputElement = document.getElementById("room-name-input");
+      if (inputElement instanceof HTMLInputElement) {
+        inputElement.focus({ preventScroll: true });
+        inputElement.select();
+      }
+    });
+  }, []);
 
   const drawCurrentScene = useCallback(() => {
     const app = appRef.current;
@@ -3209,6 +3352,26 @@ export default function EditorCanvas({
   const editorGridTemplateColumns = [leftSidebarWidth, "minmax(0,1fr)", rightInspectorWidth]
     .filter((value): value is string => value !== null)
     .join(" ");
+  const roomPresetPickerPosition = useMemo(() => {
+    if (!roomPresetPickerRoomId || viewport.width <= 0 || viewport.height <= 0) return null;
+    const room = rooms.find((candidate) => candidate.id === roomPresetPickerRoomId);
+    if (!room) return null;
+    const anchor = getPolygonLabelAnchor(room.points);
+    if (!anchor) return null;
+
+    const screenCenter = worldToScreen(anchor, camera, viewport);
+    const radius = useCompactHud ? ROOM_PRESET_PICKER_COMPACT_RADIUS_PX : ROOM_PRESET_PICKER_RADIUS_PX;
+    const buttonSize = useCompactHud
+      ? ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX
+      : ROOM_PRESET_PICKER_BUTTON_SIZE_PX;
+    const halfSize = radius + buttonSize / 2;
+    const margin = ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX + halfSize;
+
+    return {
+      x: clampValue(screenCenter.x, margin, Math.max(margin, viewport.width - margin)),
+      y: clampValue(screenCenter.y, margin, Math.max(margin, viewport.height - margin)),
+    };
+  }, [camera, roomPresetPickerRoomId, rooms, useCompactHud, viewport]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3384,6 +3547,21 @@ export default function EditorCanvas({
           }
           100% {
             background-position: 0 0%;
+          }
+        }
+
+        @keyframes roomPresetPickerSpring {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.86);
+          }
+          68% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.035);
+          }
+          100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
           }
         }
 
@@ -3821,6 +3999,14 @@ export default function EditorCanvas({
             >
               {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 15°
             </div>
+          ) : null}
+          {roomPresetPickerPosition ? (
+            <RoomPresetPickerOverlay
+              center={roomPresetPickerPosition}
+              compact={useCompactHud}
+              prefersReducedMotion={prefersReducedMotion}
+              onOther={handleRoomPresetPickerOther}
+            />
           ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (
             <aside
