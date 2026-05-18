@@ -138,6 +138,11 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
+  ROOM_PRESETS,
+  getRegionalRoomPresetLabel,
+  type RoomPreset,
+} from "@/lib/editor/roomPresets";
+import {
   matchEditorKeyboardShortcut,
   showKeyboardShortcutFeedback,
 } from "@/lib/editor/keyboardMap";
@@ -233,7 +238,7 @@ import {
 } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { EditorCommand } from "@/lib/editor/history";
-import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
+import { normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig } from "@/lib/subscription/tiers";
 
 const EMPTY_ROOM_RESIZE_UI = {
@@ -281,17 +286,6 @@ const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 104;
 const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 76;
 const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 64;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
-const ROOM_PRESET_PICKER_OPTION_LABELS = [
-  "Living",
-  "Kitchen",
-  "Bedroom",
-  "Bath",
-  "Dining",
-  "Office",
-  "Hall",
-  "Utility",
-  "Garage",
-] as const;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -475,11 +469,17 @@ function RoomPresetPickerOverlay({
   center,
   compact,
   prefersReducedMotion,
+  presets,
+  region,
+  onSelectPreset,
   onOther,
 }: {
   center: ScreenPoint;
   compact: boolean;
   prefersReducedMotion: boolean;
+  presets: readonly RoomPreset[];
+  region: ProjectRegion;
+  onSelectPreset: (preset: RoomPreset) => void;
   onOther: () => void;
 }) {
   const radius = compact ? ROOM_PRESET_PICKER_COMPACT_RADIUS_PX : ROOM_PRESET_PICKER_RADIUS_PX;
@@ -504,16 +504,18 @@ function RoomPresetPickerOverlay({
       }}
       aria-label="Room preset picker"
     >
-      {ROOM_PRESET_PICKER_OPTION_LABELS.map((label, index) => {
-        const angle = -Math.PI / 2 + (index / ROOM_PRESET_PICKER_OPTION_LABELS.length) * Math.PI * 2;
+      {presets.map((preset, index) => {
+        const label = getRegionalRoomPresetLabel(preset, region);
+        const angle = -Math.PI / 2 + (index / presets.length) * Math.PI * 2;
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
 
         return (
           <button
-            key={label}
+            key={preset.id}
             type="button"
-            aria-label={`Preset placeholder ${label}`}
+            onClick={() => onSelectPreset(preset)}
+            aria-label={`Name room ${label}`}
             className={cn(
               "absolute left-1/2 top-1/2 flex items-center justify-center rounded-full border border-border/80 bg-background/94 px-2 text-center text-[10px] leading-tight font-semibold text-foreground/72 shadow-[0_8px_22px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,background-color,color,border-color] duration-150 hover:scale-[1.04] hover:border-foreground/20 hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:bg-zinc-950/90 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)]",
               compact ? "text-[9px]" : "text-[10px]"
@@ -521,6 +523,8 @@ function RoomPresetPickerOverlay({
             style={{
               width: `${buttonSize}px`,
               height: `${buttonSize}px`,
+              borderColor: `${preset.color}99`,
+              boxShadow: `0 8px 22px rgba(15, 23, 42, 0.12), inset 0 -10px 20px ${preset.color}1f`,
               transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
               fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
             }}
@@ -1059,6 +1063,8 @@ export default function EditorCanvas({
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const applyRoomPreset = useEditorStore((state) => state.applyRoomPreset);
+  const applyOtherRoomPreset = useEditorStore((state) => state.applyOtherRoomPreset);
   const [roomPresetPickerRoomId, setRoomPresetPickerRoomId] = useState<string | null>(null);
   const previousRoomIdsRef = useRef<Set<string> | null>(null);
   const selectedFloorId = useEditorStore((state) => {
@@ -1218,7 +1224,19 @@ export default function EditorCanvas({
     selectedRoomId,
   ]);
 
+  const handleRoomPresetPickerSelect = useCallback(
+    (preset: RoomPreset) => {
+      if (!roomPresetPickerRoomId) return;
+      applyRoomPreset(roomPresetPickerRoomId, preset.id);
+      setRoomPresetPickerRoomId(null);
+    },
+    [applyRoomPreset, roomPresetPickerRoomId]
+  );
+
   const handleRoomPresetPickerOther = useCallback(() => {
+    if (roomPresetPickerRoomId) {
+      applyOtherRoomPreset(roomPresetPickerRoomId);
+    }
     setRoomPresetPickerRoomId(null);
     window.requestAnimationFrame(() => {
       const inputElement = document.getElementById("room-name-input");
@@ -1227,7 +1245,7 @@ export default function EditorCanvas({
         inputElement.select();
       }
     });
-  }, []);
+  }, [applyOtherRoomPreset, roomPresetPickerRoomId]);
 
   const drawCurrentScene = useCallback(() => {
     const app = appRef.current;
@@ -4005,6 +4023,9 @@ export default function EditorCanvas({
               center={roomPresetPickerPosition}
               compact={useCompactHud}
               prefersReducedMotion={prefersReducedMotion}
+              presets={ROOM_PRESETS}
+              region={displayUnitOrigin}
+              onSelectPreset={handleRoomPresetPickerSelect}
               onOther={handleRoomPresetPickerOther}
             />
           ) : null}
@@ -4649,6 +4670,7 @@ function drawRooms(
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
+    const roomColor = getRoomColorNumber(room.roomColor);
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
@@ -4676,7 +4698,8 @@ function drawRooms(
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
       isSelected ? selectedFillAlpha : 0.12,
       isSelected ? selectedStrokeWidth : 2,
-      isSelected ? selectedStrokeAlpha : 0.9
+      isSelected ? selectedStrokeAlpha : 0.9,
+      roomColor ?? undefined
     );
 
     if (isAssetDragTarget) {
@@ -4841,6 +4864,11 @@ function drawRooms(
 
 function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {
   return selection.some((item) => item.type === "room" && item.id === roomId);
+}
+
+function getRoomColorNumber(roomColor: string | undefined): number | null {
+  if (!roomColor || !/^#[0-9a-fA-F]{6}$/.test(roomColor)) return null;
+  return Number.parseInt(roomColor.slice(1), 16);
 }
 
 function getVisibleRoomsForFocusedRoom(rooms: Room[], focusedRoomId: string | null): Room[] {
@@ -5155,12 +5183,13 @@ function drawRoomShape(
   strokeColor: number,
   fillAlpha: number,
   strokeWidth: number,
-  strokeAlpha: number
+  strokeAlpha: number,
+  fillColor?: number
 ) {
   const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
 
   graphics.setFillStyle({
-    color: strokeColor,
+    color: fillColor ?? strokeColor,
     alpha: fillAlpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);

@@ -134,6 +134,12 @@ export type EditorCommand =
       nextName: string;
     }
   | {
+      type: "update-room-preset";
+      roomId: string;
+      previousRoom: Pick<Room, "name" | "roomType" | "roomColor">;
+      nextRoom: Pick<Room, "name" | "roomType" | "roomColor">;
+    }
+  | {
       type: "rename-floor";
       floorId: string;
       previousName: string;
@@ -497,6 +503,8 @@ export function applyEditorCommand(
         {
           ...command.room,
           unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
+          roomType: command.room.roomType,
+          roomColor: command.room.roomColor,
           points: command.room.points.map((point) => ({ ...point })),
           openings: cloneRoomOpenings(command.room.openings),
           interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
@@ -982,6 +990,23 @@ export function applyEditorCommand(
           ? {
               ...room,
               name: nextName,
+            }
+          : room
+      ),
+    };
+  }
+
+  if (command.type === "update-room-preset") {
+    const nextRoom = direction === "undo" ? command.previousRoom : command.nextRoom;
+    return {
+      ...document,
+      rooms: document.rooms.map((room) =>
+        room.id === command.roomId
+          ? {
+              ...room,
+              name: nextRoom.name,
+              roomType: nextRoom.roomType,
+              roomColor: nextRoom.roomColor,
             }
           : room
       ),

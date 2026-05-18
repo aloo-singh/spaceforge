@@ -436,6 +436,10 @@ export function getHistoryCommandActionLabel(command: EditorCommand | undefined)
     return "room rename";
   }
 
+  if (command.type === "update-room-preset") {
+    return "room preset";
+  }
+
   if (command.type === "resize-room") {
     if (command.editKind === "wall-split") {
       return `${getHistoryRoomLabel(command.roomName)} wall split`;

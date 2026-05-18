@@ -89,6 +89,17 @@ export type RoomOpeningSelection = {
   openingId: string;
 };
 
+export type RoomType =
+  | "hall-landing"
+  | "lounge"
+  | "study"
+  | "kitchen"
+  | "utility"
+  | "wc"
+  | "bedroom"
+  | "bathroom"
+  | "ensuite";
+
 /**
  * Direction of a stair's directional arrow.
  * Used to indicate flow direction (e.g., "UP" or "DOWN").
@@ -198,6 +209,8 @@ export type Room = {
   unitOrigin?: UnitOrigin;
   floorId: string;
   name: string;
+  roomType?: RoomType;
+  roomColor?: string;
   points: Point[];
   openings: RoomOpening[];
   interiorAssets: RoomInteriorAsset[];

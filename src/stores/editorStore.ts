@@ -118,6 +118,12 @@ import {
   getWallSplitResult,
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
+import {
+  getRegionalRoomPresetBaseName,
+  getRoomPresetById,
+  getSmartRoomName,
+  type RoomPresetId,
+} from "@/lib/editor/roomPresets";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
@@ -368,6 +374,8 @@ type EditorState = {
   deleteSelectedInteriorAsset: () => void;
   bulkDeleteSelection: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  applyRoomPreset: (roomId: string, presetId: RoomPresetId) => void;
+  applyOtherRoomPreset: (roomId: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
@@ -831,6 +839,8 @@ function cloneRoom(room: Room): Room {
     unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId,
     name: room.name,
+    roomType: room.roomType,
+    roomColor: room.roomColor,
     points: room.points.map((point) => ({ ...point })),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
@@ -953,6 +963,17 @@ function updateRoomNameInDocument(document: DocumentState, roomId: string, name:
         : room
     ),
   };
+}
+
+function getSmartRoomNameForFloor(
+  document: DocumentState,
+  baseName: string,
+  room: Room
+): string {
+  return getSmartRoomName(baseName, document.rooms, {
+    floorId: room.floorId ?? getNormalizedActiveFloorId(document),
+    excludeRoomId: room.id,
+  });
 }
 
 function updateFloorNameInDocument(document: DocumentState, floorId: string, name: string): DocumentState {
@@ -5701,6 +5722,89 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canRedo: false,
       };
     }),
+  applyRoomPreset: (roomId, presetId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const preset = getRoomPresetById(presetId);
+      if (!room || !preset) return state;
+
+      const baseName = getRegionalRoomPresetBaseName(preset, state.document.region);
+      const nextName = getSmartRoomNameForFloor(state.document, baseName, room);
+      const previousRoom = {
+        name: room.name,
+        roomType: room.roomType,
+        roomColor: room.roomColor,
+      };
+      const nextRoom = {
+        name: nextName,
+        roomType: preset.id,
+        roomColor: preset.color,
+      };
+      if (
+        previousRoom.name === nextRoom.name &&
+        previousRoom.roomType === nextRoom.roomType &&
+        previousRoom.roomColor === nextRoom.roomColor
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-room-preset",
+        roomId,
+        previousRoom,
+        nextRoom,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        renameSession: null,
+        shouldFocusSelectedRoomNameInput: false,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  applyOtherRoomPreset: (roomId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+
+      const nextName = getSmartRoomNameForFloor(state.document, "Room", room);
+      const previousRoom = {
+        name: room.name,
+        roomType: room.roomType,
+        roomColor: room.roomColor,
+      };
+      const nextRoom = {
+        name: nextName,
+        roomType: undefined,
+        roomColor: undefined,
+      };
+
+      const command: EditorCommand = {
+        type: "update-room-preset",
+        roomId,
+        previousRoom,
+        nextRoom,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        renameSession: null,
+        shouldFocusSelectedRoomNameInput: true,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
   insertDefaultDoorOnSelectedWall: () =>
     set((state) => {
       const nextState = insertOpeningOnSelectedWall(state, "door");
@@ -7633,7 +7737,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedOpening: null,
     selectedInteriorAsset: null,
     selection: [{ type: "room" as const, id: room.id }],
-    shouldFocusSelectedRoomNameInput: true,
+    shouldFocusSelectedRoomNameInput: false,
     renameSession: null,
     history: {
       past: pushToPast(state.history.past, command),
