@@ -7,6 +7,17 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.80.0",
+    date: "2026-05-18",
+    title: "Tabbed editor settings",
+    items: [
+      "Editor settings now open into clearer Appearance, Canvas, Regional, and Export tabs, with a wider layout that is easier to scan on larger screens.",
+      "Canvas display options and appearance preferences are grouped separately, while dependent settings remain visible and disabled until they are available.",
+      "Regional settings now show metric and imperial defaults for common assets, with labels that adapt to the selected region.",
+      "Export signature settings now live alongside other export preferences, with smoother tab switching and cleaner mobile drawer behaviour.",
+    ],
+  },
+  {
     version: "v0.79.0",
     date: "2026-05-16",
     title: "Metric and imperial project support",
