@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.80.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-18</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Converted the editor settings surface into shadcn Tabs with Appearance, Canvas, Regional, and Export tabs using icon-labelled tab headers.</li>
+                <li>Added a dedicated Regional tab with the existing Metric and Imperial region toggle, region-aware asset default previews, and the Pro-gated unit-origin highlight control.</li>
+                <li>Added the Export tab with the existing export signature setting and export footer preview details.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Made the settings dialog wider and more suitable for multi-column layouts while preserving mobile drawer behaviour.</li>
+                <li>Grouped existing settings into Appearance and Canvas sections without changing their underlying toggle logic.</li>
+                <li>Kept dependent settings visible in a disabled state until they become available, including asset labels and floor footprint opacity.</li>
+                <li>Adjusted tab styling closer to the shared shadcn defaults for more even selected and unselected tab heights.</li>
+                <li>Added subtle tab switch animation with reduced-motion support and smoother content resizing.</li>
+                <li>Updated regional asset labels to match the active project region where terminology differs, such as Hob in metric and Stove top in imperial.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Documented</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Documented the settings UX rule that dependent or gated controls should stay visible and disabled instead of disappearing.</li>
+                <li>Documented the multi-column settings layout preference to pair similarly tall controls so rows align cleanly.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.79.1</h2>
             <span className="text-sm text-muted-foreground">2026-05-16</span>
           </div>
@@ -113,7 +151,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Documented</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Added new "Composite Front-Back Assets — Desk Pattern" section to editor architecture documentation, providing pattern and implementation checklist for multi-shape assets with front-back sections that rotate as cohesive units.</li>
+                <li>Added new &quot;Composite Front-Back Assets — Desk Pattern&quot; section to editor architecture documentation, providing pattern and implementation checklist for multi-shape assets with front-back sections that rotate as cohesive units.</li>
               </ul>
             </div>
           </div>
@@ -144,7 +182,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Documented</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Added new "Asymmetric Depth-Axis Assets — Rotated Ellipse Pattern" section to editor architecture documentation, providing pattern and checklist for implementing rotated elliptical assets with asymmetric insets.</li>
+                <li>Added new &quot;Asymmetric Depth-Axis Assets — Rotated Ellipse Pattern&quot; section to editor architecture documentation, providing pattern and checklist for implementing rotated elliptical assets with asymmetric insets.</li>
               </ul>
             </div>
           </div>
@@ -160,7 +198,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
               <ul className="mt-2 list-disc space-y-2 pl-5">
-                <li>Added bath asset type with outer rectangle, inner rounded rectangle tub interior (80mm fixed corner radius), and circular plug hole detail. Grid-snapped placement (top-left corner snaps to 100mm grid while remaining centered in room). Two plug hole position presets: "At end" (700×1600mm, plug hole 150mm from front edge, centered laterally) and "Middle" (1600×700mm, same positioning rotated).</li>
+                <li>Added bath asset type with outer rectangle, inner rounded rectangle tub interior (80mm fixed corner radius), and circular plug hole detail. Grid-snapped placement (top-left corner snaps to 100mm grid while remaining centered in room). Two plug hole position presets: &quot;At end&quot; (700×1600mm, plug hole 150mm from front edge, centered laterally) and &quot;Middle&quot; (1600×700mm, same positioning rotated).</li>
               </ul>
             </div>
           </div>
