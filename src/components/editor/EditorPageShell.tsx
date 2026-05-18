@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LoaderCircle } from "@/components/ui/icons";
 import EditorCanvas from "@/components/editor/EditorCanvas";
 import { EditorProjectBootstrap } from "@/components/editor/EditorProjectBootstrap";
@@ -19,6 +19,9 @@ type EditorPageShellProps = {
 };
 
 const LOADING_OVERLAY_EXIT_DURATION_MS = 240;
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 
 export function EditorPageShell({ projectId }: EditorPageShellProps) {
   const [activeProject, setActiveProject] = useState<{
@@ -33,6 +36,11 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
     | { status: "ready" }
     | { status: "error"; message: string }
   >({ status: "loading" });
+  const hasMountedClient = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot
+  );
   const roomCount = useEditorStore((state) => state.document.rooms.length);
   const hydrateEarlyExplorer = useGamificationStore((state) => state.hydrateEarlyExplorer);
   const [baselineRoomCount, setBaselineRoomCount] = useState<number | null>(null);
@@ -121,7 +129,7 @@ export function EditorPageShell({ projectId }: EditorPageShellProps) {
           </div>
         </div>
       ) : null}
-      {!shouldHideCanvasDuringBootstrap ? (
+      {hasMountedClient && !shouldHideCanvasDuringBootstrap ? (
         <EditorCanvas
           projectId={activeProject?.id ?? null}
           hasResolvedProject={activeProject !== null}
