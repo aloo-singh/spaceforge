@@ -290,6 +290,7 @@ const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 134;
 const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 108;
 const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
+const ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE = "data-room-preset-picker-control";
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -532,6 +533,7 @@ function RoomPresetPickerOverlay({
           return (
             <div
               key={`${option.top.id}-${option.bottom.id}`}
+              data-room-preset-picker-control="true"
               className="group pointer-events-auto absolute left-1/2 top-1/2"
               style={{
                 width: `${buttonSize}px`,
@@ -576,6 +578,7 @@ function RoomPresetPickerOverlay({
             <button
               key="other"
               type="button"
+              data-room-preset-picker-control="true"
               onClick={onOther}
               className={cn(
                 "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
@@ -605,6 +608,7 @@ function RoomPresetPickerOverlay({
           <button
             key={preset.id}
             type="button"
+            data-room-preset-picker-control="true"
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
@@ -1291,6 +1295,27 @@ export default function EditorCanvas({
     selectedNorthIndicator,
     selectedRoomId,
   ]);
+
+  useEffect(() => {
+    if (!roomPresetPickerRoomId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const clickedPresetControl = event.composedPath().some(
+        (target) =>
+          target instanceof Element &&
+          target.getAttribute(ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE) === "true"
+      );
+      if (!clickedPresetControl) {
+        clearRoomPresetPicker();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, { capture: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+    };
+  }, [clearRoomPresetPicker, roomPresetPickerRoomId]);
 
   const handleRoomPresetPickerSelect = useCallback(
     (preset: RoomPreset) => {
