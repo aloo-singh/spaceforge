@@ -7,6 +7,17 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.81.0",
+    date: "2026-05-19",
+    title: "Room type presets",
+    items: [
+      "New rooms now open a circular preset picker so you can quickly name spaces like Kitchen, Bedroom, Bathroom, Study, or Lounge.",
+      "Room presets use regional labels for metric and imperial projects, including Foyer, Living Room, Office/Study, Utility/Laundry, Powder Room, and Closet where appropriate.",
+      "Preset choices now colour rooms automatically, with a new canvas setting for showing or hiding room colours.",
+      "The room inspector now shows the current room type and lets you reopen or dismiss the picker with calmer, more predictable interactions.",
+    ],
+  },
+  {
     version: "v0.80.0",
     date: "2026-05-18",
     title: "Tabbed editor settings",
