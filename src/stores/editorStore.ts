@@ -252,6 +252,7 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  roomPresetPickerRoomId: string | null;
   /** Shared selection model: single source of truth for all selections */
   selection: SharedSelectionItem[];
   isCanvasInteractionActive: boolean;
@@ -334,6 +335,8 @@ type EditorState = {
   clearSelection: () => void;
   addToSelection: (item: SharedSelectionItem) => void;
   removeFromSelection: (item: SharedSelectionItem) => void;
+  requestRoomPresetPicker: (roomId: string) => void;
+  clearRoomPresetPicker: () => void;
   /** Copy selected room(s) or stair(s) to clipboard */
   copySelection: () => void;
   /** Paste item(s) from clipboard to current floor */
@@ -2709,6 +2712,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  roomPresetPickerRoomId: null,
   selection: [],
   isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
@@ -3864,6 +3868,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selection.length === 0) return state;
       return preserveHistoryForSelectionUpdate(state, {
         selection: [],
+      });
+    }),
+  requestRoomPresetPicker: (roomId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room || state.roomPresetPickerRoomId === roomId) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        roomPresetPickerRoomId: roomId,
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: roomId }],
+        renameSession: null,
+      });
+    }),
+  clearRoomPresetPicker: () =>
+    set((state) => {
+      if (state.roomPresetPickerRoomId === null) return state;
+      return preserveHistoryForSelectionUpdate(state, {
+        roomPresetPickerRoomId: null,
       });
     }),
   addToSelection: (item) =>
@@ -5759,6 +5785,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         renameSession: null,
+        roomPresetPickerRoomId: null,
         shouldFocusSelectedRoomNameInput: false,
         history: {
           past: pushToPast(state.history.past, command),
@@ -5796,6 +5823,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         document: nextDocument,
         renameSession: null,
+        roomPresetPickerRoomId: null,
         shouldFocusSelectedRoomNameInput: true,
         history: {
           past: pushToPast(state.history.past, command),
@@ -7736,6 +7764,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedWall: null,
     selectedOpening: null,
     selectedInteriorAsset: null,
+    roomPresetPickerRoomId: room.id,
     selection: [{ type: "room" as const, id: room.id }],
     shouldFocusSelectedRoomNameInput: false,
     renameSession: null,

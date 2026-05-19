@@ -138,9 +138,10 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
-  ROOM_PRESETS,
+  ROOM_PRESET_PICKER_OPTIONS,
   getRegionalRoomPresetLabel,
   type RoomPreset,
+  type RoomPresetPickerOption,
 } from "@/lib/editor/roomPresets";
 import {
   matchEditorKeyboardShortcut,
@@ -469,7 +470,7 @@ function RoomPresetPickerOverlay({
   center,
   compact,
   prefersReducedMotion,
-  presets,
+  options,
   region,
   onSelectPreset,
   onOther,
@@ -477,7 +478,7 @@ function RoomPresetPickerOverlay({
   center: ScreenPoint;
   compact: boolean;
   prefersReducedMotion: boolean;
-  presets: readonly RoomPreset[];
+  options: readonly RoomPresetPickerOption[];
   region: ProjectRegion;
   onSelectPreset: (preset: RoomPreset) => void;
   onOther: () => void;
@@ -490,7 +491,7 @@ function RoomPresetPickerOverlay({
   return (
     <div
       className={cn(
-        "pointer-events-auto absolute z-20",
+        "pointer-events-none absolute z-20",
         prefersReducedMotion
           ? "opacity-100"
           : "motion-safe:animate-[roomPresetPickerSpring_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
@@ -504,11 +505,57 @@ function RoomPresetPickerOverlay({
       }}
       aria-label="Room preset picker"
     >
-      {presets.map((preset, index) => {
-        const label = getRegionalRoomPresetLabel(preset, region);
-        const angle = -Math.PI / 2 + (index / presets.length) * Math.PI * 2;
+      {options.map((option, index) => {
+        const angle = -Math.PI / 2 + (index / options.length) * Math.PI * 2;
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
+
+        if (option.type === "split") {
+          const topLabel = getRegionalRoomPresetLabel(option.top, region);
+          const bottomLabel = getRegionalRoomPresetLabel(option.bottom, region);
+
+          return (
+            <div
+              key={`${option.top.id}-${option.bottom.id}`}
+              className="pointer-events-auto absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-full"
+              style={{
+                width: `${buttonSize}px`,
+                height: `${buttonSize}px`,
+                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+              aria-label={`${topLabel} or ${bottomLabel}`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectPreset(option.top)}
+                aria-label={`Name room ${topLabel}`}
+                className={cn(
+                  "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2 text-center text-[10px] leading-none font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                  compact ? "text-[9px]" : "text-[10px]"
+                )}
+                style={{ backgroundColor: option.top.color }}
+              >
+                {topLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectPreset(option.bottom)}
+                aria-label={`Name room ${bottomLabel}`}
+                className={cn(
+                  "flex h-1/2 w-full items-center justify-center px-2 text-center text-[10px] leading-none font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                  compact ? "text-[9px]" : "text-[10px]"
+                )}
+                style={{ backgroundColor: option.bottom.color }}
+              >
+                {bottomLabel}
+              </button>
+            </div>
+          );
+        }
+
+        const { preset } = option;
+        const label = getRegionalRoomPresetLabel(preset, region);
 
         return (
           <button
@@ -517,15 +564,13 @@ function RoomPresetPickerOverlay({
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
-              "absolute left-1/2 top-1/2 flex items-center justify-center rounded-full border px-2 text-center text-[10px] leading-tight font-semibold text-zinc-950/78 shadow-[0_8px_22px_rgba(15,23,42,0.12)] transition-[transform,color,border-color,filter] duration-150 hover:scale-[1.04] hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)]",
+              "pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2 text-center text-[10px] leading-tight font-semibold text-zinc-950/78 transition-[transform,color,filter] duration-150 hover:scale-[1.04] hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
               compact ? "text-[9px]" : "text-[10px]"
             )}
             style={{
               width: `${buttonSize}px`,
               height: `${buttonSize}px`,
               backgroundColor: preset.color,
-              borderColor: `${preset.color}cc`,
-              boxShadow: "0 8px 22px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.42)",
               transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
               fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
             }}
@@ -538,7 +583,7 @@ function RoomPresetPickerOverlay({
         type="button"
         onClick={onOther}
         className={cn(
-          "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-900/12 bg-zinc-950 px-2 text-center text-[10px] leading-tight font-semibold text-zinc-50 shadow-[0_10px_28px_rgba(15,23,42,0.18)] transition-[transform,background-color] duration-150 hover:scale-[1.03] hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:border-zinc-100/16 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200",
+          "pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950 px-2 text-center text-[10px] leading-tight font-semibold text-zinc-50 transition-[transform,background-color] duration-150 hover:scale-[1.03] hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200",
           compact ? "text-[9px]" : "text-[10px]"
         )}
         style={{
@@ -1066,8 +1111,8 @@ export default function EditorCanvas({
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
   const applyRoomPreset = useEditorStore((state) => state.applyRoomPreset);
   const applyOtherRoomPreset = useEditorStore((state) => state.applyOtherRoomPreset);
-  const [roomPresetPickerRoomId, setRoomPresetPickerRoomId] = useState<string | null>(null);
-  const previousRoomIdsRef = useRef<Set<string> | null>(null);
+  const roomPresetPickerRoomId = useEditorStore((state) => state.roomPresetPickerRoomId);
+  const clearRoomPresetPicker = useEditorStore((state) => state.clearRoomPresetPicker);
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -1192,18 +1237,6 @@ export default function EditorCanvas({
   ]);
 
   useEffect(() => {
-    const currentRoomIds = new Set(rooms.map((room) => room.id));
-    const previousRoomIds = previousRoomIdsRef.current;
-    previousRoomIdsRef.current = currentRoomIds;
-
-    if (!previousRoomIds) return;
-    const newRoom = rooms.find((room) => !previousRoomIds.has(room.id));
-    if (!newRoom || newRoom.id !== selectedRoomId || roomDraftPointCount > 0) return;
-
-    setRoomPresetPickerRoomId(newRoom.id);
-  }, [roomDraftPointCount, rooms, selectedRoomId]);
-
-  useEffect(() => {
     if (!roomPresetPickerRoomId) return;
     const roomStillVisible = rooms.some((room) => room.id === roomPresetPickerRoomId);
     const shouldDismiss =
@@ -1214,9 +1247,10 @@ export default function EditorCanvas({
       selectedNorthIndicator;
 
     if (shouldDismiss) {
-      setRoomPresetPickerRoomId(null);
+      clearRoomPresetPicker();
     }
   }, [
+    clearRoomPresetPicker,
     isRulerMode,
     roomDraftPointCount,
     roomPresetPickerRoomId,
@@ -1229,7 +1263,6 @@ export default function EditorCanvas({
     (preset: RoomPreset) => {
       if (!roomPresetPickerRoomId) return;
       applyRoomPreset(roomPresetPickerRoomId, preset.id);
-      setRoomPresetPickerRoomId(null);
     },
     [applyRoomPreset, roomPresetPickerRoomId]
   );
@@ -1238,7 +1271,6 @@ export default function EditorCanvas({
     if (roomPresetPickerRoomId) {
       applyOtherRoomPreset(roomPresetPickerRoomId);
     }
-    setRoomPresetPickerRoomId(null);
     window.requestAnimationFrame(() => {
       const inputElement = document.getElementById("room-name-input");
       if (inputElement instanceof HTMLInputElement) {
@@ -4024,7 +4056,7 @@ export default function EditorCanvas({
               center={roomPresetPickerPosition}
               compact={useCompactHud}
               prefersReducedMotion={prefersReducedMotion}
-              presets={ROOM_PRESETS}
+              options={ROOM_PRESET_PICKER_OPTIONS}
               region={displayUnitOrigin}
               onSelectPreset={handleRoomPresetPickerSelect}
               onOther={handleRoomPresetPickerOther}

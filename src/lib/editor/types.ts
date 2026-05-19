@@ -90,7 +90,8 @@ export type RoomOpeningSelection = {
 };
 
 export type RoomType =
-  | "hall-landing"
+  | "hall"
+  | "landing"
   | "lounge"
   | "study"
   | "kitchen"
