@@ -17,6 +17,9 @@ export type RoomPresetPickerOption =
       type: "split";
       top: RoomPreset;
       bottom: RoomPreset;
+    }
+  | {
+      type: "other";
     };
 
 export const ROOM_PRESET_COLORS = {
@@ -204,12 +207,9 @@ export const ROOM_PRESET_PICKER_OPTIONS = [
     preset: STUDY_PRESET,
   },
   {
-    type: "single",
-    preset: KITCHEN_PRESET,
-  },
-  {
-    type: "single",
-    preset: UTILITY_PRESET,
+    type: "split",
+    top: KITCHEN_PRESET,
+    bottom: UTILITY_PRESET,
   },
   {
     type: "single",
@@ -227,6 +227,9 @@ export const ROOM_PRESET_PICKER_OPTIONS = [
   {
     type: "single",
     preset: WARDROBE_PRESET,
+  },
+  {
+    type: "other",
   },
 ] as const satisfies readonly RoomPresetPickerOption[];
 

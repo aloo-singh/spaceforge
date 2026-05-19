@@ -557,6 +557,33 @@ function RoomPresetPickerOverlay({
           );
         }
 
+        if (option.type === "other") {
+          return (
+            <button
+              key="other"
+              type="button"
+              onClick={onOther}
+              className={cn(
+                "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+                compact ? "text-[10px]" : "text-[12px]"
+              )}
+              style={{
+                width: `${buttonSize}px`,
+                height: `${buttonSize}px`,
+                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.03] group-hover:brightness-[1.03]"
+                style={{ backgroundColor: ROOM_PRESET_OTHER_COLOR }}
+              />
+              <span className="relative">Other</span>
+            </button>
+          );
+        }
+
         const { preset } = option;
         const label = getRegionalRoomPresetLabel(preset, region);
 
@@ -586,26 +613,6 @@ function RoomPresetPickerOverlay({
           </button>
         );
       })}
-      <button
-        type="button"
-        onClick={onOther}
-        className={cn(
-          "group pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
-          compact ? "text-[10px]" : "text-[12px]"
-        )}
-        style={{
-          width: `${buttonSize}px`,
-          height: `${buttonSize}px`,
-          fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
-        }}
-      >
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.03] group-hover:brightness-[1.03]"
-          style={{ backgroundColor: ROOM_PRESET_OTHER_COLOR }}
-        />
-        <span className="relative">Other</span>
-      </button>
     </div>
   );
 }
