@@ -13,6 +13,7 @@ export type EditorSettings = {
   showCanvasHud: boolean;
   showMiniMap: boolean;
   showRoomNames: boolean;
+  showRoomColors: boolean;
   showAssets: boolean;
   showAssetLabels: boolean;
   showUnitOriginHighlights: boolean;
@@ -33,6 +34,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   showCanvasHud: true,
   showMiniMap: true,
   showRoomNames: true,
+  showRoomColors: true,
   showAssets: true,
   showAssetLabels: true,
   showUnitOriginHighlights: false,
@@ -54,6 +56,7 @@ export function cloneEditorSettings(settings: EditorSettings): EditorSettings {
     showCanvasHud: settings.showCanvasHud,
     showMiniMap: settings.showMiniMap,
     showRoomNames: settings.showRoomNames,
+    showRoomColors: settings.showRoomColors,
     showAssets: settings.showAssets,
     showAssetLabels: settings.showAssetLabels,
     showUnitOriginHighlights: settings.showUnitOriginHighlights,
@@ -76,6 +79,7 @@ export function areEditorSettingsEqual(a: EditorSettings, b: EditorSettings): bo
     a.showCanvasHud === b.showCanvasHud &&
     a.showMiniMap === b.showMiniMap &&
     a.showRoomNames === b.showRoomNames &&
+    a.showRoomColors === b.showRoomColors &&
     a.showAssets === b.showAssets &&
     a.showAssetLabels === b.showAssetLabels &&
     a.showUnitOriginHighlights === b.showUnitOriginHighlights &&
@@ -165,6 +169,10 @@ export function normalizeEditorSettings(value: unknown): EditorSettings | null {
       "showRoomNames" in value && typeof value.showRoomNames === "boolean"
         ? value.showRoomNames
         : DEFAULT_EDITOR_SETTINGS.showRoomNames,
+    showRoomColors:
+      "showRoomColors" in value && typeof value.showRoomColors === "boolean"
+        ? value.showRoomColors
+        : DEFAULT_EDITOR_SETTINGS.showRoomColors,
     showAssets:
       "showAssets" in value && typeof value.showAssets === "boolean"
         ? value.showAssets

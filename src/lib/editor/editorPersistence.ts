@@ -74,6 +74,8 @@ type PersistedRoom = {
   unitOrigin?: Room["unitOrigin"];
   floorId?: string;
   name: string;
+  roomType?: Room["roomType"];
+  roomColor?: Room["roomColor"];
   points: PersistedPoint[];
   openings?: Room["openings"];
   interiorAssets?: Room["interiorAssets"];
@@ -337,6 +339,8 @@ function isRoom(value: unknown): value is PersistedRoom {
   if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
+  if (value.roomType !== undefined && typeof value.roomType !== "string") return false;
+  if (value.roomColor !== undefined && typeof value.roomColor !== "string") return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
@@ -425,6 +429,8 @@ function cloneRoom(room: PersistedRoom | Room): Room {
     unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId ?? DEFAULT_FLOOR_ID,
     name: room.name,
+    roomType: room.roomType,
+    roomColor: room.roomColor,
     points: room.points.map(clonePoint),
     openings: cloneRoomOpenings(room.openings ?? []),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),

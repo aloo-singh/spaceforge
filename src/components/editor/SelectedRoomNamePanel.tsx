@@ -18,6 +18,11 @@ import {
 } from "@/components/ui/tooltip";
 import { formatWallDimension } from "@/lib/editor/measurements";
 import { getPolygonBounds } from "@/lib/editor/roomGeometry";
+import {
+  ROOM_PRESET_OTHER_COLOR,
+  getRegionalRoomPresetLabel,
+  getRoomPresetById,
+} from "@/lib/editor/roomPresets";
 import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
@@ -100,6 +105,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
+  const roomPresetPickerRoomId = useEditorStore((state) => state.roomPresetPickerRoomId);
+  const requestRoomPresetPicker = useEditorStore((state) => state.requestRoomPresetPicker);
+  const clearRoomPresetPicker = useEditorStore((state) => state.clearRoomPresetPicker);
   const setFocusedRoomId = useEditorStore((state) => state.setFocusedRoomId);
   const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
@@ -123,6 +131,13 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const isFocusModeActive = focusedRoomId === selectedRoom?.id;
   const isRenameBlocked = isCanvasInteractionActive || isDraftActive;
   const shouldHideKeyboardHints = isMobile || isCompactLandscapeViewport;
+  const selectedRoomPreset = selectedRoom?.roomType ? getRoomPresetById(selectedRoom.roomType) : null;
+  const selectedRoomTypeLabel =
+    selectedRoom && selectedRoomPreset
+      ? getRegionalRoomPresetLabel(selectedRoomPreset, displayUnitOrigin)
+      : "Other";
+  const selectedRoomTypeColor =
+    selectedRoom?.roomColor ?? selectedRoomPreset?.color ?? ROOM_PRESET_OTHER_COLOR;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -299,6 +314,36 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
               <span>cancel</span>
             </p>
           ) : null}
+          <div className="mt-4">
+            <label htmlFor="room-type-picker-button" className="mb-1 block text-sm font-medium">
+              Type
+            </label>
+            <button
+              id="room-type-picker-button"
+              type="button"
+              data-room-preset-picker-control="true"
+              onClick={() => {
+                if (roomPresetPickerRoomId === selectedRoom.id) {
+                  clearRoomPresetPicker();
+                  return;
+                }
+                selectRoomById(selectedRoom.id);
+                requestRoomPresetPicker(selectedRoom.id);
+              }}
+              disabled={isRenameBlocked}
+              className="flex w-full items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="size-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: selectedRoomTypeColor }}
+                />
+                <span className="truncate">{selectedRoomTypeLabel}</span>
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">Change</span>
+            </button>
+          </div>
           <div className="mt-4">
             <RoomDimensionsDisplay room={selectedRoom} displayUnitOrigin={displayUnitOrigin} />
           </div>

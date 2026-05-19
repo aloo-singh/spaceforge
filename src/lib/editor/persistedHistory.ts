@@ -133,6 +133,8 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
+      roomType: room.roomType,
+      roomColor: room.roomColor,
       points: room.points.map((point) => ({ ...point })),
       openings: cloneRoomOpenings(room.openings ?? []),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
@@ -187,13 +189,22 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
 
     const didFloorChange = getRoomFloorId(previousRoom, previous) !== getRoomFloorId(room, next);
     const didNameChange = previousRoom.name !== room.name;
+    const didPresetChange =
+      previousRoom.roomType !== room.roomType || previousRoom.roomColor !== room.roomColor;
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
     const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings ?? [], room.openings ?? []);
     const didInteriorAssetsChange = !areRoomInteriorAssetsEqual(
       previousRoom.interiorAssets ?? [],
       room.interiorAssets ?? []
     );
-    if (!didFloorChange && !didNameChange && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) {
+    if (
+      !didFloorChange &&
+      !didNameChange &&
+      !didPresetChange &&
+      !didPointsChange &&
+      !didOpeningsChange &&
+      !didInteriorAssetsChange
+    ) {
       continue;
     }
 
@@ -452,6 +463,8 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         unitOrigin: normalizeUnitOrigin(addedRooms[0].unitOrigin),
         floorId: getRoomFloorId(addedRooms[0], next),
         name: addedRooms[0].name,
+        roomType: addedRooms[0].roomType,
+        roomColor: addedRooms[0].roomColor,
         points: addedRooms[0].points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(addedRooms[0].openings ?? []),
         interiorAssets: cloneRoomInteriorAssets(addedRooms[0].interiorAssets ?? []),
@@ -463,6 +476,9 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
 
   const changedRoom = changedRooms[0];
   const didNameChange = changedRoom.previous.name !== changedRoom.next.name;
+  const didPresetChange =
+    changedRoom.previous.roomType !== changedRoom.next.roomType ||
+    changedRoom.previous.roomColor !== changedRoom.next.roomColor;
   const didPointsChange = !arePointListsEqual(changedRoom.previous.points, changedRoom.next.points);
   const didOpeningsChange = !areRoomOpeningsEqual(
     changedRoom.previous.openings ?? [],
@@ -473,7 +489,24 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     changedRoom.next.interiorAssets ?? []
   );
 
-  if (didNameChange && !didPointsChange) {
+  if ((didNameChange || didPresetChange) && !didPointsChange && !didOpeningsChange && !didInteriorAssetsChange) {
+    if (didPresetChange) {
+      return {
+        type: "update-room-preset",
+        roomId: changedRoom.next.id,
+        previousRoom: {
+          name: changedRoom.previous.name,
+          roomType: changedRoom.previous.roomType,
+          roomColor: changedRoom.previous.roomColor,
+        },
+        nextRoom: {
+          name: changedRoom.next.name,
+          roomType: changedRoom.next.roomType,
+          roomColor: changedRoom.next.roomColor,
+        },
+      };
+    }
+
     return {
       type: "rename-room",
       roomId: changedRoom.next.id,

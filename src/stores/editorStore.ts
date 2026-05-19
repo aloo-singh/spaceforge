@@ -118,6 +118,13 @@ import {
   getWallSplitResult,
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
+import {
+  ROOM_PRESET_OTHER_COLOR,
+  getRegionalRoomPresetBaseName,
+  getRoomPresetById,
+  getSmartRoomName,
+  type RoomPresetId,
+} from "@/lib/editor/roomPresets";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
@@ -246,6 +253,7 @@ type EditorState = {
   selectedWall: RoomWallSelection | null;
   selectedOpening: RoomOpeningSelection | null;
   selectedInteriorAsset: RoomInteriorAssetSelection | null;
+  roomPresetPickerRoomId: string | null;
   /** Shared selection model: single source of truth for all selections */
   selection: SharedSelectionItem[];
   isCanvasInteractionActive: boolean;
@@ -328,6 +336,8 @@ type EditorState = {
   clearSelection: () => void;
   addToSelection: (item: SharedSelectionItem) => void;
   removeFromSelection: (item: SharedSelectionItem) => void;
+  requestRoomPresetPicker: (roomId: string) => void;
+  clearRoomPresetPicker: () => void;
   /** Copy selected room(s) or stair(s) to clipboard */
   copySelection: () => void;
   /** Paste item(s) from clipboard to current floor */
@@ -368,6 +378,8 @@ type EditorState = {
   deleteSelectedInteriorAsset: () => void;
   bulkDeleteSelection: () => void;
   updateRoomName: (roomId: string, name: string) => void;
+  applyRoomPreset: (roomId: string, presetId: RoomPresetId) => void;
+  applyOtherRoomPreset: (roomId: string) => void;
   insertDefaultDoorOnSelectedWall: () => void;
   insertDefaultWindowOnSelectedWall: () => void;
   insertDefaultStairInSelectedRoom: () => void;
@@ -831,6 +843,8 @@ function cloneRoom(room: Room): Room {
     unitOrigin: normalizeUnitOrigin(room.unitOrigin),
     floorId: room.floorId,
     name: room.name,
+    roomType: room.roomType,
+    roomColor: room.roomColor,
     points: room.points.map((point) => ({ ...point })),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
@@ -953,6 +967,17 @@ function updateRoomNameInDocument(document: DocumentState, roomId: string, name:
         : room
     ),
   };
+}
+
+function getSmartRoomNameForFloor(
+  document: DocumentState,
+  baseName: string,
+  room: Room
+): string {
+  return getSmartRoomName(baseName, document.rooms, {
+    floorId: room.floorId ?? getNormalizedActiveFloorId(document),
+    excludeRoomId: room.id,
+  });
 }
 
 function updateFloorNameInDocument(document: DocumentState, floorId: string, name: string): DocumentState {
@@ -2688,6 +2713,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedWall: null,
   selectedOpening: null,
   selectedInteriorAsset: null,
+  roomPresetPickerRoomId: null,
   selection: [],
   isCanvasInteractionActive: false,
   shouldFocusSelectedRoomNameInput: false,
@@ -3605,12 +3631,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
       
+      const hasMatchingSelection = roomId
+        ? state.selection.length === 1 &&
+          state.selection[0]?.type === "room" &&
+          state.selection[0].id === roomId
+        : state.selection.length === 0;
+
       // If already in the correct state, return early
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
         state.selectedOpening === null &&
-        state.selectedInteriorAsset === null
+        state.selectedInteriorAsset === null &&
+        hasMatchingSelection
       ) {
         return state;
       }
@@ -3843,6 +3876,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.selection.length === 0) return state;
       return preserveHistoryForSelectionUpdate(state, {
         selection: [],
+      });
+    }),
+  requestRoomPresetPicker: (roomId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room || state.roomPresetPickerRoomId === roomId) return state;
+
+      return preserveHistoryForSelectionUpdate(state, {
+        roomPresetPickerRoomId: roomId,
+        selectedRoomId: roomId,
+        selectedWall: null,
+        selectedOpening: null,
+        selectedInteriorAsset: null,
+        selection: [{ type: "room" as const, id: roomId }],
+        renameSession: null,
+      });
+    }),
+  clearRoomPresetPicker: () =>
+    set((state) => {
+      if (state.roomPresetPickerRoomId === null) return state;
+      return preserveHistoryForSelectionUpdate(state, {
+        roomPresetPickerRoomId: null,
       });
     }),
   addToSelection: (item) =>
@@ -5693,6 +5748,91 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         document: nextDocument,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  applyRoomPreset: (roomId, presetId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      const preset = getRoomPresetById(presetId);
+      if (!room || !preset) return state;
+
+      const baseName = getRegionalRoomPresetBaseName(preset, state.document.region);
+      const nextName = getSmartRoomNameForFloor(state.document, baseName, room);
+      const previousRoom = {
+        name: room.name,
+        roomType: room.roomType,
+        roomColor: room.roomColor,
+      };
+      const nextRoom = {
+        name: nextName,
+        roomType: preset.id,
+        roomColor: preset.color,
+      };
+      if (
+        previousRoom.name === nextRoom.name &&
+        previousRoom.roomType === nextRoom.roomType &&
+        previousRoom.roomColor === nextRoom.roomColor
+      ) {
+        return state;
+      }
+
+      const command: EditorCommand = {
+        type: "update-room-preset",
+        roomId,
+        previousRoom,
+        nextRoom,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        renameSession: null,
+        roomPresetPickerRoomId: null,
+        shouldFocusSelectedRoomNameInput: false,
+        history: {
+          past: pushToPast(state.history.past, command),
+          future: [],
+        },
+        canUndo: true,
+        canRedo: false,
+      };
+    }),
+  applyOtherRoomPreset: (roomId) =>
+    set((state) => {
+      const room = state.document.rooms.find((candidate) => candidate.id === roomId);
+      if (!room) return state;
+
+      const nextName = getSmartRoomNameForFloor(state.document, "Room", room);
+      const previousRoom = {
+        name: room.name,
+        roomType: room.roomType,
+        roomColor: room.roomColor,
+      };
+      const nextRoom = {
+        name: nextName,
+        roomType: undefined,
+        roomColor: ROOM_PRESET_OTHER_COLOR,
+      };
+
+      const command: EditorCommand = {
+        type: "update-room-preset",
+        roomId,
+        previousRoom,
+        nextRoom,
+      };
+      const nextDocument = applyEditorCommand(state.document, command, "redo");
+
+      return {
+        document: nextDocument,
+        renameSession: null,
+        roomPresetPickerRoomId: null,
+        shouldFocusSelectedRoomNameInput: true,
         history: {
           past: pushToPast(state.history.past, command),
           future: [],
@@ -7632,8 +7772,9 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     selectedWall: null,
     selectedOpening: null,
     selectedInteriorAsset: null,
+    roomPresetPickerRoomId: room.id,
     selection: [{ type: "room" as const, id: room.id }],
-    shouldFocusSelectedRoomNameInput: true,
+    shouldFocusSelectedRoomNameInput: false,
     renameSession: null,
     history: {
       past: pushToPast(state.history.past, command),

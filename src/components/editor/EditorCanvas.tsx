@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -87,6 +88,7 @@ import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnai
 import { getCameraFitTargetForBounds } from "@/lib/editor/cameraFit";
 import {
   findRoomAtPoint,
+  getPolygonLabelAnchor,
   isAxisAlignedRectangle,
   isPointInPolygon,
   isSimplePolygon,
@@ -136,6 +138,14 @@ import {
   shouldShowDimensions,
   type EditorSettings,
 } from "@/lib/editor/settings";
+import {
+  ROOM_PRESET_OTHER_HOVER_COLOR,
+  ROOM_PRESET_OTHER_COLOR,
+  ROOM_PRESET_PICKER_OPTIONS,
+  getRegionalRoomPresetLabel,
+  type RoomPreset,
+  type RoomPresetPickerOption,
+} from "@/lib/editor/roomPresets";
 import {
   matchEditorKeyboardShortcut,
   showKeyboardShortcutFeedback,
@@ -219,6 +229,7 @@ import {
 import { Toggle } from "@/components/ui/toggle";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useMobile } from "@/lib/use-mobile";
+import { usePrefersReducedMotion } from "@/lib/accessibility/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
@@ -231,7 +242,7 @@ import {
 } from "@/lib/analytics/client";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { EditorCommand } from "@/lib/editor/history";
-import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
+import { normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig } from "@/lib/subscription/tiers";
 
 const EMPTY_ROOM_RESIZE_UI = {
@@ -274,6 +285,13 @@ const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
 const MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS = "min(22rem, 42vh)";
 const MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX = 44;
+const ROOM_PRESET_PICKER_RADIUS_PX = 184;
+const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 134;
+const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 108;
+const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
+const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
+const ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE = "data-room-preset-picker-control";
+const ROOM_PRESET_PICKER_EXIT_MS = 110;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -449,6 +467,180 @@ function CanvasHudCard({ children, className }: { children: ReactNode; className
       className
     )}>
       {children}
+    </div>
+  );
+}
+
+function RoomPresetPickerOverlay({
+  center,
+  compact,
+  prefersReducedMotion,
+  isExiting,
+  options,
+  region,
+  onSelectPreset,
+  onOther,
+}: {
+  center: ScreenPoint;
+  compact: boolean;
+  prefersReducedMotion: boolean;
+  isExiting: boolean;
+  options: readonly RoomPresetPickerOption[];
+  region: ProjectRegion;
+  onSelectPreset: (preset: RoomPreset) => void;
+  onOther: () => void;
+}) {
+  const radius = compact ? ROOM_PRESET_PICKER_COMPACT_RADIUS_PX : ROOM_PRESET_PICKER_RADIUS_PX;
+  const buttonSize = compact
+    ? ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX
+    : ROOM_PRESET_PICKER_BUTTON_SIZE_PX;
+  const renderPresetLabel = (label: string) =>
+    label.split("/").map((part, index, parts) => (
+      <span key={`${part}-${index}`}>
+        {part}
+        {index < parts.length - 1 ? "/" : null}
+        {index < parts.length - 1 ? <br /> : null}
+      </span>
+    ));
+  const presetFillStyle = (color: string, hoverColor: string): CSSProperties => ({
+    "--room-preset-fill": color,
+    "--room-preset-hover-fill": hoverColor,
+  } as CSSProperties);
+
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute z-20 will-change-transform",
+        prefersReducedMotion
+          ? "opacity-100"
+          : isExiting
+            ? "motion-safe:animate-[roomPresetPickerExit_110ms_cubic-bezier(0.4,0,1,1)_both]"
+          : "motion-safe:animate-[roomPresetPickerSpring_420ms_linear_both]"
+      )}
+      style={{
+        left: `${center.x}px`,
+        top: `${center.y}px`,
+        width: `${radius * 2 + buttonSize}px`,
+        height: `${radius * 2 + buttonSize}px`,
+        transform: "translate(-50%, -50%)",
+      }}
+      aria-label="Room preset picker"
+    >
+      {options.map((option, index) => {
+        const angle = -Math.PI / 2 + (index / options.length) * Math.PI * 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+
+        if (option.type === "split") {
+          const topLabel = getRegionalRoomPresetLabel(option.top, region);
+          const bottomLabel = getRegionalRoomPresetLabel(option.bottom, region);
+
+          return (
+            <div
+              key={`${option.top.id}-${option.bottom.id}`}
+              data-room-preset-picker-control="true"
+              className={cn(
+                "group absolute left-1/2 top-1/2",
+                isExiting ? "pointer-events-none" : "pointer-events-auto"
+              )}
+              style={{
+                width: `${buttonSize}px`,
+                height: `${buttonSize}px`,
+                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+              aria-label={`${topLabel} or ${bottomLabel}`}
+            >
+              <div className="flex h-full w-full flex-col overflow-hidden rounded-full transition-transform duration-150 group-hover:scale-[1.04]">
+                <button
+                  type="button"
+                  onClick={() => onSelectPreset(option.top)}
+                  aria-label={`Name room ${topLabel}`}
+                  className={cn(
+                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 bg-[var(--room-preset-fill)] px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[background-color,color] duration-150 hover:bg-[var(--room-preset-hover-fill)] hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[11px]" : "text-[13px]"
+                  )}
+                  style={presetFillStyle(option.top.color, option.top.hoverColor)}
+                >
+                  <span>{renderPresetLabel(topLabel)}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectPreset(option.bottom)}
+                  aria-label={`Name room ${bottomLabel}`}
+                  className={cn(
+                    "flex h-1/2 w-full items-center justify-center bg-[var(--room-preset-fill)] px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[background-color,color] duration-150 hover:bg-[var(--room-preset-hover-fill)] hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[11px]" : "text-[13px]"
+                  )}
+                  style={presetFillStyle(option.bottom.color, option.bottom.hoverColor)}
+                >
+                  <span>{renderPresetLabel(bottomLabel)}</span>
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        if (option.type === "other") {
+          return (
+            <button
+              key="other"
+              type="button"
+              data-room-preset-picker-control="true"
+              onClick={onOther}
+              className={cn(
+                "group absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+                isExiting ? "pointer-events-none" : "pointer-events-auto",
+                compact ? "text-[11px]" : "text-[13px]"
+              )}
+              style={{
+                width: `${buttonSize}px`,
+                height: `${buttonSize}px`,
+                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full bg-[var(--room-preset-fill)] transition-[transform,background-color] duration-150 group-hover:scale-[1.03] group-hover:bg-[var(--room-preset-hover-fill)]"
+                style={presetFillStyle(ROOM_PRESET_OTHER_COLOR, ROOM_PRESET_OTHER_HOVER_COLOR)}
+              />
+              <span className="relative">Other</span>
+            </button>
+          );
+        }
+
+        const { preset } = option;
+        const label = getRegionalRoomPresetLabel(preset, region);
+
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            data-room-preset-picker-control="true"
+            onClick={() => onSelectPreset(preset)}
+            aria-label={`Name room ${label}`}
+            className={cn(
+              "group absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+              isExiting ? "pointer-events-none" : "pointer-events-auto",
+              compact ? "text-[11px]" : "text-[13px]"
+            )}
+            style={{
+              width: `${buttonSize}px`,
+              height: `${buttonSize}px`,
+              transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+              fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full bg-[var(--room-preset-fill)] transition-[transform,background-color] duration-150 group-hover:scale-[1.04] group-hover:bg-[var(--room-preset-hover-fill)]"
+              style={presetFillStyle(preset.color, preset.hoverColor)}
+            />
+            <span className="relative">{renderPresetLabel(label)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -964,6 +1156,10 @@ export default function EditorCanvas({
   const selectFloorById = useEditorStore((state) => state.selectFloorById);
   const selectedNorthIndicator = useEditorStore((state) => state.selectedNorthIndicator);
   const selectedRoomId = useEditorStore((state) => state.selectedRoomId);
+  const applyRoomPreset = useEditorStore((state) => state.applyRoomPreset);
+  const applyOtherRoomPreset = useEditorStore((state) => state.applyOtherRoomPreset);
+  const roomPresetPickerRoomId = useEditorStore((state) => state.roomPresetPickerRoomId);
+  const clearRoomPresetPicker = useEditorStore((state) => state.clearRoomPresetPicker);
   const selectedFloorId = useEditorStore((state) => {
     const floorSelection = state.selection.find(
       (item): item is Extract<SharedSelectionItem, { type: "floor" }> => item.type === "floor"
@@ -990,6 +1186,7 @@ export default function EditorCanvas({
   const floors = editorDocument.floors;
   const displayedFloors = useMemo(() => [...floors].reverse(), [floors]);
   const activeFloorId = editorDocument.activeFloorId;
+  const prefersReducedMotion = usePrefersReducedMotion();
   const showFloorFootprint = useEditorStore((state) => state.settings.showFloorFootprint);
   const [hoveredFloorPreviewId, setHoveredFloorPreviewId] = useState<string | null>(null);
   const [previousActiveFloorId, setPreviousActiveFloorId] = useState<string | null>(null);
@@ -1085,6 +1282,71 @@ export default function EditorCanvas({
     roomCount,
     roomDraftPointCount,
   ]);
+
+  useEffect(() => {
+    if (!roomPresetPickerRoomId) return;
+    const roomStillVisible = rooms.some((room) => room.id === roomPresetPickerRoomId);
+    const shouldDismiss =
+      !roomStillVisible ||
+      selectedRoomId !== roomPresetPickerRoomId ||
+      roomDraftPointCount > 0 ||
+      isRulerMode ||
+      selectedNorthIndicator;
+
+    if (shouldDismiss) {
+      clearRoomPresetPicker();
+    }
+  }, [
+    clearRoomPresetPicker,
+    isRulerMode,
+    roomDraftPointCount,
+    roomPresetPickerRoomId,
+    rooms,
+    selectedNorthIndicator,
+    selectedRoomId,
+  ]);
+
+  useEffect(() => {
+    if (!roomPresetPickerRoomId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const clickedPresetControl = event.composedPath().some(
+        (target) =>
+          target instanceof Element &&
+          target.getAttribute(ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE) === "true"
+      );
+      if (!clickedPresetControl) {
+        clearRoomPresetPicker();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, { capture: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+    };
+  }, [clearRoomPresetPicker, roomPresetPickerRoomId]);
+
+  const handleRoomPresetPickerSelect = useCallback(
+    (preset: RoomPreset) => {
+      if (!roomPresetPickerRoomId) return;
+      applyRoomPreset(roomPresetPickerRoomId, preset.id);
+    },
+    [applyRoomPreset, roomPresetPickerRoomId]
+  );
+
+  const handleRoomPresetPickerOther = useCallback(() => {
+    if (roomPresetPickerRoomId) {
+      applyOtherRoomPreset(roomPresetPickerRoomId);
+    }
+    window.requestAnimationFrame(() => {
+      const inputElement = document.getElementById("room-name-input");
+      if (inputElement instanceof HTMLInputElement) {
+        inputElement.focus({ preventScroll: true });
+        inputElement.select();
+      }
+    });
+  }, [applyOtherRoomPreset, roomPresetPickerRoomId]);
 
   const drawCurrentScene = useCallback(() => {
     const app = appRef.current;
@@ -1581,7 +1843,8 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         null,
-        exportTheme
+        exportTheme,
+        state.settings.showRoomColors
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -3209,6 +3472,61 @@ export default function EditorCanvas({
   const editorGridTemplateColumns = [leftSidebarWidth, "minmax(0,1fr)", rightInspectorWidth]
     .filter((value): value is string => value !== null)
     .join(" ");
+  const [renderedRoomPresetPicker, setRenderedRoomPresetPicker] = useState<{
+    center: ScreenPoint;
+    compact: boolean;
+    isExiting: boolean;
+  } | null>(null);
+  const roomPresetPickerPosition = useMemo(() => {
+    if (!roomPresetPickerRoomId || viewport.width <= 0 || viewport.height <= 0) return null;
+    const room = rooms.find((candidate) => candidate.id === roomPresetPickerRoomId);
+    if (!room) return null;
+    const anchor = getPolygonLabelAnchor(room.points);
+    if (!anchor) return null;
+
+    const screenCenter = worldToScreen(anchor, camera, viewport);
+    const radius = useCompactHud ? ROOM_PRESET_PICKER_COMPACT_RADIUS_PX : ROOM_PRESET_PICKER_RADIUS_PX;
+    const buttonSize = useCompactHud
+      ? ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX
+      : ROOM_PRESET_PICKER_BUTTON_SIZE_PX;
+    const halfSize = radius + buttonSize / 2;
+    const margin = ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX + halfSize;
+
+    return {
+      x: clampValue(screenCenter.x, margin, Math.max(margin, viewport.width - margin)),
+      y: clampValue(screenCenter.y, margin, Math.max(margin, viewport.height - margin)),
+    };
+  }, [camera, roomPresetPickerRoomId, rooms, useCompactHud, viewport]);
+
+  useEffect(() => {
+    if (roomPresetPickerPosition) {
+      setRenderedRoomPresetPicker({
+        center: roomPresetPickerPosition,
+        compact: useCompactHud,
+        isExiting: false,
+      });
+      return;
+    }
+
+    setRenderedRoomPresetPicker((current) =>
+      current && !current.isExiting ? { ...current, isExiting: true } : current
+    );
+  }, [roomPresetPickerPosition, useCompactHud]);
+
+  useEffect(() => {
+    if (!renderedRoomPresetPicker?.isExiting) return;
+
+    const timeout = window.setTimeout(
+      () => {
+        setRenderedRoomPresetPicker((current) => (current?.isExiting ? null : current));
+      },
+      prefersReducedMotion ? 0 : ROOM_PRESET_PICKER_EXIT_MS
+    );
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [prefersReducedMotion, renderedRoomPresetPicker?.isExiting]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3384,6 +3702,44 @@ export default function EditorCanvas({
           }
           100% {
             background-position: 0 0%;
+          }
+        }
+
+        @keyframes roomPresetPickerSpring {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.82);
+          }
+          36% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.052);
+          }
+          58% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(0.986);
+          }
+          76% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.012);
+          }
+          90% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(0.998);
+          }
+          100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+
+        @keyframes roomPresetPickerExit {
+          0% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.92);
           }
         }
 
@@ -3822,6 +4178,18 @@ export default function EditorCanvas({
               {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 15°
             </div>
           ) : null}
+          {renderedRoomPresetPicker ? (
+            <RoomPresetPickerOverlay
+              center={renderedRoomPresetPicker.center}
+              compact={renderedRoomPresetPicker.compact}
+              prefersReducedMotion={prefersReducedMotion}
+              isExiting={renderedRoomPresetPicker.isExiting}
+              options={ROOM_PRESET_PICKER_OPTIONS}
+              region={displayUnitOrigin}
+              onSelectPreset={handleRoomPresetPickerSelect}
+              onOther={handleRoomPresetPickerOther}
+            />
+          ) : null}
           {displayedHint && displayedHint.id !== "project-name" ? (
             <aside
               className={`pointer-events-none absolute top-4 left-1/2 z-20 w-full max-w-xs -translate-x-1/2 px-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none ${
@@ -4141,6 +4509,7 @@ function drawScene(
     state.viewport,
     transformFeedback,
     theme,
+    state.settings.showRoomColors,
     assetDragTargetRoomId
   );
   
@@ -4423,6 +4792,7 @@ function drawRooms(
   viewport: ViewportSize,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
+  showRoomColors: boolean,
   assetDragTargetRoomId: string | null = null
 ) {
   graphics.clear();
@@ -4463,6 +4833,7 @@ function drawRooms(
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
+    const roomColor = showRoomColors ? getRoomColorNumber(room.roomColor) : null;
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
@@ -4490,7 +4861,8 @@ function drawRooms(
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
       isSelected ? selectedFillAlpha : 0.12,
       isSelected ? selectedStrokeWidth : 2,
-      isSelected ? selectedStrokeAlpha : 0.9
+      isSelected ? selectedStrokeAlpha : 0.9,
+      roomColor ?? undefined
     );
 
     if (isAssetDragTarget) {
@@ -4655,6 +5027,11 @@ function drawRooms(
 
 function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {
   return selection.some((item) => item.type === "room" && item.id === roomId);
+}
+
+function getRoomColorNumber(roomColor: string | undefined): number | null {
+  if (!roomColor || !/^#[0-9a-fA-F]{6}$/.test(roomColor)) return null;
+  return Number.parseInt(roomColor.slice(1), 16);
 }
 
 function getVisibleRoomsForFocusedRoom(rooms: Room[], focusedRoomId: string | null): Room[] {
@@ -4969,12 +5346,13 @@ function drawRoomShape(
   strokeColor: number,
   fillAlpha: number,
   strokeWidth: number,
-  strokeAlpha: number
+  strokeAlpha: number,
+  fillColor?: number
 ) {
   const screenPoints = points.map((point) => worldToScreen(point, camera, viewport));
 
   graphics.setFillStyle({
-    color: strokeColor,
+    color: fillColor ?? strokeColor,
     alpha: fillAlpha,
   });
   graphics.moveTo(screenPoints[0].x, screenPoints[0].y);

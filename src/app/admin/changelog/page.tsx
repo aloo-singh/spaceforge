@@ -10,6 +10,44 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.81.0</h2>
+            <span className="text-sm text-muted-foreground">2026-05-19</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added a circular room type preset picker that opens when a new room polygon is completed.</li>
+                <li>Added preset data for Hall/Foyer, Landing, Lounge/Living Room, Study/Office, Kitchen, Utility/Laundry, WC/Powder Room, Bedroom, Bathroom, En-suite, Wardrobe/Closet, and Other.</li>
+                <li>Added split-circle preset controls for Hall/Landing, Kitchen/Utility, and Bathroom/En-suite.</li>
+                <li>Added room type and room colour assignment through the existing room update and history paths.</li>
+                <li>Added a Canvas settings toggle for showing assigned room colours or reverting to the default room fill.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Updated the selected room inspector to show the current room type and reopen or close the preset picker from the Type control.</li>
+                <li>Refined picker layout, sizing, text wrapping, hover states, outside-click dismissal, and open/close animations.</li>
+                <li>Kept canvas pan and zoom behaviour available while the preset picker is visible.</li>
+                <li>Defaulted older rooms with no stored room type to display as Other without mutating their saved data.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed selected room re-clicks so the inspector stays on the room instead of falling back to the parent floor.</li>
+                <li>Fixed repeated picker trigger clicks so an already-open picker closes instead of replaying the open animation.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.80.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-18</span>
           </div>
