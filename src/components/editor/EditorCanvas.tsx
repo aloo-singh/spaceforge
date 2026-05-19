@@ -488,6 +488,14 @@ function RoomPresetPickerOverlay({
   const buttonSize = compact
     ? ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX
     : ROOM_PRESET_PICKER_BUTTON_SIZE_PX;
+  const renderPresetLabel = (label: string) =>
+    label.split("/").map((part, index, parts) => (
+      <span key={`${part}-${index}`}>
+        {part}
+        {index < parts.length - 1 ? "/" : null}
+        {index < parts.length - 1 ? <br /> : null}
+      </span>
+    ));
 
   return (
     <div
@@ -538,7 +546,7 @@ function RoomPresetPickerOverlay({
                   )}
                   style={{ backgroundColor: option.top.color }}
                 >
-                  {topLabel}
+                  <span>{renderPresetLabel(topLabel)}</span>
                 </button>
                 <button
                   type="button"
@@ -550,7 +558,7 @@ function RoomPresetPickerOverlay({
                   )}
                   style={{ backgroundColor: option.bottom.color }}
                 >
-                  {bottomLabel}
+                  <span>{renderPresetLabel(bottomLabel)}</span>
                 </button>
               </div>
             </div>
@@ -609,7 +617,7 @@ function RoomPresetPickerOverlay({
               className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.04] group-hover:brightness-[1.03]"
               style={{ backgroundColor: preset.color }}
             />
-            <span className="relative">{label}</span>
+            <span className="relative">{renderPresetLabel(label)}</span>
           </button>
         );
       })}
