@@ -105,7 +105,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
   const commitRoomRenameSession = useEditorStore((state) => state.commitRoomRenameSession);
   const cancelRoomRenameSession = useEditorStore((state) => state.cancelRoomRenameSession);
   const selectRoomById = useEditorStore((state) => state.selectRoomById);
+  const roomPresetPickerRoomId = useEditorStore((state) => state.roomPresetPickerRoomId);
   const requestRoomPresetPicker = useEditorStore((state) => state.requestRoomPresetPicker);
+  const clearRoomPresetPicker = useEditorStore((state) => state.clearRoomPresetPicker);
   const setFocusedRoomId = useEditorStore((state) => state.setFocusedRoomId);
   const deleteSelectedRoom = useEditorStore((state) => state.deleteSelectedRoom);
   const consumeSelectedRoomNameInputFocusRequest = useEditorStore(
@@ -319,7 +321,12 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
             <button
               id="room-type-picker-button"
               type="button"
+              data-room-preset-picker-control="true"
               onClick={() => {
+                if (roomPresetPickerRoomId === selectedRoom.id) {
+                  clearRoomPresetPicker();
+                  return;
+                }
                 selectRoomById(selectedRoom.id);
                 requestRoomPresetPicker(selectedRoom.id);
               }}
