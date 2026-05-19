@@ -518,7 +518,7 @@ function RoomPresetPickerOverlay({
           return (
             <div
               key={`${option.top.id}-${option.bottom.id}`}
-              className="pointer-events-auto absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-full"
+              className="pointer-events-auto absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-full transition-transform duration-150 hover:scale-[1.04]"
               style={{
                 width: `${buttonSize}px`,
                 height: `${buttonSize}px`,
