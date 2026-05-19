@@ -1777,7 +1777,8 @@ export default function EditorCanvas({
         exportCamera,
         exportViewport,
         null,
-        exportTheme
+        exportTheme,
+        state.settings.showRoomColors
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -4383,6 +4384,7 @@ function drawScene(
     state.viewport,
     transformFeedback,
     theme,
+    state.settings.showRoomColors,
     assetDragTargetRoomId
   );
   
@@ -4665,6 +4667,7 @@ function drawRooms(
   viewport: ViewportSize,
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
+  showRoomColors: boolean,
   assetDragTargetRoomId: string | null = null
 ) {
   graphics.clear();
@@ -4705,7 +4708,7 @@ function drawRooms(
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
-    const roomColor = getRoomColorNumber(room.roomColor);
+    const roomColor = showRoomColors ? getRoomColorNumber(room.roomColor) : null;
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";

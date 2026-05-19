@@ -138,6 +138,7 @@ export function EditorSettingsDialog({
   const isCanvasHudVisible = settings.showCanvasHud;
   const isMiniMapVisible = settings.showMiniMap;
   const areRoomNamesVisible = settings.showRoomNames;
+  const areRoomColorsVisible = settings.showRoomColors;
   const areAssetsVisible = settings.showAssets;
   const areAssetLabelsVisible = settings.showAssetLabels;
   const areGuidelinesVisible = settings.showGuidelines;
@@ -667,6 +668,49 @@ export function EditorSettingsDialog({
               variant={!areRoomNamesVisible ? "secondary" : "ghost"}
               aria-pressed={!areRoomNamesVisible}
               onClick={() => updateSettings({ showRoomNames: false })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              Off
+            </Button>
+          </div>
+        </div>
+
+        <div
+          aria-labelledby="editor-settings-room-colors-title"
+          className="rounded-xl border border-border/70 bg-muted/25 p-3.5 lg:order-8"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div>
+              <h3 id="editor-settings-room-colors-title" className="text-sm font-medium text-foreground">
+                Show room colours
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Use assigned room colours for canvas fills, or keep the default floorplan fill.
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="mt-3 flex w-full rounded-lg border border-border/70 bg-background/90 p-1 sm:inline-flex sm:w-auto"
+            role="group"
+            aria-label="Show room colours"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={areRoomColorsVisible ? "secondary" : "ghost"}
+              aria-pressed={areRoomColorsVisible}
+              onClick={() => updateSettings({ showRoomColors: true })}
+              className="min-w-20 flex-1 sm:flex-none"
+            >
+              On
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!areRoomColorsVisible ? "secondary" : "ghost"}
+              aria-pressed={!areRoomColorsVisible}
+              onClick={() => updateSettings({ showRoomColors: false })}
               className="min-w-20 flex-1 sm:flex-none"
             >
               Off
