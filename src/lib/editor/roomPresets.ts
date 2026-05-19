@@ -61,11 +61,11 @@ const LANDING_PRESET = {
 const LOUNGE_PRESET = {
   id: "lounge",
   labels: {
-    metric: "Loung",
+    metric: "Lounge",
     imperial: "Living Room",
   },
   baseNames: {
-    metric: "Loung",
+    metric: "Lounge",
     imperial: "Living Room",
   },
   color: ROOM_PRESET_COLORS.yellow200,
