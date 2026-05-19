@@ -518,7 +518,7 @@ function RoomPresetPickerOverlay({
           return (
             <div
               key={`${option.top.id}-${option.bottom.id}`}
-              className="pointer-events-auto absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-full transition-transform duration-150 hover:scale-[1.04]"
+              className="group pointer-events-auto absolute left-1/2 top-1/2"
               style={{
                 width: `${buttonSize}px`,
                 height: `${buttonSize}px`,
@@ -527,30 +527,32 @@ function RoomPresetPickerOverlay({
               }}
               aria-label={`${topLabel} or ${bottomLabel}`}
             >
-              <button
-                type="button"
-                onClick={() => onSelectPreset(option.top)}
-                aria-label={`Name room ${topLabel}`}
-                className={cn(
-                  "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                  compact ? "text-[10px]" : "text-[12px]"
-                )}
-                style={{ backgroundColor: option.top.color }}
-              >
-                {topLabel}
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectPreset(option.bottom)}
-                aria-label={`Name room ${bottomLabel}`}
-                className={cn(
-                  "flex h-1/2 w-full items-center justify-center px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                  compact ? "text-[10px]" : "text-[12px]"
-                )}
-                style={{ backgroundColor: option.bottom.color }}
-              >
-                {bottomLabel}
-              </button>
+              <div className="flex h-full w-full flex-col overflow-hidden rounded-full transition-transform duration-150 group-hover:scale-[1.04]">
+                <button
+                  type="button"
+                  onClick={() => onSelectPreset(option.top)}
+                  aria-label={`Name room ${topLabel}`}
+                  className={cn(
+                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[10px]" : "text-[12px]"
+                  )}
+                  style={{ backgroundColor: option.top.color }}
+                >
+                  {topLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectPreset(option.bottom)}
+                  aria-label={`Name room ${bottomLabel}`}
+                  className={cn(
+                    "flex h-1/2 w-full items-center justify-center px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[10px]" : "text-[12px]"
+                  )}
+                  style={{ backgroundColor: option.bottom.color }}
+                >
+                  {bottomLabel}
+                </button>
+              </div>
             </div>
           );
         }
@@ -565,18 +567,22 @@ function RoomPresetPickerOverlay({
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
-              "pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-[transform,color,filter] duration-150 hover:scale-[1.04] hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+              "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
               compact ? "text-[10px]" : "text-[12px]"
             )}
             style={{
               width: `${buttonSize}px`,
               height: `${buttonSize}px`,
-              backgroundColor: preset.color,
               transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
               fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
             }}
           >
-            {label}
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.04] group-hover:brightness-[1.03]"
+              style={{ backgroundColor: preset.color }}
+            />
+            <span className="relative">{label}</span>
           </button>
         );
       })}
@@ -584,17 +590,21 @@ function RoomPresetPickerOverlay({
         type="button"
         onClick={onOther}
         className={cn(
-          "pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-[transform,filter] duration-150 hover:scale-[1.03] hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+          "group pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
           compact ? "text-[10px]" : "text-[12px]"
         )}
         style={{
           width: `${buttonSize}px`,
           height: `${buttonSize}px`,
-          backgroundColor: ROOM_PRESET_OTHER_COLOR,
           fontFamily: MEASUREMENT_TEXT_FONT_FAMILY,
         }}
       >
-        Other
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.03] group-hover:brightness-[1.03]"
+          style={{ backgroundColor: ROOM_PRESET_OTHER_COLOR }}
+        />
+        <span className="relative">Other</span>
       </button>
     </div>
   );
