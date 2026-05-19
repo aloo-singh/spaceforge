@@ -283,10 +283,10 @@ const DESKTOP_INSPECTOR_COLLAPSED_WIDTH_PX = 44;
 const COMPACT_LANDSCAPE_INSPECTOR_EXPANDED_WIDTH_CSS = "max(13rem, 30vw)";
 const MOBILE_PORTRAIT_INSPECTOR_EXPANDED_HEIGHT_CSS = "min(22rem, 42vh)";
 const MOBILE_PORTRAIT_INSPECTOR_COLLAPSED_HEIGHT_PX = 44;
-const ROOM_PRESET_PICKER_RADIUS_PX = 164;
-const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 132;
-const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 96;
-const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 78;
+const ROOM_PRESET_PICKER_RADIUS_PX = 184;
+const ROOM_PRESET_PICKER_COMPACT_RADIUS_PX = 134;
+const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 108;
+const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
@@ -533,8 +533,8 @@ function RoomPresetPickerOverlay({
                   onClick={() => onSelectPreset(option.top)}
                   aria-label={`Name room ${topLabel}`}
                   className={cn(
-                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                    compact ? "text-[10px]" : "text-[12px]"
+                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[11px]" : "text-[13px]"
                   )}
                   style={{ backgroundColor: option.top.color }}
                 >
@@ -545,8 +545,8 @@ function RoomPresetPickerOverlay({
                   onClick={() => onSelectPreset(option.bottom)}
                   aria-label={`Name room ${bottomLabel}`}
                   className={cn(
-                    "flex h-1/2 w-full items-center justify-center px-2 text-center text-[12px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                    compact ? "text-[10px]" : "text-[12px]"
+                    "flex h-1/2 w-full items-center justify-center px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    compact ? "text-[11px]" : "text-[13px]"
                   )}
                   style={{ backgroundColor: option.bottom.color }}
                 >
@@ -564,8 +564,8 @@ function RoomPresetPickerOverlay({
               type="button"
               onClick={onOther}
               className={cn(
-                "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
-                compact ? "text-[10px]" : "text-[12px]"
+                "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+                compact ? "text-[11px]" : "text-[13px]"
               )}
               style={{
                 width: `${buttonSize}px`,
@@ -594,8 +594,8 @@ function RoomPresetPickerOverlay({
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
-              "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-2.5 text-center text-[12px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
-              compact ? "text-[10px]" : "text-[12px]"
+              "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+              compact ? "text-[11px]" : "text-[13px]"
             )}
             style={{
               width: `${buttonSize}px`,
