@@ -26,7 +26,7 @@ export const ROOM_PRESET_COLORS = {
   violet300: "#c4b5fd",
   yellow200: "#fef08a",
   green200: "#bbf7d0",
-  taupe400: "#a18072",
+  taupe300: "#b89a8d",
   blue300: "#93c5fd",
   orange200: "#fed7aa",
   zinc400: "#a1a1aa",
@@ -97,7 +97,7 @@ const KITCHEN_PRESET = {
     metric: "Kitchen",
     imperial: "Kitchen",
   },
-  color: ROOM_PRESET_COLORS.taupe400,
+  color: ROOM_PRESET_COLORS.taupe300,
 } as const satisfies RoomPreset;
 
 const UTILITY_PRESET = {
@@ -110,7 +110,7 @@ const UTILITY_PRESET = {
     metric: "Utility",
     imperial: "Utility/Laundry",
   },
-  color: ROOM_PRESET_COLORS.taupe400,
+  color: ROOM_PRESET_COLORS.taupe300,
 } as const satisfies RoomPreset;
 
 const WC_PRESET = {
