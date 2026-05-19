@@ -291,6 +291,7 @@ const ROOM_PRESET_PICKER_BUTTON_SIZE_PX = 108;
 const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
 const ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE = "data-room-preset-picker-control";
+const ROOM_PRESET_PICKER_EXIT_MS = 110;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -474,6 +475,7 @@ function RoomPresetPickerOverlay({
   center,
   compact,
   prefersReducedMotion,
+  isExiting,
   options,
   region,
   onSelectPreset,
@@ -482,6 +484,7 @@ function RoomPresetPickerOverlay({
   center: ScreenPoint;
   compact: boolean;
   prefersReducedMotion: boolean;
+  isExiting: boolean;
   options: readonly RoomPresetPickerOption[];
   region: ProjectRegion;
   onSelectPreset: (preset: RoomPreset) => void;
@@ -510,6 +513,8 @@ function RoomPresetPickerOverlay({
         "pointer-events-none absolute z-20",
         prefersReducedMotion
           ? "opacity-100"
+          : isExiting
+            ? "motion-safe:animate-[roomPresetPickerExit_110ms_cubic-bezier(0.4,0,1,1)_both]"
           : "motion-safe:animate-[roomPresetPickerSpring_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
       )}
       style={{
@@ -534,7 +539,10 @@ function RoomPresetPickerOverlay({
             <div
               key={`${option.top.id}-${option.bottom.id}`}
               data-room-preset-picker-control="true"
-              className="group pointer-events-auto absolute left-1/2 top-1/2"
+              className={cn(
+                "group absolute left-1/2 top-1/2",
+                isExiting ? "pointer-events-none" : "pointer-events-auto"
+              )}
               style={{
                 width: `${buttonSize}px`,
                 height: `${buttonSize}px`,
@@ -581,7 +589,8 @@ function RoomPresetPickerOverlay({
               data-room-preset-picker-control="true"
               onClick={onOther}
               className={cn(
-                "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+                "group absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+                isExiting ? "pointer-events-none" : "pointer-events-auto",
                 compact ? "text-[11px]" : "text-[13px]"
               )}
               style={{
@@ -612,7 +621,8 @@ function RoomPresetPickerOverlay({
             onClick={() => onSelectPreset(preset)}
             aria-label={`Name room ${label}`}
             className={cn(
-              "group pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+              "group absolute left-1/2 top-1/2 flex items-center justify-center rounded-full px-3 text-center text-[13px] leading-tight font-semibold text-zinc-950/78 transition-colors duration-150 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-zinc-950/82",
+              isExiting ? "pointer-events-none" : "pointer-events-auto",
               compact ? "text-[11px]" : "text-[13px]"
             )}
             style={{
@@ -3462,6 +3472,11 @@ export default function EditorCanvas({
   const editorGridTemplateColumns = [leftSidebarWidth, "minmax(0,1fr)", rightInspectorWidth]
     .filter((value): value is string => value !== null)
     .join(" ");
+  const [renderedRoomPresetPicker, setRenderedRoomPresetPicker] = useState<{
+    center: ScreenPoint;
+    compact: boolean;
+    isExiting: boolean;
+  } | null>(null);
   const roomPresetPickerPosition = useMemo(() => {
     if (!roomPresetPickerRoomId || viewport.width <= 0 || viewport.height <= 0) return null;
     const room = rooms.find((candidate) => candidate.id === roomPresetPickerRoomId);
@@ -3482,6 +3497,36 @@ export default function EditorCanvas({
       y: clampValue(screenCenter.y, margin, Math.max(margin, viewport.height - margin)),
     };
   }, [camera, roomPresetPickerRoomId, rooms, useCompactHud, viewport]);
+
+  useEffect(() => {
+    if (roomPresetPickerPosition) {
+      setRenderedRoomPresetPicker({
+        center: roomPresetPickerPosition,
+        compact: useCompactHud,
+        isExiting: false,
+      });
+      return;
+    }
+
+    setRenderedRoomPresetPicker((current) =>
+      current && !current.isExiting ? { ...current, isExiting: true } : current
+    );
+  }, [roomPresetPickerPosition, useCompactHud]);
+
+  useEffect(() => {
+    if (!renderedRoomPresetPicker?.isExiting) return;
+
+    const timeout = window.setTimeout(
+      () => {
+        setRenderedRoomPresetPicker((current) => (current?.isExiting ? null : current));
+      },
+      prefersReducedMotion ? 0 : ROOM_PRESET_PICKER_EXIT_MS
+    );
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [prefersReducedMotion, renderedRoomPresetPicker?.isExiting]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3672,6 +3717,17 @@ export default function EditorCanvas({
           100% {
             opacity: 1;
             transform: translate(-50%, -50%) scale(1);
+          }
+        }
+
+        @keyframes roomPresetPickerExit {
+          0% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.92);
           }
         }
 
@@ -4110,11 +4166,12 @@ export default function EditorCanvas({
               {formatCanvasRotationDegrees(canvasRotationTooltip.rotationDegrees)} · Shift 15°
             </div>
           ) : null}
-          {roomPresetPickerPosition ? (
+          {renderedRoomPresetPicker ? (
             <RoomPresetPickerOverlay
-              center={roomPresetPickerPosition}
-              compact={useCompactHud}
+              center={renderedRoomPresetPicker.center}
+              compact={renderedRoomPresetPicker.compact}
               prefersReducedMotion={prefersReducedMotion}
+              isExiting={renderedRoomPresetPicker.isExiting}
               options={ROOM_PRESET_PICKER_OPTIONS}
               region={displayUnitOrigin}
               onSelectPreset={handleRoomPresetPickerSelect}
