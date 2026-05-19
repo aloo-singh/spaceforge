@@ -3631,12 +3631,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return state;
       }
       
+      const hasMatchingSelection = roomId
+        ? state.selection.length === 1 &&
+          state.selection[0]?.type === "room" &&
+          state.selection[0].id === roomId
+        : state.selection.length === 0;
+
       // If already in the correct state, return early
       if (
         state.selectedRoomId === roomId &&
         state.selectedWall === null &&
         state.selectedOpening === null &&
-        state.selectedInteriorAsset === null
+        state.selectedInteriorAsset === null &&
+        hasMatchingSelection
       ) {
         return state;
       }
