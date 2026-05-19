@@ -20,28 +20,29 @@ export type RoomPresetPickerOption =
     };
 
 export const ROOM_PRESET_COLORS = {
-  zinc500: "#71717a",
-  amber300: "#fcd34d",
-  violet400: "#a78bfa",
-  blue400: "#60a5fa",
-  slate400: "#94a3b8",
-  sky400: "#38bdf8",
-  green300: "#86efac",
-  blue500: "#3b82f6",
-  blue600: "#2563eb",
+  violet300: "#c4b5fd",
+  yellow200: "#fef08a",
+  green200: "#bbf7d0",
+  taupe400: "#a18072",
+  blue300: "#93c5fd",
+  orange200: "#fed7aa",
+  zinc400: "#a1a1aa",
+  red200: "#fecaca",
 } as const;
+
+export const ROOM_PRESET_OTHER_COLOR = ROOM_PRESET_COLORS.red200;
 
 const HALL_PRESET = {
   id: "hall",
   labels: {
     metric: "Hall",
-    imperial: "Hall",
+    imperial: "Foyer",
   },
   baseNames: {
     metric: "Hall",
-    imperial: "Hall",
+    imperial: "Foyer",
   },
-  color: ROOM_PRESET_COLORS.zinc500,
+  color: ROOM_PRESET_COLORS.violet300,
 } as const satisfies RoomPreset;
 
 const LANDING_PRESET = {
@@ -54,33 +55,33 @@ const LANDING_PRESET = {
     metric: "Landing",
     imperial: "Landing",
   },
-  color: ROOM_PRESET_COLORS.zinc500,
+  color: ROOM_PRESET_COLORS.violet300,
 } as const satisfies RoomPreset;
 
 const LOUNGE_PRESET = {
   id: "lounge",
   labels: {
-    metric: "Lounge",
-    imperial: "Living",
-  },
-  baseNames: {
-    metric: "Lounge",
+    metric: "Loung",
     imperial: "Living Room",
   },
-  color: ROOM_PRESET_COLORS.amber300,
+  baseNames: {
+    metric: "Loung",
+    imperial: "Living Room",
+  },
+  color: ROOM_PRESET_COLORS.yellow200,
 } as const satisfies RoomPreset;
 
 const STUDY_PRESET = {
   id: "study",
   labels: {
     metric: "Study",
-    imperial: "Office",
+    imperial: "Office/Study",
   },
   baseNames: {
     metric: "Study",
-    imperial: "Office",
+    imperial: "Office/Study",
   },
-  color: ROOM_PRESET_COLORS.violet400,
+  color: ROOM_PRESET_COLORS.green200,
 } as const satisfies RoomPreset;
 
 const KITCHEN_PRESET = {
@@ -93,33 +94,33 @@ const KITCHEN_PRESET = {
     metric: "Kitchen",
     imperial: "Kitchen",
   },
-  color: ROOM_PRESET_COLORS.blue400,
+  color: ROOM_PRESET_COLORS.taupe400,
 } as const satisfies RoomPreset;
 
 const UTILITY_PRESET = {
   id: "utility",
   labels: {
     metric: "Utility",
-    imperial: "Laundry",
+    imperial: "Utility/Laundry",
   },
   baseNames: {
     metric: "Utility",
-    imperial: "Laundry",
+    imperial: "Utility/Laundry",
   },
-  color: ROOM_PRESET_COLORS.slate400,
+  color: ROOM_PRESET_COLORS.taupe400,
 } as const satisfies RoomPreset;
 
 const WC_PRESET = {
   id: "wc",
   labels: {
     metric: "WC",
-    imperial: "Half Bath",
+    imperial: "Powder Room",
   },
   baseNames: {
     metric: "WC",
-    imperial: "Half Bath",
+    imperial: "Powder Room",
   },
-  color: ROOM_PRESET_COLORS.sky400,
+  color: ROOM_PRESET_COLORS.blue300,
 } as const satisfies RoomPreset;
 
 const BEDROOM_PRESET = {
@@ -132,7 +133,7 @@ const BEDROOM_PRESET = {
     metric: "Bedroom",
     imperial: "Bedroom",
   },
-  color: ROOM_PRESET_COLORS.green300,
+  color: ROOM_PRESET_COLORS.orange200,
 } as const satisfies RoomPreset;
 
 const BATHROOM_PRESET = {
@@ -145,7 +146,7 @@ const BATHROOM_PRESET = {
     metric: "Bathroom",
     imperial: "Bathroom",
   },
-  color: ROOM_PRESET_COLORS.blue500,
+  color: ROOM_PRESET_COLORS.blue300,
 } as const satisfies RoomPreset;
 
 const ENSUITE_PRESET = {
@@ -158,7 +159,20 @@ const ENSUITE_PRESET = {
     metric: "En-suite",
     imperial: "En-suite",
   },
-  color: ROOM_PRESET_COLORS.blue600,
+  color: ROOM_PRESET_COLORS.blue300,
+} as const satisfies RoomPreset;
+
+const WARDROBE_PRESET = {
+  id: "wardrobe",
+  labels: {
+    metric: "Wardrobe",
+    imperial: "Closet",
+  },
+  baseNames: {
+    metric: "Wardrobe",
+    imperial: "Closet",
+  },
+  color: ROOM_PRESET_COLORS.zinc400,
 } as const satisfies RoomPreset;
 
 export const ROOM_PRESETS = [
@@ -172,6 +186,7 @@ export const ROOM_PRESETS = [
   BEDROOM_PRESET,
   BATHROOM_PRESET,
   ENSUITE_PRESET,
+  WARDROBE_PRESET,
 ] as const satisfies readonly RoomPreset[];
 
 export const ROOM_PRESET_PICKER_OPTIONS = [
@@ -208,6 +223,10 @@ export const ROOM_PRESET_PICKER_OPTIONS = [
     type: "split",
     top: BATHROOM_PRESET,
     bottom: ENSUITE_PRESET,
+  },
+  {
+    type: "single",
+    preset: WARDROBE_PRESET,
   },
 ] as const satisfies readonly RoomPresetPickerOption[];
 

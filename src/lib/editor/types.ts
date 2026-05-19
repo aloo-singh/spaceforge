@@ -99,7 +99,8 @@ export type RoomType =
   | "wc"
   | "bedroom"
   | "bathroom"
-  | "ensuite";
+  | "ensuite"
+  | "wardrobe";
 
 /**
  * Direction of a stair's directional arrow.

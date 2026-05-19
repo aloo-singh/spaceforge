@@ -119,6 +119,7 @@ import {
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
 import {
+  ROOM_PRESET_OTHER_COLOR,
   getRegionalRoomPresetBaseName,
   getRoomPresetById,
   getSmartRoomName,
@@ -5809,7 +5810,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextRoom = {
         name: nextName,
         roomType: undefined,
-        roomColor: undefined,
+        roomColor: ROOM_PRESET_OTHER_COLOR,
       };
 
       const command: EditorCommand = {

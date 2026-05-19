@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/tooltip";
 import { formatWallDimension } from "@/lib/editor/measurements";
 import { getPolygonBounds } from "@/lib/editor/roomGeometry";
-import { getRegionalRoomPresetLabel, getRoomPresetById } from "@/lib/editor/roomPresets";
+import {
+  ROOM_PRESET_OTHER_COLOR,
+  getRegionalRoomPresetLabel,
+  getRoomPresetById,
+} from "@/lib/editor/roomPresets";
 import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
@@ -130,7 +134,8 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
     selectedRoom && selectedRoomPreset
       ? getRegionalRoomPresetLabel(selectedRoomPreset, displayUnitOrigin)
       : "Other";
-  const selectedRoomTypeColor = selectedRoom?.roomColor ?? selectedRoomPreset?.color ?? "#18181b";
+  const selectedRoomTypeColor =
+    selectedRoom?.roomColor ?? selectedRoomPreset?.color ?? ROOM_PRESET_OTHER_COLOR;
 
   useEffect(() => {
     if (typeof window === "undefined") {
