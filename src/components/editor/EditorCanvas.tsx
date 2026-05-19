@@ -510,12 +510,12 @@ function RoomPresetPickerOverlay({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute z-20",
+        "pointer-events-none absolute z-20 will-change-transform",
         prefersReducedMotion
           ? "opacity-100"
           : isExiting
             ? "motion-safe:animate-[roomPresetPickerExit_110ms_cubic-bezier(0.4,0,1,1)_both]"
-          : "motion-safe:animate-[roomPresetPickerSpring_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
+          : "motion-safe:animate-[roomPresetPickerSpring_420ms_linear_both]"
       )}
       style={{
         left: `${center.x}px`,
@@ -3708,11 +3708,23 @@ export default function EditorCanvas({
         @keyframes roomPresetPickerSpring {
           0% {
             opacity: 0;
-            transform: translate(-50%, -50%) scale(0.86);
+            transform: translate(-50%, -50%) scale(0.82);
           }
-          68% {
+          36% {
             opacity: 1;
-            transform: translate(-50%, -50%) scale(1.035);
+            transform: translate(-50%, -50%) scale(1.052);
+          }
+          58% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(0.986);
+          }
+          76% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.012);
+          }
+          90% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(0.998);
           }
           100% {
             opacity: 1;
