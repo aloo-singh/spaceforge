@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -138,6 +139,7 @@ import {
   type EditorSettings,
 } from "@/lib/editor/settings";
 import {
+  ROOM_PRESET_OTHER_HOVER_COLOR,
   ROOM_PRESET_OTHER_COLOR,
   ROOM_PRESET_PICKER_OPTIONS,
   getRegionalRoomPresetLabel,
@@ -496,6 +498,10 @@ function RoomPresetPickerOverlay({
         {index < parts.length - 1 ? <br /> : null}
       </span>
     ));
+  const presetFillStyle = (color: string, hoverColor: string): CSSProperties => ({
+    "--room-preset-fill": color,
+    "--room-preset-hover-fill": hoverColor,
+  } as CSSProperties);
 
   return (
     <div
@@ -541,10 +547,10 @@ function RoomPresetPickerOverlay({
                   onClick={() => onSelectPreset(option.top)}
                   aria-label={`Name room ${topLabel}`}
                   className={cn(
-                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    "flex h-1/2 w-full items-center justify-center border-b border-zinc-950/38 bg-[var(--room-preset-fill)] px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[background-color,color] duration-150 hover:bg-[var(--room-preset-hover-fill)] hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                     compact ? "text-[11px]" : "text-[13px]"
                   )}
-                  style={{ backgroundColor: option.top.color }}
+                  style={presetFillStyle(option.top.color, option.top.hoverColor)}
                 >
                   <span>{renderPresetLabel(topLabel)}</span>
                 </button>
@@ -553,10 +559,10 @@ function RoomPresetPickerOverlay({
                   onClick={() => onSelectPreset(option.bottom)}
                   aria-label={`Name room ${bottomLabel}`}
                   className={cn(
-                    "flex h-1/2 w-full items-center justify-center px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[filter,color] duration-150 hover:text-zinc-950 hover:brightness-[1.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    "flex h-1/2 w-full items-center justify-center bg-[var(--room-preset-fill)] px-2.5 text-center text-[13px] leading-tight font-semibold text-zinc-950/80 transition-[background-color,color] duration-150 hover:bg-[var(--room-preset-hover-fill)] hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                     compact ? "text-[11px]" : "text-[13px]"
                   )}
-                  style={{ backgroundColor: option.bottom.color }}
+                  style={presetFillStyle(option.bottom.color, option.bottom.hoverColor)}
                 >
                   <span>{renderPresetLabel(bottomLabel)}</span>
                 </button>
@@ -584,8 +590,8 @@ function RoomPresetPickerOverlay({
             >
               <span
                 aria-hidden="true"
-                className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.03] group-hover:brightness-[1.03]"
-                style={{ backgroundColor: ROOM_PRESET_OTHER_COLOR }}
+                className="absolute inset-0 rounded-full bg-[var(--room-preset-fill)] transition-[transform,background-color] duration-150 group-hover:scale-[1.03] group-hover:bg-[var(--room-preset-hover-fill)]"
+                style={presetFillStyle(ROOM_PRESET_OTHER_COLOR, ROOM_PRESET_OTHER_HOVER_COLOR)}
               />
               <span className="relative">Other</span>
             </button>
@@ -614,8 +620,8 @@ function RoomPresetPickerOverlay({
           >
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full transition-[transform,filter] duration-150 group-hover:scale-[1.04] group-hover:brightness-[1.03]"
-              style={{ backgroundColor: preset.color }}
+              className="absolute inset-0 rounded-full bg-[var(--room-preset-fill)] transition-[transform,background-color] duration-150 group-hover:scale-[1.04] group-hover:bg-[var(--room-preset-hover-fill)]"
+              style={presetFillStyle(preset.color, preset.hoverColor)}
             />
             <span className="relative">{renderPresetLabel(label)}</span>
           </button>

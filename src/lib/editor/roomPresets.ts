@@ -6,6 +6,7 @@ export type RoomPreset = {
   labels: Record<ProjectRegion, string>;
   baseNames: Record<ProjectRegion, string>;
   color: string;
+  hoverColor: string;
 };
 
 export type RoomPresetPickerOption =
@@ -24,16 +25,25 @@ export type RoomPresetPickerOption =
 
 export const ROOM_PRESET_COLORS = {
   violet300: "#c4b5fd",
+  violet400: "#a78bfa",
   yellow200: "#fef08a",
+  yellow300: "#fde047",
   green200: "#bbf7d0",
+  green300: "#86efac",
   taupe300: "#b89a8d",
+  taupe400: "#a18072",
   blue300: "#93c5fd",
+  blue400: "#60a5fa",
   orange200: "#fed7aa",
+  orange300: "#fdba74",
   zinc400: "#a1a1aa",
+  zinc500: "#71717a",
   red200: "#fecaca",
+  red300: "#fca5a5",
 } as const;
 
 export const ROOM_PRESET_OTHER_COLOR = ROOM_PRESET_COLORS.red200;
+export const ROOM_PRESET_OTHER_HOVER_COLOR = ROOM_PRESET_COLORS.red300;
 
 const HALL_PRESET = {
   id: "hall",
@@ -46,6 +56,7 @@ const HALL_PRESET = {
     imperial: "Foyer",
   },
   color: ROOM_PRESET_COLORS.violet300,
+  hoverColor: ROOM_PRESET_COLORS.violet400,
 } as const satisfies RoomPreset;
 
 const LANDING_PRESET = {
@@ -59,6 +70,7 @@ const LANDING_PRESET = {
     imperial: "Landing",
   },
   color: ROOM_PRESET_COLORS.violet300,
+  hoverColor: ROOM_PRESET_COLORS.violet400,
 } as const satisfies RoomPreset;
 
 const LOUNGE_PRESET = {
@@ -72,6 +84,7 @@ const LOUNGE_PRESET = {
     imperial: "Living Room",
   },
   color: ROOM_PRESET_COLORS.yellow200,
+  hoverColor: ROOM_PRESET_COLORS.yellow300,
 } as const satisfies RoomPreset;
 
 const STUDY_PRESET = {
@@ -85,6 +98,7 @@ const STUDY_PRESET = {
     imperial: "Office/Study",
   },
   color: ROOM_PRESET_COLORS.green200,
+  hoverColor: ROOM_PRESET_COLORS.green300,
 } as const satisfies RoomPreset;
 
 const KITCHEN_PRESET = {
@@ -98,6 +112,7 @@ const KITCHEN_PRESET = {
     imperial: "Kitchen",
   },
   color: ROOM_PRESET_COLORS.taupe300,
+  hoverColor: ROOM_PRESET_COLORS.taupe400,
 } as const satisfies RoomPreset;
 
 const UTILITY_PRESET = {
@@ -111,6 +126,7 @@ const UTILITY_PRESET = {
     imperial: "Utility/Laundry",
   },
   color: ROOM_PRESET_COLORS.taupe300,
+  hoverColor: ROOM_PRESET_COLORS.taupe400,
 } as const satisfies RoomPreset;
 
 const WC_PRESET = {
@@ -124,6 +140,7 @@ const WC_PRESET = {
     imperial: "Powder Room",
   },
   color: ROOM_PRESET_COLORS.blue300,
+  hoverColor: ROOM_PRESET_COLORS.blue400,
 } as const satisfies RoomPreset;
 
 const BEDROOM_PRESET = {
@@ -137,6 +154,7 @@ const BEDROOM_PRESET = {
     imperial: "Bedroom",
   },
   color: ROOM_PRESET_COLORS.orange200,
+  hoverColor: ROOM_PRESET_COLORS.orange300,
 } as const satisfies RoomPreset;
 
 const BATHROOM_PRESET = {
@@ -150,6 +168,7 @@ const BATHROOM_PRESET = {
     imperial: "Bathroom",
   },
   color: ROOM_PRESET_COLORS.blue300,
+  hoverColor: ROOM_PRESET_COLORS.blue400,
 } as const satisfies RoomPreset;
 
 const ENSUITE_PRESET = {
@@ -163,6 +182,7 @@ const ENSUITE_PRESET = {
     imperial: "En-suite",
   },
   color: ROOM_PRESET_COLORS.blue300,
+  hoverColor: ROOM_PRESET_COLORS.blue400,
 } as const satisfies RoomPreset;
 
 const WARDROBE_PRESET = {
@@ -176,6 +196,7 @@ const WARDROBE_PRESET = {
     imperial: "Closet",
   },
   color: ROOM_PRESET_COLORS.zinc400,
+  hoverColor: ROOM_PRESET_COLORS.zinc500,
 } as const satisfies RoomPreset;
 
 export const ROOM_PRESETS = [
