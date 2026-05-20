@@ -221,6 +221,11 @@ function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterS
   return true;
 }
 
+function canDuplicateProjectWithinTierLimit() {
+  // Step 3 wires this to the subscription project limit before cloning.
+  return true;
+}
+
 function formatProjectFilterSelectValue(value: number | null) {
   return value === null ? PROJECT_FILTER_ANY_VALUE : String(value);
 }
@@ -574,12 +579,21 @@ export function ProjectsPageClient() {
       return;
     }
 
+    if (!canDuplicateProjectWithinTierLimit()) {
+      setIsProjectLimitDialogOpen(true);
+      return;
+    }
+
     setDuplicatingProjectId(projectId);
 
     try {
       setErrorMessage(null);
       const clientToken = getOrCreateAnonymousClientToken();
-      await duplicateProject(clientToken, projectId);
+      const duplicatedProject = await duplicateProject(clientToken, projectId);
+      setProjects((currentProjects) => mergeProjectIntoList(currentProjects, duplicatedProject));
+      toast.success("Project duplicated", {
+        description: duplicatedProject.name,
+      });
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to duplicate project.");

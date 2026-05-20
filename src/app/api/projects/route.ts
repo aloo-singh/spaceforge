@@ -4,13 +4,19 @@ import {
   existingClientTokenHasProjects,
   fetchProjectsForClientToken,
 } from "@/lib/projects/server";
-import { isProjectDocument } from "@/lib/projects/types";
+import {
+  isProjectDocument,
+  isProjectMaxFloors,
+  isProjectThumbnailDataUrl,
+} from "@/lib/projects/types";
 
 type CreateProjectRequestBody = {
   clientToken?: unknown;
   name?: unknown;
   document?: unknown;
   projectId?: unknown;
+  thumbnailDataUrl?: unknown;
+  maxFloors?: unknown;
 };
 
 function getClientTokenFromSearchParams(request: NextRequest) {
@@ -57,11 +63,19 @@ export async function POST(request: NextRequest) {
     if (!isProjectDocument(body.document)) {
       return NextResponse.json({ error: "document is invalid." }, { status: 400 });
     }
+    if (body.thumbnailDataUrl !== undefined && !isProjectThumbnailDataUrl(body.thumbnailDataUrl)) {
+      return NextResponse.json({ error: "thumbnailDataUrl is invalid." }, { status: 400 });
+    }
+    if (body.maxFloors !== undefined && !isProjectMaxFloors(body.maxFloors)) {
+      return NextResponse.json({ error: "maxFloors is invalid." }, { status: 400 });
+    }
 
     const project = await createProjectForClientToken(clientToken, {
       name,
       document: body.document,
       projectId: projectId || undefined,
+      thumbnailDataUrl: body.thumbnailDataUrl ?? undefined,
+      maxFloors: body.maxFloors,
     });
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
