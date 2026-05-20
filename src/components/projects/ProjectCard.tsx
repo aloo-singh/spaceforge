@@ -10,6 +10,8 @@ import {
   CalendarWeek,
   Check,
   Clock3,
+  Copy,
+  LoaderCircle,
   PencilLine,
   Stack,
   Trash2,
@@ -34,8 +36,10 @@ import type { SubscriptionTier } from "@/lib/subscription/tiers";
 type ProjectCardProps = {
   project: ProjectListItem;
   onRename: (projectId: string, name: string) => Promise<void>;
+  onDuplicate: (projectId: string) => Promise<void>;
   onDeleteRequest: (project: ProjectListItem) => void;
   isRenaming: boolean;
+  isDuplicating: boolean;
   isDeleting: boolean;
   showProjectInfo?: boolean;
   currentTier: SubscriptionTier;
@@ -134,8 +138,10 @@ function ProjectInlineInfoMetric({
 export function ProjectCard({
   project,
   onRename,
+  onDuplicate,
   onDeleteRequest,
   isRenaming,
+  isDuplicating,
   isDeleting,
   showProjectInfo = false,
   currentTier,
@@ -160,7 +166,7 @@ export function ProjectCard({
       : "default";
 
   const handleCardClick = () => {
-    if (isInteractionDisabled || isEditingName || isRenaming || isDeleting) return;
+    if (isInteractionDisabled || isEditingName || isRenaming || isDuplicating || isDeleting) return;
     router.push(`/editor/${project.id}`);
   };
 
@@ -211,7 +217,7 @@ export function ProjectCard({
   };
 
   const cancelRename = () => {
-    if (isRenaming || isDeleting) return;
+    if (isRenaming || isDuplicating || isDeleting) return;
     setDraftName(project.name);
     setIsEditingName(false);
   };
@@ -223,7 +229,7 @@ export function ProjectCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !isInteractionDisabled && !isEditingName && !isRenaming && !isDeleting) {
+        if ((e.key === "Enter" || e.key === " ") && !isInteractionDisabled && !isEditingName && !isRenaming && !isDuplicating && !isDeleting) {
           handleCardClick();
         }
       }}
@@ -442,6 +448,37 @@ export function ProjectCard({
                 >
                   <PencilLine className="size-4" />
                 </Button>
+                <ImmediateTooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => {
+                            if (isInteractionDisabled || isDuplicating) return;
+                            setDraftName(project.name);
+                            setIsEditingName(false);
+                            void onDuplicate(project.id);
+                          }}
+                          disabled={isInteractionDisabled || isDuplicating}
+                          aria-label={`Duplicate ${project.name}`}
+                          className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                        >
+                          {isDuplicating ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : (
+                            <Copy className="size-4" />
+                          )}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center">
+                      Duplicate project
+                    </TooltipContent>
+                  </Tooltip>
+                </ImmediateTooltipProvider>
                 <Button
                   type="button"
                   variant="ghost"
@@ -470,7 +507,7 @@ export function ProjectCard({
                 e.stopPropagation();
                 handleCardClick();
               }}
-              disabled={isEditingName || isRenaming || isInteractionDisabled}
+              disabled={isEditingName || isRenaming || isDuplicating || isInteractionDisabled}
               className="bg-blue-500 text-white hover:bg-blue-500/90"
             >
               Open project

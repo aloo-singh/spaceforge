@@ -298,6 +298,13 @@ export async function deleteProject(clientToken: string, projectId: string) {
   }
 }
 
+export function duplicateProject(clientToken: string, projectId: string): Promise<void> {
+  void clientToken;
+  void projectId;
+
+  return Promise.resolve();
+}
+
 export function isProjectsApiUnavailableError(error: unknown) {
   return error instanceof ProjectApiError && error.status === 404 && error.message === "Projects API unavailable.";
 }
