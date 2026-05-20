@@ -221,11 +221,6 @@ function projectMatchesFilters(project: ProjectListItem, filters: ProjectFilterS
   return true;
 }
 
-function canDuplicateProjectWithinTierLimit() {
-  // Step 3 wires this to the subscription project limit before cloning.
-  return true;
-}
-
 function formatProjectFilterSelectValue(value: number | null) {
   return value === null ? PROJECT_FILTER_ANY_VALUE : String(value);
 }
@@ -423,6 +418,7 @@ export function ProjectsPageClient() {
 
   const maxProjects = getEffectiveMaxProjects(currentTier);
   const isAtProjectLimit = projects.length >= maxProjects;
+  const isAtDuplicateProjectLimit = currentTier === "Free" && isAtProjectLimit;
   const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
   const availableProjectFilterOptions = PROJECT_FILTER_OPTIONS.filter(
     (filterOption) => !filterOption.paidOnly || canUsePaidProjectFilters
@@ -579,7 +575,7 @@ export function ProjectsPageClient() {
       return;
     }
 
-    if (!canDuplicateProjectWithinTierLimit()) {
+    if (isAtDuplicateProjectLimit) {
       setIsProjectLimitDialogOpen(true);
       return;
     }
@@ -591,6 +587,7 @@ export function ProjectsPageClient() {
       const clientToken = getOrCreateAnonymousClientToken();
       const duplicatedProject = await duplicateProject(clientToken, projectId);
       setProjects((currentProjects) => mergeProjectIntoList(currentProjects, duplicatedProject));
+      await loadProjects({ showLoadingState: false });
       toast.success("Project duplicated", {
         description: duplicatedProject.name,
       });
