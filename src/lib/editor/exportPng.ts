@@ -45,6 +45,7 @@ export type PixiPngExportSource =
 
 export type PixiPngExportOptions = {
   exportScope?: EditorExportScope;
+  roomColors?: Record<string, string>;
   backgroundColor?: string;
   paddingPx?: number;
   exportResolution?: EditorExportResolution;
@@ -206,6 +207,16 @@ export function getRoomsForEditorExportScope(
   }
 
   return getCurrentFloorExportRooms(document);
+}
+
+export function getRoomColorsForEditorExportRooms(rooms: Room[]): Record<string, string> {
+  return rooms.reduce<Record<string, string>>((roomColors, room) => {
+    if (isValidExportRoomColor(room.roomColor)) {
+      roomColors[room.id] = room.roomColor;
+    }
+
+    return roomColors;
+  }, {});
 }
 
 export function getEditorExportScopeFilenameParts(
@@ -551,6 +562,10 @@ function sanitizeExportFilenamePart(value: string | undefined): string {
     .replace(/\s+/g, " ")
     .replace(/\.+$/g, "")
     .slice(0, 80);
+}
+
+function isValidExportRoomColor(roomColor: string | undefined): roomColor is string {
+  return typeof roomColor === "string" && /^#[0-9a-fA-F]{6}$/.test(roomColor);
 }
 
 function getCurrentFloorExportRooms(document: EditorExportScopeDocument): Room[] {

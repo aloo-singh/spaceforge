@@ -82,6 +82,7 @@ import {
   exportSvgToPdfBlob,
   exportToSVG,
   getEditorExportScopeFilenameParts,
+  getRoomColorsForEditorExportRooms,
   getRoomsForEditorExportScope,
 } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
@@ -1805,6 +1806,7 @@ export default function EditorCanvas({
               : room.interiorAssets,
       }));
       const layoutBounds = getLayoutBoundsFromRooms(scopedRooms);
+      const roomColors = getRoomColorsForEditorExportRooms(scopedRooms);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
         viewport: state.viewport,
@@ -1844,7 +1846,9 @@ export default function EditorCanvas({
         exportViewport,
         null,
         exportTheme,
-        state.settings.showRoomColors
+        state.settings.showRoomColors,
+        null,
+        roomColors
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -1907,6 +1911,7 @@ export default function EditorCanvas({
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           exportScope,
+          roomColors,
           paddingPx,
           exportResolution,
           header:
@@ -4793,7 +4798,8 @@ function drawRooms(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
   showRoomColors: boolean,
-  assetDragTargetRoomId: string | null = null
+  assetDragTargetRoomId: string | null = null,
+  exportRoomColors?: Record<string, string>
 ) {
   graphics.clear();
   const selectedRoomCount = selection.filter((item) => item.type === "room").length;
@@ -4833,7 +4839,9 @@ function drawRooms(
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
-    const roomColor = showRoomColors ? getRoomColorNumber(room.roomColor) : null;
+    const roomColor = getRoomColorNumber(
+      exportRoomColors?.[room.id] ?? (showRoomColors ? room.roomColor : undefined)
+    );
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
