@@ -40,6 +40,7 @@ function createLocalFallbackProject(
     name: string;
     document: EditorDocumentState;
     thumbnailDataUrl?: string | null;
+    maxFloors?: number;
   }
 ): ProjectRecord {
   const now = new Date().toISOString();
@@ -54,10 +55,27 @@ function createLocalFallbackProject(
     name: input.name,
     document: cloneProjectDocument(input.document),
     thumbnailDataUrl: input.thumbnailDataUrl ?? null,
-    maxFloors: 10,
+    maxFloors: input.maxFloors ?? 10,
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function getDuplicateProjectName(sourceName: string, existingProjectNames: string[]) {
+  const sourceBaseName = sourceName.trim() || "Untitled project";
+  const copyBaseName = `Copy of ${sourceBaseName}`;
+  const existingNames = new Set(existingProjectNames.map((name) => name.trim()));
+
+  if (!existingNames.has(copyBaseName)) {
+    return copyBaseName;
+  }
+
+  let copyIndex = 2;
+  while (existingNames.has(`${copyBaseName} (${copyIndex})`)) {
+    copyIndex += 1;
+  }
+
+  return `${copyBaseName} (${copyIndex})`;
 }
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -161,6 +179,8 @@ export async function createProject(
   input: {
     name: string;
     document: EditorDocumentState;
+    thumbnailDataUrl?: string | null;
+    maxFloors?: number;
   }
 ) {
   const normalizedDocument = cloneProjectDocument(input.document);
@@ -175,6 +195,8 @@ export async function createProject(
         clientToken,
         name: input.name,
         document: normalizedDocument,
+        thumbnailDataUrl: input.thumbnailDataUrl,
+        maxFloors: input.maxFloors,
       }),
     });
     const payload = await readJson<{ project: ProjectRecord }>(response);
@@ -186,6 +208,8 @@ export async function createProject(
       createLocalFallbackProject(clientToken, {
         name: input.name,
         document: normalizedDocument,
+        thumbnailDataUrl: input.thumbnailDataUrl,
+        maxFloors: input.maxFloors,
       })
     );
   }
@@ -296,6 +320,24 @@ export async function deleteProject(clientToken: string, projectId: string) {
 
     throw error;
   }
+}
+
+export async function duplicateProject(clientToken: string, projectId: string) {
+  const [sourceProject, existingProjects] = await Promise.all([
+    fetchProject(clientToken, projectId),
+    fetchProjects(clientToken),
+  ]);
+  const duplicateName = getDuplicateProjectName(
+    sourceProject.name,
+    existingProjects.map((project) => project.name)
+  );
+
+  return createProject(clientToken, {
+    name: duplicateName,
+    document: sourceProject.document,
+    thumbnailDataUrl: sourceProject.thumbnailDataUrl,
+    maxFloors: sourceProject.maxFloors,
+  });
 }
 
 export function isProjectsApiUnavailableError(error: unknown) {

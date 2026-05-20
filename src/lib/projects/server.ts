@@ -176,6 +176,8 @@ export async function createProjectForClientToken(
     name: string;
     document: EditorDocumentState;
     projectId?: string;
+    thumbnailDataUrl?: string | null;
+    maxFloors?: number;
   }
 ): Promise<ProjectRecord> {
   const user = await getOrCreateAppUserByClientToken(clientToken);
@@ -191,6 +193,8 @@ export async function createProjectForClientToken(
         user_id: user.id,
         name: input.name,
         document: cloneProjectDocument(input.document),
+        thumbnail_data_url: input.thumbnailDataUrl,
+        max_floors: input.maxFloors,
       }),
     });
   } catch (error) {

@@ -10,6 +10,31 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.81.1</h2>
+            <span className="text-sm text-muted-foreground">2026-05-20</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added project duplication from the <code>/projects</code> page, including full document cloning for rooms, assets, rulers, region settings, thumbnails, and project metadata.</li>
+                <li>Added smart duplicate naming, starting with &ldquo;Copy of Project Name&rdquo; and incrementing when a copy already exists.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Project card actions now use consistent shadcn tooltips across rename, duplicate, delete, save, and cancel controls.</li>
+                <li>Duplicate actions now show a calm loading state, refresh the project list on success, and reuse the existing Free-tier project limit upsell when needed.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.81.0</h2>
             <span className="text-sm text-muted-foreground">2026-05-19</span>
           </div>

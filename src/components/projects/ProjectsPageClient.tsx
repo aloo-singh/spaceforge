@@ -22,9 +22,10 @@ import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import {
   createOrFetchAnonymousUser,
   createUnsavedProject,
-  finalizeUnsavedProject,
   deleteProject,
+  duplicateProject,
   fetchProjects,
+  finalizeUnsavedProject,
   updateProject,
 } from "@/lib/projects/clientApi";
 import { ensureFirstProject } from "@/lib/projects/bootstrap";
@@ -279,6 +280,7 @@ export function ProjectsPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreatingProject, startCreateProjectTransition] = useTransition();
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [duplicatingProjectId, setDuplicatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectListItem | null>(null);
   const [isProjectLimitDialogOpen, setIsProjectLimitDialogOpen] = useState(false);
@@ -411,10 +413,12 @@ export function ProjectsPageClient() {
   const canCreateProject =
     !isCreatingProject &&
     renamingProjectId === null &&
+    duplicatingProjectId === null &&
     deletingProjectId === null;
 
   const maxProjects = getEffectiveMaxProjects(currentTier);
   const isAtProjectLimit = projects.length >= maxProjects;
+  const isAtDuplicateProjectLimit = currentTier === "Free" && isAtProjectLimit;
   const shouldShowProjectLimitBanner = currentTier === "Free" && isAtProjectLimit;
   const availableProjectFilterOptions = PROJECT_FILTER_OPTIONS.filter(
     (filterOption) => !filterOption.paidOnly || canUsePaidProjectFilters
@@ -535,7 +539,14 @@ export function ProjectsPageClient() {
   }, [handleCreateProject, shouldShowProjectFilters]);
 
   const handleRenameProject = async (projectId: string, name: string) => {
-    if (isCreatingProject || renamingProjectId !== null || deletingProjectId !== null) return;
+    if (
+      isCreatingProject ||
+      renamingProjectId !== null ||
+      duplicatingProjectId !== null ||
+      deletingProjectId !== null
+    ) {
+      return;
+    }
 
     setRenamingProjectId(projectId);
 
@@ -554,8 +565,49 @@ export function ProjectsPageClient() {
     }
   };
 
+  const handleDuplicateProject = async (projectId: string) => {
+    if (
+      isCreatingProject ||
+      renamingProjectId !== null ||
+      duplicatingProjectId !== null ||
+      deletingProjectId !== null
+    ) {
+      return;
+    }
+
+    if (isAtDuplicateProjectLimit) {
+      setIsProjectLimitDialogOpen(true);
+      return;
+    }
+
+    setDuplicatingProjectId(projectId);
+
+    try {
+      setErrorMessage(null);
+      const clientToken = getOrCreateAnonymousClientToken();
+      const duplicatedProject = await duplicateProject(clientToken, projectId);
+      setProjects((currentProjects) => mergeProjectIntoList(currentProjects, duplicatedProject));
+      await loadProjects({ showLoadingState: false });
+      toast.success("Project duplicated", {
+        description: duplicatedProject.name,
+      });
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to duplicate project.");
+    } finally {
+      setDuplicatingProjectId(null);
+    }
+  };
+
   const handleDeleteProject = async (projectId: string) => {
-    if (isCreatingProject || renamingProjectId !== null || deletingProjectId !== null) return;
+    if (
+      isCreatingProject ||
+      renamingProjectId !== null ||
+      duplicatingProjectId !== null ||
+      deletingProjectId !== null
+    ) {
+      return;
+    }
 
     setDeletingProjectId(projectId);
 
@@ -784,6 +836,7 @@ export function ProjectsPageClient() {
                 isLoading ||
                 isCreatingProject ||
                 renamingProjectId !== null ||
+                duplicatingProjectId !== null ||
                 deletingProjectId !== null
               }
             >
@@ -835,6 +888,7 @@ export function ProjectsPageClient() {
                     isLoading ||
                     isCreatingProject ||
                     renamingProjectId !== null ||
+                    duplicatingProjectId !== null ||
                     deletingProjectId !== null
                   }
                 >
@@ -945,14 +999,17 @@ export function ProjectsPageClient() {
                   key={project.id}
                   project={project}
                   onRename={handleRenameProject}
+                  onDuplicate={handleDuplicateProject}
                   onDeleteRequest={setProjectPendingDelete}
                   isRenaming={renamingProjectId === project.id}
+                  isDuplicating={duplicatingProjectId === project.id}
                   isDeleting={deletingProjectId === project.id}
                   showProjectInfo={showProjectInfo}
                   currentTier={currentTier}
                   layout={projectLayout}
                   isInteractionDisabled={
                     isCreatingProject ||
+                    (duplicatingProjectId !== null && duplicatingProjectId !== project.id) ||
                     (deletingProjectId !== null && deletingProjectId !== project.id)
                   }
                 />
