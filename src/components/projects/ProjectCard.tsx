@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -132,6 +133,27 @@ function ProjectInlineInfoMetric({
         {value}
       </span>
     </div>
+  );
+}
+
+function ProjectActionTooltip({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -400,105 +422,102 @@ export function ProjectCard({
             )}
           >
             <div className="flex items-center gap-2">
-            {isEditingName ? (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    void finishRename();
-                  }}
-                  disabled={isRenaming || isInteractionDisabled}
-                  aria-label={`Save ${project.name} name`}
-                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
-                >
-                  <Check className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={cancelRename}
-                  disabled={isRenaming || isInteractionDisabled}
-                  aria-label={`Cancel renaming ${project.name}`}
-                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
-                >
-                  <X className="size-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isInteractionDisabled) return;
-                    setDraftName(project.name);
-                    setIsEditingName(true);
-                  }}
-                  disabled={isInteractionDisabled}
-                  aria-label={`Rename ${project.name}`}
-                  title="Rename project"
-                  className="text-foreground/64 hover:bg-muted hover:text-foreground"
-                >
-                  <PencilLine className="size-4" />
-                </Button>
-                <ImmediateTooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => {
-                            if (isInteractionDisabled || isDuplicating) return;
-                            setDraftName(project.name);
-                            setIsEditingName(false);
-                            void onDuplicate(project.id);
-                          }}
-                          disabled={isInteractionDisabled || isDuplicating}
-                          aria-label={`Duplicate ${project.name}`}
-                          className="text-foreground/64 hover:bg-muted hover:text-foreground"
-                        >
-                          {isDuplicating ? (
-                            <LoaderCircle className="size-4 animate-spin" />
-                          ) : (
-                            <Copy className="size-4" />
-                          )}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" align="center">
-                      Duplicate project
-                    </TooltipContent>
-                  </Tooltip>
-                </ImmediateTooltipProvider>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isInteractionDisabled) return;
-                    setDraftName(project.name);
-                    setIsEditingName(false);
-                    onDeleteRequest(project);
-                  }}
-                  disabled={isInteractionDisabled}
-                  aria-label={`Delete ${project.name}`}
-                  title="Delete project"
-                  className="text-foreground/64 hover:bg-muted hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </>
-            )}
+              <ImmediateTooltipProvider>
+                {isEditingName ? (
+                  <>
+                    <ProjectActionTooltip label="Save name">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          void finishRename();
+                        }}
+                        disabled={isRenaming || isInteractionDisabled}
+                        aria-label={`Save ${project.name} name`}
+                        className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                      >
+                        <Check className="size-4" />
+                      </Button>
+                    </ProjectActionTooltip>
+                    <ProjectActionTooltip label="Cancel rename">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={cancelRename}
+                        disabled={isRenaming || isInteractionDisabled}
+                        aria-label={`Cancel renaming ${project.name}`}
+                        className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </ProjectActionTooltip>
+                  </>
+                ) : (
+                  <>
+                    <ProjectActionTooltip label="Rename project">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          if (isInteractionDisabled) return;
+                          setDraftName(project.name);
+                          setIsEditingName(true);
+                        }}
+                        disabled={isInteractionDisabled}
+                        aria-label={`Rename ${project.name}`}
+                        className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                      >
+                        <PencilLine className="size-4" />
+                      </Button>
+                    </ProjectActionTooltip>
+                    <ProjectActionTooltip label="Duplicate project">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          if (isInteractionDisabled || isDuplicating) return;
+                          setDraftName(project.name);
+                          setIsEditingName(false);
+                          void onDuplicate(project.id);
+                        }}
+                        disabled={isInteractionDisabled || isDuplicating}
+                        aria-label={`Duplicate ${project.name}`}
+                        className="text-foreground/64 hover:bg-muted hover:text-foreground"
+                      >
+                        {isDuplicating ? (
+                          <LoaderCircle className="size-4 animate-spin" />
+                        ) : (
+                          <Copy className="size-4" />
+                        )}
+                      </Button>
+                    </ProjectActionTooltip>
+                    <ProjectActionTooltip label="Delete project">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          if (isInteractionDisabled) return;
+                          setDraftName(project.name);
+                          setIsEditingName(false);
+                          onDeleteRequest(project);
+                        }}
+                        disabled={isInteractionDisabled}
+                        aria-label={`Delete ${project.name}`}
+                        className="text-foreground/64 hover:bg-muted hover:text-destructive"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </ProjectActionTooltip>
+                  </>
+                )}
+              </ImmediateTooltipProvider>
             </div>
             <Button
               type="button"
