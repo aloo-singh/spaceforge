@@ -293,6 +293,7 @@ const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
 const ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE = "data-room-preset-picker-control";
 const ROOM_PRESET_PICKER_EXIT_MS = 110;
+const EXPORT_ROOM_COLOR_FILL_ALPHA = 0.32;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -1848,7 +1849,10 @@ export default function EditorCanvas({
         exportTheme,
         state.settings.showRoomColors,
         null,
-        roomColors
+        {
+          roomColors,
+          roomColorFillAlpha: EXPORT_ROOM_COLOR_FILL_ALPHA,
+        }
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -4799,7 +4803,10 @@ function drawRooms(
   theme: EditorCanvasTheme,
   showRoomColors: boolean,
   assetDragTargetRoomId: string | null = null,
-  exportRoomColors?: Record<string, string>
+  options: {
+    roomColors?: Record<string, string>;
+    roomColorFillAlpha?: number;
+  } = {}
 ) {
   graphics.clear();
   const selectedRoomCount = selection.filter((item) => item.type === "room").length;
@@ -4840,7 +4847,7 @@ function drawRooms(
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
     const roomColor = getRoomColorNumber(
-      exportRoomColors?.[room.id] ?? (showRoomColors ? room.roomColor : undefined)
+      options.roomColors?.[room.id] ?? (showRoomColors ? room.roomColor : undefined)
     );
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
@@ -4860,6 +4867,12 @@ function drawRooms(
       : isTransformSettling
         ? 2.2 + 0.3 * getTransformRoomEase(transformFeedback)
         : 2.5;
+    const fillAlpha =
+      roomColor !== null && !isSelected
+        ? options.roomColorFillAlpha ?? 0.12
+        : isSelected
+          ? selectedFillAlpha
+          : 0.12;
 
     drawRoomShape(
       graphics,
@@ -4867,7 +4880,7 @@ function drawRooms(
       camera,
       viewport,
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
-      isSelected ? selectedFillAlpha : 0.12,
+      fillAlpha,
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9,
       roomColor ?? undefined
