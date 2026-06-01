@@ -76,6 +76,7 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   buildEditorExportFilename,
+  type EditorExportRoomColorOverride,
   type EditorExportScope,
   exportPixiCanvasToPngBlob,
   exportPixiCanvasToPngDataUrl,
@@ -432,6 +433,13 @@ function normalizeExportMultilineText(value: string): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function getExportRoomColorOverride(request: ExportPngRequest): EditorExportRoomColorOverride {
+  return {
+    mode: request.roomColorMode,
+    color: request.roomColorMode === "single" ? request.roomColorOverride : undefined,
+  };
 }
 
 type EditorCanvasProps = {
@@ -1773,6 +1781,7 @@ export default function EditorCanvas({
       themeMode,
       exportResolution,
       exportScope,
+      roomColorOverride,
     }: {
       includeSignature: boolean;
       includeNorthIndicator?: boolean;
@@ -1790,6 +1799,7 @@ export default function EditorCanvas({
       themeMode: "light" | "dark";
       exportResolution?: "normal" | "hi-res";
       exportScope?: EditorExportScope;
+      roomColorOverride?: EditorExportRoomColorOverride;
     }) => {
       const app = appRef.current;
       if (!app) return null;
@@ -1807,7 +1817,7 @@ export default function EditorCanvas({
               : room.interiorAssets,
       }));
       const layoutBounds = getLayoutBoundsFromRooms(scopedRooms);
-      const roomColors = getRoomColorsForEditorExportRooms(scopedRooms);
+      const roomColors = getRoomColorsForEditorExportRooms(scopedRooms, roomColorOverride);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
         viewport: state.viewport,
@@ -1847,7 +1857,7 @@ export default function EditorCanvas({
         exportViewport,
         null,
         exportTheme,
-        state.settings.showRoomColors,
+        roomColorOverride?.mode === "none" ? false : state.settings.showRoomColors,
         null,
         {
           roomColors,
@@ -1916,6 +1926,7 @@ export default function EditorCanvas({
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           exportScope,
           roomColors,
+          roomColorOverride,
           paddingPx,
           exportResolution,
           header:
@@ -1980,6 +1991,7 @@ export default function EditorCanvas({
   );
 
   const createPngExportSnapshotFromRequest = useCallback((request: ExportPngRequest) => {
+    const roomColorOverride = getExportRoomColorOverride(request);
     const exportSignatureText = normalizeEditorExportSignature(
       request.designedBy || useEditorStore.getState().settings.exportSignatureText
     );
@@ -2028,6 +2040,7 @@ export default function EditorCanvas({
       themeMode: resolvedThemeMode,
       exportResolution: request.exportResolution,
       exportScope: request.exportScope,
+      roomColorOverride,
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
 
@@ -2044,6 +2057,7 @@ export default function EditorCanvas({
 
       try {
         const state = useEditorStore.getState();
+        const roomColorOverride = getExportRoomColorOverride(request);
         const exportTitle =
           request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
         const exportDescription =
@@ -2088,6 +2102,7 @@ export default function EditorCanvas({
             effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
               ? effectiveLegendPosition
               : undefined,
+          roomColorOverride,
           signatureText: exportSignatureText || undefined,
           signatureLines: exportSignatureLines,
           displayUnitOrigin: state.document.region,

@@ -30,6 +30,13 @@ export type EditorExportScope = {
   id: string;
 };
 
+export type EditorExportRoomColorMode = "none" | "room-type" | "single";
+
+export type EditorExportRoomColorOverride = {
+  mode: EditorExportRoomColorMode;
+  color?: string;
+};
+
 export type EditorExportScopeDocument = {
   floors: Floor[];
   activeFloorId: string | null;
@@ -46,6 +53,7 @@ export type PixiPngExportSource =
 export type PixiPngExportOptions = {
   exportScope?: EditorExportScope;
   roomColors?: Record<string, string>;
+  roomColorOverride?: EditorExportRoomColorOverride;
   backgroundColor?: string;
   paddingPx?: number;
   exportResolution?: EditorExportResolution;
@@ -157,6 +165,7 @@ export type SvgExportOptions = {
   northBearingDegrees?: number;
   legendItems?: SvgLegendItem[];
   legendPosition?: "bottom" | "right-side";
+  roomColorOverride?: EditorExportRoomColorOverride;
   signatureText?: string;
   signatureLines?: string[];
   displayUnitOrigin?: UnitOrigin;
@@ -209,7 +218,24 @@ export function getRoomsForEditorExportScope(
   return getCurrentFloorExportRooms(document);
 }
 
-export function getRoomColorsForEditorExportRooms(rooms: Room[]): Record<string, string> {
+export function getRoomColorsForEditorExportRooms(
+  rooms: Room[],
+  roomColorOverride: EditorExportRoomColorOverride = { mode: "room-type" }
+): Record<string, string> {
+  if (roomColorOverride.mode === "none") {
+    return {};
+  }
+
+  if (roomColorOverride.mode === "single") {
+    if (!isValidExportRoomColor(roomColorOverride.color)) return {};
+    const overrideColor = roomColorOverride.color;
+
+    return rooms.reduce<Record<string, string>>((roomColors, room) => {
+      roomColors[room.id] = overrideColor;
+      return roomColors;
+    }, {});
+  }
+
   return rooms.reduce<Record<string, string>>((roomColors, room) => {
     if (isValidExportRoomColor(room.roomColor)) {
       roomColors[room.id] = room.roomColor;
@@ -254,6 +280,7 @@ export function exportToSVG({
   northBearingDegrees,
   legendItems,
   legendPosition,
+  roomColorOverride,
   signatureText,
   signatureLines,
   displayUnitOrigin,
@@ -337,7 +364,7 @@ export function exportToSVG({
     if (room.points.length < 3) continue;
 
     const polygonPoints = room.points.map(pointToString).join(" ");
-    const roomFill = getSvgRoomFill(room);
+    const roomFill = getSvgRoomFill(room, roomColorOverride);
     roomElements.push(
       `<polygon points="${polygonPoints}" fill="${roomFill}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
     );
@@ -569,7 +596,15 @@ function isValidExportRoomColor(roomColor: string | undefined): roomColor is str
   return typeof roomColor === "string" && /^#[0-9a-fA-F]{6}$/.test(roomColor);
 }
 
-function getSvgRoomFill(room: Room): string {
+function getSvgRoomFill(
+  room: Room,
+  roomColorOverride: EditorExportRoomColorOverride | undefined
+): string {
+  if (roomColorOverride?.mode === "none") return SVG_ROOM_FILL;
+  if (roomColorOverride?.mode === "single") {
+    return isValidExportRoomColor(roomColorOverride.color) ? roomColorOverride.color : SVG_ROOM_FILL;
+  }
+
   return isValidExportRoomColor(room.roomColor) ? room.roomColor : SVG_ROOM_FILL;
 }
 

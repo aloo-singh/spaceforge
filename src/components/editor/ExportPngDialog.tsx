@@ -37,6 +37,7 @@ import {
 import {
   buildEditorExportFilename,
   getEditorExportScopeFilenameParts,
+  type EditorExportRoomColorMode,
   type EditorExportScope,
 } from "@/lib/editor/exportPng";
 import { useEditorStore } from "@/stores/editorStore";
@@ -44,8 +45,31 @@ import { cn } from "@/lib/utils";
 
 export type ExportPngThemeOption = "light" | "dark" | "system";
 
+const DEFAULT_EXPORT_ROOM_COLOR = "#93c5fd";
+
+const EXPORT_ROOM_COLOR_SWATCHES = [
+  { name: "Rose", value: "#fecdd3" },
+  { name: "Orange", value: "#fed7aa" },
+  { name: "Amber", value: "#fde68a" },
+  { name: "Yellow", value: "#fef08a" },
+  { name: "Lime", value: "#d9f99d" },
+  { name: "Green", value: "#bbf7d0" },
+  { name: "Emerald", value: "#a7f3d0" },
+  { name: "Teal", value: "#99f6e4" },
+  { name: "Cyan", value: "#a5f3fc" },
+  { name: "Sky", value: "#bae6fd" },
+  { name: "Blue", value: "#93c5fd" },
+  { name: "Indigo", value: "#c7d2fe" },
+  { name: "Violet", value: "#c4b5fd" },
+  { name: "Purple", value: "#d8b4fe" },
+  { name: "Pink", value: "#fbcfe8" },
+  { name: "Zinc", value: "#d4d4d8" },
+];
+
 export type ExportPngRequest = {
   exportScope?: EditorExportScope;
+  roomColorMode: EditorExportRoomColorMode;
+  roomColorOverride?: string;
   title: string;
   description: string;
   titlePosition: ProjectExportTitlePosition;
@@ -155,6 +179,8 @@ export function ExportPngDialog({
   const [showSvgUpsellDialog, setShowSvgUpsellDialog] = useState(false);
   const [showPdfUpsellDialog, setShowPdfUpsellDialog] = useState(false);
   const [selectedScopeValue, setSelectedScopeValue] = useState("");
+  const [roomColorMode, setRoomColorMode] = useState<EditorExportRoomColorMode>("room-type");
+  const [roomColorOverride, setRoomColorOverride] = useState(DEFAULT_EXPORT_ROOM_COLOR);
   const previewRequestIdRef = useRef(0);
   const previewScopeValueRef = useRef("");
 
@@ -235,6 +261,8 @@ export function ExportPngDialog({
 
       void onPreviewRequest({
         exportScope,
+        roomColorMode,
+        roomColorOverride: roomColorMode === "single" ? roomColorOverride : undefined,
         title,
         description,
         titlePosition,
@@ -283,6 +311,8 @@ export function ExportPngDialog({
     onPreviewRequest,
     effectiveScopeValue,
     exportScope,
+    roomColorMode,
+    roomColorOverride,
     title,
     description,
     titlePosition,
@@ -305,6 +335,8 @@ export function ExportPngDialog({
     handleOpenChange(false);
     void onExport({
       exportScope,
+      roomColorMode,
+      roomColorOverride: roomColorMode === "single" ? roomColorOverride : undefined,
       title,
       description,
       titlePosition,
@@ -708,38 +740,96 @@ export function ExportPngDialog({
               title="Appearance"
               description="Choose the appearance of the exported file."
             >
-              <div
-                className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
-                role="group"
-                aria-label="Appearance"
-              >
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={theme === "system" ? "secondary" : "ghost"}
-                  aria-pressed={theme === "system"}
-                  onClick={() => onThemeChange("system")}
+              <div className="mt-3 space-y-3">
+                <div
+                  className="grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/90 p-1"
+                  role="group"
+                  aria-label="Appearance"
                 >
-                  System
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={theme === "light" ? "secondary" : "ghost"}
-                  aria-pressed={theme === "light"}
-                  onClick={() => onThemeChange("light")}
-                >
-                  Light
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={theme === "dark" ? "secondary" : "ghost"}
-                  aria-pressed={theme === "dark"}
-                  onClick={() => onThemeChange("dark")}
-                >
-                  Dark
-                </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={theme === "system" ? "secondary" : "ghost"}
+                    aria-pressed={theme === "system"}
+                    onClick={() => onThemeChange("system")}
+                  >
+                    System
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={theme === "light" ? "secondary" : "ghost"}
+                    aria-pressed={theme === "light"}
+                    onClick={() => onThemeChange("light")}
+                  >
+                    Light
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={theme === "dark" ? "secondary" : "ghost"}
+                    aria-pressed={theme === "dark"}
+                    onClick={() => onThemeChange("dark")}
+                  >
+                    Dark
+                  </Button>
+                </div>
+
+                <div className="space-y-2 border-t border-border/60 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
+                      Room colour
+                    </p>
+                    <span
+                      className="size-4 rounded-full border border-border/80 shadow-sm"
+                      style={{
+                        background:
+                          roomColorMode === "single"
+                            ? roomColorOverride
+                            : roomColorMode === "room-type"
+                              ? "linear-gradient(135deg, #fed7aa 0 33%, #bbf7d0 33% 66%, #93c5fd 66% 100%)"
+                              : "transparent",
+                      }}
+                    />
+                  </div>
+                  <PositionChoice
+                    ariaLabel="Room colour"
+                    value={roomColorMode}
+                    options={[
+                      { label: "None", value: "none" },
+                      { label: "Room type", value: "room-type" },
+                      { label: "All the same", value: "single" },
+                    ]}
+                    onChange={(value) => setRoomColorMode(value as EditorExportRoomColorMode)}
+                  />
+                  <div
+                    className={cn(
+                      "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+                      roomColorMode === "single" ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    )}
+                  >
+                    <div className="min-h-0">
+                      <div className="mt-2 grid grid-cols-8 gap-1 rounded-lg border border-border/70 bg-background/90 p-2">
+                        {EXPORT_ROOM_COLOR_SWATCHES.map((swatch) => (
+                          <button
+                            key={swatch.value}
+                            type="button"
+                            aria-label={swatch.name}
+                            aria-pressed={roomColorOverride === swatch.value}
+                            onClick={() => setRoomColorOverride(swatch.value)}
+                            className={cn(
+                              "size-6 rounded-md border transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
+                              roomColorOverride === swatch.value
+                                ? "border-foreground shadow-sm"
+                                : "border-border/70"
+                            )}
+                            style={{ backgroundColor: swatch.value }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </ExportToggleCard>
 
