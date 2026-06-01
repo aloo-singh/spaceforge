@@ -337,8 +337,9 @@ export function exportToSVG({
     if (room.points.length < 3) continue;
 
     const polygonPoints = room.points.map(pointToString).join(" ");
+    const roomFill = getSvgRoomFill(room);
     roomElements.push(
-      `<polygon points="${polygonPoints}" fill="${SVG_ROOM_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
+      `<polygon points="${polygonPoints}" fill="${roomFill}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
     );
 
     for (let index = 0; index < room.points.length; index += 1) {
@@ -566,6 +567,10 @@ function sanitizeExportFilenamePart(value: string | undefined): string {
 
 function isValidExportRoomColor(roomColor: string | undefined): roomColor is string {
   return typeof roomColor === "string" && /^#[0-9a-fA-F]{6}$/.test(roomColor);
+}
+
+function getSvgRoomFill(room: Room): string {
+  return isValidExportRoomColor(room.roomColor) ? room.roomColor : SVG_ROOM_FILL;
 }
 
 function getCurrentFloorExportRooms(document: EditorExportScopeDocument): Room[] {
