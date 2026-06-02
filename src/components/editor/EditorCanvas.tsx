@@ -76,6 +76,7 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   buildEditorExportFilename,
+  EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA,
   type EditorExportRoomColorOverride,
   type EditorExportScope,
   exportPixiCanvasToPngBlob,
@@ -294,7 +295,6 @@ const ROOM_PRESET_PICKER_COMPACT_BUTTON_SIZE_PX = 82;
 const ROOM_PRESET_PICKER_VIEWPORT_MARGIN_PX = 18;
 const ROOM_PRESET_PICKER_CONTROL_ATTRIBUTE = "data-room-preset-picker-control";
 const ROOM_PRESET_PICKER_EXIT_MS = 110;
-const EXPORT_ROOM_COLOR_FILL_ALPHA = 0.32;
 const RESIZE_DIMENSION_FONT_FAMILY = MEASUREMENT_TEXT_FONT_FAMILY;
 const RESIZE_DIMENSION_FONT_SIZE_PX = 12;
 const RESIZE_DIMENSION_FONT_WEIGHT = "500";
@@ -1861,7 +1861,7 @@ export default function EditorCanvas({
         null,
         {
           roomColors,
-          roomColorFillAlpha: EXPORT_ROOM_COLOR_FILL_ALPHA,
+          roomColorFillAlpha: EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA,
         }
       );
       drawOpenings(

@@ -101,6 +101,7 @@ export type PixiPngExportOptions = {
 const DEFAULT_EXPORT_BACKGROUND = "#ffffff";
 const DEFAULT_EXPORT_PADDING_PX = 48;
 const DEFAULT_EDGE_CROP_PX = 1;
+export const EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA = 0.12;
 const EXPORT_TEXT_FONT_FAMILY = "system-ui, sans-serif";
 const STANDARD_EXPORT_WIDTH_PX = 1280;
 const SVG_EXPORT_PADDING_PX = 64;
@@ -152,6 +153,11 @@ type ExportNorthIndicatorBlock = {
 type SvgLegendItem = {
   name: string;
   area: string;
+};
+
+type SvgRoomFill = {
+  color: string;
+  opacity?: number;
 };
 
 export type SvgExportOptions = {
@@ -365,8 +371,10 @@ export function exportToSVG({
 
     const polygonPoints = room.points.map(pointToString).join(" ");
     const roomFill = getSvgRoomFill(room, roomColorOverride);
+    const roomFillOpacityAttribute =
+      roomFill.opacity === undefined ? "" : ` fill-opacity="${formatNumber(roomFill.opacity)}"`;
     roomElements.push(
-      `<polygon points="${polygonPoints}" fill="${roomFill}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
+      `<polygon points="${polygonPoints}" fill="${roomFill.color}"${roomFillOpacityAttribute} stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
     );
 
     for (let index = 0; index < room.points.length; index += 1) {
@@ -599,13 +607,17 @@ function isValidExportRoomColor(roomColor: string | undefined): roomColor is str
 function getSvgRoomFill(
   room: Room,
   roomColorOverride: EditorExportRoomColorOverride | undefined
-): string {
-  if (roomColorOverride?.mode === "none") return SVG_ROOM_FILL;
+): SvgRoomFill {
+  if (roomColorOverride?.mode === "none") return { color: SVG_ROOM_FILL };
   if (roomColorOverride?.mode === "single") {
-    return isValidExportRoomColor(roomColorOverride.color) ? roomColorOverride.color : SVG_ROOM_FILL;
+    return isValidExportRoomColor(roomColorOverride.color)
+      ? { color: roomColorOverride.color, opacity: EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA }
+      : { color: SVG_ROOM_FILL };
   }
 
-  return isValidExportRoomColor(room.roomColor) ? room.roomColor : SVG_ROOM_FILL;
+  return isValidExportRoomColor(room.roomColor)
+    ? { color: room.roomColor, opacity: EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA }
+    : { color: SVG_ROOM_FILL };
 }
 
 function getCurrentFloorExportRooms(document: EditorExportScopeDocument): Room[] {
