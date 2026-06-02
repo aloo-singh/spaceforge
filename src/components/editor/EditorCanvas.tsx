@@ -442,6 +442,29 @@ function getExportRoomColorOverride(request: ExportPngRequest): EditorExportRoom
   };
 }
 
+function getPngExportRoomColors(roomColors: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(roomColors).map(([roomId, roomColor]) => [
+      roomId,
+      blendHexColorWithWhite(roomColor, EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA),
+    ])
+  );
+}
+
+function blendHexColorWithWhite(hexColor: string, alpha: number): string {
+  const normalizedColor = /^#[0-9a-fA-F]{6}$/.test(hexColor) ? hexColor : "#ffffff";
+  const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+  const red = Number.parseInt(normalizedColor.slice(1, 3), 16);
+  const green = Number.parseInt(normalizedColor.slice(3, 5), 16);
+  const blue = Number.parseInt(normalizedColor.slice(5, 7), 16);
+  const blendChannel = (channel: number) =>
+    Math.round(channel * normalizedAlpha + 255 * (1 - normalizedAlpha));
+
+  return `#${[blendChannel(red), blendChannel(green), blendChannel(blue)]
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
 type EditorCanvasProps = {
   projectId?: string | null;
   hasResolvedProject?: boolean;
@@ -1818,6 +1841,7 @@ export default function EditorCanvas({
       }));
       const layoutBounds = getLayoutBoundsFromRooms(scopedRooms);
       const roomColors = getRoomColorsForEditorExportRooms(scopedRooms, roomColorOverride);
+      const pngRoomColors = getPngExportRoomColors(roomColors);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
         viewport: state.viewport,
@@ -1860,8 +1884,8 @@ export default function EditorCanvas({
         roomColorOverride?.mode === "none" ? false : state.settings.showRoomColors,
         null,
         {
-          roomColors,
-          roomColorFillAlpha: EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA,
+          roomColors: pngRoomColors,
+          roomColorFillAlpha: 1,
         }
       );
       drawOpenings(
@@ -1925,7 +1949,7 @@ export default function EditorCanvas({
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           exportScope,
-          roomColors,
+          roomColors: pngRoomColors,
           roomColorOverride,
           paddingPx,
           exportResolution,
