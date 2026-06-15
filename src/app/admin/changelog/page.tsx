@@ -10,6 +10,39 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">v0.81.2</h2>
+            <span className="text-sm text-muted-foreground">2026-06-15</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Added</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Added room colour data flow through PNG, SVG, and PDF export paths.</li>
+                <li>Added export-level room colour choices for None, Room type, and All the same, including a calm Tailwind swatch picker for the shared colour option.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Improved</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Aligned PNG, SVG, and PDF export room colour opacity so exported plans look visually consistent.</li>
+                <li>Matched export room label pills, title alignment, north indicator placement, scale position, and signature styling more closely across export formats.</li>
+                <li>Updated SVG/PDF export text to use a stable sans-serif stack for plan labels while keeping the Designed by footer monospaced.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Fixed</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Fixed the None room colour export option so room interiors are transparent instead of falling back to grey, including light and dark themed exports.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.81.1</h2>
             <span className="text-sm text-muted-foreground">2026-05-20</span>
           </div>

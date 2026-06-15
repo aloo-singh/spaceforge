@@ -7,6 +7,17 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.81.2",
+    date: "2026-06-15",
+    title: "Cleaner coloured exports",
+    items: [
+      "Exported floor plans now support room colours across PNG, SVG, and PDF outputs.",
+      "The export dialog now lets you choose no room colour, room type colours, or one shared colour for all exported rooms.",
+      "Room labels, title text, north indicators, scale markers, and export credits now align more consistently between PNG, SVG, and PDF exports.",
+      "Choosing no room colour now leaves room interiors transparent instead of applying a grey fallback.",
+    ],
+  },
+  {
     version: "v0.81.0",
     date: "2026-05-19",
     title: "Room type presets",

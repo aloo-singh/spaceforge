@@ -76,12 +76,15 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   buildEditorExportFilename,
+  EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA,
+  type EditorExportRoomColorOverride,
   type EditorExportScope,
   exportPixiCanvasToPngBlob,
   exportPixiCanvasToPngDataUrl,
   exportSvgToPdfBlob,
   exportToSVG,
   getEditorExportScopeFilenameParts,
+  getRoomColorsForEditorExportRooms,
   getRoomsForEditorExportScope,
 } from "@/lib/editor/exportPng";
 import { exportPixiCanvasToThumbnailDataUrl } from "@/lib/editor/projectThumbnail";
@@ -430,6 +433,50 @@ function normalizeExportMultilineText(value: string): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function getExportRoomColorOverride(request: ExportPngRequest): EditorExportRoomColorOverride {
+  return {
+    mode: request.roomColorMode,
+    color: request.roomColorMode === "single" ? request.roomColorOverride : undefined,
+  };
+}
+
+function getPngExportRoomColors(roomColors: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(roomColors).map(([roomId, roomColor]) => [
+      roomId,
+      blendHexColorWithWhite(roomColor, EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA),
+    ])
+  );
+}
+
+function blendHexColorWithWhite(hexColor: string, alpha: number): string {
+  const normalizedColor = /^#[0-9a-fA-F]{6}$/.test(hexColor) ? hexColor : "#ffffff";
+  const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+  const red = Number.parseInt(normalizedColor.slice(1, 3), 16);
+  const green = Number.parseInt(normalizedColor.slice(3, 5), 16);
+  const blue = Number.parseInt(normalizedColor.slice(5, 7), 16);
+  const blendChannel = (channel: number) =>
+    Math.round(channel * normalizedAlpha + 255 * (1 - normalizedAlpha));
+
+  return `#${[blendChannel(red), blendChannel(green), blendChannel(blue)]
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function getExportCanvasTheme(theme: EditorCanvasTheme): EditorCanvasTheme {
+  return {
+    ...theme,
+    roomLabelFill: 0x111827,
+    roomLabelStroke: 0xffffff,
+    roomLabelPillFill: 0xffffff,
+    roomLabelPillStroke: 0xbccce0,
+    roomLabelPillHoverFill: 0xffffff,
+    roomLabelPillHoverStroke: 0xbccce0,
+    roomLabelPillSelectedFill: 0xffffff,
+    roomLabelPillSelectedStroke: 0xbccce0,
+  };
 }
 
 type EditorCanvasProps = {
@@ -1771,6 +1818,7 @@ export default function EditorCanvas({
       themeMode,
       exportResolution,
       exportScope,
+      roomColorOverride,
     }: {
       includeSignature: boolean;
       includeNorthIndicator?: boolean;
@@ -1788,12 +1836,13 @@ export default function EditorCanvas({
       themeMode: "light" | "dark";
       exportResolution?: "normal" | "hi-res";
       exportScope?: EditorExportScope;
+      roomColorOverride?: EditorExportRoomColorOverride;
     }) => {
       const app = appRef.current;
       if (!app) return null;
 
       const state = useEditorStore.getState();
-      const exportTheme = getEditorCanvasTheme(themeMode);
+      const exportTheme = getExportCanvasTheme(getEditorCanvasTheme(themeMode));
       const scopedRooms = getRoomsForEditorExportScope(state.document, exportScope);
       const exportRooms = scopedRooms.map((room) => ({
         ...room,
@@ -1805,6 +1854,8 @@ export default function EditorCanvas({
               : room.interiorAssets,
       }));
       const layoutBounds = getLayoutBoundsFromRooms(scopedRooms);
+      const roomColors = getRoomColorsForEditorExportRooms(scopedRooms, roomColorOverride);
+      const pngRoomColors = getPngExportRoomColors(roomColors);
       const exportFraming = getAutoFitExportFraming({
         layoutBounds,
         viewport: state.viewport,
@@ -1844,7 +1895,13 @@ export default function EditorCanvas({
         exportViewport,
         null,
         exportTheme,
-        state.settings.showRoomColors
+        roomColorOverride?.mode === "none" ? false : state.settings.showRoomColors,
+        null,
+        {
+          roomColors: pngRoomColors,
+          roomColorFillAlpha: 1,
+          roomDefaultFillAlpha: roomColorOverride?.mode === "none" ? 0 : undefined,
+        }
       );
       drawOpenings(
         exportOpeningGraphics,
@@ -1907,6 +1964,8 @@ export default function EditorCanvas({
         options: {
           backgroundColor: themeMode === "light" ? "#ffffff" : "#000000",
           exportScope,
+          roomColors: pngRoomColors,
+          roomColorOverride,
           paddingPx,
           exportResolution,
           header:
@@ -1971,6 +2030,7 @@ export default function EditorCanvas({
   );
 
   const createPngExportSnapshotFromRequest = useCallback((request: ExportPngRequest) => {
+    const roomColorOverride = getExportRoomColorOverride(request);
     const exportSignatureText = normalizeEditorExportSignature(
       request.designedBy || useEditorStore.getState().settings.exportSignatureText
     );
@@ -2019,6 +2079,7 @@ export default function EditorCanvas({
       themeMode: resolvedThemeMode,
       exportResolution: request.exportResolution,
       exportScope: request.exportScope,
+      roomColorOverride,
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
 
@@ -2035,6 +2096,7 @@ export default function EditorCanvas({
 
       try {
         const state = useEditorStore.getState();
+        const roomColorOverride = getExportRoomColorOverride(request);
         const exportTitle =
           request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
         const exportDescription =
@@ -2079,6 +2141,7 @@ export default function EditorCanvas({
             effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
               ? effectiveLegendPosition
               : undefined,
+          roomColorOverride,
           signatureText: exportSignatureText || undefined,
           signatureLines: exportSignatureLines,
           displayUnitOrigin: state.document.region,
@@ -4793,7 +4856,12 @@ function drawRooms(
   transformFeedback: TransformFeedback | null,
   theme: EditorCanvasTheme,
   showRoomColors: boolean,
-  assetDragTargetRoomId: string | null = null
+  assetDragTargetRoomId: string | null = null,
+  options: {
+    roomColors?: Record<string, string>;
+    roomColorFillAlpha?: number;
+    roomDefaultFillAlpha?: number;
+  } = {}
 ) {
   graphics.clear();
   const selectedRoomCount = selection.filter((item) => item.type === "room").length;
@@ -4833,7 +4901,9 @@ function drawRooms(
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
     const isAssetDragTarget = room.id === assetDragTargetRoomId;
-    const roomColor = showRoomColors ? getRoomColorNumber(room.roomColor) : null;
+    const roomColor = getRoomColorNumber(
+      options.roomColors?.[room.id] ?? (showRoomColors ? room.roomColor : undefined)
+    );
     const isActiveTransformRoom = transformFeedback?.roomId === room.id;
     const isTransformActive = isActiveTransformRoom && transformFeedback?.phase === "active";
     const isTransformSettling = isActiveTransformRoom && transformFeedback?.phase === "settling";
@@ -4852,6 +4922,12 @@ function drawRooms(
       : isTransformSettling
         ? 2.2 + 0.3 * getTransformRoomEase(transformFeedback)
         : 2.5;
+    const fillAlpha =
+      roomColor !== null && !isSelected
+        ? options.roomColorFillAlpha ?? 0.12
+        : isSelected
+          ? selectedFillAlpha
+          : options.roomDefaultFillAlpha ?? 0.12;
 
     drawRoomShape(
       graphics,
@@ -4859,7 +4935,7 @@ function drawRooms(
       camera,
       viewport,
       isSelected ? theme.roomSelectionOutline : theme.roomOutline,
-      isSelected ? selectedFillAlpha : 0.12,
+      fillAlpha,
       isSelected ? selectedStrokeWidth : 2,
       isSelected ? selectedStrokeAlpha : 0.9,
       roomColor ?? undefined
