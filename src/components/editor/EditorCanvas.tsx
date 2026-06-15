@@ -465,6 +465,20 @@ function blendHexColorWithWhite(hexColor: string, alpha: number): string {
     .join("")}`;
 }
 
+function getExportCanvasTheme(theme: EditorCanvasTheme): EditorCanvasTheme {
+  return {
+    ...theme,
+    roomLabelFill: 0x111827,
+    roomLabelStroke: 0xffffff,
+    roomLabelPillFill: 0xffffff,
+    roomLabelPillStroke: 0xbccce0,
+    roomLabelPillHoverFill: 0xffffff,
+    roomLabelPillHoverStroke: 0xbccce0,
+    roomLabelPillSelectedFill: 0xffffff,
+    roomLabelPillSelectedStroke: 0xbccce0,
+  };
+}
+
 type EditorCanvasProps = {
   projectId?: string | null;
   hasResolvedProject?: boolean;
@@ -1828,7 +1842,7 @@ export default function EditorCanvas({
       if (!app) return null;
 
       const state = useEditorStore.getState();
-      const exportTheme = getEditorCanvasTheme(themeMode);
+      const exportTheme = getExportCanvasTheme(getEditorCanvasTheme(themeMode));
       const scopedRooms = getRoomsForEditorExportScope(state.document, exportScope);
       const exportRooms = scopedRooms.map((room) => ({
         ...room,

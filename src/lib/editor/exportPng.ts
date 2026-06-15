@@ -108,6 +108,17 @@ const SVG_EXPORT_PADDING_PX = 64;
 const SVG_ROOM_FILL = "#f8fafc";
 const SVG_ROOM_STROKE = "#0f172a";
 const SVG_MUTED_STROKE = "#64748b";
+const SVG_SANS_FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const SVG_MONO_FONT_FAMILY = "Courier, monospace";
+const SVG_ROOM_LABEL_FILL = "#111827";
+const SVG_ROOM_LABEL_PILL_FILL = "#ffffff";
+const SVG_ROOM_LABEL_PILL_STROKE = "#bccce0";
+const SVG_ROOM_LABEL_FONT_FAMILY = SVG_SANS_FONT_FAMILY;
+const SVG_ROOM_LABEL_FONT_SIZE_PX = 14;
+const SVG_ROOM_LABEL_FONT_WEIGHT = 500;
+const SVG_ROOM_LABEL_MIN_WIDTH_PX = 44;
+const SVG_ROOM_LABEL_PADDING_X_PX = 10;
+const SVG_ROOM_LABEL_HEIGHT_PX = 26;
 const SVG_ASSET_FILL = "#eef2f7";
 const SVG_ASSET_DETAIL_FILL = "#dbe4ee";
 const SVG_SCALE_BAR_HEIGHT_PX = 72;
@@ -341,6 +352,10 @@ export function exportToSVG({
   const originX = (bounds?.minX ?? 0) - maxDoorSwingMm;
   const originY = (bounds?.minY ?? 0) - maxDoorSwingMm;
   const svgTitle = normalizeSvgText(title || "spaceforge export");
+  const contentLeftPx = bounds ? leftPaddingPx + (bounds.minX - originX) * scale : leftPaddingPx;
+  const contentRightPx = bounds
+    ? leftPaddingPx + (bounds.maxX - originX) * scale
+    : exportWidth - rightPaddingPx;
 
   const projectPoint = (point: Point): Point => ({
     x: leftPaddingPx + (point.x - originX) * scale,
@@ -459,9 +474,7 @@ export function exportToSVG({
     const labelAnchor = getPolygonLabelAnchor(room.points);
     if (labelAnchor) {
       const labelPoint = projectPoint(labelAnchor);
-      labelElements.push(
-        `<text x="${formatNumber(labelPoint.x)}" y="${formatNumber(labelPoint.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${normalizeSvgText(room.name || "Room")}</text>`
-      );
+      labelElements.push(buildSvgRoomLabelElement(room.name || "Room", labelPoint, formatNumber));
     }
   }
 
@@ -470,26 +483,26 @@ export function exportToSVG({
   const bottomLeftStartY = exportHeight - SVG_EXPORT_PADDING_PX - bottomLeftHeight;
   const scaleBar = buildSvgScaleBar(
     scale,
-    exportHeight,
+    contentLeftPx,
     formatNumber,
     bottomLeftStartY,
     displayUnitOrigin
   );
 
-  const northIndicator = buildSvgNorthIndicator(northBearingDegrees, exportWidth, formatNumber);
+  const northIndicator = buildSvgNorthIndicator(northBearingDegrees, contentRightPx, formatNumber);
   if (northIndicator) {
     elements.push(northIndicator);
   }
 
   if (header) {
-    elements.push(buildSvgHeaderElements(header, formatNumber));
+    elements.push(buildSvgHeaderElements(header, contentLeftPx, formatNumber));
   }
 
   const rightLegend =
     effectiveLegendPosition === "right-side"
       ? buildSvgLegendElements({
           items: normalizedLegendItems,
-          x: exportWidth - SVG_EXPORT_PADDING_PX - SVG_RIGHT_LEGEND_WIDTH_PX,
+          x: contentRightPx - SVG_RIGHT_LEGEND_WIDTH_PX,
           y: topPaddingPx,
           formatNumber,
         })
@@ -502,7 +515,7 @@ export function exportToSVG({
     effectiveLegendPosition === "bottom"
       ? buildSvgLegendElements({
           items: normalizedLegendItems,
-          x: SVG_EXPORT_PADDING_PX,
+          x: contentLeftPx,
           y: bottomLeftStartY + SVG_SCALE_BAR_HEIGHT_PX + SVG_BOTTOM_LEGEND_GAP_PX,
           formatNumber,
         })
@@ -515,7 +528,7 @@ export function exportToSVG({
     elements.push(bottomLegend);
   }
 
-  elements.push(buildSvgSignatureElements(normalizedSignatureLines, exportWidth, exportHeight, formatNumber));
+  elements.push(buildSvgSignatureElements(normalizedSignatureLines, contentRightPx, exportHeight, formatNumber));
 
   elements.push("</svg>");
   return elements.join("\n");
@@ -589,6 +602,50 @@ function parseSvgNumber(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function buildSvgRoomLabelElement(
+  label: string,
+  center: Point,
+  formatNumber: (value: number) => string
+): string {
+  const normalizedLabel = normalizeSvgText(label.trim() || "Room");
+  const labelWidth = Math.max(
+    SVG_ROOM_LABEL_MIN_WIDTH_PX,
+    estimateSvgRoomLabelWidthPx(label) + SVG_ROOM_LABEL_PADDING_X_PX * 2
+  );
+  const labelHeight = SVG_ROOM_LABEL_HEIGHT_PX;
+  const labelX = center.x - labelWidth / 2;
+  const labelY = center.y - labelHeight / 2;
+  const textY = center.y + SVG_ROOM_LABEL_FONT_SIZE_PX * 0.34;
+  const radius = labelHeight / 2;
+
+  return [
+    `<g aria-label="${normalizedLabel}">`,
+    `<rect x="${formatNumber(labelX)}" y="${formatNumber(labelY)}" width="${formatNumber(labelWidth)}" height="${formatNumber(labelHeight)}" rx="${formatNumber(radius)}" fill="${SVG_ROOM_LABEL_PILL_FILL}" stroke="${SVG_ROOM_LABEL_PILL_STROKE}" stroke-width="1.2" />`,
+    `<text x="${formatNumber(center.x)}" y="${formatNumber(textY)}" text-anchor="middle" fill="${SVG_ROOM_LABEL_FILL}" font-family="${SVG_ROOM_LABEL_FONT_FAMILY}" font-size="${SVG_ROOM_LABEL_FONT_SIZE_PX}" font-weight="${SVG_ROOM_LABEL_FONT_WEIGHT}">${normalizedLabel}</text>`,
+    `</g>`,
+  ].join("\n");
+}
+
+function estimateSvgRoomLabelWidthPx(label: string): number {
+  let width = 0;
+
+  for (const character of label.trim() || "Room") {
+    if (" il.,'|!".includes(character)) {
+      width += 4.7;
+      continue;
+    }
+
+    if ("MW@#%&".includes(character)) {
+      width += 11;
+      continue;
+    }
+
+    width += 8.6;
+  }
+
+  return width * (SVG_ROOM_LABEL_FONT_SIZE_PX / 16);
 }
 
 function sanitizeExportFilenamePart(value: string | undefined): string {
@@ -792,7 +849,7 @@ function buildSvgInteriorAssetElements(
       const arrowLabel = normalizeSvgText(asset.arrowLabel?.trim() || "");
       if (arrowLabel) {
         labelElements.push(
-          `<text x="${formatNumber(isSidewaysStairRun ? tailX - 16 * headSign : center.x)}" y="${formatNumber(isSidewaysStairRun ? center.y : tailY + 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="600">${arrowLabel}</text>`
+          `<text x="${formatNumber(isSidewaysStairRun ? tailX - 16 * headSign : center.x)}" y="${formatNumber(isSidewaysStairRun ? center.y : tailY + 14 * headSign)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_ROOM_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="11" font-weight="600">${arrowLabel}</text>`
         );
       }
     }
@@ -800,7 +857,7 @@ function buildSvgInteriorAssetElements(
 
   if (asset.type !== "stairs") {
     labelElements.push(
-      `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="500">${label}</text>`
+      `<text x="${formatNumber(center.x)}" y="${formatNumber(center.y)}" text-anchor="middle" dominant-baseline="middle" fill="${SVG_MUTED_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="11" font-weight="500">${label}</text>`
     );
   }
 
@@ -811,7 +868,7 @@ function buildSvgInteriorAssetElements(
 
 function buildSvgScaleBar(
   scale: number,
-  exportHeight: number,
+  x: number,
   formatNumber: (value: number) => string,
   startY?: number,
   displayUnitOrigin?: UnitOrigin
@@ -825,8 +882,7 @@ function buildSvgScaleBar(
     }
   }
   const widthPx = lengthMm * scale;
-  const x = SVG_EXPORT_PADDING_PX;
-  const y = startY === undefined ? exportHeight - SVG_EXPORT_PADDING_PX + 14 : startY + 14;
+  const y = startY === undefined ? SVG_EXPORT_PADDING_PX + 14 : startY + 14;
   const label = formatWallDimension(lengthMm, displayUnitOrigin);
 
   return [
@@ -834,7 +890,7 @@ function buildSvgScaleBar(
     `<line x1="${formatNumber(x)}" y1="${formatNumber(y)}" x2="${formatNumber(x + widthPx)}" y2="${formatNumber(y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
     `<line x1="${formatNumber(x)}" y1="${formatNumber(y - 6)}" x2="${formatNumber(x)}" y2="${formatNumber(y + 6)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
     `<line x1="${formatNumber(x + widthPx)}" y1="${formatNumber(y - 6)}" x2="${formatNumber(x + widthPx)}" y2="${formatNumber(y + 6)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`,
-    `<text x="${formatNumber(x)}" y="${formatNumber(y + 24)}" fill="${SVG_MUTED_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="500">${label}</text>`,
+    `<text x="${formatNumber(x)}" y="${formatNumber(y + 24)}" fill="${SVG_MUTED_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="12" font-weight="500">${label}</text>`,
     `</g>`,
   ].join("\n");
 }
@@ -870,7 +926,7 @@ function buildSvgLegendElements({
   const elements = [`<g aria-label="Legend">`];
   let lineY = y;
   elements.push(
-    `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_ROOM_STROKE}" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700">Legend</text>`
+    `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_ROOM_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="12" font-weight="700">Legend</text>`
   );
   lineY += 30;
 
@@ -878,12 +934,12 @@ function buildSvgLegendElements({
     const name = normalizeSvgText(item.name || "Room");
     const area = normalizeSvgTextWithSuperscriptTwo(item.area);
     elements.push(
-      `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_ROOM_STROKE}" font-family="system-ui, sans-serif" font-size="14" font-weight="500">&#8226; ${name}</text>`
+      `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_ROOM_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="14" font-weight="500">&#8226; ${name}</text>`
     );
     lineY += 18;
     if (area) {
       elements.push(
-        `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_MUTED_STROKE}" opacity="0.94" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="600">${area}</text>`
+        `<text x="${formatNumber(x)}" y="${formatNumber(lineY)}" fill="${SVG_MUTED_STROKE}" opacity="0.94" font-family="${SVG_SANS_FONT_FAMILY}" font-size="12" font-weight="600">${area}</text>`
       );
     }
     lineY += 24;
@@ -912,18 +968,18 @@ function getSvgSignatureHeight(signatureLines: string[]): number {
 
 function buildSvgSignatureElements(
   signatureLines: string[],
-  exportWidth: number,
+  rightEdgePx: number,
   exportHeight: number,
   formatNumber: (value: number) => string
 ): string {
-  const x = exportWidth - Math.max(12, Math.floor(SVG_EXPORT_PADDING_PX * 0.33));
+  const x = rightEdgePx;
   let y = exportHeight - SVG_SIGNATURE_BASELINE_INSET_PX;
   const elements = [`<g aria-label="Export signature" text-anchor="end">`];
 
   for (let index = signatureLines.length - 1; index >= 0; index -= 1) {
     const isBrandLine = index === signatureLines.length - 2 && signatureLines.length > 1;
     elements.push(
-      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_MUTED_STROKE}" opacity="0.7" font-family="JetBrains Mono, ui-monospace, monospace" font-size="${isBrandLine ? 12 : 11}" font-weight="${isBrandLine ? 600 : 500}">${normalizeSvgText(signatureLines[index])}</text>`
+      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_MUTED_STROKE}" opacity="0.7" font-family="${SVG_MONO_FONT_FAMILY}" font-size="${isBrandLine ? 12 : 11}" font-weight="${isBrandLine ? 600 : 500}">${normalizeSvgText(signatureLines[index])}</text>`
     );
     y -= isBrandLine ? 18 : 17;
   }
@@ -960,22 +1016,22 @@ function buildSvgHeader(title: string | undefined, description: string | undefin
 
 function buildSvgHeaderElements(
   header: SvgHeader,
+  x: number,
   formatNumber: (value: number) => string
 ): string {
-  const x = SVG_EXPORT_PADDING_PX;
   let y = SVG_EXPORT_PADDING_PX;
   const elements = [`<g aria-label="Export header">`];
 
   if (header.title) {
     elements.push(
-      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_ROOM_STROKE}" font-family="system-ui, sans-serif" font-size="30" font-weight="700">${normalizeSvgText(header.title)}</text>`
+      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_ROOM_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="30" font-weight="700">${normalizeSvgText(header.title)}</text>`
     );
     y += 46;
   }
 
   for (const line of header.descriptionLines) {
     elements.push(
-      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_MUTED_STROKE}" font-family="system-ui, sans-serif" font-size="16" font-weight="400">${normalizeSvgText(line)}</text>`
+      `<text x="${formatNumber(x)}" y="${formatNumber(y)}" fill="${SVG_MUTED_STROKE}" font-family="${SVG_SANS_FONT_FAMILY}" font-size="16" font-weight="400">${normalizeSvgText(line)}</text>`
     );
     y += 21;
   }
@@ -986,14 +1042,14 @@ function buildSvgHeaderElements(
 
 function buildSvgNorthIndicator(
   bearingDegrees: number | undefined,
-  exportWidth: number,
+  rightEdgePx: number,
   formatNumber: (value: number) => string
 ): string | null {
   if (bearingDegrees === undefined || !Number.isFinite(bearingDegrees)) return null;
 
   const width = SVG_NORTH_INDICATOR_WIDTH_PX;
   const height = SVG_NORTH_INDICATOR_HEIGHT_PX;
-  const x = exportWidth - SVG_EXPORT_PADDING_PX - width;
+  const x = rightEdgePx - width;
   const y = SVG_EXPORT_PADDING_PX;
   const centerX = x + width / 2;
   const labelY = y + 1;
@@ -1011,7 +1067,7 @@ function buildSvgNorthIndicator(
     `<line x1="${formatNumber(centerX - 10)}" y1="${formatNumber(shaftMidY)}" x2="${formatNumber(centerX + 10)}" y2="${formatNumber(shaftMidY)}" />`,
     `<polygon points="${formatNumber(centerX)},${formatNumber(shaftTopY)} ${formatNumber(centerX - 7)},${formatNumber(shaftTopY + 13)} ${formatNumber(centerX + 7)},${formatNumber(shaftTopY + 13)}" />`,
     `</g>`,
-    `<text x="${formatNumber(centerX)}" y="${formatNumber(labelY)}" text-anchor="middle" fill="${SVG_ROOM_STROKE}" opacity="0.94" font-family="JetBrains Mono, ui-monospace, monospace" font-size="22" font-weight="700">N</text>`,
+    `<text x="${formatNumber(centerX)}" y="${formatNumber(labelY)}" text-anchor="middle" fill="${SVG_ROOM_STROKE}" opacity="0.94" font-family="${SVG_SANS_FONT_FAMILY}" font-size="26" font-weight="700">N</text>`,
     `</g>`,
   ].join("\n");
 }
