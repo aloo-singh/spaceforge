@@ -1900,6 +1900,7 @@ export default function EditorCanvas({
         {
           roomColors: pngRoomColors,
           roomColorFillAlpha: 1,
+          roomDefaultFillAlpha: roomColorOverride?.mode === "none" ? 0 : undefined,
         }
       );
       drawOpenings(
@@ -4859,6 +4860,7 @@ function drawRooms(
   options: {
     roomColors?: Record<string, string>;
     roomColorFillAlpha?: number;
+    roomDefaultFillAlpha?: number;
   } = {}
 ) {
   graphics.clear();
@@ -4925,7 +4927,7 @@ function drawRooms(
         ? options.roomColorFillAlpha ?? 0.12
         : isSelected
           ? selectedFillAlpha
-          : 0.12;
+          : options.roomDefaultFillAlpha ?? 0.12;
 
     drawRoomShape(
       graphics,

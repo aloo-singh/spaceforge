@@ -665,7 +665,7 @@ function getSvgRoomFill(
   room: Room,
   roomColorOverride: EditorExportRoomColorOverride | undefined
 ): SvgRoomFill {
-  if (roomColorOverride?.mode === "none") return { color: SVG_ROOM_FILL };
+  if (roomColorOverride?.mode === "none") return { color: "none" };
   if (roomColorOverride?.mode === "single") {
     return isValidExportRoomColor(roomColorOverride.color)
       ? { color: roomColorOverride.color, opacity: EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA }
