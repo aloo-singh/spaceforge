@@ -18,6 +18,7 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 
 function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
@@ -100,6 +101,8 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
       roomA.id !== roomB.id ||
       normalizeUnitOrigin(roomA.unitOrigin) !== normalizeUnitOrigin(roomB.unitOrigin) ||
       roomA.name !== roomB.name ||
+      normalizeRoomHeightMm(roomA.heightMm, roomA.unitOrigin) !==
+        normalizeRoomHeightMm(roomB.heightMm, roomB.unitOrigin) ||
       getRoomFloorId(roomA, a) !== getRoomFloorId(roomB, b)
     ) {
       return false;
@@ -135,6 +138,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       name: room.name,
       roomType: room.roomType,
       roomColor: room.roomColor,
+      heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
       points: room.points.map((point) => ({ ...point })),
       openings: cloneRoomOpenings(room.openings ?? []),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
@@ -191,6 +195,9 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
     const didNameChange = previousRoom.name !== room.name;
     const didPresetChange =
       previousRoom.roomType !== room.roomType || previousRoom.roomColor !== room.roomColor;
+    const didHeightChange =
+      normalizeRoomHeightMm(previousRoom.heightMm, previousRoom.unitOrigin) !==
+      normalizeRoomHeightMm(room.heightMm, room.unitOrigin);
     const didPointsChange = !arePointListsEqual(previousRoom.points, room.points);
     const didOpeningsChange = !areRoomOpeningsEqual(previousRoom.openings ?? [], room.openings ?? []);
     const didInteriorAssetsChange = !areRoomInteriorAssetsEqual(
@@ -201,6 +208,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
       !didFloorChange &&
       !didNameChange &&
       !didPresetChange &&
+      !didHeightChange &&
       !didPointsChange &&
       !didOpeningsChange &&
       !didInteriorAssetsChange
@@ -418,6 +426,9 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         unitOrigin: normalizeUnitOrigin(deletedRoom.unitOrigin),
         floorId: getRoomFloorId(deletedRoom, previous),
         name: deletedRoom.name,
+        roomType: deletedRoom.roomType,
+        roomColor: deletedRoom.roomColor,
+        heightMm: normalizeRoomHeightMm(deletedRoom.heightMm, deletedRoom.unitOrigin),
         points: deletedRoom.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(deletedRoom.openings ?? []),
         interiorAssets: cloneRoomInteriorAssets(deletedRoom.interiorAssets ?? []),
@@ -465,6 +476,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         name: addedRooms[0].name,
         roomType: addedRooms[0].roomType,
         roomColor: addedRooms[0].roomColor,
+        heightMm: normalizeRoomHeightMm(addedRooms[0].heightMm, addedRooms[0].unitOrigin),
         points: addedRooms[0].points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(addedRooms[0].openings ?? []),
         interiorAssets: cloneRoomInteriorAssets(addedRooms[0].interiorAssets ?? []),

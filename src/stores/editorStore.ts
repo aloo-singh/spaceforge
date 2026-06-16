@@ -125,6 +125,7 @@ import {
   getSmartRoomName,
   type RoomPresetId,
 } from "@/lib/editor/roomPresets";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
@@ -792,6 +793,9 @@ function buildConnectedFloorDocument(
     unitOrigin: getDocumentUnitOrigin(document),
     floorId: createdFloorId,
     name: room.name,
+    roomType: room.roomType,
+    roomColor: room.roomColor,
+    heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map((point) => ({ ...point })),
     openings: [],
     interiorAssets: [
@@ -845,6 +849,7 @@ function cloneRoom(room: Room): Room {
     name: room.name,
     roomType: room.roomType,
     roomColor: room.roomColor,
+    heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map((point) => ({ ...point })),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
@@ -2428,6 +2433,9 @@ function getSafePersistedHistorySnapshot(
             unitOrigin: normalizeUnitOrigin(room.unitOrigin),
             floorId: room.floorId,
             name: room.name,
+            roomType: room.roomType,
+            roomColor: room.roomColor,
+            heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
             points: room.points.map((point) => ({ ...point })),
             openings: cloneRoomOpenings(room.openings),
             interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
@@ -5431,14 +5439,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const roomsToDeleteWithIndex = roomsToDelete.map((room) => {
         const previousIndex = state.document.rooms.findIndex((r) => r.id === room.id);
         return {
-          room: {
-            id: room.id,
-            floorId: room.floorId,
-            name: room.name,
-            points: room.points.map((point) => ({ ...point })),
-            openings: cloneRoomOpenings(room.openings),
-            interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
-          },
+          room: cloneRoom(room),
           previousIndex,
         };
       });
@@ -5493,14 +5494,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const room = state.document.rooms[previousIndex];
       const command: EditorCommand = {
         type: "delete-room",
-        room: {
-          id: room.id,
-          floorId: room.floorId,
-          name: room.name,
-          points: room.points.map((point) => ({ ...point })),
-          openings: cloneRoomOpenings(room.openings),
-          interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
-        },
+        room: cloneRoom(room),
         previousIndex,
       };
       const nextDocument = applyEditorCommand(state.document, command, "redo");
@@ -7752,6 +7746,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     unitOrigin: getDocumentUnitOrigin(state.document),
     floorId: getNormalizedActiveFloorId(state.document),
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
+    heightMm: normalizeRoomHeightMm(undefined, getDocumentUnitOrigin(state.document)),
     points: normalizedRoomPoints.map((point) => ({ ...point })),
     openings: [],
     interiorAssets: [],

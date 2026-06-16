@@ -213,6 +213,7 @@ export type Room = {
   name: string;
   roomType?: RoomType;
   roomColor?: string;
+  heightMm: number;
   points: Point[];
   openings: RoomOpening[];
   interiorAssets: RoomInteriorAsset[];

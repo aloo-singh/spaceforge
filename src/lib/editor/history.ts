@@ -8,6 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
@@ -505,6 +506,7 @@ export function applyEditorCommand(
           unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
           roomType: command.room.roomType,
           roomColor: command.room.roomColor,
+          heightMm: normalizeRoomHeightMm(command.room.heightMm, command.room.unitOrigin),
           points: command.room.points.map((point) => ({ ...point })),
           openings: cloneRoomOpenings(command.room.openings),
           interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
@@ -543,6 +545,9 @@ export function applyEditorCommand(
         unitOrigin: normalizeUnitOrigin(command.room.unitOrigin),
         floorId: command.room.floorId,
         name: command.room.name,
+        roomType: command.room.roomType,
+        roomColor: command.room.roomColor,
+        heightMm: normalizeRoomHeightMm(command.room.heightMm, command.room.unitOrigin),
         points: command.room.points.map((point) => ({ ...point })),
         openings: cloneRoomOpenings(command.room.openings),
         interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
@@ -886,6 +891,9 @@ export function applyEditorCommand(
             id: r.id,
             floorId: r.floorId,
             name: r.name,
+            roomType: r.roomType,
+            roomColor: r.roomColor,
+            heightMm: normalizeRoomHeightMm(r.heightMm, r.unitOrigin),
             points: r.points.map((point) => ({ ...point })),
             openings: cloneRoomOpenings(r.openings),
             interiorAssets: cloneRoomInteriorAssets(r.interiorAssets),
@@ -1047,6 +1055,9 @@ export function applyEditorCommand(
           id: room.id,
           floorId: room.floorId,
           name: room.name,
+          roomType: room.roomType,
+          roomColor: room.roomColor,
+          heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
           points: room.points.map((point) => ({ ...point })),
           openings: cloneRoomOpenings(room.openings),
           interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
@@ -1316,6 +1327,9 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
       unitOrigin: normalizeUnitOrigin(room.unitOrigin),
       floorId: getRoomFloorId(room, document),
       name: room.name,
+      roomType: room.roomType,
+      roomColor: room.roomColor,
+      heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
       points: room.points.map((point) => ({ ...point })),
       openings: cloneRoomOpenings(room.openings),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),

@@ -124,6 +124,7 @@ import {
   getRectResizeMeasurements,
   getCornerResizeMeasurements,
 } from "@/lib/editor/measurements";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import {
   getConstrainedDrawPoint,
   getActiveSnapStepMm,
@@ -8878,6 +8879,7 @@ function getDraftPreviewRoom(
     id: "__draft-preview__",
     floorId: DEFAULT_FLOOR_ID,
     name: "",
+    heightMm: normalizeRoomHeightMm(undefined),
     points: draftPoints,
     openings: [],
     interiorAssets: [],

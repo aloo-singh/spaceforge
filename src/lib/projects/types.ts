@@ -144,6 +144,7 @@ function isRoom(value: unknown): boolean {
   if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
   if (value.floorId !== undefined && typeof value.floorId !== "string") return false;
   if (typeof value.name !== "string") return false;
+  if (value.heightMm !== undefined && (!isFiniteNumber(value.heightMm) || value.heightMm <= 0)) return false;
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
   if (!value.points.every(isPoint)) return false;
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {

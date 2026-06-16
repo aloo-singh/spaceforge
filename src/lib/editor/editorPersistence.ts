@@ -26,6 +26,7 @@ import {
   DEFAULT_NORTH_BEARING_DEGREES,
   normalizeNorthBearingDegrees,
 } from "@/lib/editor/north";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import {
   cloneEditorExportPreferences,
   DEFAULT_EDITOR_EXPORT_PREFERENCES,
@@ -57,10 +58,11 @@ import {
 // - v12 payloads also persist ruler measurements.
 // - v13 payloads also persist the project region.
 // - v14 payloads also persist unit origin tags on dimensioned objects.
+// - v15 payloads also persist room height.
 // - Unknown versions or malformed layout payloads are rejected entirely.
 // - Malformed history inside an otherwise valid payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 14;
+export const EDITOR_PERSISTENCE_VERSION = 15;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 function warnEditorPersistence(message: string, details?: unknown) {
@@ -76,6 +78,7 @@ type PersistedRoom = {
   name: string;
   roomType?: Room["roomType"];
   roomColor?: Room["roomColor"];
+  heightMm?: Room["heightMm"];
   points: PersistedPoint[];
   openings?: Room["openings"];
   interiorAssets?: Room["interiorAssets"];
@@ -341,6 +344,7 @@ function isRoom(value: unknown): value is PersistedRoom {
   if (typeof value.name !== "string") return false;
   if (value.roomType !== undefined && typeof value.roomType !== "string") return false;
   if (value.roomColor !== undefined && typeof value.roomColor !== "string") return false;
+  if (value.heightMm !== undefined && (!isFiniteNumber(value.heightMm) || value.heightMm <= 0)) return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
@@ -431,6 +435,7 @@ function cloneRoom(room: PersistedRoom | Room): Room {
     name: room.name,
     roomType: room.roomType,
     roomColor: room.roomColor,
+    heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map(clonePoint),
     openings: cloneRoomOpenings(room.openings ?? []),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
@@ -578,6 +583,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 11 &&
         parsed.version !== 12 &&
         parsed.version !== 13 &&
+        parsed.version !== 14 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {

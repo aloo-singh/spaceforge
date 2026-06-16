@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconEye, Trash2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
+import { IconEye, Trash2, Ruler2, RulerMeasure2, RulerMeasure } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,10 @@ function RoomDimensionsDisplay({
         <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
           <RulerMeasure className="size-4 shrink-0" />
           <span>{formatWallDimension(width, displayUnitOrigin)}</span>
+        </div>
+        <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center gap-2">
+          <Ruler2 className="size-4 shrink-0" />
+          <span>{formatWallDimension(room.heightMm, displayUnitOrigin)} height</span>
         </div>
       </div>
     </div>
