@@ -17,10 +17,12 @@ import type {
   EditorExportAssetMode,
   EditorExportFormat,
   EditorExportResolution,
+  EditorExportViewMode,
 } from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { formatWallDimension } from "@/lib/editor/measurements";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
+import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
 import type { Floor, Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
 import type { UnitOrigin } from "@/lib/projects/region";
@@ -130,6 +132,13 @@ const SVG_RIGHT_LEGEND_WIDTH_PX = 190;
 const SVG_BOTTOM_LEGEND_GAP_PX = 16;
 const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
+const SVG_EXTRUDED_ISO_X_SCALE = 0.62;
+const SVG_EXTRUDED_ISO_Y_SCALE = 0.36;
+const SVG_EXTRUDED_HEIGHT_SCALE = 0.22;
+const SVG_EXTRUDED_WALL_FILL = "#cbd5e1";
+const SVG_EXTRUDED_WALL_ALT_FILL = "#d8e0ea";
+const SVG_EXTRUDED_TOP_FILL = "#f8fafc";
+const SVG_EXTRUDED_SHADOW_FILL = "#0f172a";
 
 type ExportTextLine = {
   text: string;
@@ -183,6 +192,7 @@ export type SvgExportOptions = {
   legendItems?: SvgLegendItem[];
   legendPosition?: "bottom" | "right-side";
   roomColorOverride?: EditorExportRoomColorOverride;
+  exportViewMode?: EditorExportViewMode;
   signatureText?: string;
   signatureLines?: string[];
   displayUnitOrigin?: UnitOrigin;
@@ -298,6 +308,7 @@ export function exportToSVG({
   legendItems,
   legendPosition,
   roomColorOverride,
+  exportViewMode = "top-down",
   signatureText,
   signatureLines,
   displayUnitOrigin,
@@ -305,6 +316,18 @@ export function exportToSVG({
   const exportRooms = exportScope
     ? getRoomsForEditorExportScope({ rooms, floors, activeFloorId }, exportScope)
     : rooms;
+
+  if (exportViewMode === "extruded") {
+    return exportToExtrudedSVG({
+      rooms: exportRooms,
+      title,
+      description,
+      northBearingDegrees,
+      signatureText,
+      signatureLines,
+    });
+  }
+
   const bounds = getLayoutBoundsFromRooms(exportRooms);
   const header = buildSvgHeader(title, description);
   const includeNorthIndicator =
@@ -534,6 +557,165 @@ export function exportToSVG({
   return elements.join("\n");
 }
 
+function exportToExtrudedSVG({
+  rooms,
+  title,
+  description,
+  northBearingDegrees,
+  signatureText,
+  signatureLines,
+}: {
+  rooms: Room[];
+  title?: string;
+  description?: string;
+  northBearingDegrees?: number;
+  signatureText?: string;
+  signatureLines?: string[];
+}): string {
+  const projectedRooms = rooms
+    .filter((room) => room.points.length >= 3)
+    .map((room) => ({
+      room,
+      bottom: room.points.map((point) => projectExtrudedSvgPoint(point, 0)),
+      top: room.points.map((point) =>
+        projectExtrudedSvgPoint(point, normalizeRoomHeightMm(room.heightMm, room.unitOrigin))
+      ),
+    }));
+  const allPoints = projectedRooms.flatMap((room) => [...room.bottom, ...room.top]);
+  const header = buildSvgHeader(title, description);
+  const includeNorthIndicator =
+    northBearingDegrees !== undefined && Number.isFinite(northBearingDegrees);
+  const normalizedSignatureLines = normalizeSvgSignatureLines(signatureLines, signatureText);
+  const signatureHeight = getSvgSignatureHeight(normalizedSignatureLines);
+  const topOverlayHeight = Math.max(
+    header ? header.height : 0,
+    includeNorthIndicator ? SVG_NORTH_INDICATOR_HEIGHT_PX : 0
+  );
+  const topPaddingPx =
+    SVG_EXPORT_PADDING_PX + (topOverlayHeight > 0 ? topOverlayHeight + SVG_HEADER_GAP_PX : 0);
+  const bottomPaddingPx =
+    SVG_EXPORT_PADDING_PX + (signatureHeight > 0 ? signatureHeight + SVG_HEADER_GAP_PX : 0);
+  const projectedBounds = getPointBounds(allPoints);
+  const layoutWidth = Math.max(projectedBounds?.width ?? 1, 1);
+  const layoutHeight = Math.max(projectedBounds?.height ?? 1, 1);
+  const rightOverlayWidth = includeNorthIndicator ? SVG_NORTH_INDICATOR_WIDTH_PX : 0;
+  const leftPaddingPx = SVG_EXPORT_PADDING_PX;
+  const rightPaddingPx =
+    SVG_EXPORT_PADDING_PX +
+    (rightOverlayWidth > 0 ? rightOverlayWidth + SVG_NORTH_INDICATOR_GAP_PX : 0);
+  const drawableWidth = STANDARD_EXPORT_WIDTH_PX - leftPaddingPx - rightPaddingPx;
+  const scale = drawableWidth / layoutWidth;
+  const exportWidth = STANDARD_EXPORT_WIDTH_PX;
+  const exportHeight = Math.max(
+    1,
+    Math.ceil(layoutHeight * scale + topPaddingPx + bottomPaddingPx)
+  );
+  const originX = projectedBounds?.minX ?? 0;
+  const originY = projectedBounds?.minY ?? 0;
+  const contentLeftPx = leftPaddingPx;
+  const contentRightPx = exportWidth - rightPaddingPx;
+  const svgTitle = normalizeSvgText(title || "spaceforge 2.5D export");
+
+  const formatNumber = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
+  const toCanvasPoint = (point: Point): Point => ({
+    x: leftPaddingPx + (point.x - originX) * scale,
+    y: topPaddingPx + (point.y - originY) * scale,
+  });
+  const pointList = (points: Point[]) =>
+    points.map((point) => {
+      const canvasPoint = toCanvasPoint(point);
+      return `${formatNumber(canvasPoint.x)},${formatNumber(canvasPoint.y)}`;
+    }).join(" ");
+
+  const elements: string[] = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}" role="img" aria-labelledby="title">`,
+    `<title id="title">${svgTitle}</title>`,
+    `<rect width="100%" height="100%" fill="#ffffff" />`,
+  ];
+
+  const shadowPoints = projectedRooms.flatMap((room) => room.bottom).map(toCanvasPoint);
+  const shadowBounds = getPointBounds(shadowPoints);
+  if (shadowBounds) {
+    elements.push(
+      `<ellipse cx="${formatNumber(shadowBounds.minX + shadowBounds.width / 2)}" cy="${formatNumber(shadowBounds.maxY + 16)}" rx="${formatNumber(Math.max(24, shadowBounds.width * 0.46))}" ry="${formatNumber(Math.max(16, shadowBounds.height * 0.18))}" fill="${SVG_EXTRUDED_SHADOW_FILL}" opacity="0.08" />`
+    );
+  }
+
+  const wallFaces = projectedRooms.flatMap(({ room, bottom, top }) =>
+    room.points.map((_, index) => {
+      const nextIndex = (index + 1) % room.points.length;
+      const quad = [bottom[index], bottom[nextIndex], top[nextIndex], top[index]];
+      const depth = quad.reduce((sum, point) => sum + point.y, 0) / quad.length;
+      return { quad, depth, index };
+    })
+  ).sort((a, b) => a.depth - b.depth);
+
+  for (const face of wallFaces) {
+    elements.push(
+      `<polygon points="${pointList(face.quad)}" fill="${face.index % 2 === 0 ? SVG_EXTRUDED_WALL_FILL : SVG_EXTRUDED_WALL_ALT_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.4" stroke-linejoin="round" opacity="0.96" />`
+    );
+  }
+
+  const topFaces = [...projectedRooms].sort((a, b) => {
+    const aDepth = a.bottom.reduce((sum, point) => sum + point.y, 0) / a.bottom.length;
+    const bDepth = b.bottom.reduce((sum, point) => sum + point.y, 0) / b.bottom.length;
+    return aDepth - bDepth;
+  });
+
+  for (const projectedRoom of topFaces) {
+    elements.push(
+      `<polygon points="${pointList(projectedRoom.top)}" fill="${SVG_EXTRUDED_TOP_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.8" stroke-linejoin="round" />`
+    );
+  }
+
+  if (header) {
+    elements.push(buildSvgHeaderElements(header, contentLeftPx, formatNumber));
+  }
+
+  const northIndicator = buildSvgNorthIndicator(northBearingDegrees, contentRightPx, formatNumber);
+  if (northIndicator) {
+    elements.push(northIndicator);
+  }
+
+  elements.push(buildSvgSignatureElements(normalizedSignatureLines, contentRightPx, exportHeight, formatNumber));
+  elements.push("</svg>");
+  return elements.join("\n");
+}
+
+function projectExtrudedSvgPoint(point: Point, heightMm: number): Point {
+  return {
+    x: (point.x - point.y) * SVG_EXTRUDED_ISO_X_SCALE,
+    y: (point.x + point.y) * SVG_EXTRUDED_ISO_Y_SCALE - heightMm * SVG_EXTRUDED_HEIGHT_SCALE,
+  };
+}
+
+function getPointBounds(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null {
+  if (points.length === 0) return null;
+
+  let minX = points[0].x;
+  let maxX = points[0].x;
+  let minY = points[0].y;
+  let maxY = points[0].y;
+
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 export async function exportSvgToPdfBlob(
   svg: string,
   metadata: SvgPdfExportMetadata = {}
@@ -543,13 +725,13 @@ export async function exportSvgToPdfBlob(
     import("svg2pdf.js"),
   ]);
   const parser = new DOMParser();
-  const document = parser.parseFromString(svg, "image/svg+xml");
-  const parserError = document.querySelector("parsererror");
+  const parsedDocument = parser.parseFromString(svg, "image/svg+xml");
+  const parserError = parsedDocument.querySelector("parsererror");
   if (parserError) {
     throw new Error("PDF export failed: generated SVG is invalid.");
   }
 
-  const svgElement = document.documentElement as unknown as SVGSVGElement;
+  const svgElement = parsedDocument.documentElement as unknown as SVGSVGElement;
   const pageSize = getSvgPageSize(svgElement);
   const pdf = new jsPDF({
     orientation: pageSize.width >= pageSize.height ? "landscape" : "portrait",
@@ -1761,6 +1943,62 @@ async function canvasToPngBlob(canvas: ICanvas): Promise<Blob> {
   const dataUrl = canvas.toDataURL("image/png");
   const response = await fetch(dataUrl);
   return response.blob();
+}
+
+async function renderSvgToCanvas(svg: string): Promise<HTMLCanvasElement> {
+  const parser = new DOMParser();
+  const parsedDocument = parser.parseFromString(svg, "image/svg+xml");
+  const parserError = parsedDocument.querySelector("parsererror");
+  if (parserError) {
+    throw new Error("SVG PNG export failed: generated SVG is invalid.");
+  }
+
+  const pageSize = getSvgPageSize(parsedDocument.documentElement as unknown as SVGSVGElement);
+  const canvas = globalThis.document.createElement("canvas");
+  canvas.width = pageSize.width;
+  canvas.height = pageSize.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("SVG PNG export failed: unable to acquire 2D export context.");
+  }
+
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  const image = new Image();
+  image.decoding = "async";
+  const imageLoad = new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("SVG PNG export failed: unable to render SVG image."));
+  });
+
+  try {
+    image.src = svgUrl;
+    await imageLoad;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(image, 0, 0, pageSize.width, pageSize.height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+export async function exportSvgToPngDataUrl(
+  svg: string,
+  options: { exportResolution?: EditorExportResolution } = {}
+): Promise<string> {
+  const canvas = await renderSvgToCanvas(svg);
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(canvas, options.exportResolution);
+  return standardizedCanvas.toDataURL("image/png");
+}
+
+export async function exportSvgToPngBlob(
+  svg: string,
+  options: { exportResolution?: EditorExportResolution } = {}
+): Promise<Blob> {
+  const canvas = await renderSvgToCanvas(svg);
+  const standardizedCanvas = resizeCanvasToStandardExportDimensions(canvas, options.exportResolution);
+  return canvasToPngBlob(standardizedCanvas);
 }
 
 export async function exportPixiCanvasToPngDataUrl(

@@ -27,6 +27,7 @@ import type {
   EditorExportResolution,
   EditorExportFormat,
   EditorExportAssetMode,
+  EditorExportViewMode,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -86,6 +87,7 @@ export type ExportPngRequest = {
   theme: ExportPngThemeOption;
   exportResolution: EditorExportResolution;
   exportFormat: EditorExportFormat;
+  exportViewMode: EditorExportViewMode;
 };
 
 type ExportPngDialogProps = {
@@ -111,6 +113,7 @@ type ExportPngDialogProps = {
   scaleBarPosition: EditorExportScaleBarPosition;
   exportResolution: EditorExportResolution;
   exportFormat: EditorExportFormat;
+  exportViewMode: EditorExportViewMode;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
@@ -126,6 +129,7 @@ type ExportPngDialogProps = {
   onScaleBarPositionChange: (value: EditorExportScaleBarPosition) => void;
   onExportResolutionChange: (value: EditorExportResolution) => void;
   onExportFormatChange: (value: EditorExportFormat) => void;
+  onExportViewModeChange: (value: EditorExportViewMode) => void;
   currentThemeLabel: "Light" | "Dark";
   defaultDesignedBy?: string;
 };
@@ -153,6 +157,7 @@ export function ExportPngDialog({
   scaleBarPosition,
   exportResolution,
   exportFormat,
+  exportViewMode,
   onTitleChange,
   onDescriptionChange,
   onTitlePositionChange,
@@ -168,6 +173,7 @@ export function ExportPngDialog({
   onScaleBarPositionChange,
   onExportResolutionChange,
   onExportFormatChange,
+  onExportViewModeChange,
   defaultDesignedBy = "",
 }: ExportPngDialogProps) {
   const [designedBy, setDesignedBy] = useState(defaultDesignedBy);
@@ -279,6 +285,7 @@ export function ExportPngDialog({
         theme,
         exportResolution,
         exportFormat,
+        exportViewMode,
       })
         .then((nextPreviewSrc) => {
           if (previewRequestIdRef.current !== requestId) return;
@@ -327,6 +334,7 @@ export function ExportPngDialog({
     theme,
     exportResolution,
     exportFormat,
+    exportViewMode,
   ]);
 
   const handleExport = () => {
@@ -353,6 +361,7 @@ export function ExportPngDialog({
       theme,
       exportResolution,
       exportFormat,
+      exportViewMode,
     });
   };
 
@@ -564,6 +573,21 @@ export function ExportPngDialog({
                 </Select>
               </div>
             </div>
+
+            <ExportToggleCard
+              title="View"
+              description="Choose the export renderer without changing the live canvas."
+            >
+              <PositionChoice
+                ariaLabel="Export view"
+                value={exportViewMode}
+                options={[
+                  { label: "2D Top-Down", value: "top-down" },
+                  { label: "2.5D Extruded", value: "extruded" },
+                ]}
+                onChange={onExportViewModeChange}
+              />
+            </ExportToggleCard>
 
             <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">

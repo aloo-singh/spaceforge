@@ -4,6 +4,7 @@ export type EditorExportScaleBarPosition = "bottom-left" | "none";
 export type EditorExportResolution = "normal" | "hi-res";
 export type EditorExportFormat = "png-normal" | "png-hi-res" | "svg" | "pdf";
 export type EditorExportAssetMode = "all" | "stairs-only" | "none";
+export type EditorExportViewMode = "top-down" | "extruded";
 
 export type EditorExportPreferences = {
   showLegend: boolean;
@@ -16,6 +17,7 @@ export type EditorExportPreferences = {
   scaleBarPosition: EditorExportScaleBarPosition;
   exportResolution: EditorExportResolution;
   exportFormat: EditorExportFormat;
+  exportViewMode: EditorExportViewMode;
 };
 
 export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
@@ -29,6 +31,7 @@ export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
   scaleBarPosition: "bottom-left",
   exportResolution: "normal",
   exportFormat: "png-normal",
+  exportViewMode: "top-down",
 };
 
 function normalizeEditorExportResolution(value: unknown): EditorExportResolution {
@@ -68,6 +71,12 @@ function normalizeEditorExportAssetMode(value: unknown): EditorExportAssetMode {
   return DEFAULT_EDITOR_EXPORT_PREFERENCES.exportAssetMode;
 }
 
+function normalizeEditorExportViewMode(value: unknown): EditorExportViewMode {
+  return value === "extruded" || value === "top-down"
+    ? value
+    : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportViewMode;
+}
+
 export function cloneEditorExportPreferences(
   preferences: EditorExportPreferences
 ): EditorExportPreferences {
@@ -82,6 +91,7 @@ export function cloneEditorExportPreferences(
     scaleBarPosition: preferences.scaleBarPosition,
     exportResolution: preferences.exportResolution,
     exportFormat: preferences.exportFormat,
+    exportViewMode: preferences.exportViewMode,
   };
 }
 
@@ -99,7 +109,8 @@ export function areEditorExportPreferencesEqual(
     a.legendPosition === b.legendPosition &&
     a.scaleBarPosition === b.scaleBarPosition &&
     a.exportResolution === b.exportResolution &&
-    a.exportFormat === b.exportFormat
+    a.exportFormat === b.exportFormat &&
+    a.exportViewMode === b.exportViewMode
   );
 }
 
@@ -158,5 +169,9 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       "exportFormat" in value
         ? normalizeEditorExportFormat(value.exportFormat, exportResolution)
         : getExportFormatFromResolution(exportResolution),
+    exportViewMode:
+      "exportViewMode" in value
+        ? normalizeEditorExportViewMode(value.exportViewMode)
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportViewMode,
   };
 }

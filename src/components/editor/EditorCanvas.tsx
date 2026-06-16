@@ -82,6 +82,8 @@ import {
   exportPixiCanvasToPngBlob,
   exportPixiCanvasToPngDataUrl,
   exportSvgToPdfBlob,
+  exportSvgToPngBlob,
+  exportSvgToPngDataUrl,
   exportToSVG,
   getEditorExportScopeFilenameParts,
   getRoomColorsForEditorExportRooms,
@@ -2084,6 +2086,67 @@ export default function EditorCanvas({
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
 
+  const createSvgExportPayloadFromRequest = useCallback((request: ExportPngRequest) => {
+    const state = useEditorStore.getState();
+    const roomColorOverride = getExportRoomColorOverride(request);
+    const exportTitle =
+      request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
+    const exportDescription =
+      request.descriptionPosition === "below-title"
+        ? normalizeExportMultilineText(request.description)
+        : "";
+    const filenameParts = getEditorExportScopeFilenameParts(state.document, request.exportScope);
+    const scopedRooms = getRoomsForEditorExportScope(state.document, request.exportScope);
+    const exportSignatureText = normalizeEditorExportSignature(
+      request.designedBy || state.settings.exportSignatureText
+    );
+    const exportSignatureLines = exportSignatureText
+      ? [`Designed by ${exportSignatureText}`, "Designed with [s]paceforge", "spaceforge.app"]
+      : ["Designed with [s]paceforge", "spaceforge.app"];
+    const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
+    const exportLegendItems =
+      effectiveLegendPosition !== "none"
+        ? scopedRooms.map((room, index) => ({
+            name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
+            area: formatRoomAreaForRoom(room, state.document.region),
+          }))
+        : undefined;
+    const svg = exportToSVG({
+      rooms: state.document.rooms,
+      floors: state.document.floors,
+      activeFloorId: state.document.activeFloorId,
+      exportScope: request.exportScope,
+      title: exportTitle || undefined,
+      description: exportDescription || undefined,
+      exportAssetMode: request.exportAssetMode,
+      northBearingDegrees: request.includeNorthIndicator
+        ? state.document.northBearingDegrees
+        : undefined,
+      legendItems: exportLegendItems,
+      legendPosition:
+        effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
+          ? effectiveLegendPosition
+          : undefined,
+      roomColorOverride,
+      exportViewMode: request.exportViewMode,
+      signatureText: exportSignatureText || undefined,
+      signatureLines: exportSignatureLines,
+      displayUnitOrigin: state.document.region,
+    });
+    const filename = buildEditorExportFilename({
+      projectName: exportTitle,
+      floorName: filenameParts.floorName,
+      roomName: filenameParts.roomName,
+      format: request.exportFormat,
+    });
+
+    return {
+      svg,
+      filename,
+      exportTitle,
+    };
+  }, []);
+
   const exportCurrentCanvasAsPng = useCallback(async (request: ExportPngRequest) => {
     if (isExportingPng) return;
 
@@ -2096,57 +2159,7 @@ export default function EditorCanvas({
       setIsExportingPng(true);
 
       try {
-        const state = useEditorStore.getState();
-        const roomColorOverride = getExportRoomColorOverride(request);
-        const exportTitle =
-          request.titlePosition === "top" ? normalizeExportSingleLineText(request.title) : "";
-        const exportDescription =
-          request.descriptionPosition === "below-title"
-            ? normalizeExportMultilineText(request.description)
-            : "";
-        const filenameParts = getEditorExportScopeFilenameParts(state.document, request.exportScope);
-        const scopedRooms = getRoomsForEditorExportScope(state.document, request.exportScope);
-        const exportSignatureText = normalizeEditorExportSignature(
-          request.designedBy || state.settings.exportSignatureText
-        );
-        const exportSignatureLines = exportSignatureText
-          ? [`Designed by ${exportSignatureText}`, "Designed with [s]paceforge", "spaceforge.app"]
-          : ["Designed with [s]paceforge", "spaceforge.app"];
-        const effectiveLegendPosition = request.showLegend ? request.legendPosition : "none";
-        const exportLegendItems =
-          effectiveLegendPosition !== "none"
-            ? scopedRooms.map((room, index) => ({
-                name: normalizeExportSingleLineText(room.name) || `Room ${index + 1}`,
-                area: formatRoomAreaForRoom(room, state.document.region),
-              }))
-            : undefined;
-        const filename = buildEditorExportFilename({
-          projectName: exportTitle,
-          floorName: filenameParts.floorName,
-          roomName: filenameParts.roomName,
-          format: request.exportFormat,
-        });
-        const svg = exportToSVG({
-          rooms: state.document.rooms,
-          floors: state.document.floors,
-          activeFloorId: state.document.activeFloorId,
-          exportScope: request.exportScope,
-          title: exportTitle || undefined,
-          description: exportDescription || undefined,
-          exportAssetMode: request.exportAssetMode,
-          northBearingDegrees: request.includeNorthIndicator
-            ? state.document.northBearingDegrees
-            : undefined,
-          legendItems: exportLegendItems,
-          legendPosition:
-            effectiveLegendPosition === "bottom" || effectiveLegendPosition === "right-side"
-              ? effectiveLegendPosition
-              : undefined,
-          roomColorOverride,
-          signatureText: exportSignatureText || undefined,
-          signatureLines: exportSignatureLines,
-          displayUnitOrigin: state.document.region,
-        });
+        const { svg, filename, exportTitle } = createSvgExportPayloadFromRequest(request);
         const blob =
           request.exportFormat === "pdf"
             ? await exportSvgToPdfBlob(svg, {
@@ -2171,6 +2184,36 @@ export default function EditorCanvas({
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
       } catch (error) {
         console.error(`${request.exportFormat.toUpperCase()} export failed.`, error);
+      } finally {
+        setIsExportingPng(false);
+      }
+
+      return;
+    }
+
+    if (request.exportViewMode === "extruded") {
+      setIsExportingPng(true);
+
+      try {
+        const { svg, filename } = createSvgExportPayloadFromRequest(request);
+        const blob = await exportSvgToPngBlob(svg, {
+          exportResolution: request.exportResolution,
+        });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        link.click();
+        track(ANALYTICS_EVENTS.exportCompleted, {
+          exportType: "png",
+        });
+        trackFirstSuccess(ANALYTICS_EVENTS.exportCompleted);
+        if (activeHintIdRef.current === "export-as-png") {
+          completeHint("export-as-png");
+        }
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      } catch (error) {
+        console.error("2.5D PNG export failed.", error);
       } finally {
         setIsExportingPng(false);
       }
@@ -2218,9 +2261,16 @@ export default function EditorCanvas({
       exportSnapshot.destroy();
       setIsExportingPng(false);
     }
-  }, [completeHint, createPngExportSnapshotFromRequest, isExportingPng]);
+  }, [completeHint, createPngExportSnapshotFromRequest, createSvgExportPayloadFromRequest, isExportingPng]);
 
   const generateExportPreviewDataUrl = useCallback(async (request: ExportPngRequest) => {
+    if (request.exportViewMode === "extruded") {
+      const { svg } = createSvgExportPayloadFromRequest(request);
+      return exportSvgToPngDataUrl(svg, {
+        exportResolution: request.exportResolution,
+      });
+    }
+
     const exportSnapshot = createPngExportSnapshotFromRequest(request);
     if (!exportSnapshot) {
       return null;
@@ -2234,7 +2284,7 @@ export default function EditorCanvas({
     } finally {
       exportSnapshot.destroy();
     }
-  }, [createPngExportSnapshotFromRequest]);
+  }, [createPngExportSnapshotFromRequest, createSvgExportPayloadFromRequest]);
 
   const generateThumbnailDataUrl = useCallback(async () => {
     const exportSnapshot = createCanvasExportSnapshot({

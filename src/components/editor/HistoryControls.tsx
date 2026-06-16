@@ -895,6 +895,7 @@ export function HistoryControls({
         scaleBarPosition={exportPreferences.scaleBarPosition}
         exportResolution={exportPreferences.exportResolution}
         exportFormat={exportPreferences.exportFormat}
+        exportViewMode={exportPreferences.exportViewMode}
         onTitleChange={(value) => updateProjectExportConfig({ title: value })}
         onDescriptionChange={(value) => updateProjectExportConfig({ description: value })}
         onTitlePositionChange={(value) => updateProjectExportConfig({ titlePosition: value })}
@@ -914,6 +915,7 @@ export function HistoryControls({
         onScaleBarPositionChange={(value) => updateExportPreferences({ scaleBarPosition: value })}
         onExportResolutionChange={(value) => updateExportPreferences({ exportResolution: value })}
         onExportFormatChange={(value) => updateExportPreferences({ exportFormat: value })}
+        onExportViewModeChange={(value) => updateExportPreferences({ exportViewMode: value })}
         currentThemeLabel={currentThemeLabel}
         defaultDesignedBy={defaultDesignedBy}
       />
