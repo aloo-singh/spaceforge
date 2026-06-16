@@ -132,11 +132,11 @@ const SVG_RIGHT_LEGEND_WIDTH_PX = 190;
 const SVG_BOTTOM_LEGEND_GAP_PX = 16;
 const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
-const SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE = 0.045;
-const SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE = 0.18;
+const SVG_EXTRUDED_HEIGHT_PERSPECTIVE_SCALE = 0.18;
 const SVG_EXTRUDED_WALL_THICKNESS_MM = 200;
-const SVG_EXTRUDED_WALL_FILL = "#cbd5e1";
-const SVG_EXTRUDED_WALL_ALT_FILL = "#d8e0ea";
+const SVG_EXTRUDED_WALL_FILL = "#d6dde6";
+const SVG_EXTRUDED_WALL_ALT_FILL = "#c6d0dc";
+const SVG_EXTRUDED_WALL_INNER_FILL = "#e5eaf1";
 const SVG_EXTRUDED_FLOOR_FILL = "#f8fafc";
 const SVG_EXTRUDED_TOP_STROKE = "#f8fafc";
 const SVG_EXTRUDED_TOP_CAP_FILL = "#eef2f7";
@@ -579,12 +579,12 @@ function exportToExtrudedSVG({
     .map((room) => {
       const heightMm = normalizeRoomHeightMm(room.heightMm, room.unitOrigin);
       return {
-        bottom: room.points.map((point) => projectExtrudedSvgPoint(point, 0)),
+        floor: room.points.map((point) => ({ ...point })),
         wallPrisms: getExtrudedWallPrisms(room, heightMm),
       };
     });
   const allPoints = projectedRooms.flatMap((room) => [
-    ...room.bottom,
+    ...room.floor,
     ...room.wallPrisms.flatMap((wall) => [...wall.bottom, ...wall.top]),
   ]);
   const header = buildSvgHeader(title, description);
@@ -640,7 +640,7 @@ function exportToExtrudedSVG({
     `<rect width="100%" height="100%" fill="#ffffff" />`,
   ];
 
-  const shadowPoints = projectedRooms.flatMap((room) => room.bottom).map(toCanvasPoint);
+  const shadowPoints = projectedRooms.flatMap((room) => room.wallPrisms.flatMap((wall) => wall.bottom)).map(toCanvasPoint);
   const shadowBounds = getPointBounds(shadowPoints);
   if (shadowBounds) {
     elements.push(
@@ -650,23 +650,30 @@ function exportToExtrudedSVG({
 
   for (const projectedRoom of projectedRooms) {
     elements.push(
-      `<polygon points="${pointList(projectedRoom.bottom)}" fill="${SVG_EXTRUDED_FLOOR_FILL}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.1" stroke-linejoin="round" opacity="0.9" />`
+      `<polygon points="${pointList(projectedRoom.floor)}" fill="${SVG_EXTRUDED_FLOOR_FILL}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.1" stroke-linejoin="round" opacity="0.92" />`
     );
   }
 
   const wallFaces = projectedRooms.flatMap((room) =>
     room.wallPrisms.flatMap((wall) =>
-      getExtrudedWallSideFaces(wall).map((quad, faceIndex) => ({
-        quad,
-        depth: getAveragePointY(quad),
+      getExtrudedWallSideFaces(wall).map((face, faceIndex) => ({
+        quad: face.points,
+        face: face.type,
+        depth: getAveragePointY(face.points),
         index: wall.index + faceIndex,
       }))
     )
   ).sort((a, b) => a.depth - b.depth);
 
   for (const face of wallFaces) {
+    const fill =
+      face.face === "inner"
+        ? SVG_EXTRUDED_WALL_INNER_FILL
+        : face.index % 2 === 0
+          ? SVG_EXTRUDED_WALL_FILL
+          : SVG_EXTRUDED_WALL_ALT_FILL;
     elements.push(
-      `<polygon points="${pointList(face.quad)}" fill="${face.index % 2 === 0 ? SVG_EXTRUDED_WALL_FILL : SVG_EXTRUDED_WALL_ALT_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.4" stroke-linejoin="round" opacity="0.96" />`
+      `<polygon points="${pointList(face.quad)}" fill="${fill}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.2" stroke-linejoin="round" opacity="0.92" />`
     );
   }
 
@@ -698,21 +705,18 @@ function exportToExtrudedSVG({
   return elements.join("\n");
 }
 
-function projectExtrudedSvgPoint(point: Point, heightMm: number): Point {
-  return {
-    x: point.x + heightMm * SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE,
-    y: point.y - heightMm * SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE,
-  };
-}
-
 type ExtrudedWallPrism = {
   bottom: Point[];
   top: Point[];
   index: number;
 };
 
+type ExtrudedWallSideFace = {
+  points: Point[];
+  type: "inner" | "outer" | "end";
+};
+
 function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[] {
-  const halfThicknessMm = SVG_EXTRUDED_WALL_THICKNESS_MM / 2;
   const prisms: ExtrudedWallPrism[] = [];
 
   for (let index = 0; index < room.points.length; index += 1) {
@@ -723,28 +727,32 @@ function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[
     const length = Math.hypot(dx, dy);
     if (length <= 0) continue;
 
-    const normal = {
+    const segmentNormal = {
       x: -dy / length,
       y: dx / length,
     };
-    const startA = offsetPoint(start, normal, halfThicknessMm);
-    const endA = offsetPoint(end, normal, halfThicknessMm);
-    const endB = offsetPoint(end, normal, -halfThicknessMm);
-    const startB = offsetPoint(start, normal, -halfThicknessMm);
+    const outwardNormal = getOutwardSegmentNormal(room.points, start, end, segmentNormal);
+    const topOffsetMm = heightMm * SVG_EXTRUDED_HEIGHT_PERSPECTIVE_SCALE;
+    const bottomInnerStart = start;
+    const bottomInnerEnd = end;
+    const bottomOuterEnd = offsetPoint(end, outwardNormal, SVG_EXTRUDED_WALL_THICKNESS_MM);
+    const bottomOuterStart = offsetPoint(start, outwardNormal, SVG_EXTRUDED_WALL_THICKNESS_MM);
+    const topInnerStart = offsetPoint(start, outwardNormal, topOffsetMm);
+    const topInnerEnd = offsetPoint(end, outwardNormal, topOffsetMm);
+    const topOuterEnd = offsetPoint(
+      end,
+      outwardNormal,
+      SVG_EXTRUDED_WALL_THICKNESS_MM + topOffsetMm
+    );
+    const topOuterStart = offsetPoint(
+      start,
+      outwardNormal,
+      SVG_EXTRUDED_WALL_THICKNESS_MM + topOffsetMm
+    );
 
     prisms.push({
-      bottom: [
-        projectExtrudedSvgPoint(startA, 0),
-        projectExtrudedSvgPoint(endA, 0),
-        projectExtrudedSvgPoint(endB, 0),
-        projectExtrudedSvgPoint(startB, 0),
-      ],
-      top: [
-        projectExtrudedSvgPoint(startA, heightMm),
-        projectExtrudedSvgPoint(endA, heightMm),
-        projectExtrudedSvgPoint(endB, heightMm),
-        projectExtrudedSvgPoint(startB, heightMm),
-      ],
+      bottom: [bottomInnerStart, bottomInnerEnd, bottomOuterEnd, bottomOuterStart],
+      top: [topInnerStart, topInnerEnd, topOuterEnd, topOuterStart],
       index,
     });
   }
@@ -752,13 +760,32 @@ function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[
   return prisms;
 }
 
-function getExtrudedWallSideFaces(wall: ExtrudedWallPrism): Point[][] {
+function getExtrudedWallSideFaces(wall: ExtrudedWallPrism): ExtrudedWallSideFace[] {
   return [
-    [wall.bottom[0], wall.bottom[1], wall.top[1], wall.top[0]],
-    [wall.bottom[1], wall.bottom[2], wall.top[2], wall.top[1]],
-    [wall.bottom[2], wall.bottom[3], wall.top[3], wall.top[2]],
-    [wall.bottom[3], wall.bottom[0], wall.top[0], wall.top[3]],
+    { points: [wall.bottom[0], wall.bottom[1], wall.top[1], wall.top[0]], type: "inner" },
+    { points: [wall.bottom[1], wall.bottom[2], wall.top[2], wall.top[1]], type: "end" },
+    { points: [wall.bottom[2], wall.bottom[3], wall.top[3], wall.top[2]], type: "outer" },
+    { points: [wall.bottom[3], wall.bottom[0], wall.top[0], wall.top[3]], type: "end" },
   ];
+}
+
+function getOutwardSegmentNormal(
+  roomPoints: Point[],
+  start: Point,
+  end: Point,
+  normal: Point
+): Point {
+  const center = getPointAverage(roomPoints);
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const candidate = offsetPoint(midpoint, normal, SVG_EXTRUDED_WALL_THICKNESS_MM);
+  const opposite = offsetPoint(midpoint, normal, -SVG_EXTRUDED_WALL_THICKNESS_MM);
+  const candidateDistance = getSquaredDistance(candidate, center);
+  const oppositeDistance = getSquaredDistance(opposite, center);
+
+  return candidateDistance >= oppositeDistance ? normal : { x: -normal.x, y: -normal.y };
 }
 
 function offsetPoint(point: Point, direction: Point, amountMm: number): Point {
@@ -766,6 +793,28 @@ function offsetPoint(point: Point, direction: Point, amountMm: number): Point {
     x: point.x + direction.x * amountMm,
     y: point.y + direction.y * amountMm,
   };
+}
+
+function getPointAverage(points: Point[]): Point {
+  const sum = points.reduce(
+    (total, point) => ({
+      x: total.x + point.x,
+      y: total.y + point.y,
+    }),
+    { x: 0, y: 0 }
+  );
+  const divisor = Math.max(points.length, 1);
+
+  return {
+    x: sum.x / divisor,
+    y: sum.y / divisor,
+  };
+}
+
+function getSquaredDistance(a: Point, b: Point): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
 }
 
 function getAveragePointY(points: Point[]): number {
