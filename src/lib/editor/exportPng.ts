@@ -134,10 +134,12 @@ const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
 const SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE = 0.045;
 const SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE = 0.18;
+const SVG_EXTRUDED_WALL_THICKNESS_MM = 200;
 const SVG_EXTRUDED_WALL_FILL = "#cbd5e1";
 const SVG_EXTRUDED_WALL_ALT_FILL = "#d8e0ea";
 const SVG_EXTRUDED_FLOOR_FILL = "#f8fafc";
 const SVG_EXTRUDED_TOP_STROKE = "#f8fafc";
+const SVG_EXTRUDED_TOP_CAP_FILL = "#eef2f7";
 const SVG_EXTRUDED_SHADOW_FILL = "#0f172a";
 
 type ExportTextLine = {
@@ -574,14 +576,17 @@ function exportToExtrudedSVG({
 }): string {
   const projectedRooms = rooms
     .filter((room) => room.points.length >= 3)
-    .map((room) => ({
-      room,
-      bottom: room.points.map((point) => projectExtrudedSvgPoint(point, 0)),
-      top: room.points.map((point) =>
-        projectExtrudedSvgPoint(point, normalizeRoomHeightMm(room.heightMm, room.unitOrigin))
-      ),
-    }));
-  const allPoints = projectedRooms.flatMap((room) => [...room.bottom, ...room.top]);
+    .map((room) => {
+      const heightMm = normalizeRoomHeightMm(room.heightMm, room.unitOrigin);
+      return {
+        bottom: room.points.map((point) => projectExtrudedSvgPoint(point, 0)),
+        wallPrisms: getExtrudedWallPrisms(room, heightMm),
+      };
+    });
+  const allPoints = projectedRooms.flatMap((room) => [
+    ...room.bottom,
+    ...room.wallPrisms.flatMap((wall) => [...wall.bottom, ...wall.top]),
+  ]);
   const header = buildSvgHeader(title, description);
   const includeNorthIndicator =
     northBearingDegrees !== undefined && Number.isFinite(northBearingDegrees);
@@ -649,13 +654,14 @@ function exportToExtrudedSVG({
     );
   }
 
-  const wallFaces = projectedRooms.flatMap(({ room, bottom, top }) =>
-    room.points.map((_, index) => {
-      const nextIndex = (index + 1) % room.points.length;
-      const quad = [bottom[index], bottom[nextIndex], top[nextIndex], top[index]];
-      const depth = quad.reduce((sum, point) => sum + point.y, 0) / quad.length;
-      return { quad, depth, index };
-    })
+  const wallFaces = projectedRooms.flatMap((room) =>
+    room.wallPrisms.flatMap((wall) =>
+      getExtrudedWallSideFaces(wall).map((quad, faceIndex) => ({
+        quad,
+        depth: getAveragePointY(quad),
+        index: wall.index + faceIndex,
+      }))
+    )
   ).sort((a, b) => a.depth - b.depth);
 
   for (const face of wallFaces) {
@@ -664,16 +670,17 @@ function exportToExtrudedSVG({
     );
   }
 
-  const topFaces = [...projectedRooms].sort((a, b) => {
-    const aDepth = a.bottom.reduce((sum, point) => sum + point.y, 0) / a.bottom.length;
-    const bDepth = b.bottom.reduce((sum, point) => sum + point.y, 0) / b.bottom.length;
-    return aDepth - bDepth;
-  });
+  const topCaps = projectedRooms.flatMap((room) =>
+    room.wallPrisms.map((wall) => ({
+      points: wall.top,
+      depth: getAveragePointY(wall.top),
+    }))
+  ).sort((a, b) => a.depth - b.depth);
 
-  for (const projectedRoom of topFaces) {
+  for (const topCap of topCaps) {
     elements.push(
-      `<polygon points="${pointList(projectedRoom.top)}" fill="none" stroke="${SVG_EXTRUDED_TOP_STROKE}" stroke-width="3.2" stroke-linejoin="round" />`,
-      `<polygon points="${pointList(projectedRoom.top)}" fill="none" stroke="${SVG_ROOM_STROKE}" stroke-width="1.5" stroke-linejoin="round" opacity="0.72" />`
+      `<polygon points="${pointList(topCap.points)}" fill="${SVG_EXTRUDED_TOP_CAP_FILL}" stroke="${SVG_EXTRUDED_TOP_STROKE}" stroke-width="3.2" stroke-linejoin="round" />`,
+      `<polygon points="${pointList(topCap.points)}" fill="none" stroke="${SVG_ROOM_STROKE}" stroke-width="1.15" stroke-linejoin="round" opacity="0.62" />`
     );
   }
 
@@ -696,6 +703,73 @@ function projectExtrudedSvgPoint(point: Point, heightMm: number): Point {
     x: point.x + heightMm * SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE,
     y: point.y - heightMm * SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE,
   };
+}
+
+type ExtrudedWallPrism = {
+  bottom: Point[];
+  top: Point[];
+  index: number;
+};
+
+function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[] {
+  const halfThicknessMm = SVG_EXTRUDED_WALL_THICKNESS_MM / 2;
+  const prisms: ExtrudedWallPrism[] = [];
+
+  for (let index = 0; index < room.points.length; index += 1) {
+    const start = room.points[index];
+    const end = room.points[(index + 1) % room.points.length];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) continue;
+
+    const normal = {
+      x: -dy / length,
+      y: dx / length,
+    };
+    const startA = offsetPoint(start, normal, halfThicknessMm);
+    const endA = offsetPoint(end, normal, halfThicknessMm);
+    const endB = offsetPoint(end, normal, -halfThicknessMm);
+    const startB = offsetPoint(start, normal, -halfThicknessMm);
+
+    prisms.push({
+      bottom: [
+        projectExtrudedSvgPoint(startA, 0),
+        projectExtrudedSvgPoint(endA, 0),
+        projectExtrudedSvgPoint(endB, 0),
+        projectExtrudedSvgPoint(startB, 0),
+      ],
+      top: [
+        projectExtrudedSvgPoint(startA, heightMm),
+        projectExtrudedSvgPoint(endA, heightMm),
+        projectExtrudedSvgPoint(endB, heightMm),
+        projectExtrudedSvgPoint(startB, heightMm),
+      ],
+      index,
+    });
+  }
+
+  return prisms;
+}
+
+function getExtrudedWallSideFaces(wall: ExtrudedWallPrism): Point[][] {
+  return [
+    [wall.bottom[0], wall.bottom[1], wall.top[1], wall.top[0]],
+    [wall.bottom[1], wall.bottom[2], wall.top[2], wall.top[1]],
+    [wall.bottom[2], wall.bottom[3], wall.top[3], wall.top[2]],
+    [wall.bottom[3], wall.bottom[0], wall.top[0], wall.top[3]],
+  ];
+}
+
+function offsetPoint(point: Point, direction: Point, amountMm: number): Point {
+  return {
+    x: point.x + direction.x * amountMm,
+    y: point.y + direction.y * amountMm,
+  };
+}
+
+function getAveragePointY(points: Point[]): number {
+  return points.reduce((sum, point) => sum + point.y, 0) / Math.max(points.length, 1);
 }
 
 function getPointBounds(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null {
