@@ -132,12 +132,12 @@ const SVG_RIGHT_LEGEND_WIDTH_PX = 190;
 const SVG_BOTTOM_LEGEND_GAP_PX = 16;
 const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
-const SVG_EXTRUDED_ISO_X_SCALE = 0.62;
-const SVG_EXTRUDED_ISO_Y_SCALE = 0.36;
-const SVG_EXTRUDED_HEIGHT_SCALE = 0.22;
+const SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE = 0.045;
+const SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE = 0.18;
 const SVG_EXTRUDED_WALL_FILL = "#cbd5e1";
 const SVG_EXTRUDED_WALL_ALT_FILL = "#d8e0ea";
-const SVG_EXTRUDED_TOP_FILL = "#f8fafc";
+const SVG_EXTRUDED_FLOOR_FILL = "#f8fafc";
+const SVG_EXTRUDED_TOP_STROKE = "#f8fafc";
 const SVG_EXTRUDED_SHADOW_FILL = "#0f172a";
 
 type ExportTextLine = {
@@ -643,6 +643,12 @@ function exportToExtrudedSVG({
     );
   }
 
+  for (const projectedRoom of projectedRooms) {
+    elements.push(
+      `<polygon points="${pointList(projectedRoom.bottom)}" fill="${SVG_EXTRUDED_FLOOR_FILL}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.1" stroke-linejoin="round" opacity="0.9" />`
+    );
+  }
+
   const wallFaces = projectedRooms.flatMap(({ room, bottom, top }) =>
     room.points.map((_, index) => {
       const nextIndex = (index + 1) % room.points.length;
@@ -666,7 +672,8 @@ function exportToExtrudedSVG({
 
   for (const projectedRoom of topFaces) {
     elements.push(
-      `<polygon points="${pointList(projectedRoom.top)}" fill="${SVG_EXTRUDED_TOP_FILL}" stroke="${SVG_ROOM_STROKE}" stroke-width="1.8" stroke-linejoin="round" />`
+      `<polygon points="${pointList(projectedRoom.top)}" fill="none" stroke="${SVG_EXTRUDED_TOP_STROKE}" stroke-width="3.2" stroke-linejoin="round" />`,
+      `<polygon points="${pointList(projectedRoom.top)}" fill="none" stroke="${SVG_ROOM_STROKE}" stroke-width="1.5" stroke-linejoin="round" opacity="0.72" />`
     );
   }
 
@@ -686,8 +693,8 @@ function exportToExtrudedSVG({
 
 function projectExtrudedSvgPoint(point: Point, heightMm: number): Point {
   return {
-    x: (point.x - point.y) * SVG_EXTRUDED_ISO_X_SCALE,
-    y: (point.x + point.y) * SVG_EXTRUDED_ISO_Y_SCALE - heightMm * SVG_EXTRUDED_HEIGHT_SCALE,
+    x: point.x + heightMm * SVG_EXTRUDED_HEIGHT_X_OFFSET_SCALE,
+    y: point.y - heightMm * SVG_EXTRUDED_HEIGHT_Y_OFFSET_SCALE,
   };
 }
 
