@@ -134,6 +134,8 @@ const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
 const SVG_EXTRUDED_HEIGHT_PERSPECTIVE_SCALE = 0.18;
 const SVG_EXTRUDED_WALL_THICKNESS_MM = 200;
+const SVG_EXTRUDED_NEAR_PERSPECTIVE_FACTOR = 1.28;
+const SVG_EXTRUDED_FAR_PERSPECTIVE_FACTOR = 0.66;
 const SVG_EXTRUDED_WALL_FILL = "#d6dde6";
 const SVG_EXTRUDED_WALL_ALT_FILL = "#c6d0dc";
 const SVG_EXTRUDED_WALL_INNER_FILL = "#e5eaf1";
@@ -574,13 +576,15 @@ function exportToExtrudedSVG({
   signatureText?: string;
   signatureLines?: string[];
 }): string {
+  const planBounds = getPointBounds(rooms.flatMap((room) => room.points));
+  const perspectiveCamera = getExtrudedPerspectiveCamera(planBounds);
   const projectedRooms = rooms
     .filter((room) => room.points.length >= 3)
     .map((room) => {
       const heightMm = normalizeRoomHeightMm(room.heightMm, room.unitOrigin);
       return {
         floor: room.points.map((point) => ({ ...point })),
-        wallPrisms: getExtrudedWallPrisms(room, heightMm),
+        wallPrisms: getExtrudedWallPrisms(room, heightMm, perspectiveCamera),
       };
     });
   const allPoints = projectedRooms.flatMap((room) => [
@@ -716,7 +720,26 @@ type ExtrudedWallSideFace = {
   type: "inner" | "outer" | "end";
 };
 
-function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[] {
+type PointBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+};
+
+type ExtrudedPerspectiveCamera = {
+  point: Point;
+  nearDistance: number;
+  farDistance: number;
+};
+
+function getExtrudedWallPrisms(
+  room: Room,
+  heightMm: number,
+  camera: ExtrudedPerspectiveCamera
+): ExtrudedWallPrism[] {
   const prisms: ExtrudedWallPrism[] = [];
 
   for (let index = 0; index < room.points.length; index += 1) {
@@ -732,23 +755,14 @@ function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[
       y: dx / length,
     };
     const outwardNormal = getOutwardSegmentNormal(room.points, start, end, segmentNormal);
-    const topOffsetMm = heightMm * SVG_EXTRUDED_HEIGHT_PERSPECTIVE_SCALE;
     const bottomInnerStart = start;
     const bottomInnerEnd = end;
     const bottomOuterEnd = offsetPoint(end, outwardNormal, SVG_EXTRUDED_WALL_THICKNESS_MM);
     const bottomOuterStart = offsetPoint(start, outwardNormal, SVG_EXTRUDED_WALL_THICKNESS_MM);
-    const topInnerStart = offsetPoint(start, outwardNormal, topOffsetMm);
-    const topInnerEnd = offsetPoint(end, outwardNormal, topOffsetMm);
-    const topOuterEnd = offsetPoint(
-      end,
-      outwardNormal,
-      SVG_EXTRUDED_WALL_THICKNESS_MM + topOffsetMm
-    );
-    const topOuterStart = offsetPoint(
-      start,
-      outwardNormal,
-      SVG_EXTRUDED_WALL_THICKNESS_MM + topOffsetMm
-    );
+    const topInnerStart = projectExtrudedHeightPoint(start, heightMm, camera);
+    const topInnerEnd = projectExtrudedHeightPoint(end, heightMm, camera);
+    const topOuterEnd = projectExtrudedHeightPoint(bottomOuterEnd, heightMm, camera);
+    const topOuterStart = projectExtrudedHeightPoint(bottomOuterStart, heightMm, camera);
 
     prisms.push({
       bottom: [bottomInnerStart, bottomInnerEnd, bottomOuterEnd, bottomOuterStart],
@@ -758,6 +772,62 @@ function getExtrudedWallPrisms(room: Room, heightMm: number): ExtrudedWallPrism[
   }
 
   return prisms;
+}
+
+function projectExtrudedHeightPoint(
+  point: Point,
+  heightMm: number,
+  camera: ExtrudedPerspectiveCamera
+): Point {
+  const projectionDirection = normalizePointDirection({
+    x: point.x - camera.point.x,
+    y: point.y - camera.point.y,
+  });
+  const perspectiveFactor = getExtrudedPerspectiveFactor(point, camera);
+  const projectionDistanceMm =
+    heightMm * SVG_EXTRUDED_HEIGHT_PERSPECTIVE_SCALE * perspectiveFactor;
+
+  return offsetPoint(point, projectionDirection, projectionDistanceMm);
+}
+
+function getExtrudedPerspectiveCamera(bounds: PointBounds | null): ExtrudedPerspectiveCamera {
+  const width = Math.max(bounds?.width ?? 1, 1);
+  const height = Math.max(bounds?.height ?? 1, 1);
+  const minX = bounds?.minX ?? 0;
+  const minY = bounds?.minY ?? 0;
+  const maxX = bounds?.maxX ?? width;
+  const maxY = bounds?.maxY ?? height;
+  const cameraPoint = {
+    x: minX + width * 0.5,
+    y: maxY + height * 1.35,
+  };
+  const corners = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: maxY },
+    { x: minX, y: maxY },
+  ];
+  const distances = corners.map((corner) => getPointDistance(corner, cameraPoint));
+
+  return {
+    point: cameraPoint,
+    nearDistance: Math.min(...distances),
+    farDistance: Math.max(...distances),
+  };
+}
+
+function getExtrudedPerspectiveFactor(
+  point: Point,
+  camera: ExtrudedPerspectiveCamera
+): number {
+  const distance = getPointDistance(point, camera.point);
+  const range = Math.max(camera.farDistance - camera.nearDistance, 1);
+  const recede = clamp((distance - camera.nearDistance) / range, 0, 1);
+
+  return (
+    SVG_EXTRUDED_NEAR_PERSPECTIVE_FACTOR -
+    recede * (SVG_EXTRUDED_NEAR_PERSPECTIVE_FACTOR - SVG_EXTRUDED_FAR_PERSPECTIVE_FACTOR)
+  );
 }
 
 function getExtrudedWallSideFaces(wall: ExtrudedWallPrism): ExtrudedWallSideFace[] {
@@ -795,6 +865,19 @@ function offsetPoint(point: Point, direction: Point, amountMm: number): Point {
   };
 }
 
+function normalizePointDirection(direction: Point): Point {
+  const length = Math.hypot(direction.x, direction.y);
+
+  if (length <= 0) {
+    return { x: 0, y: -1 };
+  }
+
+  return {
+    x: direction.x / length,
+    y: direction.y / length,
+  };
+}
+
 function getPointAverage(points: Point[]): Point {
   const sum = points.reduce(
     (total, point) => ({
@@ -817,11 +900,21 @@ function getSquaredDistance(a: Point, b: Point): number {
   return dx * dx + dy * dy;
 }
 
+function getPointDistance(a: Point, b: Point): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.hypot(dx, dy);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 function getAveragePointY(points: Point[]): number {
   return points.reduce((sum, point) => sum + point.y, 0) / Math.max(points.length, 1);
 }
 
-function getPointBounds(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null {
+function getPointBounds(points: Point[]): PointBounds | null {
   if (points.length === 0) return null;
 
   let minX = points[0].x;
