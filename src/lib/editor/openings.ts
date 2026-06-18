@@ -37,6 +37,8 @@ function inchesToMm(inches: number) {
 export type RoomWallSegment = {
   wall: RoomWall;
   unitOrigin?: Room["unitOrigin"];
+  thicknessMm?: number;
+  isExternal?: boolean;
   segmentIndex: number;
   axis: "horizontal" | "vertical" | "diagonal";
   start: Point;

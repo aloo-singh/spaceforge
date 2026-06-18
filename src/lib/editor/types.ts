@@ -66,6 +66,8 @@ export type RoomOpening = {
 export type Wall = {
   id: string;
   unitOrigin?: UnitOrigin;
+  thicknessMm?: number;
+  isExternal?: boolean;
   a: Point;
   b: Point;
 };
