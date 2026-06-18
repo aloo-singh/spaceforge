@@ -134,7 +134,6 @@ function migrateProjectDocumentForLoad(document: ReturnType<typeof cloneDocument
   const result = migrateDocumentWallThickness(document);
   if (result.didMigrate) {
     markWallThicknessMigrationAnnouncementPending();
-    showWallThicknessMigrationAnnouncementIfPending();
   }
   return result.document;
 }
@@ -413,6 +412,7 @@ export function EditorProjectBootstrap({
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
             onBootstrapStateChangeRef.current?.({ status: "ready" });
+            showWallThicknessMigrationAnnouncementIfPending();
             if (projectId && projectId !== fallbackProject.id) {
               router.replace(`/editor/${fallbackProject.id}`);
             }
@@ -505,6 +505,7 @@ export function EditorProjectBootstrap({
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
         onBootstrapStateChangeRef.current?.({ status: "ready" });
+        showWallThicknessMigrationAnnouncementIfPending();
       } catch (error) {
         clearActiveProjectId();
         setActiveProjectId(null);
