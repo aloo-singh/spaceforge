@@ -3,7 +3,11 @@ import {
   normalizeRoomOpeningsForSegmentAnchoring,
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
-import { cloneRoomWallSegments } from "@/lib/editor/wallThickness";
+import {
+  cloneRoomWallSegments,
+  markWallThicknessMigrationAnnouncementPending,
+  migrateDocumentWallThickness,
+} from "@/lib/editor/wallThickness";
 import type { CameraState, Floor, Point, Room, RulerMeasurement } from "@/lib/editor/types";
 import {
   DEFAULT_FLOOR_ID,
@@ -60,10 +64,11 @@ import {
 // - v13 payloads also persist the project region.
 // - v14 payloads also persist unit origin tags on dimensioned objects.
 // - v15 payloads also persist room height.
+// - v16 payloads also persist wall thickness metadata.
 // - Unknown versions or malformed layout payloads are rejected entirely.
 // - Malformed history inside an otherwise valid payload is dropped while layout/camera/settings still hydrate.
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
-export const EDITOR_PERSISTENCE_VERSION = 15;
+export const EDITOR_PERSISTENCE_VERSION = 16;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
 
 function warnEditorPersistence(message: string, details?: unknown) {
@@ -104,6 +109,7 @@ export type PersistedEditorSnapshot = {
   exportPreferences: EditorExportPreferences;
   historyStack: EditorDocumentState[];
   historyIndex: number;
+  didMigrateWallThickness?: boolean;
 };
 
 export type PersistedEditorHydrationSnapshot = {
@@ -113,6 +119,7 @@ export type PersistedEditorHydrationSnapshot = {
   exportPreferences: EditorExportPreferences;
   historyStack: EditorDocumentState[] | null;
   historyIndex: number | null;
+  didMigrateWallThickness?: boolean;
 };
 
 export type PersistedEditorPayloadV1 = {
@@ -308,6 +315,17 @@ function isRoomOpening(value: unknown): value is Room["openings"][number] {
   return isFiniteNumber(value.offsetMm) && isFiniteNumber(value.widthMm) && value.widthMm > 0;
 }
 
+function isRoomWallMetadata(value: unknown): value is NonNullable<Room["wallSegments"]>[number] {
+  if (!isObject(value)) return false;
+  if (value.thicknessMm !== undefined && (!isFiniteNumber(value.thicknessMm) || value.thicknessMm <= 0)) {
+    return false;
+  }
+  if (value.isExternal !== undefined && typeof value.isExternal !== "boolean") {
+    return false;
+  }
+  return true;
+}
+
 function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][number] {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -349,6 +367,14 @@ function isRoom(value: unknown): value is PersistedRoom {
   if (value.heightMm !== undefined && (!isFiniteNumber(value.heightMm) || value.heightMm <= 0)) return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
+  if (
+    value.wallSegments !== undefined &&
+    (!Array.isArray(value.wallSegments) ||
+      value.wallSegments.length !== value.points.length ||
+      !value.wallSegments.every(isRoomWallMetadata))
+  ) {
+    return false;
+  }
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
     return false;
   }
@@ -494,20 +520,23 @@ function createHistorylessHydrationSnapshot(
   document: PersistedDocument | EditorDocumentState,
   camera: CameraState | null
 ): PersistedEditorHydrationSnapshot {
+  const migratedDocument = migrateDocumentWallThickness(cloneDocument(document));
+
   return {
-    document: cloneDocument(document),
+    document: migratedDocument.document,
     camera: camera ? cloneCamera(camera) : null,
     settings: cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
     exportPreferences: cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES),
     historyStack: null,
     historyIndex: null,
+    didMigrateWallThickness: migratedDocument.didMigrate,
   };
 }
 
 function normalizeDocumentForSegmentAnchoring(
   document: PersistedDocument | EditorDocumentState,
   options?: { migrateNumericSegmentOffsets?: boolean }
-): EditorDocumentState {
+): { document: EditorDocumentState; didMigrateWallThickness: boolean } {
   const migrateNumericSegmentOffsets = options?.migrateNumericSegmentOffsets ?? false;
   const floors = getNormalizedFloors(document as EditorDocumentState);
   const activeFloorId = getNormalizedActiveFloorId({
@@ -515,7 +544,7 @@ function normalizeDocumentForSegmentAnchoring(
     activeFloorId: document.activeFloorId ?? null,
   });
 
-  return {
+  const normalizedDocument = {
     region: normalizeProjectRegion(document.region),
     floors,
     activeFloorId,
@@ -545,6 +574,12 @@ function normalizeDocumentForSegmentAnchoring(
       };
     }),
     rulerMeasurements: (document.rulerMeasurements ?? []).map(cloneRulerMeasurement),
+  };
+  const migratedDocument = migrateDocumentWallThickness(normalizedDocument);
+
+  return {
+    document: migratedDocument.document,
+    didMigrateWallThickness: migratedDocument.didMigrate,
   };
 }
 
@@ -587,6 +622,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         parsed.version !== 12 &&
         parsed.version !== 13 &&
         parsed.version !== 14 &&
+        parsed.version !== 15 &&
         parsed.version !== EDITOR_PERSISTENCE_VERSION) ||
       !isPersistedDocument(parsed.document)
     ) {
@@ -596,18 +632,22 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
     }
 
     const shouldMigrateNumericSegmentOffsets = parsed.version < 12;
-    const normalizedDocument = normalizeDocumentForSegmentAnchoring(parsed.document, {
+    const normalizedDocumentResult = normalizeDocumentForSegmentAnchoring(parsed.document, {
       migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
     });
+    const normalizedDocument = normalizedDocumentResult.document;
+    let didMigrateWallThickness = normalizedDocumentResult.didMigrateWallThickness;
 
     const normalizedHistory = isPersistedHistory(parsed.history)
       ? normalizePersistedHistorySnapshot(
           {
-            historyStack: parsed.history.stack.map((document) =>
-              normalizeDocumentForSegmentAnchoring(document, {
+            historyStack: parsed.history.stack.map((document) => {
+              const result = normalizeDocumentForSegmentAnchoring(document, {
                 migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
-              })
-            ),
+              });
+              if (result.didMigrateWallThickness) didMigrateWallThickness = true;
+              return result.document;
+            }),
             historyIndex: parsed.history.index,
           },
           PERSISTED_HISTORY_STATE_LIMIT,
@@ -632,6 +672,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         ),
         historyStack: normalizedHistory?.historyStack ?? null,
         historyIndex: normalizedHistory?.historyIndex ?? null,
+        didMigrateWallThickness,
       },
     };
   } catch {
@@ -683,6 +724,7 @@ export function deserializeEditorSnapshot(raw: string): PersistedEditorSnapshot 
     exportPreferences: hydrationSnapshot.exportPreferences,
     historyStack: hydrationSnapshot.historyStack,
     historyIndex: hydrationSnapshot.historyIndex,
+    didMigrateWallThickness: hydrationSnapshot.didMigrateWallThickness,
   };
 }
 
@@ -720,6 +762,8 @@ export function loadEditorSnapshot(
     const snapshot = deserializeEditorSnapshot(raw);
     if (!snapshot) {
       warnEditorPersistence("Ignoring invalid persisted editor snapshot.");
+    } else if (snapshot.didMigrateWallThickness) {
+      markWallThicknessMigrationAnnouncementPending(storage);
     }
     return snapshot;
   } catch (error) {
@@ -739,6 +783,8 @@ export function loadEditorSnapshotForHydration(
     const snapshot = deserializeEditorSnapshotForHydration(raw);
     if (!snapshot) {
       warnEditorPersistence("Ignoring invalid persisted editor hydration snapshot.");
+    } else if (snapshot.didMigrateWallThickness) {
+      markWallThicknessMigrationAnnouncementPending(storage);
     }
     return snapshot;
   } catch (error) {

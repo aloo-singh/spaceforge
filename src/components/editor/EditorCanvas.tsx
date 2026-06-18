@@ -441,6 +441,16 @@ function normalizeExportMultilineText(value: string): string {
     .trim();
 }
 
+function formatGridStepDimension(lengthMillimetres: number, displayUnitOrigin?: UnitOrigin): string {
+  if (displayUnitOrigin === "imperial") {
+    return formatWallDimension(lengthMillimetres, displayUnitOrigin);
+  }
+
+  const metres = lengthMillimetres / 1_000;
+  const fractionDigits = lengthMillimetres < 100 ? 2 : 1;
+  return `${metres.toFixed(fractionDigits).replace(/\.?0+$/, "")} m`;
+}
+
 function getExportRoomColorOverride(request: ExportPngRequest): EditorExportRoomColorOverride {
   return {
     mode: request.roomColorMode,
@@ -4011,8 +4021,8 @@ export default function EditorCanvas({
                   style={{ fontFamily: MEASUREMENT_TEXT_FONT_FAMILY }}
                 >
                   {hydratedSnappingEnabled
-                    ? `Grid ${formatWallDimension(activeSnapStepMm, displayUnitOrigin)} · Magnet On`
-                    : `Grid ${formatWallDimension(activeSnapStepMm, displayUnitOrigin)}`}
+                    ? `Grid ${formatGridStepDimension(activeSnapStepMm, displayUnitOrigin)} · Magnet On`
+                    : `Grid ${formatGridStepDimension(activeSnapStepMm, displayUnitOrigin)}`}
                 </div>
               </CanvasHudCard>
               <NorthIndicatorControl

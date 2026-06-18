@@ -60,6 +60,11 @@ import {
   NEW_PROJECT_INITIAL_PIXELS_PER_MM,
 } from "@/lib/editor/constants";
 import { loadGlobalSettings, saveGlobalSettings } from "@/lib/editor/globalSettings";
+import {
+  consumeWallThicknessMigrationAnnouncement,
+  markWallThicknessMigrationAnnouncementPending,
+  migrateDocumentWallThickness,
+} from "@/lib/editor/wallThickness";
 import type { ProjectRecord } from "@/lib/projects/types";
 import { normalizeProjectRegion, type ProjectRegion } from "@/lib/projects/region";
 import { saveProjectDocument, checkForCachedProjectRecovery } from "@/lib/projects/projectDocumentPersistence";
@@ -114,6 +119,24 @@ function shouldPromptForRegionPreference(document: ReturnType<typeof cloneDocume
     !hasStoredDocumentRegion(rawDocument) ||
     (!loadGlobalSettings().hasConfirmedProjectRegionPreference && document.rooms.length === 0)
   );
+}
+
+function showWallThicknessMigrationAnnouncementIfPending() {
+  if (!consumeWallThicknessMigrationAnnouncement()) return;
+
+  toast.success("Wall thickness added", {
+    description: "Existing rooms now use external 300 mm walls so plans stay ready for realistic thickness.",
+    duration: 5200,
+  });
+}
+
+function migrateProjectDocumentForLoad(document: ReturnType<typeof cloneDocumentState>) {
+  const result = migrateDocumentWallThickness(document);
+  if (result.didMigrate) {
+    markWallThicknessMigrationAnnouncementPending();
+    showWallThicknessMigrationAnnouncementIfPending();
+  }
+  return result.document;
 }
 
 function FirstProjectRegionDialog({
@@ -299,6 +322,10 @@ export function EditorProjectBootstrap({
   }, [onProjectResolved]);
 
   useEffect(() => {
+    showWallThicknessMigrationAnnouncementIfPending();
+  }, []);
+
+  useEffect(() => {
     onBootstrapStateChangeRef.current = onBootstrapStateChange;
   }, [onBootstrapStateChange]);
 
@@ -354,6 +381,7 @@ export function EditorProjectBootstrap({
             if (fallbackRecovery.didRecover && fallbackRecovery.recoveredDocument) {
               fallbackDocument = fallbackRecovery.recoveredDocument;
             }
+            fallbackDocument = migrateProjectDocumentForLoad(fallbackDocument);
 
             if (isCancelled) return;
 
@@ -445,6 +473,7 @@ export function EditorProjectBootstrap({
         if (selectedRecovery.didRecover && selectedRecovery.recoveredDocument) {
           nextDocument = selectedRecovery.recoveredDocument;
         }
+        nextDocument = migrateProjectDocumentForLoad(nextDocument);
 
         if (isCancelled) return;
 
