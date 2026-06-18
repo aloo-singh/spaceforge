@@ -14,6 +14,7 @@ import {
   cloneRoomInteriorAssets,
 } from "@/lib/editor/interiorAssets";
 import { areRoomOpeningsEqual, cloneRoomOpening, cloneRoomOpenings } from "@/lib/editor/openings";
+import { areRoomWallSegmentsEqual, cloneRoomWallSegments } from "@/lib/editor/wallThickness";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
@@ -108,6 +109,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
       return false;
     }
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
+    if (!areRoomWallSegmentsEqual(roomA.wallSegments, roomB.wallSegments)) return false;
     if (!areRoomOpeningsEqual(roomA.openings ?? [], roomB.openings ?? [])) return false;
     if (!areRoomInteriorAssetsEqual(roomA.interiorAssets ?? [], roomB.interiorAssets ?? [])) return false;
   }
@@ -140,6 +142,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       roomColor: room.roomColor,
       heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
       points: room.points.map((point) => ({ ...point })),
+      wallSegments: cloneRoomWallSegments(room.wallSegments),
       openings: cloneRoomOpenings(room.openings ?? []),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
     })),
@@ -430,6 +433,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         roomColor: deletedRoom.roomColor,
         heightMm: normalizeRoomHeightMm(deletedRoom.heightMm, deletedRoom.unitOrigin),
         points: deletedRoom.points.map((point) => ({ ...point })),
+        wallSegments: cloneRoomWallSegments(deletedRoom.wallSegments),
         openings: cloneRoomOpenings(deletedRoom.openings ?? []),
         interiorAssets: cloneRoomInteriorAssets(deletedRoom.interiorAssets ?? []),
       },
@@ -478,6 +482,7 @@ function inferEditorCommand(previous: EditorDocumentState, next: EditorDocumentS
         roomColor: addedRooms[0].roomColor,
         heightMm: normalizeRoomHeightMm(addedRooms[0].heightMm, addedRooms[0].unitOrigin),
         points: addedRooms[0].points.map((point) => ({ ...point })),
+        wallSegments: cloneRoomWallSegments(addedRooms[0].wallSegments),
         openings: cloneRoomOpenings(addedRooms[0].openings ?? []),
         interiorAssets: cloneRoomInteriorAssets(addedRooms[0].interiorAssets ?? []),
       },

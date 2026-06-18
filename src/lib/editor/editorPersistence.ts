@@ -3,6 +3,7 @@ import {
   normalizeRoomOpeningsForSegmentAnchoring,
 } from "@/lib/editor/openings";
 import { cloneRoomInteriorAssets } from "@/lib/editor/interiorAssets";
+import { cloneRoomWallSegments } from "@/lib/editor/wallThickness";
 import type { CameraState, Floor, Point, Room, RulerMeasurement } from "@/lib/editor/types";
 import {
   DEFAULT_FLOOR_ID,
@@ -80,6 +81,7 @@ type PersistedRoom = {
   roomColor?: Room["roomColor"];
   heightMm?: Room["heightMm"];
   points: PersistedPoint[];
+  wallSegments?: Room["wallSegments"];
   openings?: Room["openings"];
   interiorAssets?: Room["interiorAssets"];
 };
@@ -437,6 +439,7 @@ function cloneRoom(room: PersistedRoom | Room): Room {
     roomColor: room.roomColor,
     heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map(clonePoint),
+    wallSegments: cloneRoomWallSegments(room.wallSegments),
     openings: cloneRoomOpenings(room.openings ?? []),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
   };

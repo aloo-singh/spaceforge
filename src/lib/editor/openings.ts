@@ -1,6 +1,7 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { getAxisAlignedRoomBounds, type RoomRectBounds } from "@/lib/editor/rectRoomResize";
+import { getRoomWallMetadata } from "@/lib/editor/wallThickness";
 import type {
   CameraState,
   DoorHingeSide,
@@ -125,10 +126,13 @@ export function getRoomWallSegment(room: Room, wall: RoomWall): RoomWallSegment 
   const interiorNormal = getSegmentInteriorNormal(room.points, originalStart, originalEnd);
   if (!interiorNormal) return null;
   const { start, end } = getCanonicalSegmentEndpoints(originalStart, originalEnd, axis);
+  const wallMetadata = getRoomWallMetadata(room, segmentIndex);
 
   return {
     wall,
     unitOrigin: normalizeUnitOrigin(room.unitOrigin),
+    thicknessMm: wallMetadata?.thicknessMm,
+    isExternal: wallMetadata?.isExternal,
     segmentIndex,
     axis,
     start,

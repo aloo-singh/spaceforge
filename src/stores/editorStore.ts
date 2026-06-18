@@ -126,6 +126,7 @@ import {
   type RoomPresetId,
 } from "@/lib/editor/roomPresets";
 import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
+import { cloneRoomWallSegments, createExternalRoomWallSegments } from "@/lib/editor/wallThickness";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
@@ -797,6 +798,7 @@ function buildConnectedFloorDocument(
     roomColor: room.roomColor,
     heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map((point) => ({ ...point })),
+    wallSegments: createExternalRoomWallSegments(room.points),
     openings: [],
     interiorAssets: [
       {
@@ -851,6 +853,7 @@ function cloneRoom(room: Room): Room {
     roomColor: room.roomColor,
     heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
     points: room.points.map((point) => ({ ...point })),
+    wallSegments: cloneRoomWallSegments(room.wallSegments),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
   };
@@ -2437,6 +2440,7 @@ function getSafePersistedHistorySnapshot(
             roomColor: room.roomColor,
             heightMm: normalizeRoomHeightMm(room.heightMm, room.unitOrigin),
             points: room.points.map((point) => ({ ...point })),
+            wallSegments: cloneRoomWallSegments(room.wallSegments),
             openings: cloneRoomOpenings(room.openings),
             interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
           })),
@@ -5628,6 +5632,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 floorId: room.floorId,
                 name: room.name,
                 points: room.points.map((p) => ({ ...p })),
+                wallSegments: cloneRoomWallSegments(room.wallSegments),
                 openings: cloneRoomOpenings(room.openings),
                 interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
               },
@@ -7748,6 +7753,7 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
     heightMm: normalizeRoomHeightMm(undefined, getDocumentUnitOrigin(state.document)),
     points: normalizedRoomPoints.map((point) => ({ ...point })),
+    wallSegments: createExternalRoomWallSegments(normalizedRoomPoints),
     openings: [],
     interiorAssets: [],
   };

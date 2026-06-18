@@ -281,6 +281,9 @@ const ANCHORED_HINT_ARROW_SIZE_PX = 12;
 const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const FLOOR_FOOTPRINT_MAX_ALPHA = 0.50;
 const FLOOR_FOOTPRINT_STROKE_WIDTH_PX = 2.25;
+const MINOR_GRID_MIN_VISIBLE_PX = 4;
+const EXTERNAL_WALL_FILL_ALPHA = 0.22;
+const INTERNAL_WALL_FILL_ALPHA = 0.12;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
@@ -4828,7 +4831,7 @@ function drawGrid(
   const gridBoundsPaddingMm = GRID_SIZE_MM;
   const { minX, maxX, minY, maxY } = getViewportWorldBounds(camera, viewport, gridBoundsPaddingMm);
 
-  if (GRID_MINOR_SIZE_MM * camera.pixelsPerMm >= 8) {
+  if (GRID_MINOR_SIZE_MM * camera.pixelsPerMm >= MINOR_GRID_MIN_VISIBLE_PX) {
     drawGridLines(graphics, camera, viewport, minX, maxX, minY, maxY, GRID_MINOR_SIZE_MM, {
       width: 1,
       color: theme.gridMinor,
@@ -4979,6 +4982,8 @@ function drawRooms(
         : isSelected
           ? selectedFillAlpha
           : options.roomDefaultFillAlpha ?? 0.12;
+
+    drawRoomWallThickness(graphics, room, camera, viewport, theme);
 
     drawRoomShape(
       graphics,
@@ -5500,6 +5505,51 @@ function drawRoomShape(
   }
   graphics.closePath();
   graphics.stroke();
+}
+
+function drawRoomWallThickness(
+  graphics: Graphics,
+  room: Room,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  if (!room.wallSegments || room.points.length < 2) return;
+
+  for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
+    const segment = getRoomWallSegment(room, wallIndex);
+    if (!segment?.thicknessMm || segment.thicknessMm <= 0) continue;
+
+    const outwardNormal = {
+      x: -segment.interiorNormal.x,
+      y: -segment.interiorNormal.y,
+    };
+    const outerStart = {
+      x: segment.originalStart.x + outwardNormal.x * segment.thicknessMm,
+      y: segment.originalStart.y + outwardNormal.y * segment.thicknessMm,
+    };
+    const outerEnd = {
+      x: segment.originalEnd.x + outwardNormal.x * segment.thicknessMm,
+      y: segment.originalEnd.y + outwardNormal.y * segment.thicknessMm,
+    };
+    const screenPoints = [
+      worldToScreen(segment.originalStart, camera, viewport),
+      worldToScreen(segment.originalEnd, camera, viewport),
+      worldToScreen(outerEnd, camera, viewport),
+      worldToScreen(outerStart, camera, viewport),
+    ];
+
+    graphics.setFillStyle({
+      color: theme.roomOutline,
+      alpha: segment.isExternal ? EXTERNAL_WALL_FILL_ALPHA : INTERNAL_WALL_FILL_ALPHA,
+    });
+    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+    for (let index = 1; index < screenPoints.length; index += 1) {
+      graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+    }
+    graphics.closePath();
+    graphics.fill();
+  }
 }
 
 function drawRoomOpenings(

@@ -72,6 +72,11 @@ export type Wall = {
   b: Point;
 };
 
+export type RoomWallMetadata = {
+  thicknessMm?: number;
+  isExternal?: boolean;
+};
+
 export type RulerMeasurement = {
   id: string;
   unitOrigin?: UnitOrigin;
@@ -217,6 +222,7 @@ export type Room = {
   roomColor?: string;
   heightMm: number;
   points: Point[];
+  wallSegments?: RoomWallMetadata[];
   openings: RoomOpening[];
   interiorAssets: RoomInteriorAsset[];
 };
