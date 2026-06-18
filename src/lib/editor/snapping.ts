@@ -6,7 +6,7 @@ import type { UnitOrigin } from "@/lib/projects/region";
 
 export const ADAPTIVE_SNAP_STEP_LARGE_MM = 1_000;
 export const ADAPTIVE_SNAP_STEP_MEDIUM_MM = 500;
-export const ADAPTIVE_SNAP_STEP_FINE_MM = 100;
+export const ADAPTIVE_SNAP_STEP_FINE_MM = 50;
 const ADAPTIVE_SNAP_MEDIUM_ZOOM_THRESHOLD = 0.04;
 const ADAPTIVE_SNAP_FINE_ZOOM_THRESHOLD = 0.08;
 const SCALE_BAR_MAX_WIDTH_PX = 112;

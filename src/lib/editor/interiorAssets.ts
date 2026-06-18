@@ -1,5 +1,6 @@
 import { worldToScreen } from "@/lib/editor/camera";
 import { snapToCardinalRotationDegrees } from "@/lib/editor/canvasRotation";
+import { GRID_MINOR_SIZE_MM } from "@/lib/editor/constants";
 import { snapToGrid } from "@/lib/editor/geometry";
 import { getPolygonBounds, isPointInPolygon } from "@/lib/editor/roomGeometry";
 import type { RectCorner, RectWall, RoomRectBounds } from "@/lib/editor/rectRoomResize";
@@ -620,10 +621,9 @@ export function createCenteredDefaultBath(
   const topLeftX = roomCenter.x - widthMm / 2;
   const topLeftY = roomCenter.y - depthMm / 2;
 
-  // Snap top-left corner to 100mm grid
-  const gridSizeMm = 100;
-  const snappedTopLeftX = snapToGrid(topLeftX, gridSizeMm);
-  const snappedTopLeftY = snapToGrid(topLeftY, gridSizeMm);
+  // Snap top-left corner to the editor minor grid.
+  const snappedTopLeftX = snapToGrid(topLeftX, GRID_MINOR_SIZE_MM);
+  const snappedTopLeftY = snapToGrid(topLeftY, GRID_MINOR_SIZE_MM);
 
   // Calculate center from snapped top-left
   const center = {

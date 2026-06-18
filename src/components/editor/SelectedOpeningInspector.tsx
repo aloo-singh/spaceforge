@@ -138,7 +138,7 @@ export function SelectedOpeningInspector({
             aria-describedby="opening-width-hint"
           />
           <p id="opening-width-hint" className="text-[11px] leading-relaxed text-muted-foreground">
-            Width snaps to 100 mm and is constrained to the current host segment when saved.
+            Width snaps to 50 mm and is constrained to the current host segment when saved.
           </p>
         </div>
 
