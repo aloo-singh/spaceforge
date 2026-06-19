@@ -5526,13 +5526,60 @@ function drawRoomWallThickness(
 ) {
   if (!room.wallSegments || room.points.length < 2) return;
 
+  const wallQuads = getRoomWallThicknessQuads(room);
+
+  for (const wallQuad of wallQuads) {
+    const screenPoints = [
+      worldToScreen(wallQuad.innerStart, camera, viewport),
+      worldToScreen(wallQuad.innerEnd, camera, viewport),
+      worldToScreen(wallQuad.outerEnd, camera, viewport),
+      worldToScreen(wallQuad.outerStart, camera, viewport),
+    ];
+
+    graphics.setFillStyle({
+      color: theme.roomOutline,
+      alpha: wallQuad.isExternal ? EXTERNAL_WALL_FILL_ALPHA : INTERNAL_WALL_FILL_ALPHA,
+    });
+    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+    for (let index = 1; index < screenPoints.length; index += 1) {
+      graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+    }
+    graphics.closePath();
+    graphics.fill();
+  }
+}
+
+type RoomWallThicknessLine = {
+  innerStart: Point;
+  innerEnd: Point;
+  outerStart: Point;
+  outerEnd: Point;
+  direction: Point;
+  isExternal?: boolean;
+};
+
+type RoomWallThicknessQuad = {
+  innerStart: Point;
+  innerEnd: Point;
+  outerStart: Point;
+  outerEnd: Point;
+  isExternal?: boolean;
+};
+
+function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
+  const wallLines: RoomWallThicknessLine[] = [];
+
   for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
     const segment = getRoomWallSegment(room, wallIndex);
-    if (!segment?.thicknessMm || segment.thicknessMm <= 0) continue;
+    if (!segment?.thicknessMm || segment.thicknessMm <= 0 || segment.lengthMm <= 0) continue;
 
     const outwardNormal = {
       x: -segment.interiorNormal.x,
       y: -segment.interiorNormal.y,
+    };
+    const direction = {
+      x: (segment.originalEnd.x - segment.originalStart.x) / segment.lengthMm,
+      y: (segment.originalEnd.y - segment.originalStart.y) / segment.lengthMm,
     };
     const outerStart = {
       x: segment.originalStart.x + outwardNormal.x * segment.thicknessMm,
@@ -5542,24 +5589,71 @@ function drawRoomWallThickness(
       x: segment.originalEnd.x + outwardNormal.x * segment.thicknessMm,
       y: segment.originalEnd.y + outwardNormal.y * segment.thicknessMm,
     };
-    const screenPoints = [
-      worldToScreen(segment.originalStart, camera, viewport),
-      worldToScreen(segment.originalEnd, camera, viewport),
-      worldToScreen(outerEnd, camera, viewport),
-      worldToScreen(outerStart, camera, viewport),
-    ];
 
-    graphics.setFillStyle({
-      color: theme.roomOutline,
-      alpha: segment.isExternal ? EXTERNAL_WALL_FILL_ALPHA : INTERNAL_WALL_FILL_ALPHA,
+    wallLines.push({
+      innerStart: segment.originalStart,
+      innerEnd: segment.originalEnd,
+      outerStart,
+      outerEnd,
+      direction,
+      isExternal: segment.isExternal,
     });
-    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
-    for (let index = 1; index < screenPoints.length; index += 1) {
-      graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
-    }
-    graphics.closePath();
-    graphics.fill();
   }
+
+  return wallLines.map((wallLine, index) => {
+    const previousWallLine = wallLines[(index - 1 + wallLines.length) % wallLines.length];
+    const nextWallLine = wallLines[(index + 1) % wallLines.length];
+
+    return {
+      innerStart: wallLine.innerStart,
+      innerEnd: wallLine.innerEnd,
+      outerStart: getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart),
+      outerEnd: getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd),
+      isExternal: wallLine.isExternal,
+    };
+  });
+}
+
+function getWallMiterPoint(
+  incomingWallLine: RoomWallThicknessLine | undefined,
+  outgoingWallLine: RoomWallThicknessLine | undefined,
+  fallbackPoint: Point
+): Point {
+  if (!incomingWallLine || !outgoingWallLine) return fallbackPoint;
+
+  return (
+    getLineIntersection(
+      incomingWallLine.outerStart,
+      incomingWallLine.direction,
+      outgoingWallLine.outerStart,
+      outgoingWallLine.direction
+    ) ?? fallbackPoint
+  );
+}
+
+function getLineIntersection(
+  firstPoint: Point,
+  firstDirection: Point,
+  secondPoint: Point,
+  secondDirection: Point
+): Point | null {
+  const denominator = crossProduct(firstDirection, secondDirection);
+  if (Math.abs(denominator) < 0.000001) return null;
+
+  const delta = {
+    x: secondPoint.x - firstPoint.x,
+    y: secondPoint.y - firstPoint.y,
+  };
+  const distanceAlongFirst = crossProduct(delta, secondDirection) / denominator;
+
+  return {
+    x: firstPoint.x + firstDirection.x * distanceAlongFirst,
+    y: firstPoint.y + firstDirection.y * distanceAlongFirst,
+  };
+}
+
+function crossProduct(a: Point, b: Point): number {
+  return a.x * b.y - a.y * b.x;
 }
 
 function drawRoomOpenings(
