@@ -129,6 +129,7 @@ import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
 import {
   cloneRoomWallSegments,
   createExternalRoomWallSegments,
+  getRoomPointsWithInternalWallSpacing,
   reconcileSharedRoomWallSegments,
 } from "@/lib/editor/wallThickness";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
@@ -1055,24 +1056,33 @@ function updateRoomPointsInDocument(
 function updateResizedRoomInDocument(
   document: DocumentState,
   roomId: string,
+  previousPoints: Point[],
   nextPoints: Point[],
   nextInteriorAssets?: Room["interiorAssets"],
   unitOrigin?: UnitOrigin
 ): DocumentState {
+  const adjustedPoints = getRoomPointsWithInternalWallSpacing(
+    document.rooms,
+    roomId,
+    nextPoints,
+    previousPoints
+  );
+  const rooms = document.rooms.map((room) =>
+    room.id === roomId
+      ? {
+          ...room,
+          unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
+          points: adjustedPoints.map((point) => ({ ...point })),
+          interiorAssets: nextInteriorAssets
+            ? cloneRoomInteriorAssets(nextInteriorAssets)
+            : room.interiorAssets,
+        }
+      : room
+  );
+
   return {
     ...document,
-    rooms: document.rooms.map((room) =>
-      room.id === roomId
-        ? {
-            ...room,
-            unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
-            points: nextPoints.map((point) => ({ ...point })),
-            interiorAssets: nextInteriorAssets
-              ? cloneRoomInteriorAssets(nextInteriorAssets)
-              : room.interiorAssets,
-          }
-        : room
-    ),
+    rooms: reconcileSharedRoomWallSegments(rooms),
   };
 }
 
@@ -1083,13 +1093,19 @@ function updateMovedRoomInDocument(
   nextPoints: Point[],
   unitOrigin?: UnitOrigin
 ): DocumentState {
-  const delta = getRoomTranslationDelta(previousPoints, nextPoints);
+  const adjustedPoints = getRoomPointsWithInternalWallSpacing(
+    document.rooms,
+    roomId,
+    nextPoints,
+    previousPoints
+  );
+  const delta = getRoomTranslationDelta(previousPoints, adjustedPoints);
   const rooms = document.rooms.map((room) =>
     room.id === roomId
       ? {
           ...room,
           unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
-          points: nextPoints.map((point) => ({ ...point })),
+          points: adjustedPoints.map((point) => ({ ...point })),
           interiorAssets: room.interiorAssets.map((asset) => ({
             ...cloneRoomInteriorAsset(asset),
             xMm: asset.xMm + delta.x,
@@ -7030,12 +7046,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (arePointListsEqual(previousPoints, nextPoints)) return state;
+      const adjustedNextPoints = getRoomPointsWithInternalWallSpacing(
+        state.document.rooms,
+        roomId,
+        nextPoints,
+        previousPoints
+      );
 
       const command: EditorCommand = {
         type: "move-room",
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
-        nextPoints: nextPoints.map((point) => ({ ...point })),
+        nextPoints: adjustedNextPoints.map((point) => ({ ...point })),
         previousUnitOrigin: normalizeUnitOrigin(room.unitOrigin),
         nextUnitOrigin: getDocumentUnitOrigin(state.document),
       };
@@ -7045,7 +7067,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           state.document,
           roomId,
           previousPoints,
-          nextPoints,
+          adjustedNextPoints,
           getDocumentUnitOrigin(state.document)
         ),
         history: {
@@ -7118,7 +7140,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (arePointListsEqual(room.points, nextPoints)) return state;
 
       return {
-        document: updateRoomPointsInDocument(state.document, roomId, nextPoints),
+        document: updateResizedRoomInDocument(state.document, roomId, room.points, nextPoints),
       };
     }),
   commitRoomResize: (roomId, previousPoints, nextPoints, options) =>
@@ -7126,18 +7148,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const room = state.document.rooms.find((candidate) => candidate.id === roomId);
       if (!room) return state;
       if (arePointListsEqual(previousPoints, nextPoints)) return state;
+      const adjustedNextPoints = getRoomPointsWithInternalWallSpacing(
+        state.document.rooms,
+        roomId,
+        nextPoints,
+        previousPoints
+      );
       const isWallSplit = options?.editKind === "wall-split";
       const isVertexDelete = options?.editKind === "vertex-delete";
       const { nextInteriorAssets, didAdjust } = getAdjustedInteriorAssetsForRoomResize(
         room,
-        nextPoints
+        adjustedNextPoints
       );
 
       const command: EditorCommand = {
         type: "resize-room",
         roomId,
         previousPoints: previousPoints.map((point) => ({ ...point })),
-        nextPoints: nextPoints.map((point) => ({ ...point })),
+        nextPoints: adjustedNextPoints.map((point) => ({ ...point })),
         previousUnitOrigin: normalizeUnitOrigin(room.unitOrigin),
         nextUnitOrigin: getDocumentUnitOrigin(state.document),
         ...(isWallSplit ? { editKind: "wall-split" as const, roomName: room.name } : {}),
@@ -7148,19 +7176,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextDocument = updateResizedRoomInDocument(
         state.document,
         roomId,
-        nextPoints,
+        previousPoints,
+        adjustedNextPoints,
         didAdjust ? nextInteriorAssets : undefined,
         getDocumentUnitOrigin(state.document)
       );
 
       if (didAdjust) {
-        showStairsAdjustedToast(roomId, nextPoints);
+        showStairsAdjustedToast(roomId, adjustedNextPoints);
       }
       if (isWallSplit) {
-        showWallSplitToast(roomId, room.name, nextPoints);
+        showWallSplitToast(roomId, room.name, adjustedNextPoints);
       }
       if (isVertexDelete) {
-        showVertexDeleteToast(roomId, room.name, nextPoints);
+        showVertexDeleteToast(roomId, room.name, adjustedNextPoints);
       }
 
       return {
@@ -7751,8 +7780,9 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
   if (normalizedRoomPoints.length < 4) return state;
   if (!isValidDraftRoomClosure(normalizedRoomPoints)) return state;
 
+  const roomId = createRoomId();
   const room: Room = {
-    id: createRoomId(),
+    id: roomId,
     unitOrigin: getDocumentUnitOrigin(state.document),
     floorId: getNormalizedActiveFloorId(state.document),
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
@@ -7762,9 +7792,19 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     openings: [],
     interiorAssets: [],
   };
+  const adjustedRoomPoints = getRoomPointsWithInternalWallSpacing(
+    [...state.document.rooms, room],
+    roomId,
+    normalizedRoomPoints
+  );
+  const adjustedRoom: Room = {
+    ...room,
+    points: adjustedRoomPoints,
+    wallSegments: createExternalRoomWallSegments(adjustedRoomPoints),
+  };
   const command: EditorCommand = {
     type: "complete-room",
-    room,
+    room: adjustedRoom,
   };
   const nextDocument = applyEditorCommand(state.document, command, "redo");
 
@@ -7774,12 +7814,12 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
       points: [],
       history: [],
     },
-    selectedRoomId: room.id,
+    selectedRoomId: adjustedRoom.id,
     selectedWall: null,
     selectedOpening: null,
     selectedInteriorAsset: null,
-    roomPresetPickerRoomId: room.id,
-    selection: [{ type: "room" as const, id: room.id }],
+    roomPresetPickerRoomId: adjustedRoom.id,
+    selection: [{ type: "room" as const, id: adjustedRoom.id }],
     shouldFocusSelectedRoomNameInput: false,
     renameSession: null,
     history: {

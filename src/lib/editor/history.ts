@@ -9,7 +9,10 @@ import {
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
-import { cloneRoomWallSegments, reconcileSharedRoomWallSegments } from "@/lib/editor/wallThickness";
+import {
+  cloneRoomWallSegments,
+  reconcileSharedRoomWallSegments,
+} from "@/lib/editor/wallThickness";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
@@ -560,13 +563,15 @@ export function applyEditorCommand(
 
       return {
         ...document,
-        rooms: nextRooms,
+        rooms: reconcileSharedRoomWallSegments(nextRooms),
       };
     }
 
     return {
       ...document,
-      rooms: document.rooms.filter((room) => room.id !== command.room.id),
+      rooms: reconcileSharedRoomWallSegments(
+        document.rooms.filter((room) => room.id !== command.room.id)
+      ),
     };
   }
 
@@ -578,20 +583,22 @@ export function applyEditorCommand(
       direction === "undo"
         ? command.previousInteriorAssets
         : command.nextInteriorAssets;
+    const rooms = document.rooms.map((room) =>
+      room.id === command.roomId
+        ? {
+            ...room,
+            unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
+            points: nextPoints.map((point) => ({ ...point })),
+            interiorAssets: nextInteriorAssets
+              ? cloneRoomInteriorAssets(nextInteriorAssets)
+              : room.interiorAssets,
+          }
+        : room
+    );
+
     return {
       ...document,
-      rooms: document.rooms.map((room) =>
-        room.id === command.roomId
-          ? {
-              ...room,
-              unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
-              points: nextPoints.map((point) => ({ ...point })),
-              interiorAssets: nextInteriorAssets
-                ? cloneRoomInteriorAssets(nextInteriorAssets)
-                : room.interiorAssets,
-            }
-          : room
-      ),
+      rooms: reconcileSharedRoomWallSegments(rooms),
     };
   }
 

@@ -5572,6 +5572,9 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
   for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
     const segment = getRoomWallSegment(room, wallIndex);
     if (!segment?.thicknessMm || segment.thicknessMm <= 0 || segment.lengthMm <= 0) continue;
+    const renderThicknessMm = segment.isExternal
+      ? segment.thicknessMm
+      : segment.thicknessMm / 2;
 
     const outwardNormal = {
       x: -segment.interiorNormal.x,
@@ -5582,12 +5585,12 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
       y: (segment.originalEnd.y - segment.originalStart.y) / segment.lengthMm,
     };
     const outerStart = {
-      x: segment.originalStart.x + outwardNormal.x * segment.thicknessMm,
-      y: segment.originalStart.y + outwardNormal.y * segment.thicknessMm,
+      x: segment.originalStart.x + outwardNormal.x * renderThicknessMm,
+      y: segment.originalStart.y + outwardNormal.y * renderThicknessMm,
     };
     const outerEnd = {
-      x: segment.originalEnd.x + outwardNormal.x * segment.thicknessMm,
-      y: segment.originalEnd.y + outwardNormal.y * segment.thicknessMm,
+      x: segment.originalEnd.x + outwardNormal.x * renderThicknessMm,
+      y: segment.originalEnd.y + outwardNormal.y * renderThicknessMm,
     };
 
     wallLines.push({
