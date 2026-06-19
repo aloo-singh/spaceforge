@@ -23,6 +23,10 @@ import {
   getRegionalRoomPresetLabel,
   getRoomPresetById,
 } from "@/lib/editor/roomPresets";
+import {
+  DEFAULT_EXTERNAL_WALL_THICKNESS_MM,
+  DEFAULT_INTERNAL_WALL_THICKNESS_MM,
+} from "@/lib/editor/wallThickness";
 import type { Room } from "@/lib/editor/types";
 import { useMobile } from "@/lib/use-mobile";
 import { useEditorStore } from "@/stores/editorStore";
@@ -84,6 +88,37 @@ function RoomDimensionsDisplay({
           <Ruler2 className="size-4 shrink-0" />
           <span>{formatWallDimension(room.heightMm, displayUnitOrigin)} height</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RoomWallThicknessPlaceholder({
+  room,
+  displayUnitOrigin,
+}: {
+  room: Room;
+  displayUnitOrigin?: UnitOrigin;
+}) {
+  const internalWallCount =
+    room.wallSegments?.filter((segment) => segment.isExternal === false).length ?? 0;
+  const externalWallCount = Math.max(room.points.length - internalWallCount, 0);
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">Wall thickness</p>
+      <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm text-foreground">
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span>
+            External {formatWallDimension(DEFAULT_EXTERNAL_WALL_THICKNESS_MM, displayUnitOrigin)}
+          </span>
+          <span>
+            Internal {formatWallDimension(DEFAULT_INTERNAL_WALL_THICKNESS_MM, displayUnitOrigin)}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {externalWallCount} external, {internalWallCount} internal. Per-wall overrides coming later.
+        </p>
       </div>
     </div>
   );
@@ -350,6 +385,9 @@ export function SelectedRoomNamePanel({ className }: SelectedRoomNamePanelProps)
           </div>
           <div className="mt-4">
             <RoomDimensionsDisplay room={selectedRoom} displayUnitOrigin={displayUnitOrigin} />
+          </div>
+          <div className="mt-4">
+            <RoomWallThicknessPlaceholder room={selectedRoom} displayUnitOrigin={displayUnitOrigin} />
           </div>
           <div className="mt-4 flex justify-between gap-2">
             <ImmediateTooltipProvider>

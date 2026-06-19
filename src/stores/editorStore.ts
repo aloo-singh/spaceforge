@@ -126,7 +126,11 @@ import {
   type RoomPresetId,
 } from "@/lib/editor/roomPresets";
 import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
-import { cloneRoomWallSegments, createExternalRoomWallSegments } from "@/lib/editor/wallThickness";
+import {
+  cloneRoomWallSegments,
+  createExternalRoomWallSegments,
+  reconcileSharedRoomWallSegments,
+} from "@/lib/editor/wallThickness";
 import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin, type ProjectRegion, type UnitOrigin } from "@/lib/projects/region";
 import { getTierConfig, type SubscriptionTier, AVAILABLE_TIERS } from "@/lib/subscription/tiers";
@@ -1080,23 +1084,24 @@ function updateMovedRoomInDocument(
   unitOrigin?: UnitOrigin
 ): DocumentState {
   const delta = getRoomTranslationDelta(previousPoints, nextPoints);
+  const rooms = document.rooms.map((room) =>
+    room.id === roomId
+      ? {
+          ...room,
+          unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
+          points: nextPoints.map((point) => ({ ...point })),
+          interiorAssets: room.interiorAssets.map((asset) => ({
+            ...cloneRoomInteriorAsset(asset),
+            xMm: asset.xMm + delta.x,
+            yMm: asset.yMm + delta.y,
+          })),
+        }
+      : room
+  );
 
   return {
     ...document,
-    rooms: document.rooms.map((room) =>
-      room.id === roomId
-        ? {
-            ...room,
-            unitOrigin: normalizeUnitOrigin(unitOrigin ?? room.unitOrigin),
-            points: nextPoints.map((point) => ({ ...point })),
-            interiorAssets: room.interiorAssets.map((asset) => ({
-              ...cloneRoomInteriorAsset(asset),
-              xMm: asset.xMm + delta.x,
-              yMm: asset.yMm + delta.y,
-            })),
-          }
-        : room
-    ),
+    rooms: reconcileSharedRoomWallSegments(rooms),
   };
 }
 

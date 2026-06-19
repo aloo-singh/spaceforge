@@ -321,8 +321,9 @@ export function EditorProjectBootstrap({
   }, [onProjectResolved]);
 
   useEffect(() => {
+    if (!activeProjectId) return;
     showWallThicknessMigrationAnnouncementIfPending();
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     onBootstrapStateChangeRef.current = onBootstrapStateChange;
@@ -412,7 +413,6 @@ export function EditorProjectBootstrap({
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
             onBootstrapStateChangeRef.current?.({ status: "ready" });
-            showWallThicknessMigrationAnnouncementIfPending();
             if (projectId && projectId !== fallbackProject.id) {
               router.replace(`/editor/${fallbackProject.id}`);
             }
@@ -505,7 +505,6 @@ export function EditorProjectBootstrap({
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
         onBootstrapStateChangeRef.current?.({ status: "ready" });
-        showWallThicknessMigrationAnnouncementIfPending();
       } catch (error) {
         clearActiveProjectId();
         setActiveProjectId(null);

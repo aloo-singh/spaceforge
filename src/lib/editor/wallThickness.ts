@@ -44,6 +44,63 @@ export function getRoomWallMetadata(room: Room, segmentIndex: number): RoomWallM
   };
 }
 
+function getPointKey(point: Point): string {
+  return `${point.x}:${point.y}`;
+}
+
+function getSegmentKey(room: Room, segmentIndex: number): string | null {
+  const start = room.points[segmentIndex];
+  const end = room.points[(segmentIndex + 1) % room.points.length];
+  if (!start || !end) return null;
+  if (start.x === end.x && start.y === end.y) return null;
+
+  const startKey = getPointKey(start);
+  const endKey = getPointKey(end);
+  const [firstKey, secondKey] =
+    startKey < endKey ? [startKey, endKey] : [endKey, startKey];
+  return `${room.floorId ?? ""}|${firstKey}|${secondKey}`;
+}
+
+export function reconcileSharedRoomWallSegments(rooms: Room[]): Room[] {
+  const segmentRoomIds = new Map<string, Set<string>>();
+
+  for (const room of rooms) {
+    room.points.forEach((_, segmentIndex) => {
+      const segmentKey = getSegmentKey(room, segmentIndex);
+      if (!segmentKey) return;
+
+      const roomIds = segmentRoomIds.get(segmentKey) ?? new Set<string>();
+      roomIds.add(room.id);
+      segmentRoomIds.set(segmentKey, roomIds);
+    });
+  }
+
+  return rooms.map((room) => {
+    const nextWallSegments = room.points.map((_, segmentIndex) => {
+      const segmentKey = getSegmentKey(room, segmentIndex);
+      const isShared = segmentKey
+        ? (segmentRoomIds.get(segmentKey)?.size ?? 0) > 1
+        : false;
+
+      return {
+        thicknessMm: isShared
+          ? DEFAULT_INTERNAL_WALL_THICKNESS_MM
+          : DEFAULT_EXTERNAL_WALL_THICKNESS_MM,
+        isExternal: !isShared,
+      };
+    });
+
+    if (areRoomWallSegmentsEqual(room.wallSegments, nextWallSegments)) {
+      return room;
+    }
+
+    return {
+      ...room,
+      wallSegments: nextWallSegments,
+    };
+  });
+}
+
 function getBrowserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   return window.localStorage;

@@ -9,7 +9,7 @@ import {
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeRoomHeightMm } from "@/lib/editor/roomHeight";
-import { cloneRoomWallSegments } from "@/lib/editor/wallThickness";
+import { cloneRoomWallSegments, reconcileSharedRoomWallSegments } from "@/lib/editor/wallThickness";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
@@ -494,13 +494,15 @@ export function applyEditorCommand(
     if (direction === "undo") {
       return {
         ...document,
-        rooms: document.rooms.filter((room) => room.id !== command.room.id),
+        rooms: reconcileSharedRoomWallSegments(
+          document.rooms.filter((room) => room.id !== command.room.id)
+        ),
       };
     }
 
     return {
       ...document,
-      rooms: [
+      rooms: reconcileSharedRoomWallSegments([
         ...document.rooms.filter((room) => room.id !== command.room.id),
         {
           ...command.room,
@@ -513,7 +515,7 @@ export function applyEditorCommand(
           openings: cloneRoomOpenings(command.room.openings),
           interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
         },
-      ],
+      ]),
     };
   }
 
@@ -599,22 +601,24 @@ export function applyEditorCommand(
     const commandUnitOrigin =
       direction === "undo" ? command.previousUnitOrigin : command.nextUnitOrigin;
     const delta = getTranslationDelta(previousPoints, nextPoints);
+    const rooms = document.rooms.map((room) =>
+      room.id === command.roomId
+        ? {
+            ...room,
+            unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
+            points: nextPoints.map((point) => ({ ...point })),
+            interiorAssets: room.interiorAssets.map((asset) => ({
+              ...cloneRoomInteriorAsset(asset),
+              xMm: asset.xMm + delta.x,
+              yMm: asset.yMm + delta.y,
+            })),
+          }
+        : room
+    );
+
     return {
       ...document,
-      rooms: document.rooms.map((room) =>
-        room.id === command.roomId
-          ? {
-              ...room,
-              unitOrigin: normalizeUnitOrigin(commandUnitOrigin ?? room.unitOrigin),
-              points: nextPoints.map((point) => ({ ...point })),
-              interiorAssets: room.interiorAssets.map((asset) => ({
-                ...cloneRoomInteriorAsset(asset),
-                xMm: asset.xMm + delta.x,
-                yMm: asset.yMm + delta.y,
-              })),
-            }
-          : room
-      ),
+      rooms: reconcileSharedRoomWallSegments(rooms),
     };
   }
 
