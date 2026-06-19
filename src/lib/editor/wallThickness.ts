@@ -4,6 +4,8 @@ export const DEFAULT_EXTERNAL_WALL_THICKNESS_MM = 300;
 export const DEFAULT_INTERNAL_WALL_THICKNESS_MM = 150;
 const WALL_THICKNESS_MIGRATION_PENDING_KEY = "spaceforge.wallThicknessMigration.pending.v1";
 const WALL_THICKNESS_MIGRATION_SHOWN_KEY = "spaceforge.wallThicknessMigration.shown.v1";
+const WALL_THICKNESS_MIGRATION_DISMISSED_PROJECTS_KEY =
+  "spaceforge.wallThicknessMigration.dismissedProjects.v1";
 
 export function createExternalRoomWallSegments(points: Point[]): RoomWallMetadata[] {
   return points.map(() => ({
@@ -104,6 +106,55 @@ export function reconcileSharedRoomWallSegments(rooms: Room[]): Room[] {
 function getBrowserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   return window.localStorage;
+}
+
+function readDismissedWallThicknessMigrationProjectIds(
+  storage: Storage | null = getBrowserStorage()
+): Set<string> {
+  if (!storage) return new Set();
+
+  try {
+    const rawValue = storage.getItem(WALL_THICKNESS_MIGRATION_DISMISSED_PROJECTS_KEY);
+    if (!rawValue) return new Set();
+
+    const parsedValue = JSON.parse(rawValue) as unknown;
+    if (!Array.isArray(parsedValue)) {
+      storage.removeItem(WALL_THICKNESS_MIGRATION_DISMISSED_PROJECTS_KEY);
+      return new Set();
+    }
+
+    return new Set(parsedValue.filter((projectId): projectId is string => typeof projectId === "string"));
+  } catch {
+    storage.removeItem(WALL_THICKNESS_MIGRATION_DISMISSED_PROJECTS_KEY);
+    return new Set();
+  }
+}
+
+function saveDismissedWallThicknessMigrationProjectIds(
+  projectIds: Set<string>,
+  storage: Storage | null = getBrowserStorage()
+) {
+  if (!storage) return;
+  storage.setItem(
+    WALL_THICKNESS_MIGRATION_DISMISSED_PROJECTS_KEY,
+    JSON.stringify(Array.from(projectIds))
+  );
+}
+
+export function hasDismissedWallThicknessMigrationAnnouncement(
+  projectId: string,
+  storage: Storage | null = getBrowserStorage()
+): boolean {
+  return readDismissedWallThicknessMigrationProjectIds(storage).has(projectId);
+}
+
+export function dismissWallThicknessMigrationAnnouncement(
+  projectId: string,
+  storage: Storage | null = getBrowserStorage()
+) {
+  const dismissedProjectIds = readDismissedWallThicknessMigrationProjectIds(storage);
+  dismissedProjectIds.add(projectId);
+  saveDismissedWallThicknessMigrationProjectIds(dismissedProjectIds, storage);
 }
 
 function normalizeRoomWallSegmentMetadata(segment: RoomWallMetadata | undefined): RoomWallMetadata {

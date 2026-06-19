@@ -61,8 +61,8 @@ import {
 } from "@/lib/editor/constants";
 import { loadGlobalSettings, saveGlobalSettings } from "@/lib/editor/globalSettings";
 import {
-  consumeWallThicknessMigrationAnnouncement,
-  markWallThicknessMigrationAnnouncementPending,
+  dismissWallThicknessMigrationAnnouncement,
+  hasDismissedWallThicknessMigrationAnnouncement,
   migrateDocumentWallThickness,
 } from "@/lib/editor/wallThickness";
 import type { ProjectRecord } from "@/lib/projects/types";
@@ -121,21 +121,35 @@ function shouldPromptForRegionPreference(document: ReturnType<typeof cloneDocume
   );
 }
 
-function showWallThicknessMigrationAnnouncementIfPending() {
-  if (!consumeWallThicknessMigrationAnnouncement()) return;
+function showWallThicknessMigrationAnnouncementForProject(
+  projectId: string,
+  document: ReturnType<typeof cloneDocumentState>
+) {
+  if (document.rooms.length === 0) {
+    dismissWallThicknessMigrationAnnouncement(projectId);
+    return;
+  }
+  if (hasDismissedWallThicknessMigrationAnnouncement(projectId)) return;
 
-  toast.success("Wall thickness added", {
-    description: "Existing rooms now use external 300 mm walls so plans stay ready for realistic thickness.",
-    duration: 5200,
+  const toastId = toast("A small upgrade to reality", {
+    description:
+      "Your existing rooms now have real wall thickness. The numbers you see are still internal dimensions, but it is worth checking the layout before you rely on it.",
+    duration: Infinity,
+    action: {
+      label: "Got it",
+      onClick: () => {
+        dismissWallThicknessMigrationAnnouncement(projectId);
+        toast.dismiss(toastId);
+      },
+    },
+    onDismiss: () => {
+      dismissWallThicknessMigrationAnnouncement(projectId);
+    },
   });
 }
 
 function migrateProjectDocumentForLoad(document: ReturnType<typeof cloneDocumentState>) {
-  const result = migrateDocumentWallThickness(document);
-  if (result.didMigrate) {
-    markWallThicknessMigrationAnnouncementPending();
-  }
-  return result.document;
+  return migrateDocumentWallThickness(document).document;
 }
 
 function FirstProjectRegionDialog({
@@ -321,11 +335,6 @@ export function EditorProjectBootstrap({
   }, [onProjectResolved]);
 
   useEffect(() => {
-    if (!activeProjectId) return;
-    showWallThicknessMigrationAnnouncementIfPending();
-  }, [activeProjectId]);
-
-  useEffect(() => {
     onBootstrapStateChangeRef.current = onBootstrapStateChange;
   }, [onBootstrapStateChange]);
 
@@ -413,6 +422,7 @@ export function EditorProjectBootstrap({
             setActiveProjectId(fallbackProject.id);
             isBootstrappingRef.current = false;
             onBootstrapStateChangeRef.current?.({ status: "ready" });
+            showWallThicknessMigrationAnnouncementForProject(fallbackProject.id, fallbackDocument);
             if (projectId && projectId !== fallbackProject.id) {
               router.replace(`/editor/${fallbackProject.id}`);
             }
@@ -447,6 +457,7 @@ export function EditorProjectBootstrap({
           setActiveProjectId(project.id);
           isBootstrappingRef.current = false;
           onBootstrapStateChangeRef.current?.({ status: "ready" });
+          showWallThicknessMigrationAnnouncementForProject(project.id, project.document);
           if (projectId && projectId !== project.id) {
             router.replace(`/editor/${project.id}`);
           }
@@ -505,6 +516,7 @@ export function EditorProjectBootstrap({
         setActiveProjectId(selectedProject.id);
         isBootstrappingRef.current = false;
         onBootstrapStateChangeRef.current?.({ status: "ready" });
+        showWallThicknessMigrationAnnouncementForProject(selectedProject.id, nextDocument);
       } catch (error) {
         clearActiveProjectId();
         setActiveProjectId(null);
