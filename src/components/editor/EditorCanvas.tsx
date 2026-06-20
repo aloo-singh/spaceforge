@@ -5721,6 +5721,9 @@ function getWallSpanIntervals(
       });
     }
   }
+  internalIntervals.push(
+    ...getInternalWallJunctionIntervals(roomId, segment, rooms, outwardNormal, direction)
+  );
 
   const mergedInternalIntervals = mergeWallSpanIntervals(internalIntervals, segment.lengthMm);
   if (mergedInternalIntervals.length === 0) {
@@ -5753,6 +5756,182 @@ function getWallSpanIntervals(
   }
 
   return spans;
+}
+
+function getInternalWallJunctionIntervals(
+  roomId: string,
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  rooms: Room[],
+  outwardNormal: Point,
+  direction: Point
+): Array<Pick<WallSpanInterval, "startMm" | "endMm">> {
+  const junctionIntervals: Array<Pick<WallSpanInterval, "startMm" | "endMm">> = [];
+  const perpendicularSegments = getPerpendicularInternalJunctionSegments(roomId, segment, rooms, direction);
+
+  for (let index = 0; index < perpendicularSegments.length; index += 1) {
+    const firstSegment = perpendicularSegments[index];
+    const firstDirection = getWallSegmentDirection(firstSegment);
+    if (!firstDirection) continue;
+    const firstOutwardNormal = {
+      x: -firstSegment.interiorNormal.x,
+      y: -firstSegment.interiorNormal.y,
+    };
+
+    for (let otherIndex = index + 1; otherIndex < perpendicularSegments.length; otherIndex += 1) {
+      const secondSegment = perpendicularSegments[otherIndex];
+      if (firstSegment.roomId === secondSegment.roomId) continue;
+
+      const secondDirection = getWallSegmentDirection(secondSegment);
+      if (!secondDirection) continue;
+      const secondOutwardNormal = {
+        x: -secondSegment.interiorNormal.x,
+        y: -secondSegment.interiorNormal.y,
+      };
+      const sharedInternalWall =
+        getFacingWallOverlap(
+          firstSegment.originalStart,
+          firstSegment.originalEnd,
+          firstDirection,
+          firstOutwardNormal,
+          secondSegment.originalStart,
+          secondSegment.originalEnd,
+          secondOutwardNormal
+        ) ??
+        getFacingWallOverlap(
+          secondSegment.originalStart,
+          secondSegment.originalEnd,
+          secondDirection,
+          secondOutwardNormal,
+          firstSegment.originalStart,
+          firstSegment.originalEnd,
+          firstOutwardNormal
+        );
+      if (
+        !sharedInternalWall ||
+        Math.abs(sharedInternalWall.gapMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM) > 2
+      ) {
+        continue;
+      }
+
+      const firstProjection = dotProduct(
+        {
+          x: firstSegment.originalStart.x - segment.originalStart.x,
+          y: firstSegment.originalStart.y - segment.originalStart.y,
+        },
+        direction
+      );
+      const secondProjection = dotProduct(
+        {
+          x: secondSegment.originalStart.x - segment.originalStart.x,
+          y: secondSegment.originalStart.y - segment.originalStart.y,
+        },
+        direction
+      );
+      const startMm = Math.max(0, Math.min(firstProjection, secondProjection));
+      const endMm = Math.min(segment.lengthMm, Math.max(firstProjection, secondProjection));
+      if (Math.abs(endMm - startMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM) > 2) continue;
+      if (!isInternalJunctionAdjacentToSegment(segment, outwardNormal, firstSegment, secondSegment)) {
+        continue;
+      }
+
+      junctionIntervals.push({ startMm, endMm });
+    }
+  }
+
+  return junctionIntervals;
+}
+
+function getPerpendicularInternalJunctionSegments(
+  roomId: string,
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  rooms: Room[],
+  direction: Point
+): Array<NonNullable<ReturnType<typeof getRoomWallSegment>> & { roomId: string }> {
+  const perpendicularSegments: Array<NonNullable<ReturnType<typeof getRoomWallSegment>> & { roomId: string }> = [];
+
+  for (const room of rooms) {
+    if (room.id === roomId) continue;
+
+    for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
+      const otherSegment = getRoomWallSegment(room, wallIndex);
+      if (!otherSegment || otherSegment.lengthMm <= 0) continue;
+      const otherDirection = getWallSegmentDirection(otherSegment);
+      if (!otherDirection || Math.abs(dotProduct(direction, otherDirection)) > 0.001) continue;
+
+      const distanceToCurrentLineMm = Math.abs(
+        dotProduct(
+          {
+            x: otherSegment.originalStart.x - segment.originalStart.x,
+            y: otherSegment.originalStart.y - segment.originalStart.y,
+          },
+          direction
+        )
+      );
+      if (distanceToCurrentLineMm > segment.lengthMm + DEFAULT_INTERNAL_WALL_THICKNESS_MM) continue;
+
+      perpendicularSegments.push({
+        ...otherSegment,
+        roomId: room.id,
+      });
+    }
+  }
+
+  return perpendicularSegments;
+}
+
+function isInternalJunctionAdjacentToSegment(
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  outwardNormal: Point,
+  firstSegment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  secondSegment: NonNullable<ReturnType<typeof getRoomWallSegment>>
+): boolean {
+  const firstRange = getProjectedSegmentRange(firstSegment, segment.originalStart, outwardNormal);
+  const secondRange = getProjectedSegmentRange(secondSegment, segment.originalStart, outwardNormal);
+
+  return (
+    isProjectedSegmentRangeInInternalJunctionCorridor(firstRange) &&
+    isProjectedSegmentRangeInInternalJunctionCorridor(secondRange)
+  );
+}
+
+function isProjectedSegmentRangeInInternalJunctionCorridor(range: { min: number; max: number }): boolean {
+  return range.max >= -2 && range.min <= DEFAULT_INTERNAL_WALL_THICKNESS_MM + 2;
+}
+
+function getProjectedSegmentRange(
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  origin: Point,
+  direction: Point
+): { min: number; max: number } {
+  const startProjection = dotProduct(
+    {
+      x: segment.originalStart.x - origin.x,
+      y: segment.originalStart.y - origin.y,
+    },
+    direction
+  );
+  const endProjection = dotProduct(
+    {
+      x: segment.originalEnd.x - origin.x,
+      y: segment.originalEnd.y - origin.y,
+    },
+    direction
+  );
+
+  return {
+    min: Math.min(startProjection, endProjection),
+    max: Math.max(startProjection, endProjection),
+  };
+}
+
+function getWallSegmentDirection(
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>
+): Point | null {
+  if (segment.lengthMm <= 0) return null;
+  return {
+    x: (segment.originalEnd.x - segment.originalStart.x) / segment.lengthMm,
+    y: (segment.originalEnd.y - segment.originalStart.y) / segment.lengthMm,
+  };
 }
 
 function mergeWallSpanIntervals(
