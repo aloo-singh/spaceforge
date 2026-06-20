@@ -5556,6 +5556,7 @@ function drawRoomsWallThickness(
     graphics.fill();
   }
 
+  drawExternalWallCornerJoins(graphics, wallLines, camera, viewport, theme);
   drawExternalWallBridges(graphics, wallLines, camera, viewport, theme);
 }
 
@@ -6085,6 +6086,139 @@ function drawExternalWallBridges(
       graphics.fill();
     }
   }
+}
+
+function drawExternalWallCornerJoins(
+  graphics: Graphics,
+  wallLines: RoomWallThicknessLine[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const externalLines = wallLines.filter((wallLine) => wallLine.isExternal && wallLine.renderThicknessMm > 0);
+
+  for (let index = 0; index < externalLines.length; index += 1) {
+    const wallLine = externalLines[index];
+    for (let otherIndex = index + 1; otherIndex < externalLines.length; otherIndex += 1) {
+      const otherWallLine = externalLines[otherIndex];
+      const join = getExternalWallCornerJoin(wallLine, otherWallLine);
+      if (!join) continue;
+
+      const screenPoints = join.map((point) => worldToScreen(point, camera, viewport));
+      graphics.setFillStyle({
+        color: theme.roomOutline,
+        alpha: EXTERNAL_WALL_FILL_ALPHA,
+      });
+      graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+      for (let pointIndex = 1; pointIndex < screenPoints.length; pointIndex += 1) {
+        graphics.lineTo(screenPoints[pointIndex].x, screenPoints[pointIndex].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+    }
+  }
+}
+
+type WallEndpoint = {
+  inner: Point;
+  outer: Point;
+  directionAwayFromEndpoint: Point;
+};
+
+function getExternalWallCornerJoin(
+  wallLine: RoomWallThicknessLine,
+  otherWallLine: RoomWallThicknessLine
+): Point[] | null {
+  if (wallLine.roomId === otherWallLine.roomId) return null;
+  if (!isDiagonalWallLine(wallLine) || !isDiagonalWallLine(otherWallLine)) return null;
+  if (Math.abs(crossProduct(wallLine.direction, otherWallLine.direction)) < 0.001) return null;
+  if (dotProduct(wallLine.outwardNormal, otherWallLine.outwardNormal) > 0.98) return null;
+
+  const wallEndpoints = getWallLineEndpoints(wallLine);
+  const otherWallEndpoints = getWallLineEndpoints(otherWallLine);
+
+  for (const wallEndpoint of wallEndpoints) {
+    for (const otherWallEndpoint of otherWallEndpoints) {
+      const innerGapMm = Math.hypot(
+        otherWallEndpoint.inner.x - wallEndpoint.inner.x,
+        otherWallEndpoint.inner.y - wallEndpoint.inner.y
+      );
+      if (innerGapMm <= 0.001 || innerGapMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) continue;
+
+      const miterPoint = getLineIntersection(
+        wallEndpoint.outer,
+        wallLine.direction,
+        otherWallEndpoint.outer,
+        otherWallLine.direction
+      );
+      if (!miterPoint) continue;
+
+      const wallMiterDistanceMm = Math.hypot(
+        miterPoint.x - wallEndpoint.outer.x,
+        miterPoint.y - wallEndpoint.outer.y
+      );
+      const otherMiterDistanceMm = Math.hypot(
+        miterPoint.x - otherWallEndpoint.outer.x,
+        miterPoint.y - otherWallEndpoint.outer.y
+      );
+      if (
+        wallMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2 ||
+        otherMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2
+      ) {
+        continue;
+      }
+
+      const miterAwayFromWallEndpoint = dotProduct(
+        {
+          x: miterPoint.x - wallEndpoint.outer.x,
+          y: miterPoint.y - wallEndpoint.outer.y,
+        },
+        wallEndpoint.directionAwayFromEndpoint
+      );
+      const miterAwayFromOtherEndpoint = dotProduct(
+        {
+          x: miterPoint.x - otherWallEndpoint.outer.x,
+          y: miterPoint.y - otherWallEndpoint.outer.y,
+        },
+        otherWallEndpoint.directionAwayFromEndpoint
+      );
+      if (miterAwayFromWallEndpoint > 0.001 || miterAwayFromOtherEndpoint > 0.001) continue;
+
+      return [
+        wallEndpoint.inner,
+        otherWallEndpoint.inner,
+        otherWallEndpoint.outer,
+        miterPoint,
+        wallEndpoint.outer,
+      ];
+    }
+  }
+
+  return null;
+}
+
+function isDiagonalWallLine(wallLine: RoomWallThicknessLine): boolean {
+  const absX = Math.abs(wallLine.direction.x);
+  const absY = Math.abs(wallLine.direction.y);
+  return absX > 0.001 && absY > 0.001 && Math.abs(absX - absY) < 0.001;
+}
+
+function getWallLineEndpoints(wallLine: RoomWallThicknessLine): WallEndpoint[] {
+  return [
+    {
+      inner: wallLine.innerStart,
+      outer: wallLine.outerStart,
+      directionAwayFromEndpoint: wallLine.direction,
+    },
+    {
+      inner: wallLine.innerEnd,
+      outer: wallLine.outerEnd,
+      directionAwayFromEndpoint: {
+        x: -wallLine.direction.x,
+        y: -wallLine.direction.y,
+      },
+    },
+  ];
 }
 
 function getExternalWallBridge(
