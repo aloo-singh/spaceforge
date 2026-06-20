@@ -176,6 +176,7 @@ import {
   getRoomsForActiveFloor,
   getRoomsForFloor,
 } from "@/lib/editor/history";
+import { DEFAULT_EXTERNAL_WALL_THICKNESS_MM } from "@/lib/editor/wallThickness";
 import { usePersistentPanelState } from "@/lib/editor/usePersistentPanelState";
 import {
   easeOutCubic,
@@ -4961,6 +4962,8 @@ function drawRooms(
     );
   }
 
+  drawRoomsWallThickness(graphics, rooms, camera, viewport, theme);
+
   for (const room of rooms) {
     if (room.points.length < 3) continue;
     const isSelected = room.id === selectedRoomId || isRoomSelected(selection, room.id);
@@ -4992,8 +4995,6 @@ function drawRooms(
         : isSelected
           ? selectedFillAlpha
           : options.roomDefaultFillAlpha ?? 0.12;
-
-    drawRoomWallThickness(graphics, room, camera, viewport, theme);
 
     drawRoomShape(
       graphics,
@@ -5517,16 +5518,16 @@ function drawRoomShape(
   graphics.stroke();
 }
 
-function drawRoomWallThickness(
+function drawRoomsWallThickness(
   graphics: Graphics,
-  room: Room,
+  rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  if (!room.wallSegments || room.points.length < 2) return;
-
-  const wallQuads = getRoomWallThicknessQuads(room);
+  const wallLinesByRoom = rooms.map((room) => getRoomWallThicknessLines(room, rooms));
+  const wallLines = wallLinesByRoom.flat();
+  const wallQuads = wallLinesByRoom.flatMap(getRoomWallThicknessQuads);
 
   for (const wallQuad of wallQuads) {
     const screenPoints = [
@@ -5547,14 +5548,20 @@ function drawRoomWallThickness(
     graphics.closePath();
     graphics.fill();
   }
+
+  drawExternalWallBridges(graphics, wallLines, camera, viewport, theme);
 }
 
 type RoomWallThicknessLine = {
+  roomId: string;
+  segmentIndex: number;
   innerStart: Point;
   innerEnd: Point;
   outerStart: Point;
   outerEnd: Point;
   direction: Point;
+  outwardNormal: Point;
+  renderThicknessMm: number;
   isExternal?: boolean;
 };
 
@@ -5566,15 +5573,13 @@ type RoomWallThicknessQuad = {
   isExternal?: boolean;
 };
 
-function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
+function getRoomWallThicknessLines(room: Room, rooms: Room[]): RoomWallThicknessLine[] {
   const wallLines: RoomWallThicknessLine[] = [];
+  if (!room.wallSegments || room.points.length < 2) return wallLines;
 
   for (let wallIndex = 0; wallIndex < room.points.length; wallIndex += 1) {
     const segment = getRoomWallSegment(room, wallIndex);
     if (!segment?.thicknessMm || segment.thicknessMm <= 0 || segment.lengthMm <= 0) continue;
-    const renderThicknessMm = segment.isExternal
-      ? segment.thicknessMm
-      : segment.thicknessMm / 2;
 
     const outwardNormal = {
       x: -segment.interiorNormal.x,
@@ -5584,6 +5589,7 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
       x: (segment.originalEnd.x - segment.originalStart.x) / segment.lengthMm,
       y: (segment.originalEnd.y - segment.originalStart.y) / segment.lengthMm,
     };
+    const renderThicknessMm = getWallRenderThicknessMm(room.id, wallIndex, segment, rooms, outwardNormal, direction);
     const outerStart = {
       x: segment.originalStart.x + outwardNormal.x * renderThicknessMm,
       y: segment.originalStart.y + outwardNormal.y * renderThicknessMm,
@@ -5594,15 +5600,23 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
     };
 
     wallLines.push({
+      roomId: room.id,
+      segmentIndex: wallIndex,
       innerStart: segment.originalStart,
       innerEnd: segment.originalEnd,
       outerStart,
       outerEnd,
       direction,
+      outwardNormal,
+      renderThicknessMm,
       isExternal: segment.isExternal,
     });
   }
 
+  return wallLines;
+}
+
+function getRoomWallThicknessQuads(wallLines: RoomWallThicknessLine[]): RoomWallThicknessQuad[] {
   return wallLines.map((wallLine, index) => {
     const previousWallLine = wallLines[(index - 1 + wallLines.length) % wallLines.length];
     const nextWallLine = wallLines[(index + 1) % wallLines.length];
@@ -5610,8 +5624,8 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
     return {
       innerStart: wallLine.innerStart,
       innerEnd: wallLine.innerEnd,
-      outerStart: getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart),
-      outerEnd: getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd),
+      outerStart: getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart, wallLine),
+      outerEnd: getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd, wallLine),
       isExternal: wallLine.isExternal,
     };
   });
@@ -5620,9 +5634,14 @@ function getRoomWallThicknessQuads(room: Room): RoomWallThicknessQuad[] {
 function getWallMiterPoint(
   incomingWallLine: RoomWallThicknessLine | undefined,
   outgoingWallLine: RoomWallThicknessLine | undefined,
-  fallbackPoint: Point
+  fallbackPoint: Point,
+  wallLine: RoomWallThicknessLine
 ): Point {
   if (!incomingWallLine || !outgoingWallLine) return fallbackPoint;
+  if (incomingWallLine.roomId !== outgoingWallLine.roomId) return fallbackPoint;
+  if (incomingWallLine.isExternal !== outgoingWallLine.isExternal) return fallbackPoint;
+  if (Math.abs(incomingWallLine.renderThicknessMm - wallLine.renderThicknessMm) > 0.001) return fallbackPoint;
+  if (Math.abs(outgoingWallLine.renderThicknessMm - wallLine.renderThicknessMm) > 0.001) return fallbackPoint;
 
   return (
     getLineIntersection(
@@ -5632,6 +5651,210 @@ function getWallMiterPoint(
       outgoingWallLine.direction
     ) ?? fallbackPoint
   );
+}
+
+function getWallRenderThicknessMm(
+  roomId: string,
+  wallIndex: number,
+  segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
+  rooms: Room[],
+  outwardNormal: Point,
+  direction: Point
+): number {
+  const baseThicknessMm = segment.isExternal
+    ? segment.thicknessMm ?? 0
+    : (segment.thicknessMm ?? 0) / 2;
+  if (!segment.isExternal || baseThicknessMm <= 0) return baseThicknessMm;
+
+  let renderThicknessMm = baseThicknessMm;
+  for (const room of rooms) {
+    if (room.id === roomId) continue;
+
+    for (let otherWallIndex = 0; otherWallIndex < room.points.length; otherWallIndex += 1) {
+      const otherSegment = getRoomWallSegment(room, otherWallIndex);
+      if (!otherSegment?.isExternal || !otherSegment.thicknessMm || otherSegment.lengthMm <= 0) continue;
+
+      const otherOutwardNormal = {
+        x: -otherSegment.interiorNormal.x,
+        y: -otherSegment.interiorNormal.y,
+      };
+      const gapMm = getFacingWallGapMm(
+        segment.originalStart,
+        segment.originalEnd,
+        direction,
+        outwardNormal,
+        otherSegment.originalStart,
+        otherSegment.originalEnd,
+        otherOutwardNormal
+      );
+      if (!gapMm || gapMm >= DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) continue;
+
+      renderThicknessMm = Math.min(renderThicknessMm, Math.max(gapMm / 2, 0));
+    }
+  }
+
+  return renderThicknessMm;
+}
+
+function getFacingWallGapMm(
+  start: Point,
+  end: Point,
+  direction: Point,
+  outwardNormal: Point,
+  otherStart: Point,
+  otherEnd: Point,
+  otherOutwardNormal: Point
+): number | null {
+  const otherDx = otherEnd.x - otherStart.x;
+  const otherDy = otherEnd.y - otherStart.y;
+  const otherLength = Math.hypot(otherDx, otherDy);
+  if (otherLength < 0.001) return null;
+  const otherDirection = {
+    x: otherDx / otherLength,
+    y: otherDy / otherLength,
+  };
+
+  if (Math.abs(crossProduct(direction, otherDirection)) > 0.001) return null;
+  if (dotProduct(outwardNormal, otherOutwardNormal) > -0.98) return null;
+
+  const gapMm = dotProduct(
+    {
+      x: otherStart.x - start.x,
+      y: otherStart.y - start.y,
+    },
+    outwardNormal
+  );
+  if (gapMm <= 0) return null;
+
+  const projectedOtherStart = dotProduct(
+    {
+      x: otherStart.x - start.x,
+      y: otherStart.y - start.y,
+    },
+    direction
+  );
+  const projectedOtherEnd = dotProduct(
+    {
+      x: otherEnd.x - start.x,
+      y: otherEnd.y - start.y,
+    },
+    direction
+  );
+  const otherMin = Math.min(projectedOtherStart, projectedOtherEnd);
+  const otherMax = Math.max(projectedOtherStart, projectedOtherEnd);
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  const overlapMm = Math.min(length, otherMax) - Math.max(0, otherMin);
+  if (overlapMm < 50) return null;
+
+  return gapMm;
+}
+
+function drawExternalWallBridges(
+  graphics: Graphics,
+  wallLines: RoomWallThicknessLine[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const externalLines = wallLines.filter((wallLine) => wallLine.isExternal && wallLine.renderThicknessMm > 0);
+
+  for (let index = 0; index < externalLines.length; index += 1) {
+    const wallLine = externalLines[index];
+    for (let otherIndex = index + 1; otherIndex < externalLines.length; otherIndex += 1) {
+      const otherWallLine = externalLines[otherIndex];
+      const bridge = getExternalWallBridge(wallLine, otherWallLine);
+      if (!bridge) continue;
+
+      const screenPoints = bridge.map((point) => worldToScreen(point, camera, viewport));
+      graphics.setFillStyle({
+        color: theme.roomOutline,
+        alpha: EXTERNAL_WALL_FILL_ALPHA,
+      });
+      graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+      for (let pointIndex = 1; pointIndex < screenPoints.length; pointIndex += 1) {
+        graphics.lineTo(screenPoints[pointIndex].x, screenPoints[pointIndex].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+    }
+  }
+}
+
+function getExternalWallBridge(
+  wallLine: RoomWallThicknessLine,
+  otherWallLine: RoomWallThicknessLine
+): Point[] | null {
+  if (dotProduct(wallLine.outwardNormal, otherWallLine.outwardNormal) < 0.98) return null;
+  if (Math.abs(crossProduct(wallLine.direction, otherWallLine.direction)) > 0.001) return null;
+
+  const normalOffsetMm = Math.abs(
+    dotProduct(
+      {
+        x: otherWallLine.innerStart.x - wallLine.innerStart.x,
+        y: otherWallLine.innerStart.y - wallLine.innerStart.y,
+      },
+      wallLine.outwardNormal
+    )
+  );
+  if (normalOffsetMm > 0.001) return null;
+
+  const lengthMm = Math.hypot(
+    wallLine.innerEnd.x - wallLine.innerStart.x,
+    wallLine.innerEnd.y - wallLine.innerStart.y
+  );
+  const otherStartProjection = dotProduct(
+    {
+      x: otherWallLine.innerStart.x - wallLine.innerStart.x,
+      y: otherWallLine.innerStart.y - wallLine.innerStart.y,
+    },
+    wallLine.direction
+  );
+  const otherEndProjection = dotProduct(
+    {
+      x: otherWallLine.innerEnd.x - wallLine.innerStart.x,
+      y: otherWallLine.innerEnd.y - wallLine.innerStart.y,
+    },
+    wallLine.direction
+  );
+  const otherMin = Math.min(otherStartProjection, otherEndProjection);
+  const otherMax = Math.max(otherStartProjection, otherEndProjection);
+  let gapStart: number;
+  let gapEnd: number;
+
+  if (lengthMm < otherMin) {
+    gapStart = lengthMm;
+    gapEnd = otherMin;
+  } else if (otherMax < 0) {
+    gapStart = otherMax;
+    gapEnd = 0;
+  } else {
+    return null;
+  }
+
+  const gapMm = gapEnd - gapStart;
+  if (gapMm <= 0.001 || gapMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) return null;
+
+  const thicknessMm = Math.min(wallLine.renderThicknessMm, otherWallLine.renderThicknessMm);
+  const innerStart = {
+    x: wallLine.innerStart.x + wallLine.direction.x * gapStart,
+    y: wallLine.innerStart.y + wallLine.direction.y * gapStart,
+  };
+  const innerEnd = {
+    x: wallLine.innerStart.x + wallLine.direction.x * gapEnd,
+    y: wallLine.innerStart.y + wallLine.direction.y * gapEnd,
+  };
+  return [
+    innerStart,
+    innerEnd,
+    {
+      x: innerEnd.x + wallLine.outwardNormal.x * thicknessMm,
+      y: innerEnd.y + wallLine.outwardNormal.y * thicknessMm,
+    },
+    {
+      x: innerStart.x + wallLine.outwardNormal.x * thicknessMm,
+      y: innerStart.y + wallLine.outwardNormal.y * thicknessMm,
+    },
+  ];
 }
 
 function getLineIntersection(
@@ -5653,6 +5876,10 @@ function getLineIntersection(
     x: firstPoint.x + firstDirection.x * distanceAlongFirst,
     y: firstPoint.y + firstDirection.y * distanceAlongFirst,
   };
+}
+
+function dotProduct(a: Point, b: Point): number {
+  return a.x * b.x + a.y * b.y;
 }
 
 function crossProduct(a: Point, b: Point): number {
