@@ -176,7 +176,10 @@ import {
   getRoomsForActiveFloor,
   getRoomsForFloor,
 } from "@/lib/editor/history";
-import { DEFAULT_EXTERNAL_WALL_THICKNESS_MM } from "@/lib/editor/wallThickness";
+import {
+  DEFAULT_EXTERNAL_WALL_THICKNESS_MM,
+  DEFAULT_INTERNAL_WALL_THICKNESS_MM,
+} from "@/lib/editor/wallThickness";
 import { usePersistentPanelState } from "@/lib/editor/usePersistentPanelState";
 import {
   easeOutCubic,
@@ -5555,6 +5558,8 @@ function drawRoomsWallThickness(
 type RoomWallThicknessLine = {
   roomId: string;
   segmentIndex: number;
+  spanStartMm: number;
+  spanEndMm: number;
   innerStart: Point;
   innerEnd: Point;
   outerStart: Point;
@@ -5563,6 +5568,12 @@ type RoomWallThicknessLine = {
   outwardNormal: Point;
   renderThicknessMm: number;
   isExternal?: boolean;
+};
+
+type WallSpanInterval = {
+  startMm: number;
+  endMm: number;
+  isExternal: boolean;
 };
 
 type RoomWallThicknessQuad = {
@@ -5589,28 +5600,44 @@ function getRoomWallThicknessLines(room: Room, rooms: Room[]): RoomWallThickness
       x: (segment.originalEnd.x - segment.originalStart.x) / segment.lengthMm,
       y: (segment.originalEnd.y - segment.originalStart.y) / segment.lengthMm,
     };
-    const renderThicknessMm = getWallRenderThicknessMm(room.id, wallIndex, segment, rooms, outwardNormal, direction);
-    const outerStart = {
-      x: segment.originalStart.x + outwardNormal.x * renderThicknessMm,
-      y: segment.originalStart.y + outwardNormal.y * renderThicknessMm,
-    };
-    const outerEnd = {
-      x: segment.originalEnd.x + outwardNormal.x * renderThicknessMm,
-      y: segment.originalEnd.y + outwardNormal.y * renderThicknessMm,
-    };
+    const wallSpanIntervals = getWallSpanIntervals(room.id, segment, rooms, outwardNormal, direction);
 
-    wallLines.push({
-      roomId: room.id,
-      segmentIndex: wallIndex,
-      innerStart: segment.originalStart,
-      innerEnd: segment.originalEnd,
-      outerStart,
-      outerEnd,
-      direction,
-      outwardNormal,
-      renderThicknessMm,
-      isExternal: segment.isExternal,
-    });
+    for (const spanInterval of wallSpanIntervals) {
+      const innerStart = {
+        x: segment.originalStart.x + direction.x * spanInterval.startMm,
+        y: segment.originalStart.y + direction.y * spanInterval.startMm,
+      };
+      const innerEnd = {
+        x: segment.originalStart.x + direction.x * spanInterval.endMm,
+        y: segment.originalStart.y + direction.y * spanInterval.endMm,
+      };
+      const renderThicknessMm = spanInterval.isExternal
+        ? getExternalWallRenderThicknessMm(room.id, innerStart, innerEnd, rooms, outwardNormal, direction)
+        : (segment.thicknessMm ?? 0) / 2;
+      const outerStart = {
+        x: innerStart.x + outwardNormal.x * renderThicknessMm,
+        y: innerStart.y + outwardNormal.y * renderThicknessMm,
+      };
+      const outerEnd = {
+        x: innerEnd.x + outwardNormal.x * renderThicknessMm,
+        y: innerEnd.y + outwardNormal.y * renderThicknessMm,
+      };
+
+      wallLines.push({
+        roomId: room.id,
+        segmentIndex: wallIndex,
+        spanStartMm: spanInterval.startMm,
+        spanEndMm: spanInterval.endMm,
+        innerStart,
+        innerEnd,
+        outerStart,
+        outerEnd,
+        direction,
+        outwardNormal,
+        renderThicknessMm,
+        isExternal: spanInterval.isExternal,
+      });
+    }
   }
 
   return wallLines;
@@ -5640,6 +5667,7 @@ function getWallMiterPoint(
   if (!incomingWallLine || !outgoingWallLine) return fallbackPoint;
   if (incomingWallLine.roomId !== outgoingWallLine.roomId) return fallbackPoint;
   if (incomingWallLine.isExternal !== outgoingWallLine.isExternal) return fallbackPoint;
+  if (incomingWallLine.segmentIndex === outgoingWallLine.segmentIndex) return fallbackPoint;
   if (Math.abs(incomingWallLine.renderThicknessMm - wallLine.renderThicknessMm) > 0.001) return fallbackPoint;
   if (Math.abs(outgoingWallLine.renderThicknessMm - wallLine.renderThicknessMm) > 0.001) return fallbackPoint;
 
@@ -5653,20 +5681,110 @@ function getWallMiterPoint(
   );
 }
 
-function getWallRenderThicknessMm(
+function getWallSpanIntervals(
   roomId: string,
-  wallIndex: number,
   segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
   rooms: Room[],
   outwardNormal: Point,
   direction: Point
-): number {
-  const baseThicknessMm = segment.isExternal
-    ? segment.thicknessMm ?? 0
-    : (segment.thicknessMm ?? 0) / 2;
-  if (!segment.isExternal || baseThicknessMm <= 0) return baseThicknessMm;
+): WallSpanInterval[] {
+  const internalIntervals: Array<Pick<WallSpanInterval, "startMm" | "endMm">> = [];
+  for (const room of rooms) {
+    if (room.id === roomId) continue;
 
-  let renderThicknessMm = baseThicknessMm;
+    for (let otherWallIndex = 0; otherWallIndex < room.points.length; otherWallIndex += 1) {
+      const otherSegment = getRoomWallSegment(room, otherWallIndex);
+      if (!otherSegment || otherSegment.lengthMm <= 0) continue;
+
+      const otherOutwardNormal = {
+        x: -otherSegment.interiorNormal.x,
+        y: -otherSegment.interiorNormal.y,
+      };
+      const overlap = getFacingWallOverlap(
+        segment.originalStart,
+        segment.originalEnd,
+        direction,
+        outwardNormal,
+        otherSegment.originalStart,
+        otherSegment.originalEnd,
+        otherOutwardNormal
+      );
+      if (!overlap || Math.abs(overlap.gapMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM) > 2) continue;
+
+      internalIntervals.push({
+        startMm: overlap.startMm,
+        endMm: overlap.endMm,
+      });
+    }
+  }
+
+  const mergedInternalIntervals = mergeWallSpanIntervals(internalIntervals, segment.lengthMm);
+  if (mergedInternalIntervals.length === 0) {
+    return [{ startMm: 0, endMm: segment.lengthMm, isExternal: segment.isExternal !== false }];
+  }
+
+  const spans: WallSpanInterval[] = [];
+  let cursorMm = 0;
+  for (const internalInterval of mergedInternalIntervals) {
+    if (internalInterval.startMm - cursorMm > 0.001) {
+      spans.push({
+        startMm: cursorMm,
+        endMm: internalInterval.startMm,
+        isExternal: true,
+      });
+    }
+    spans.push({
+      startMm: internalInterval.startMm,
+      endMm: internalInterval.endMm,
+      isExternal: false,
+    });
+    cursorMm = internalInterval.endMm;
+  }
+  if (segment.lengthMm - cursorMm > 0.001) {
+    spans.push({
+      startMm: cursorMm,
+      endMm: segment.lengthMm,
+      isExternal: true,
+    });
+  }
+
+  return spans;
+}
+
+function mergeWallSpanIntervals(
+  intervals: Array<Pick<WallSpanInterval, "startMm" | "endMm">>,
+  wallLengthMm: number
+): Array<Pick<WallSpanInterval, "startMm" | "endMm">> {
+  const sortedIntervals = intervals
+    .map((interval) => ({
+      startMm: Math.max(0, Math.min(wallLengthMm, interval.startMm)),
+      endMm: Math.max(0, Math.min(wallLengthMm, interval.endMm)),
+    }))
+    .filter((interval) => interval.endMm - interval.startMm > 0.001)
+    .sort((a, b) => a.startMm - b.startMm);
+
+  const mergedIntervals: Array<Pick<WallSpanInterval, "startMm" | "endMm">> = [];
+  for (const interval of sortedIntervals) {
+    const previousInterval = mergedIntervals[mergedIntervals.length - 1];
+    if (!previousInterval || interval.startMm - previousInterval.endMm > 0.001) {
+      mergedIntervals.push({ ...interval });
+      continue;
+    }
+    previousInterval.endMm = Math.max(previousInterval.endMm, interval.endMm);
+  }
+
+  return mergedIntervals;
+}
+
+function getExternalWallRenderThicknessMm(
+  roomId: string,
+  start: Point,
+  end: Point,
+  rooms: Room[],
+  outwardNormal: Point,
+  direction: Point
+): number {
+  let renderThicknessMm = DEFAULT_EXTERNAL_WALL_THICKNESS_MM;
   for (const room of rooms) {
     if (room.id === roomId) continue;
 
@@ -5678,25 +5796,25 @@ function getWallRenderThicknessMm(
         x: -otherSegment.interiorNormal.x,
         y: -otherSegment.interiorNormal.y,
       };
-      const gapMm = getFacingWallGapMm(
-        segment.originalStart,
-        segment.originalEnd,
+      const overlap = getFacingWallOverlap(
+        start,
+        end,
         direction,
         outwardNormal,
         otherSegment.originalStart,
         otherSegment.originalEnd,
         otherOutwardNormal
       );
-      if (!gapMm || gapMm >= DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) continue;
+      if (!overlap || overlap.gapMm >= DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) continue;
 
-      renderThicknessMm = Math.min(renderThicknessMm, Math.max(gapMm / 2, 0));
+      renderThicknessMm = Math.min(renderThicknessMm, Math.max(overlap.gapMm / 2, 0));
     }
   }
 
   return renderThicknessMm;
 }
 
-function getFacingWallGapMm(
+function getFacingWallOverlap(
   start: Point,
   end: Point,
   direction: Point,
@@ -5704,7 +5822,7 @@ function getFacingWallGapMm(
   otherStart: Point,
   otherEnd: Point,
   otherOutwardNormal: Point
-): number | null {
+): { gapMm: number; startMm: number; endMm: number } | null {
   const otherDx = otherEnd.x - otherStart.x;
   const otherDy = otherEnd.y - otherStart.y;
   const otherLength = Math.hypot(otherDx, otherDy);
@@ -5743,10 +5861,16 @@ function getFacingWallGapMm(
   const otherMin = Math.min(projectedOtherStart, projectedOtherEnd);
   const otherMax = Math.max(projectedOtherStart, projectedOtherEnd);
   const length = Math.hypot(end.x - start.x, end.y - start.y);
-  const overlapMm = Math.min(length, otherMax) - Math.max(0, otherMin);
+  const overlapStartMm = Math.max(0, otherMin);
+  const overlapEndMm = Math.min(length, otherMax);
+  const overlapMm = overlapEndMm - overlapStartMm;
   if (overlapMm < 50) return null;
 
-  return gapMm;
+  return {
+    gapMm,
+    startMm: overlapStartMm,
+    endMm: overlapEndMm,
+  };
 }
 
 function drawExternalWallBridges(
