@@ -5528,7 +5528,11 @@ function drawRoomsWallThickness(
   viewport: ViewportSize,
   theme: EditorCanvasTheme
 ) {
-  const wallLinesByRoom = rooms.map((room) => getRoomWallThicknessLines(room, rooms));
+  const rawWallLinesByRoom = rooms.map((room) => getRoomWallThicknessLines(room, rooms));
+  const rawWallLines = rawWallLinesByRoom.flat();
+  const wallLinesByRoom = rawWallLinesByRoom.map((roomWallLines) =>
+    roomWallLines.map((wallLine) => trimExternalWallInsideCornerOverlap(wallLine, rawWallLines))
+  );
   const wallLines = wallLinesByRoom.flat();
   const wallQuads = wallLinesByRoom.flatMap(getRoomWallThicknessQuads);
 
@@ -5979,6 +5983,117 @@ function getExternalWallBridge(
       y: innerStart.y + wallLine.outwardNormal.y * thicknessMm,
     },
   ];
+}
+
+function trimExternalWallInsideCornerOverlap(
+  wallLine: RoomWallThicknessLine,
+  wallLines: RoomWallThicknessLine[]
+): RoomWallThicknessLine {
+  if (!wallLine.isExternal || wallLine.renderThicknessMm <= 0) return wallLine;
+
+  let startTrimMm = 0;
+  let endTrimMm = 0;
+  const wallLengthMm = getWallLineLengthMm(wallLine);
+
+  for (const otherWallLine of wallLines) {
+    if (otherWallLine === wallLine) continue;
+    if (!otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) continue;
+    if (wallLine.roomId === otherWallLine.roomId) continue;
+    if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+
+    const startTrimCandidate = getExternalWallInsideCornerTrimMm(
+      wallLine.innerStart,
+      wallLine.direction,
+      otherWallLine
+    );
+    if (startTrimCandidate !== null) {
+      startTrimMm = Math.max(startTrimMm, startTrimCandidate);
+    }
+
+    const endTrimCandidate = getExternalWallInsideCornerTrimMm(
+      wallLine.innerEnd,
+      { x: -wallLine.direction.x, y: -wallLine.direction.y },
+      otherWallLine
+    );
+    if (endTrimCandidate !== null) {
+      endTrimMm = Math.max(endTrimMm, endTrimCandidate);
+    }
+  }
+
+  if (startTrimMm <= 0.001 && endTrimMm <= 0.001) return wallLine;
+  if (startTrimMm + endTrimMm >= wallLengthMm - 0.001) return wallLine;
+
+  const nextInnerStart = {
+    x: wallLine.innerStart.x + wallLine.direction.x * startTrimMm,
+    y: wallLine.innerStart.y + wallLine.direction.y * startTrimMm,
+  };
+  const nextInnerEnd = {
+    x: wallLine.innerEnd.x - wallLine.direction.x * endTrimMm,
+    y: wallLine.innerEnd.y - wallLine.direction.y * endTrimMm,
+  };
+
+  return {
+    ...wallLine,
+    spanStartMm: wallLine.spanStartMm + startTrimMm,
+    spanEndMm: wallLine.spanEndMm - endTrimMm,
+    innerStart: nextInnerStart,
+    innerEnd: nextInnerEnd,
+    outerStart: {
+      x: nextInnerStart.x + wallLine.outwardNormal.x * wallLine.renderThicknessMm,
+      y: nextInnerStart.y + wallLine.outwardNormal.y * wallLine.renderThicknessMm,
+    },
+    outerEnd: {
+      x: nextInnerEnd.x + wallLine.outwardNormal.x * wallLine.renderThicknessMm,
+      y: nextInnerEnd.y + wallLine.outwardNormal.y * wallLine.renderThicknessMm,
+    },
+  };
+}
+
+function getExternalWallInsideCornerTrimMm(
+  endpoint: Point,
+  trimDirection: Point,
+  otherWallLine: RoomWallThicknessLine
+): number | null {
+  const projectedAlongOther = dotProduct(
+    {
+      x: endpoint.x - otherWallLine.innerStart.x,
+      y: endpoint.y - otherWallLine.innerStart.y,
+    },
+    otherWallLine.direction
+  );
+  const otherLengthMm = getWallLineLengthMm(otherWallLine);
+  if (projectedAlongOther < -0.001 || projectedAlongOther > otherLengthMm + 0.001) return null;
+
+  const projectedAcrossOther = dotProduct(
+    {
+      x: endpoint.x - otherWallLine.innerStart.x,
+      y: endpoint.y - otherWallLine.innerStart.y,
+    },
+    otherWallLine.outwardNormal
+  );
+  if (projectedAcrossOther < -0.001 || projectedAcrossOther > otherWallLine.renderThicknessMm + 0.001) {
+    return null;
+  }
+
+  const trimToOtherOuterFaceMm = dotProduct(
+    {
+      x: otherWallLine.outerStart.x - endpoint.x,
+      y: otherWallLine.outerStart.y - endpoint.y,
+    },
+    trimDirection
+  );
+  if (trimToOtherOuterFaceMm <= 0.001 || trimToOtherOuterFaceMm > otherWallLine.renderThicknessMm + 0.001) {
+    return null;
+  }
+
+  return trimToOtherOuterFaceMm;
+}
+
+function getWallLineLengthMm(wallLine: RoomWallThicknessLine): number {
+  return Math.hypot(
+    wallLine.innerEnd.x - wallLine.innerStart.x,
+    wallLine.innerEnd.y - wallLine.innerStart.y
+  );
 }
 
 function getLineIntersection(
