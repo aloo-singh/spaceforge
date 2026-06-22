@@ -5686,9 +5686,11 @@ function getRoomWallThicknessQuads(
       innerStart: wallLine.innerStart,
       innerEnd: wallLine.innerEnd,
       outerStart:
+        getSharedInternalWallEndpointPoint(wallLine, "start", allWallLines) ??
         getExternalEnvelopeMiterPoint(wallLine, "start", allWallLines) ??
         getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart, wallLine),
       outerEnd:
+        getSharedInternalWallEndpointPoint(wallLine, "end", allWallLines) ??
         getExternalEnvelopeMiterPoint(wallLine, "end", allWallLines) ??
         getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd, wallLine),
       isExternal: wallLine.isExternal,
@@ -5746,6 +5748,62 @@ function getExternalEnvelopeMiterPoint(
   }
 
   return null;
+}
+
+function getSharedInternalWallEndpointPoint(
+  wallLine: RoomWallThicknessLine,
+  endpointKey: "start" | "end",
+  wallLines: RoomWallThicknessLine[]
+): Point | null {
+  if (wallLine.isExternal || wallLine.renderThicknessMm <= 0) return null;
+
+  const endpoint = getWallLineEndpoint(wallLine, endpointKey);
+  let bestEndpoint: WallEndpoint | null = null;
+  let bestDistanceMm = Number.POSITIVE_INFINITY;
+
+  for (const otherWallLine of wallLines) {
+    if (otherWallLine === wallLine) continue;
+    if (otherWallLine.roomId === wallLine.roomId) continue;
+    if (otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) continue;
+    if (Math.abs(crossProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+    if (dotProduct(wallLine.outwardNormal, otherWallLine.outwardNormal) > -0.98) continue;
+
+    const overlap = getFacingWallOverlap(
+      wallLine.innerStart,
+      wallLine.innerEnd,
+      wallLine.direction,
+      wallLine.outwardNormal,
+      otherWallLine.innerStart,
+      otherWallLine.innerEnd,
+      otherWallLine.outwardNormal
+    );
+    if (!overlap || Math.abs(overlap.gapMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM) > 2) continue;
+
+    for (const otherEndpoint of getWallLineEndpoints(otherWallLine)) {
+      const endpointDelta = {
+        x: otherEndpoint.inner.x - endpoint.inner.x,
+        y: otherEndpoint.inner.y - endpoint.inner.y,
+      };
+      const acrossGapMm = dotProduct(endpointDelta, wallLine.outwardNormal);
+      if (Math.abs(acrossGapMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM) > 2) continue;
+
+      const alongOffsetMm = Math.abs(dotProduct(endpointDelta, wallLine.direction));
+      if (alongOffsetMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM) continue;
+
+      const distanceMm = Math.hypot(endpointDelta.x, endpointDelta.y);
+      if (distanceMm >= bestDistanceMm) continue;
+
+      bestEndpoint = otherEndpoint;
+      bestDistanceMm = distanceMm;
+    }
+  }
+
+  if (!bestEndpoint) return null;
+
+  return {
+    x: (endpoint.inner.x + bestEndpoint.inner.x) / 2,
+    y: (endpoint.inner.y + bestEndpoint.inner.y) / 2,
+  };
 }
 
 function getWallMiterPoint(
