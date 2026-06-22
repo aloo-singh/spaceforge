@@ -286,8 +286,7 @@ const PROJECT_RENAME_HINT_PAUSE_MS = 1200;
 const FLOOR_FOOTPRINT_MAX_ALPHA = 0.50;
 const FLOOR_FOOTPRINT_STROKE_WIDTH_PX = 2.25;
 const MINOR_GRID_MIN_VISIBLE_PX = 4;
-const EXTERNAL_WALL_FILL_ALPHA = 0.22;
-const INTERNAL_WALL_FILL_ALPHA = 0.12;
+const WALL_FILL_ALPHA = 1;
 const NORTH_INDICATOR_SURFACE_FADE_DELAY_MS = 320;
 const DESKTOP_SIDEBAR_EXPANDED_WIDTH_PX = 288;
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH_PX = 44;
@@ -5534,27 +5533,26 @@ function drawRoomsWallThickness(
     roomWallLines.map((wallLine) => trimExternalWallInsideCornerOverlap(wallLine, rawWallLines))
   );
   const wallLines = wallLinesByRoom.flat();
-  const wallQuads = wallLinesByRoom.flatMap(getRoomWallThicknessQuads);
+  const wallQuads = wallLinesByRoom.flatMap((roomWallLines) =>
+    getRoomWallThicknessQuads(roomWallLines, wallLines)
+  );
 
-  for (const wallQuad of wallQuads) {
-    const screenPoints = [
-      worldToScreen(wallQuad.innerStart, camera, viewport),
-      worldToScreen(wallQuad.innerEnd, camera, viewport),
-      worldToScreen(wallQuad.outerEnd, camera, viewport),
-      worldToScreen(wallQuad.outerStart, camera, viewport),
-    ];
-
-    graphics.setFillStyle({
-      color: theme.roomOutline,
-      alpha: wallQuad.isExternal ? EXTERNAL_WALL_FILL_ALPHA : INTERNAL_WALL_FILL_ALPHA,
-    });
-    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
-    for (let index = 1; index < screenPoints.length; index += 1) {
-      graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
-    }
-    graphics.closePath();
-    graphics.fill();
-  }
+  drawWallThicknessQuads(
+    graphics,
+    wallQuads.filter((wallQuad) => wallQuad.isExternal),
+    camera,
+    viewport,
+    theme.externalWallFill,
+    WALL_FILL_ALPHA
+  );
+  drawWallThicknessQuads(
+    graphics,
+    wallQuads.filter((wallQuad) => !wallQuad.isExternal),
+    camera,
+    viewport,
+    theme.internalWallFill,
+    WALL_FILL_ALPHA
+  );
 
   drawExternalWallCornerJoins(graphics, wallLines, camera, viewport, theme);
   drawExternalWallBridges(graphics, wallLines, camera, viewport, theme);
@@ -5588,6 +5586,34 @@ type RoomWallThicknessQuad = {
   outerEnd: Point;
   isExternal?: boolean;
 };
+
+function drawWallThicknessQuads(
+  graphics: Graphics,
+  wallQuads: RoomWallThicknessQuad[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  color: number,
+  alpha: number
+) {
+  if (wallQuads.length === 0) return;
+
+  graphics.setFillStyle({ color, alpha });
+  for (const wallQuad of wallQuads) {
+    const screenPoints = [
+      worldToScreen(wallQuad.innerStart, camera, viewport),
+      worldToScreen(wallQuad.innerEnd, camera, viewport),
+      worldToScreen(wallQuad.outerEnd, camera, viewport),
+      worldToScreen(wallQuad.outerStart, camera, viewport),
+    ];
+
+    graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+    for (let index = 1; index < screenPoints.length; index += 1) {
+      graphics.lineTo(screenPoints[index].x, screenPoints[index].y);
+    }
+    graphics.closePath();
+  }
+  graphics.fill();
+}
 
 function getRoomWallThicknessLines(room: Room, rooms: Room[]): RoomWallThicknessLine[] {
   const wallLines: RoomWallThicknessLine[] = [];
@@ -5648,7 +5674,10 @@ function getRoomWallThicknessLines(room: Room, rooms: Room[]): RoomWallThickness
   return wallLines;
 }
 
-function getRoomWallThicknessQuads(wallLines: RoomWallThicknessLine[]): RoomWallThicknessQuad[] {
+function getRoomWallThicknessQuads(
+  wallLines: RoomWallThicknessLine[],
+  allWallLines: RoomWallThicknessLine[]
+): RoomWallThicknessQuad[] {
   return wallLines.map((wallLine, index) => {
     const previousWallLine = wallLines[(index - 1 + wallLines.length) % wallLines.length];
     const nextWallLine = wallLines[(index + 1) % wallLines.length];
@@ -5656,11 +5685,64 @@ function getRoomWallThicknessQuads(wallLines: RoomWallThicknessLine[]): RoomWall
     return {
       innerStart: wallLine.innerStart,
       innerEnd: wallLine.innerEnd,
-      outerStart: getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart, wallLine),
-      outerEnd: getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd, wallLine),
+      outerStart:
+        getExternalEnvelopeMiterPoint(wallLine, "start", allWallLines) ??
+        getWallMiterPoint(previousWallLine, wallLine, wallLine.outerStart, wallLine),
+      outerEnd:
+        getExternalEnvelopeMiterPoint(wallLine, "end", allWallLines) ??
+        getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd, wallLine),
       isExternal: wallLine.isExternal,
     };
   });
+}
+
+function getExternalEnvelopeMiterPoint(
+  wallLine: RoomWallThicknessLine,
+  endpointKey: "start" | "end",
+  wallLines: RoomWallThicknessLine[]
+): Point | null {
+  if (!wallLine.isExternal || wallLine.renderThicknessMm <= 0 || isDiagonalWallLine(wallLine)) {
+    return null;
+  }
+
+  const endpoint = getWallLineEndpoint(wallLine, endpointKey);
+  for (const otherWallLine of wallLines) {
+    if (otherWallLine === wallLine) continue;
+    if (!otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) continue;
+    if (isDiagonalWallLine(otherWallLine)) continue;
+    if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+
+    for (const otherEndpoint of getWallLineEndpoints(otherWallLine)) {
+      if (!hasInternalDiagonalConnector(endpoint.inner, otherEndpoint.inner, wallLines)) continue;
+
+      const miterPoint = getLineIntersection(
+        endpoint.outer,
+        wallLine.direction,
+        otherEndpoint.outer,
+        otherWallLine.direction
+      );
+      if (!miterPoint) continue;
+
+      const wallMiterDistanceMm = Math.hypot(
+        miterPoint.x - endpoint.outer.x,
+        miterPoint.y - endpoint.outer.y
+      );
+      const otherMiterDistanceMm = Math.hypot(
+        miterPoint.x - otherEndpoint.outer.x,
+        miterPoint.y - otherEndpoint.outer.y
+      );
+      if (
+        wallMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2 ||
+        otherMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2
+      ) {
+        continue;
+      }
+
+      return miterPoint;
+    }
+  }
+
+  return null;
 }
 
 function getWallMiterPoint(
@@ -6075,8 +6157,8 @@ function drawExternalWallBridges(
 
       const screenPoints = bridge.map((point) => worldToScreen(point, camera, viewport));
       graphics.setFillStyle({
-        color: theme.roomOutline,
-        alpha: EXTERNAL_WALL_FILL_ALPHA,
+        color: theme.externalWallFill,
+        alpha: WALL_FILL_ALPHA,
       });
       graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
       for (let pointIndex = 1; pointIndex < screenPoints.length; pointIndex += 1) {
@@ -6106,8 +6188,8 @@ function drawExternalWallCornerJoins(
 
       const screenPoints = join.map((point) => worldToScreen(point, camera, viewport));
       graphics.setFillStyle({
-        color: theme.roomOutline,
-        alpha: EXTERNAL_WALL_FILL_ALPHA,
+        color: theme.externalWallFill,
+        alpha: WALL_FILL_ALPHA,
       });
       graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
       for (let pointIndex = 1; pointIndex < screenPoints.length; pointIndex += 1) {
@@ -6197,10 +6279,37 @@ function getExternalWallCornerJoin(
   return null;
 }
 
+function hasInternalDiagonalConnector(
+  firstPoint: Point,
+  secondPoint: Point,
+  wallLines: RoomWallThicknessLine[]
+): boolean {
+  const gapMm = Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y);
+  if (gapMm <= 0.001 || gapMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) return false;
+
+  return wallLines.some((wallLine) => {
+    if (wallLine.isExternal || !isDiagonalWallLine(wallLine)) return false;
+    return (
+      (arePointsClose(wallLine.innerStart, firstPoint, DEFAULT_INTERNAL_WALL_THICKNESS_MM) &&
+        arePointsClose(wallLine.innerEnd, secondPoint, DEFAULT_INTERNAL_WALL_THICKNESS_MM)) ||
+      (arePointsClose(wallLine.innerStart, secondPoint, DEFAULT_INTERNAL_WALL_THICKNESS_MM) &&
+        arePointsClose(wallLine.innerEnd, firstPoint, DEFAULT_INTERNAL_WALL_THICKNESS_MM))
+    );
+  });
+}
+
+function arePointsClose(firstPoint: Point, secondPoint: Point, toleranceMm: number): boolean {
+  return Math.hypot(firstPoint.x - secondPoint.x, firstPoint.y - secondPoint.y) <= toleranceMm;
+}
+
 function isDiagonalWallLine(wallLine: RoomWallThicknessLine): boolean {
   const absX = Math.abs(wallLine.direction.x);
   const absY = Math.abs(wallLine.direction.y);
   return absX > 0.001 && absY > 0.001 && Math.abs(absX - absY) < 0.001;
+}
+
+function isHorizontalWallLine(wallLine: RoomWallThicknessLine): boolean {
+  return Math.abs(wallLine.direction.y) < 0.001 && Math.abs(wallLine.direction.x) > 0.001;
 }
 
 function getWallLineEndpoints(wallLine: RoomWallThicknessLine): WallEndpoint[] {
@@ -6219,6 +6328,23 @@ function getWallLineEndpoints(wallLine: RoomWallThicknessLine): WallEndpoint[] {
       },
     },
   ];
+}
+
+function getWallLineEndpoint(wallLine: RoomWallThicknessLine, endpointKey: "start" | "end"): WallEndpoint {
+  return endpointKey === "start"
+    ? {
+        inner: wallLine.innerStart,
+        outer: wallLine.outerStart,
+        directionAwayFromEndpoint: wallLine.direction,
+      }
+    : {
+        inner: wallLine.innerEnd,
+        outer: wallLine.outerEnd,
+        directionAwayFromEndpoint: {
+          x: -wallLine.direction.x,
+          y: -wallLine.direction.y,
+        },
+      };
 }
 
 function getExternalWallBridge(
@@ -6310,26 +6436,76 @@ function trimExternalWallInsideCornerOverlap(
 
   for (const otherWallLine of wallLines) {
     if (otherWallLine === wallLine) continue;
-    if (!otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) continue;
-    if (wallLine.roomId === otherWallLine.roomId) continue;
-    if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+    if (otherWallLine.renderThicknessMm <= 0) continue;
 
-    const startTrimCandidate = getExternalWallInsideCornerTrimMm(
-      wallLine.innerStart,
-      wallLine.direction,
-      otherWallLine
-    );
-    if (startTrimCandidate !== null) {
-      startTrimMm = Math.max(startTrimMm, startTrimCandidate);
+    if (otherWallLine.isExternal) {
+      if (wallLine.roomId === otherWallLine.roomId) continue;
+      if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+
+      const startTrimCandidate = getExternalWallInsideCornerTrimMm(
+        wallLine.innerStart,
+        wallLine.direction,
+        otherWallLine
+      );
+      if (startTrimCandidate !== null) {
+        startTrimMm = Math.max(startTrimMm, startTrimCandidate);
+      }
+
+      const endTrimCandidate = getExternalWallInsideCornerTrimMm(
+        wallLine.innerEnd,
+        { x: -wallLine.direction.x, y: -wallLine.direction.y },
+        otherWallLine
+      );
+      if (endTrimCandidate !== null) {
+        endTrimMm = Math.max(endTrimMm, endTrimCandidate);
+      }
+      continue;
     }
 
-    const endTrimCandidate = getExternalWallInsideCornerTrimMm(
-      wallLine.innerEnd,
-      { x: -wallLine.direction.x, y: -wallLine.direction.y },
-      otherWallLine
+    if (isDiagonalWallLine(otherWallLine)) {
+      if (!hasExternalEnvelopeCornerForInternalDiagonal(wallLine.innerStart, wallLine, otherWallLine, wallLines)) {
+        const startTrimCandidate = getExternalWallInternalCornerTrimMm(
+          wallLine.innerStart,
+          wallLine.direction,
+          otherWallLine
+        );
+        if (startTrimCandidate !== null) {
+          startTrimMm = Math.max(startTrimMm, startTrimCandidate);
+        }
+      }
+
+      if (!hasExternalEnvelopeCornerForInternalDiagonal(wallLine.innerEnd, wallLine, otherWallLine, wallLines)) {
+        const endTrimCandidate = getExternalWallInternalCornerTrimMm(
+          wallLine.innerEnd,
+          { x: -wallLine.direction.x, y: -wallLine.direction.y },
+          otherWallLine
+        );
+        if (endTrimCandidate !== null) {
+          endTrimMm = Math.max(endTrimMm, endTrimCandidate);
+        }
+      }
+    }
+  }
+
+  if (isHorizontalWallLine(wallLine)) {
+    const startConnectorTrimMm = getExternalEnvelopeConnectorTrimMm(
+      wallLine,
+      "start",
+      wallLine.direction,
+      wallLines
     );
-    if (endTrimCandidate !== null) {
-      endTrimMm = Math.max(endTrimMm, endTrimCandidate);
+    if (startConnectorTrimMm !== null) {
+      startTrimMm = Math.max(startTrimMm, startConnectorTrimMm);
+    }
+
+    const endConnectorTrimMm = getExternalEnvelopeConnectorTrimMm(
+      wallLine,
+      "end",
+      { x: -wallLine.direction.x, y: -wallLine.direction.y },
+      wallLines
+    );
+    if (endConnectorTrimMm !== null) {
+      endTrimMm = Math.max(endTrimMm, endConnectorTrimMm);
     }
   }
 
@@ -6400,6 +6576,242 @@ function getExternalWallInsideCornerTrimMm(
   }
 
   return trimToOtherOuterFaceMm;
+}
+
+function getExternalEnvelopeConnectorTrimMm(
+  wallLine: RoomWallThicknessLine,
+  endpointKey: "start" | "end",
+  trimDirection: Point,
+  wallLines: RoomWallThicknessLine[]
+): number | null {
+  const endpoint = getWallLineEndpoint(wallLine, endpointKey);
+
+  for (const otherWallLine of wallLines) {
+    if (otherWallLine === wallLine) continue;
+    if (!otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) continue;
+    if (isDiagonalWallLine(otherWallLine) || isHorizontalWallLine(otherWallLine)) continue;
+    if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) continue;
+
+    if (
+      !hasInternalDiagonalNearExternalOverlap(endpoint.inner, otherWallLine, wallLines) ||
+      !isPointInWallLineQuad(endpoint.inner, otherWallLine)
+    ) {
+      continue;
+    }
+
+    const trimMm = getRayWallLineQuadExitDistanceMm(endpoint.inner, trimDirection, otherWallLine);
+    if (trimMm <= 0.001 || trimMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) continue;
+
+    return trimMm;
+  }
+
+  return null;
+}
+
+function hasInternalDiagonalNearExternalOverlap(
+  point: Point,
+  externalWallLine: RoomWallThicknessLine,
+  wallLines: RoomWallThicknessLine[]
+): boolean {
+  return wallLines.some((wallLine) => {
+    if (wallLine.isExternal || !isDiagonalWallLine(wallLine)) return false;
+    const distanceToPointMm = getPointToSegmentDistanceMm(point, wallLine.innerStart, wallLine.innerEnd);
+    const distanceToExternalWallMm = Math.min(
+      getPointToSegmentDistanceMm(wallLine.innerStart, externalWallLine.innerStart, externalWallLine.innerEnd),
+      getPointToSegmentDistanceMm(wallLine.innerEnd, externalWallLine.innerStart, externalWallLine.innerEnd)
+    );
+
+    return (
+      distanceToPointMm <= DEFAULT_INTERNAL_WALL_THICKNESS_MM + 2 &&
+      distanceToExternalWallMm <= DEFAULT_INTERNAL_WALL_THICKNESS_MM + 2
+    );
+  });
+}
+
+function isPointInWallLineQuad(point: Point, wallLine: RoomWallThicknessLine): boolean {
+  return isPointInConvexPolygon(point, [
+    wallLine.innerStart,
+    wallLine.innerEnd,
+    wallLine.outerEnd,
+    wallLine.outerStart,
+  ]);
+}
+
+function getRayWallLineQuadExitDistanceMm(
+  point: Point,
+  direction: Point,
+  wallLine: RoomWallThicknessLine
+): number {
+  const points = [wallLine.innerStart, wallLine.innerEnd, wallLine.outerEnd, wallLine.outerStart];
+  let exitDistanceMm = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    const intersectionDistanceMm = getRaySegmentIntersectionDistanceMm(point, direction, start, end);
+    if (intersectionDistanceMm !== null && intersectionDistanceMm > 0.001) {
+      exitDistanceMm = Math.min(exitDistanceMm, intersectionDistanceMm);
+    }
+  }
+
+  return exitDistanceMm;
+}
+
+function getRaySegmentIntersectionDistanceMm(
+  rayStart: Point,
+  rayDirection: Point,
+  segmentStart: Point,
+  segmentEnd: Point
+): number | null {
+  const segmentDirection = {
+    x: segmentEnd.x - segmentStart.x,
+    y: segmentEnd.y - segmentStart.y,
+  };
+  const denominator = crossProduct(rayDirection, segmentDirection);
+  if (Math.abs(denominator) < 0.000001) return null;
+
+  const delta = {
+    x: segmentStart.x - rayStart.x,
+    y: segmentStart.y - rayStart.y,
+  };
+  const rayDistanceMm = crossProduct(delta, segmentDirection) / denominator;
+  const segmentDistance = crossProduct(delta, rayDirection) / denominator;
+  if (rayDistanceMm < -0.001 || segmentDistance < -0.001 || segmentDistance > 1.001) return null;
+
+  return rayDistanceMm;
+}
+
+function isPointInConvexPolygon(point: Point, polygon: Point[]): boolean {
+  if (polygon.length < 3) return false;
+
+  let sign = 0;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const start = polygon[index];
+    const end = polygon[(index + 1) % polygon.length];
+    const cross = crossProduct(
+      {
+        x: end.x - start.x,
+        y: end.y - start.y,
+      },
+      {
+        x: point.x - start.x,
+        y: point.y - start.y,
+      }
+    );
+    if (Math.abs(cross) <= 0.001) continue;
+    const nextSign = Math.sign(cross);
+    if (sign !== 0 && nextSign !== sign) return false;
+    sign = nextSign;
+  }
+
+  return true;
+}
+
+function getPointToSegmentDistanceMm(point: Point, start: Point, end: Point): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.001) return Math.hypot(point.x - start.x, point.y - start.y);
+
+  const rawT = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+  const t = Math.max(0, Math.min(1, rawT));
+  return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
+}
+
+function hasExternalEnvelopeCornerForInternalDiagonal(
+  endpoint: Point,
+  wallLine: RoomWallThicknessLine,
+  internalWallLine: RoomWallThicknessLine,
+  wallLines: RoomWallThicknessLine[]
+): boolean {
+  if (isDiagonalWallLine(wallLine)) return false;
+
+  return wallLines.some((otherWallLine) => {
+    if (otherWallLine === wallLine) return false;
+    if (!otherWallLine.isExternal || otherWallLine.renderThicknessMm <= 0) return false;
+    if (isDiagonalWallLine(otherWallLine)) return false;
+    if (Math.abs(dotProduct(wallLine.direction, otherWallLine.direction)) > 0.001) return false;
+
+    return getWallLineEndpoints(otherWallLine).some((otherEndpoint) => {
+      if (!hasInternalDiagonalConnector(endpoint, otherEndpoint.inner, [internalWallLine])) {
+        return false;
+      }
+
+      const miterPoint = getLineIntersection(
+        endpoint,
+        wallLine.direction,
+        otherEndpoint.inner,
+        otherWallLine.direction
+      );
+      if (!miterPoint) return false;
+
+      return (
+        Math.hypot(miterPoint.x - endpoint.x, miterPoint.y - endpoint.y) <=
+          DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2 &&
+        Math.hypot(miterPoint.x - otherEndpoint.inner.x, miterPoint.y - otherEndpoint.inner.y) <=
+          DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2
+      );
+    });
+  });
+}
+
+function getExternalWallInternalCornerTrimMm(
+  endpoint: Point,
+  trimDirection: Point,
+  otherWallLine: RoomWallThicknessLine
+): number | null {
+  const projectedAlongOther = dotProduct(
+    {
+      x: endpoint.x - otherWallLine.innerStart.x,
+      y: endpoint.y - otherWallLine.innerStart.y,
+    },
+    otherWallLine.direction
+  );
+  const otherLengthMm = getWallLineLengthMm(otherWallLine);
+  if (projectedAlongOther < -DEFAULT_INTERNAL_WALL_THICKNESS_MM || projectedAlongOther > otherLengthMm + DEFAULT_INTERNAL_WALL_THICKNESS_MM) {
+    return null;
+  }
+
+  const projectedAcrossOther = dotProduct(
+    {
+      x: endpoint.x - otherWallLine.innerStart.x,
+      y: endpoint.y - otherWallLine.innerStart.y,
+    },
+    otherWallLine.outwardNormal
+  );
+  if (projectedAcrossOther < -0.001 || projectedAcrossOther > otherWallLine.renderThicknessMm + 0.001) {
+    return null;
+  }
+
+  const trimPoint = getLineIntersection(
+    endpoint,
+    trimDirection,
+    otherWallLine.outerStart,
+    otherWallLine.direction
+  );
+  if (!trimPoint) return null;
+
+  const trimMm = dotProduct(
+    {
+      x: trimPoint.x - endpoint.x,
+      y: trimPoint.y - endpoint.y,
+    },
+    trimDirection
+  );
+  if (trimMm <= 0.001 || trimMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2) return null;
+
+  const trimAlongOther = dotProduct(
+    {
+      x: trimPoint.x - otherWallLine.innerStart.x,
+      y: trimPoint.y - otherWallLine.innerStart.y,
+    },
+    otherWallLine.direction
+  );
+  if (trimAlongOther < -DEFAULT_INTERNAL_WALL_THICKNESS_MM || trimAlongOther > otherLengthMm + DEFAULT_INTERNAL_WALL_THICKNESS_MM) {
+    return null;
+  }
+
+  return trimMm;
 }
 
 function getWallLineLengthMm(wallLine: RoomWallThicknessLine): number {
