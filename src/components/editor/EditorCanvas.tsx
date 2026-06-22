@@ -5534,7 +5534,7 @@ function drawRoomsWallThickness(
   );
   const wallLines = wallLinesByRoom.flat();
   const wallQuads = wallLinesByRoom.flatMap((roomWallLines) =>
-    getRoomWallThicknessQuads(roomWallLines, wallLines)
+    getRoomWallThicknessQuads(roomWallLines, wallLines, rooms)
   );
 
   drawWallThicknessQuads(
@@ -5554,8 +5554,8 @@ function drawRoomsWallThickness(
     WALL_FILL_ALPHA
   );
 
-  drawExternalWallCornerJoins(graphics, wallLines, camera, viewport, theme);
-  drawExternalWallBridges(graphics, wallLines, camera, viewport, theme);
+  drawExternalWallCornerJoins(graphics, wallLines, rooms, camera, viewport, theme);
+  drawExternalWallBridges(graphics, wallLines, rooms, camera, viewport, theme);
 }
 
 type RoomWallThicknessLine = {
@@ -5676,13 +5676,13 @@ function getRoomWallThicknessLines(room: Room, rooms: Room[]): RoomWallThickness
 
 function getRoomWallThicknessQuads(
   wallLines: RoomWallThicknessLine[],
-  allWallLines: RoomWallThicknessLine[]
+  allWallLines: RoomWallThicknessLine[],
+  rooms: Room[]
 ): RoomWallThicknessQuad[] {
-  return wallLines.map((wallLine, index) => {
+  return wallLines.flatMap((wallLine, index) => {
     const previousWallLine = wallLines[(index - 1 + wallLines.length) % wallLines.length];
     const nextWallLine = wallLines[(index + 1) % wallLines.length];
-
-    return {
+    const wallQuad = {
       innerStart: wallLine.innerStart,
       innerEnd: wallLine.innerEnd,
       outerStart:
@@ -5693,6 +5693,9 @@ function getRoomWallThicknessQuads(
         getWallMiterPoint(wallLine, nextWallLine, wallLine.outerEnd, wallLine),
       isExternal: wallLine.isExternal,
     };
+
+    if (!wallLine.isExternal) return [wallQuad];
+    return getVisibleWallQuadsOutsideRooms(wallLine, wallQuad, rooms);
   });
 }
 
@@ -5768,6 +5771,85 @@ function getWallMiterPoint(
   );
 }
 
+function getVisibleWallQuadsOutsideRooms(
+  wallLine: RoomWallThicknessLine,
+  wallQuad: RoomWallThicknessQuad,
+  rooms: Room[]
+): RoomWallThicknessQuad[] {
+  const wallLengthMm = getWallLineLengthMm(wallLine);
+  if (wallLengthMm <= 0.001) return [];
+
+  const roomBoundaries = rooms.filter((room) => room.id !== wallLine.roomId && room.points.length >= 3);
+  if (roomBoundaries.length === 0) return [wallQuad];
+
+  const sampleStepMm = Math.max(25, Math.min(50, wallLengthMm / 24));
+  const visibleIntervals: Array<{ startMm: number; endMm: number }> = [];
+  let visibleStartMm: number | null = null;
+
+  for (let startMm = 0; startMm < wallLengthMm - 0.001; startMm += sampleStepMm) {
+    const endMm = Math.min(wallLengthMm, startMm + sampleStepMm);
+    const sampleMm = (startMm + endMm) / 2;
+    const samplePoint = getWallQuadPointAtDistance(wallLine, wallQuad, sampleMm, 0.5);
+    const isInsideRoom = roomBoundaries.some((room) => isPointInPolygon(samplePoint, room.points));
+
+    if (!isInsideRoom && visibleStartMm === null) {
+      visibleStartMm = startMm;
+    } else if (isInsideRoom && visibleStartMm !== null) {
+      visibleIntervals.push({ startMm: visibleStartMm, endMm: startMm });
+      visibleStartMm = null;
+    }
+  }
+
+  if (visibleStartMm !== null) {
+    visibleIntervals.push({ startMm: visibleStartMm, endMm: wallLengthMm });
+  }
+
+  if (visibleIntervals.length === 0) return [];
+  if (visibleIntervals.length === 1 && visibleIntervals[0].startMm <= 0.001 && visibleIntervals[0].endMm >= wallLengthMm - 0.001) {
+    return [wallQuad];
+  }
+
+  return visibleIntervals
+    .filter((interval) => interval.endMm - interval.startMm > 0.001)
+    .map((interval) => getWallQuadSlice(wallLine, wallQuad, interval.startMm, interval.endMm));
+}
+
+function getWallQuadSlice(
+  wallLine: RoomWallThicknessLine,
+  wallQuad: RoomWallThicknessQuad,
+  startMm: number,
+  endMm: number
+): RoomWallThicknessQuad {
+  return {
+    innerStart: getWallQuadPointAtDistance(wallLine, wallQuad, startMm, 0),
+    innerEnd: getWallQuadPointAtDistance(wallLine, wallQuad, endMm, 0),
+    outerStart: getWallQuadPointAtDistance(wallLine, wallQuad, startMm, 1),
+    outerEnd: getWallQuadPointAtDistance(wallLine, wallQuad, endMm, 1),
+    isExternal: wallQuad.isExternal,
+  };
+}
+
+function getWallQuadPointAtDistance(
+  wallLine: RoomWallThicknessLine,
+  wallQuad: RoomWallThicknessQuad,
+  distanceMm: number,
+  outwardT: number
+): Point {
+  const wallLengthMm = getWallLineLengthMm(wallLine);
+  const alongT = wallLengthMm <= 0.001 ? 0 : Math.max(0, Math.min(1, distanceMm / wallLengthMm));
+  const innerPoint = lerpPoint(wallQuad.innerStart, wallQuad.innerEnd, alongT);
+  const outerPoint = lerpPoint(wallQuad.outerStart, wallQuad.outerEnd, alongT);
+
+  return lerpPoint(innerPoint, outerPoint, outwardT);
+}
+
+function lerpPoint(start: Point, end: Point, t: number): Point {
+  return {
+    x: start.x + (end.x - start.x) * t,
+    y: start.y + (end.y - start.y) * t,
+  };
+}
+
 function getWallSpanIntervals(
   roomId: string,
   segment: NonNullable<ReturnType<typeof getRoomWallSegment>>,
@@ -5808,7 +5890,10 @@ function getWallSpanIntervals(
     ...getInternalWallJunctionIntervals(roomId, segment, rooms, outwardNormal, direction)
   );
 
-  const mergedInternalIntervals = mergeWallSpanIntervals(internalIntervals, segment.lengthMm);
+  const mergedInternalIntervals = mergeWallSpanIntervals(
+    expandInternalWallSpanIntervals(internalIntervals, segment.lengthMm),
+    segment.lengthMm
+  );
   if (mergedInternalIntervals.length === 0) {
     return [{ startMm: 0, endMm: segment.lengthMm, isExternal: segment.isExternal !== false }];
   }
@@ -6042,6 +6127,16 @@ function mergeWallSpanIntervals(
   return mergedIntervals;
 }
 
+function expandInternalWallSpanIntervals(
+  intervals: Array<Pick<WallSpanInterval, "startMm" | "endMm">>,
+  wallLengthMm: number
+): Array<Pick<WallSpanInterval, "startMm" | "endMm">> {
+  return intervals.map((interval) => ({
+    startMm: Math.max(0, interval.startMm - DEFAULT_INTERNAL_WALL_THICKNESS_MM),
+    endMm: Math.min(wallLengthMm, interval.endMm + DEFAULT_INTERNAL_WALL_THICKNESS_MM),
+  }));
+}
+
 function getExternalWallRenderThicknessMm(
   roomId: string,
   start: Point,
@@ -6142,6 +6237,7 @@ function getFacingWallOverlap(
 function drawExternalWallBridges(
   graphics: Graphics,
   wallLines: RoomWallThicknessLine[],
+  rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -6154,6 +6250,7 @@ function drawExternalWallBridges(
       const otherWallLine = externalLines[otherIndex];
       const bridge = getExternalWallBridge(wallLine, otherWallLine);
       if (!bridge) continue;
+      if (isWallPolygonInsideAnyOtherRoom(bridge, [wallLine.roomId, otherWallLine.roomId], rooms)) continue;
 
       const screenPoints = bridge.map((point) => worldToScreen(point, camera, viewport));
       graphics.setFillStyle({
@@ -6173,6 +6270,7 @@ function drawExternalWallBridges(
 function drawExternalWallCornerJoins(
   graphics: Graphics,
   wallLines: RoomWallThicknessLine[],
+  rooms: Room[],
   camera: CameraState,
   viewport: ViewportSize,
   theme: EditorCanvasTheme
@@ -6185,6 +6283,7 @@ function drawExternalWallCornerJoins(
       const otherWallLine = externalLines[otherIndex];
       const join = getExternalWallCornerJoin(wallLine, otherWallLine);
       if (!join) continue;
+      if (isWallPolygonInsideAnyOtherRoom(join, [wallLine.roomId, otherWallLine.roomId], rooms)) continue;
 
       const screenPoints = join.map((point) => worldToScreen(point, camera, viewport));
       graphics.setFillStyle({
@@ -6277,6 +6376,38 @@ function getExternalWallCornerJoin(
   }
 
   return null;
+}
+
+function isWallPolygonInsideAnyOtherRoom(
+  polygon: Point[],
+  owningRoomIds: string[],
+  rooms: Room[]
+): boolean {
+  if (polygon.length < 3) return false;
+
+  const samplePoints = [
+    getPolygonCentroid(polygon),
+    ...polygon,
+  ];
+  return rooms.some((room) => {
+    if (owningRoomIds.includes(room.id) || room.points.length < 3) return false;
+    return samplePoints.some((point) => isPointInPolygon(point, room.points));
+  });
+}
+
+function getPolygonCentroid(points: Point[]): Point {
+  const total = points.reduce(
+    (sum, point) => ({
+      x: sum.x + point.x,
+      y: sum.y + point.y,
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length,
+  };
 }
 
 function hasInternalDiagonalConnector(
