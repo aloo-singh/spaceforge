@@ -4953,6 +4953,8 @@ function drawRooms(
         ? 1
         : 0;
 
+  drawRoomsWallThickness(graphics, rooms, camera, viewport, theme);
+
   if (shouldShowDestinationPreview && destinationPreviewAlpha > 0.02) {
     drawTransformDestinationPreview(
       graphics,
@@ -4963,8 +4965,6 @@ function drawRooms(
       destinationPreviewAlpha
     );
   }
-
-  drawRoomsWallThickness(graphics, rooms, camera, viewport, theme);
 
   for (const room of rooms) {
     if (room.points.length < 3) continue;
