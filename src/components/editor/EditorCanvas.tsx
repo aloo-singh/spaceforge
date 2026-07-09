@@ -5545,6 +5545,10 @@ function drawRoomsWallThickness(
     theme.externalWallFill,
     WALL_FILL_ALPHA
   );
+  drawExternalWallCornerJoins(graphics, wallLines, rooms, camera, viewport, theme);
+  drawExternalWallBridges(graphics, wallLines, rooms, camera, viewport, theme);
+  drawExternalWallMixedJunctionFills(graphics, wallLines, rooms, camera, viewport, theme);
+
   drawWallThicknessQuads(
     graphics,
     wallQuads.filter((wallQuad) => !wallQuad.isExternal),
@@ -5553,9 +5557,6 @@ function drawRoomsWallThickness(
     theme.internalWallFill,
     WALL_FILL_ALPHA
   );
-
-  drawExternalWallCornerJoins(graphics, wallLines, rooms, camera, viewport, theme);
-  drawExternalWallBridges(graphics, wallLines, rooms, camera, viewport, theme);
 }
 
 type RoomWallThicknessLine = {
@@ -5755,9 +5756,23 @@ function getSharedInternalWallEndpointPoint(
   endpointKey: "start" | "end",
   wallLines: RoomWallThicknessLine[]
 ): Point | null {
+  const endpoint = getWallLineEndpoint(wallLine, endpointKey);
+  const pairedEndpoint = getPairedSharedInternalWallEndpoint(wallLine, endpoint, wallLines);
+  if (!pairedEndpoint) return null;
+
+  return {
+    x: (endpoint.inner.x + pairedEndpoint.inner.x) / 2,
+    y: (endpoint.inner.y + pairedEndpoint.inner.y) / 2,
+  };
+}
+
+function getPairedSharedInternalWallEndpoint(
+  wallLine: RoomWallThicknessLine,
+  endpoint: WallEndpoint,
+  wallLines: RoomWallThicknessLine[]
+): WallEndpoint | null {
   if (wallLine.isExternal || wallLine.renderThicknessMm <= 0) return null;
 
-  const endpoint = getWallLineEndpoint(wallLine, endpointKey);
   let bestEndpoint: WallEndpoint | null = null;
   let bestDistanceMm = Number.POSITIVE_INFINITY;
 
@@ -5798,12 +5813,7 @@ function getSharedInternalWallEndpointPoint(
     }
   }
 
-  if (!bestEndpoint) return null;
-
-  return {
-    x: (endpoint.inner.x + bestEndpoint.inner.x) / 2,
-    y: (endpoint.inner.y + bestEndpoint.inner.y) / 2,
-  };
+  return bestEndpoint;
 }
 
 function getWallMiterPoint(
@@ -6323,6 +6333,130 @@ function drawExternalWallBridges(
       graphics.fill();
     }
   }
+}
+
+function drawExternalWallMixedJunctionFills(
+  graphics: Graphics,
+  wallLines: RoomWallThicknessLine[],
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const internalLines = wallLines.filter((wallLine) => !wallLine.isExternal && wallLine.renderThicknessMm > 0);
+  if (internalLines.length === 0) return;
+
+  for (const internalLine of internalLines) {
+    for (const internalEndpoint of getWallLineEndpoints(internalLine)) {
+      const pairedInternalEndpoint = getPairedSharedInternalWallEndpoint(
+        internalLine,
+        internalEndpoint,
+        wallLines
+      );
+      if (!pairedInternalEndpoint) continue;
+
+      const firstExternalEndpoint = getNearestExternalWallEndpoint(
+        internalEndpoint.inner,
+        wallLines,
+        []
+      );
+      const secondExternalEndpoint = getNearestExternalWallEndpoint(
+        pairedInternalEndpoint.inner,
+        wallLines,
+        []
+      );
+      if (!firstExternalEndpoint || !secondExternalEndpoint) continue;
+      if (firstExternalEndpoint.wallLine === secondExternalEndpoint.wallLine) continue;
+      if (Math.abs(crossProduct(firstExternalEndpoint.wallLine.direction, secondExternalEndpoint.wallLine.direction)) < 0.001) {
+        continue;
+      }
+
+      const miterPoint = getLineIntersection(
+        firstExternalEndpoint.endpoint.outer,
+        firstExternalEndpoint.wallLine.direction,
+        secondExternalEndpoint.endpoint.outer,
+        secondExternalEndpoint.wallLine.direction
+      );
+      if (!miterPoint) continue;
+
+      const firstMiterDistanceMm = Math.hypot(
+        miterPoint.x - firstExternalEndpoint.endpoint.outer.x,
+        miterPoint.y - firstExternalEndpoint.endpoint.outer.y
+      );
+      const secondMiterDistanceMm = Math.hypot(
+        miterPoint.x - secondExternalEndpoint.endpoint.outer.x,
+        miterPoint.y - secondExternalEndpoint.endpoint.outer.y
+      );
+      if (
+        firstMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2 ||
+        secondMiterDistanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM * 2
+      ) {
+        continue;
+      }
+
+      const fill = [
+        internalEndpoint.inner,
+        pairedInternalEndpoint.inner,
+        secondExternalEndpoint.endpoint.outer,
+        miterPoint,
+        firstExternalEndpoint.endpoint.outer,
+      ];
+      if (
+        isWallPolygonInsideAnyOtherRoom(
+          fill,
+          [
+            internalLine.roomId,
+            firstExternalEndpoint.wallLine.roomId,
+            secondExternalEndpoint.wallLine.roomId,
+          ],
+          rooms
+        )
+      ) {
+        continue;
+      }
+
+      const screenPoints = fill.map((point) => worldToScreen(point, camera, viewport));
+      graphics.setFillStyle({
+        color: theme.externalWallFill,
+        alpha: WALL_FILL_ALPHA,
+      });
+      graphics.moveTo(screenPoints[0].x, screenPoints[0].y);
+      for (let pointIndex = 1; pointIndex < screenPoints.length; pointIndex += 1) {
+        graphics.lineTo(screenPoints[pointIndex].x, screenPoints[pointIndex].y);
+      }
+      graphics.closePath();
+      graphics.fill();
+    }
+  }
+}
+
+function getNearestExternalWallEndpoint(
+  point: Point,
+  wallLines: RoomWallThicknessLine[],
+  ignoredRoomIds: string[]
+): { wallLine: RoomWallThicknessLine; endpoint: WallEndpoint } | null {
+  let nearestEndpoint: { wallLine: RoomWallThicknessLine; endpoint: WallEndpoint } | null = null;
+  let nearestDistanceMm = Number.POSITIVE_INFINITY;
+
+  for (const wallLine of wallLines) {
+    if (!wallLine.isExternal || wallLine.renderThicknessMm <= 0) continue;
+    if (ignoredRoomIds.includes(wallLine.roomId)) continue;
+
+    for (const endpoint of getWallLineEndpoints(wallLine)) {
+      const distanceMm = Math.hypot(endpoint.inner.x - point.x, endpoint.inner.y - point.y);
+      if (
+        distanceMm > DEFAULT_EXTERNAL_WALL_THICKNESS_MM + DEFAULT_INTERNAL_WALL_THICKNESS_MM + 2 ||
+        distanceMm >= nearestDistanceMm
+      ) {
+        continue;
+      }
+
+      nearestEndpoint = { wallLine, endpoint };
+      nearestDistanceMm = distanceMm;
+    }
+  }
+
+  return nearestEndpoint;
 }
 
 function drawExternalWallCornerJoins(

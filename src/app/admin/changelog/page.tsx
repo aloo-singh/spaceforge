@@ -10,6 +10,33 @@ export default function ChangelogPage() {
 
         <section className="mt-10 rounded-xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-2xl font-semibold">Wall Thickness Exploration (paused)</h2>
+            <span className="text-sm text-muted-foreground">Exploratory / no version bump</span>
+          </div>
+
+          <div className="mt-5 space-y-4 text-sm leading-relaxed text-foreground/90">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Investigated</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Investigated adding realistic wall thickness with 300 mm external walls and 150 mm internal walls.</li>
+                <li>Updated snapping grid exploration to 0.05 m.</li>
+                <li>Added a wall metadata model and basic rendering path.</li>
+                <li>Implemented a one-time migration and announcement flow.</li>
+                <li>Identified significant complexity in reliable outer/inner wall detection and geometry.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-foreground/95">Decision</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                <li>Paused the wall thickness work and will reassess the approach from first principles before proceeding.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-xl border border-border bg-card p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-2xl font-semibold">v0.81.2</h2>
             <span className="text-sm text-muted-foreground">2026-06-15</span>
           </div>
