@@ -37,6 +37,8 @@ export type RoomWall = RectangularRoomWall | number;
 export type OpeningType = "door" | "window";
 export type DoorOpeningSide = "interior" | "exterior";
 export type DoorHingeSide = "start" | "end";
+export type WallType = "external" | "internal" | "user";
+export type WallSide = "side-a" | "side-b";
 
 export type RoomOpening = {
   id: string;
@@ -68,6 +70,11 @@ export type Wall = {
   unitOrigin?: UnitOrigin;
   a: Point;
   b: Point;
+  thicknessMm: number;
+  type: WallType;
+  floorHeightMm: number;
+  ceilingHeightMm: number;
+  sides: readonly [WallSide, WallSide];
 };
 
 export type RulerMeasurement = {
