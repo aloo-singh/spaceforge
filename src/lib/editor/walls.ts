@@ -1,4 +1,5 @@
-import type { Point, Wall, WallSide, WallType } from "@/lib/editor/types";
+import type { EditorDocumentState } from "@/lib/editor/history";
+import type { Point, Room, Wall, WallSide, WallType } from "@/lib/editor/types";
 import { normalizeUnitOrigin, type UnitOrigin } from "@/lib/projects/region";
 
 export const DEFAULT_ROOM_BOUNDARY_WALL_THICKNESS_MM = 300;
@@ -52,4 +53,85 @@ export function cloneWall(wall: Wall): Wall {
 
 export function cloneWalls(walls: Wall[] | undefined): Wall[] {
   return (walls ?? []).map((wall) => cloneWall(wall));
+}
+
+export function areWallsEqual(a: Wall[] | undefined, b: Wall[] | undefined): boolean {
+  const wallsA = a ?? [];
+  const wallsB = b ?? [];
+  if (wallsA.length !== wallsB.length) return false;
+
+  for (let i = 0; i < wallsA.length; i += 1) {
+    const wallA = wallsA[i];
+    const wallB = wallsB[i];
+    if (
+      wallA.id !== wallB.id ||
+      normalizeUnitOrigin(wallA.unitOrigin) !== normalizeUnitOrigin(wallB.unitOrigin) ||
+      wallA.a.x !== wallB.a.x ||
+      wallA.a.y !== wallB.a.y ||
+      wallA.b.x !== wallB.b.x ||
+      wallA.b.y !== wallB.b.y ||
+      wallA.thicknessMm !== wallB.thicknessMm ||
+      wallA.type !== wallB.type ||
+      wallA.floorHeightMm !== wallB.floorHeightMm ||
+      wallA.ceilingHeightMm !== wallB.ceilingHeightMm ||
+      wallA.sides[0] !== wallB.sides[0] ||
+      wallA.sides[1] !== wallB.sides[1]
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function hasRoomBoundaryWalls(room: Pick<Room, "walls">): boolean {
+  return Array.isArray(room.walls) && room.walls.length > 0;
+}
+
+export function createMigratedRoomBoundaryWalls(room: Pick<Room, "id" | "unitOrigin" | "points">): Wall[] {
+  return createRoomBoundaryWalls(room.points, {
+    unitOrigin: room.unitOrigin,
+    createWallId: (edgeIndex) => `${room.id}-wall-${edgeIndex + 1}`,
+  });
+}
+
+export function migrateRoomBoundaryWalls(room: Room): Room {
+  if (hasRoomBoundaryWalls(room)) {
+    return {
+      ...room,
+      walls: cloneWalls(room.walls),
+    };
+  }
+
+  return {
+    ...room,
+    walls: createMigratedRoomBoundaryWalls(room),
+  };
+}
+
+export function migrateDocumentRoomsToWalls(document: EditorDocumentState): {
+  document: EditorDocumentState;
+  didMigrate: boolean;
+} {
+  let didMigrate = false;
+  const rooms = document.rooms.map((room) => {
+    if (hasRoomBoundaryWalls(room)) return room;
+    didMigrate = true;
+    return migrateRoomBoundaryWalls(room);
+  });
+
+  if (!didMigrate) {
+    return {
+      document,
+      didMigrate: false,
+    };
+  }
+
+  return {
+    document: {
+      ...document,
+      rooms,
+    },
+    didMigrate: true,
+  };
 }

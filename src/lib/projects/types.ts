@@ -14,6 +14,7 @@ import {
   PROJECT_EXPORT_TITLE_MAX_LENGTH,
 } from "@/lib/projects/exportConfig";
 import { isProjectRegion, isUnitOrigin, normalizeProjectRegion } from "@/lib/projects/region";
+import type { Wall } from "@/lib/editor/types";
 
 export type AppUser = {
   id: string;
@@ -138,6 +139,35 @@ function isRoomInteriorAsset(value: unknown): boolean {
   );
 }
 
+function isWall(value: unknown): value is Wall {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
+  if (!isPoint(value.a) || !isPoint(value.b)) return false;
+  if (
+    value.type !== "external" &&
+    value.type !== "internal" &&
+    value.type !== "user"
+  ) {
+    return false;
+  }
+  if (
+    !Array.isArray(value.sides) ||
+    value.sides.length !== 2 ||
+    (value.sides[0] !== "side-a" && value.sides[0] !== "side-b") ||
+    (value.sides[1] !== "side-a" && value.sides[1] !== "side-b")
+  ) {
+    return false;
+  }
+
+  return (
+    isFiniteNumber(value.thicknessMm) &&
+    value.thicknessMm > 0 &&
+    isFiniteNumber(value.floorHeightMm) &&
+    isFiniteNumber(value.ceilingHeightMm)
+  );
+}
+
 function isRoom(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -146,6 +176,9 @@ function isRoom(value: unknown): boolean {
   if (typeof value.name !== "string") return false;
   if (!Array.isArray(value.points) || value.points.length < 3) return false;
   if (!value.points.every(isPoint)) return false;
+  if (value.walls !== undefined && (!Array.isArray(value.walls) || !value.walls.every(isWall))) {
+    return false;
+  }
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
     return false;
   }

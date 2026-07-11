@@ -118,7 +118,7 @@ import {
   getWallSplitResult,
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
-import { cloneWalls, createRoomBoundaryWalls } from "@/lib/editor/walls";
+import { cloneWalls, createRoomBoundaryWalls, migrateDocumentRoomsToWalls } from "@/lib/editor/walls";
 import {
   ROOM_PRESET_OTHER_COLOR,
   getRegionalRoomPresetBaseName,
@@ -2443,6 +2443,7 @@ function getSafePersistedHistorySnapshot(
             floorId: room.floorId,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
+            walls: cloneWalls(room.walls),
             openings: cloneRoomOpenings(room.openings),
             interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
           })),
@@ -7577,7 +7578,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Recovery automatically positions the camera to fit the project layout.
   loadProjectDocument: (document, options) =>
     set((state) => {
-      const nextDocument = cloneDocumentState(document);
+      const nextDocument = migrateDocumentRoomsToWalls(cloneDocumentState(document)).document;
       if (areDocumentsEqual(state.document, nextDocument)) {
         return state;
       }
