@@ -4,8 +4,10 @@ export type EditorExportScaleBarPosition = "bottom-left" | "none";
 export type EditorExportResolution = "normal" | "hi-res";
 export type EditorExportFormat = "png-normal" | "png-hi-res" | "svg" | "pdf";
 export type EditorExportAssetMode = "all" | "stairs-only" | "none";
+export type EditorExportMode = "2d" | "2.5d";
 
 export type EditorExportPreferences = {
+  exportMode: EditorExportMode;
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
@@ -19,6 +21,7 @@ export type EditorExportPreferences = {
 };
 
 export const DEFAULT_EDITOR_EXPORT_PREFERENCES: EditorExportPreferences = {
+  exportMode: "2d",
   showLegend: false,
   showScaleBar: false,
   showGrid: true,
@@ -72,6 +75,7 @@ export function cloneEditorExportPreferences(
   preferences: EditorExportPreferences
 ): EditorExportPreferences {
   return {
+    exportMode: preferences.exportMode,
     showLegend: preferences.showLegend,
     showScaleBar: preferences.showScaleBar,
     showGrid: preferences.showGrid,
@@ -90,6 +94,7 @@ export function areEditorExportPreferencesEqual(
   b: EditorExportPreferences
 ) {
   return (
+    a.exportMode === b.exportMode &&
     a.showLegend === b.showLegend &&
     a.showScaleBar === b.showScaleBar &&
     a.showGrid === b.showGrid &&
@@ -114,6 +119,10 @@ export function normalizeEditorExportPreferences(value: unknown): EditorExportPr
       : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportResolution;
 
   return {
+    exportMode:
+      "exportMode" in value && (value.exportMode === "2d" || value.exportMode === "2.5d")
+        ? value.exportMode
+        : DEFAULT_EDITOR_EXPORT_PREFERENCES.exportMode,
     showLegend:
       "showLegend" in value && typeof value.showLegend === "boolean"
         ? value.showLegend

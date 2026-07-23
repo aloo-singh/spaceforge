@@ -27,6 +27,7 @@ import type {
   EditorExportResolution,
   EditorExportFormat,
   EditorExportAssetMode,
+  EditorExportMode,
 } from "@/lib/editor/exportPreferences";
 import {
   PROJECT_EXPORT_DESCRIPTION_MAX_LENGTH,
@@ -67,6 +68,7 @@ const EXPORT_ROOM_COLOR_SWATCHES = [
 ];
 
 export type ExportPngRequest = {
+  exportMode: EditorExportMode;
   exportScope?: EditorExportScope;
   roomColorMode: EditorExportRoomColorMode;
   roomColorOverride?: string;
@@ -101,6 +103,7 @@ type ExportPngDialogProps = {
   titlePosition: ProjectExportTitlePosition;
   descriptionPosition: ProjectExportDescriptionPosition;
   includeNorthIndicator: boolean;
+  exportMode: EditorExportMode;
   showLegend: boolean;
   showScaleBar: boolean;
   showGrid: boolean;
@@ -116,6 +119,7 @@ type ExportPngDialogProps = {
   onTitlePositionChange: (value: ProjectExportTitlePosition) => void;
   onDescriptionPositionChange: (value: ProjectExportDescriptionPosition) => void;
   onIncludeNorthIndicatorChange: (value: boolean) => void;
+  onExportModeChange: (value: EditorExportMode) => void;
   onShowLegendChange: (value: boolean) => void;
   onShowScaleBarChange: (value: boolean) => void;
   onShowGridChange: (value: boolean) => void;
@@ -143,6 +147,7 @@ export function ExportPngDialog({
   titlePosition,
   descriptionPosition,
   includeNorthIndicator,
+  exportMode,
   showLegend,
   showScaleBar,
   showGrid,
@@ -158,6 +163,7 @@ export function ExportPngDialog({
   onTitlePositionChange,
   onDescriptionPositionChange,
   onIncludeNorthIndicatorChange,
+  onExportModeChange,
   onShowLegendChange,
   onShowScaleBarChange,
   onShowGridChange,
@@ -260,6 +266,7 @@ export function ExportPngDialog({
       }, 160);
 
       void onPreviewRequest({
+        exportMode,
         exportScope,
         roomColorMode,
         roomColorOverride: roomColorMode === "single" ? roomColorOverride : undefined,
@@ -318,6 +325,7 @@ export function ExportPngDialog({
     titlePosition,
     descriptionPosition,
     includeNorthIndicator,
+    exportMode,
     effectiveLegendPosition,
     effectiveScaleBarPosition,
     designedBy,
@@ -334,6 +342,7 @@ export function ExportPngDialog({
 
     handleOpenChange(false);
     void onExport({
+      exportMode,
       exportScope,
       roomColorMode,
       roomColorOverride: roomColorMode === "single" ? roomColorOverride : undefined,
@@ -521,47 +530,68 @@ export function ExportPngDialog({
         <section className="min-h-0 pr-1 lg:h-full lg:overflow-y-auto">
           <div className="space-y-2.5 pb-2 lg:pb-1">
             <div className="rounded-xl border border-border/70 bg-muted/25 p-3.5">
-              <div className="space-y-1">
-                <label
-                  htmlFor="export-png-scope"
-                  className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase"
-                >
-                  What to export
-                </label>
-                <Select value={effectiveScopeValue} onValueChange={setSelectedScopeValue}>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <SelectTrigger id="export-png-scope" className="h-9 bg-background/90">
-                          <SelectValue placeholder="Choose export scope" />
-                        </SelectTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">Choose a floor or a single room for this export.</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <SelectContent>
-                    {exportScopeOptions.floors.map((floor, index) => (
-                      <SelectGroup key={floor.id}>
-                        {index > 0 ? <SelectSeparator /> : null}
-                        <SelectLabel>{floor.name}</SelectLabel>
-                        <SelectItem value={formatExportScopeValue({ type: "floor", id: floor.id })}>
-                          {floor.id === exportScopeOptions.activeFloorId ? "Current floor" : floor.name}
-                        </SelectItem>
-                        {floor.rooms.map((room) => (
-                          <SelectItem
-                            key={room.id}
-                            value={formatExportScopeValue({ type: "room", id: room.id })}
-                            className="pl-5"
-                          >
-                            {room.id === exportScopeOptions.selectedRoomId
-                              ? `Selected room - ${room.name}`
-                              : room.name}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor="export-png-scope"
+                    className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase"
+                  >
+                    What to export
+                  </label>
+                  <Select value={effectiveScopeValue} onValueChange={setSelectedScopeValue}>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <SelectTrigger id="export-png-scope" className="h-9 bg-background/90">
+                            <SelectValue placeholder="Choose export scope" />
+                          </SelectTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Choose a floor or a single room for this export.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <SelectContent>
+                      {exportScopeOptions.floors.map((floor, index) => (
+                        <SelectGroup key={floor.id}>
+                          {index > 0 ? <SelectSeparator /> : null}
+                          <SelectLabel>{floor.name}</SelectLabel>
+                          <SelectItem value={formatExportScopeValue({ type: "floor", id: floor.id })}>
+                            {floor.id === exportScopeOptions.activeFloorId
+                              ? "Current floor"
+                              : floor.name}
                           </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
+                          {floor.rooms.map((room) => (
+                            <SelectItem
+                              key={room.id}
+                              value={formatExportScopeValue({ type: "room", id: room.id })}
+                              className="pl-5"
+                            >
+                              {room.id === exportScopeOptions.selectedRoomId
+                                ? `Selected room - ${room.name}`
+                                : room.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1 border-t border-border/60 pt-3">
+                  <p className="text-[11px] font-medium tracking-[0.04em] text-foreground/88 uppercase">
+                    View
+                  </p>
+                  <PositionChoice
+                    ariaLabel="Export view"
+                    value={exportMode}
+                    options={[
+                      { label: "2D Top-Down", value: "2d" },
+                      { label: "2.5D Extruded", value: "2.5d" },
+                    ]}
+                    onChange={onExportModeChange}
+                  />
+                </div>
               </div>
             </div>
 

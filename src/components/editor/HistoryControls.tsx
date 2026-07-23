@@ -885,6 +885,7 @@ export function HistoryControls({
         titlePosition={exportTitlePosition}
         descriptionPosition={exportDescriptionPosition}
         includeNorthIndicator={includeNorthIndicator}
+        exportMode={exportPreferences.exportMode}
         showLegend={exportPreferences.showLegend}
         showScaleBar={exportPreferences.showScaleBar}
         showGrid={exportPreferences.showGrid}
@@ -904,6 +905,7 @@ export function HistoryControls({
         onIncludeNorthIndicatorChange={(value) =>
           updateProjectExportConfig({ includeNorthIndicator: value })
         }
+        onExportModeChange={(value) => updateExportPreferences({ exportMode: value })}
         onShowLegendChange={(value) => updateExportPreferences({ showLegend: value })}
         onShowScaleBarChange={(value) => updateExportPreferences({ showScaleBar: value })}
         onShowGridChange={(value) => updateExportPreferences({ showGrid: value })}
