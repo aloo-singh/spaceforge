@@ -118,6 +118,7 @@ import {
   getWallSplitResult,
   type WallSplitResult,
 } from "@/lib/editor/wallSplit";
+import { cloneWalls, createRoomBoundaryWalls, migrateDocumentRoomsToWalls } from "@/lib/editor/walls";
 import {
   ROOM_PRESET_OTHER_COLOR,
   getRegionalRoomPresetBaseName,
@@ -644,6 +645,14 @@ function createOpeningId(): string {
   return `opening-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+function createWallId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `wall-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
 function createInteriorAssetId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -793,6 +802,10 @@ function buildConnectedFloorDocument(
     floorId: createdFloorId,
     name: room.name,
     points: room.points.map((point) => ({ ...point })),
+    walls: createRoomBoundaryWalls(room.points, {
+      unitOrigin: getDocumentUnitOrigin(document),
+      createWallId: () => createWallId(),
+    }),
     openings: [],
     interiorAssets: [
       {
@@ -846,6 +859,7 @@ function cloneRoom(room: Room): Room {
     roomType: room.roomType,
     roomColor: room.roomColor,
     points: room.points.map((point) => ({ ...point })),
+    walls: cloneWalls(room.walls),
     openings: cloneRoomOpenings(room.openings),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
   };
@@ -2429,6 +2443,7 @@ function getSafePersistedHistorySnapshot(
             floorId: room.floorId,
             name: room.name,
             points: room.points.map((point) => ({ ...point })),
+            walls: cloneWalls(room.walls),
             openings: cloneRoomOpenings(room.openings),
             interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
           })),
@@ -7563,7 +7578,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Recovery automatically positions the camera to fit the project layout.
   loadProjectDocument: (document, options) =>
     set((state) => {
-      const nextDocument = cloneDocumentState(document);
+      const nextDocument = migrateDocumentRoomsToWalls(cloneDocumentState(document)).document;
       if (areDocumentsEqual(state.document, nextDocument)) {
         return state;
       }
@@ -7753,6 +7768,10 @@ function completeDraftRoom(state: EditorState, draftPoints: Point[]) {
     floorId: getNormalizedActiveFloorId(state.document),
     name: `Room ${getRoomsForActiveFloor(state.document).length + 1}`,
     points: normalizedRoomPoints.map((point) => ({ ...point })),
+    walls: createRoomBoundaryWalls(normalizedRoomPoints, {
+      unitOrigin: getDocumentUnitOrigin(state.document),
+      createWallId: () => createWallId(),
+    }),
     openings: [],
     interiorAssets: [],
   };

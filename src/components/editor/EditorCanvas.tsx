@@ -194,6 +194,7 @@ import type {
   RoomWallSelection,
   ScreenPoint,
   ViewportSize,
+  Wall,
 } from "@/lib/editor/types";
 import { useEditorStore } from "@/stores/editorStore";
 import { type ExportPngRequest } from "@/components/editor/ExportPngDialog";
@@ -4940,6 +4941,7 @@ function drawRooms(
       isSelected ? selectedStrokeAlpha : 0.9,
       roomColor ?? undefined
     );
+    drawRoomWalls(graphics, room, camera, viewport, theme);
 
     if (isAssetDragTarget) {
       drawRoomShape(
@@ -5099,6 +5101,54 @@ function drawRooms(
       });
     }
   }
+}
+
+function drawRoomWalls(
+  graphics: Graphics,
+  room: Room,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const walls = room.walls ?? [];
+  if (walls.length === 0) return;
+
+  for (let edgeIndex = 0; edgeIndex < room.points.length; edgeIndex += 1) {
+    const wall = walls[edgeIndex];
+    if (!wall) continue;
+
+    const edgeStart = room.points[edgeIndex];
+    const edgeEnd = room.points[(edgeIndex + 1) % room.points.length];
+    if (!edgeStart || !edgeEnd) continue;
+
+    drawWallSegment(graphics, wall, edgeStart, edgeEnd, camera, viewport, theme);
+  }
+}
+
+function drawWallSegment(
+  graphics: Graphics,
+  wall: Wall,
+  startPoint: Point,
+  endPoint: Point,
+  camera: CameraState,
+  viewport: ViewportSize,
+  theme: EditorCanvasTheme
+) {
+  const start = worldToScreen(startPoint, camera, viewport);
+  const end = worldToScreen(endPoint, camera, viewport);
+  const thicknessPx = Math.max(wall.thicknessMm * camera.pixelsPerMm, 2.5);
+  const isExternal = wall.type === "external";
+
+  graphics.setStrokeStyle({
+    width: thicknessPx,
+    color: isExternal ? theme.roomOutline : theme.roomSelectionOutline,
+    alpha: isExternal ? 0.72 : 0.42,
+    cap: "butt",
+    join: "miter",
+  });
+  graphics.moveTo(start.x, start.y);
+  graphics.lineTo(end.x, end.y);
+  graphics.stroke();
 }
 
 function isRoomSelected(selection: SharedSelectionItem[], roomId: string) {

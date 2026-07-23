@@ -8,6 +8,7 @@ import {
   normalizeCanvasRotationDegrees,
 } from "@/lib/editor/canvasRotation";
 import { DEFAULT_NORTH_BEARING_DEGREES, normalizeNorthBearingDegrees } from "@/lib/editor/north";
+import { cloneWalls } from "@/lib/editor/walls";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 import {
   cloneProjectExportConfig,
@@ -506,6 +507,7 @@ export function applyEditorCommand(
           roomType: command.room.roomType,
           roomColor: command.room.roomColor,
           points: command.room.points.map((point) => ({ ...point })),
+          walls: cloneWalls(command.room.walls),
           openings: cloneRoomOpenings(command.room.openings),
           interiorAssets: cloneRoomInteriorAssets(command.room.interiorAssets),
         },
@@ -1317,6 +1319,7 @@ function cloneEditorDocumentState(document: EditorDocumentState): EditorDocument
       floorId: getRoomFloorId(room, document),
       name: room.name,
       points: room.points.map((point) => ({ ...point })),
+      walls: cloneWalls(room.walls),
       openings: cloneRoomOpenings(room.openings),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets),
     })),

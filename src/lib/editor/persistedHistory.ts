@@ -18,6 +18,7 @@ import { normalizeProjectExportConfig } from "@/lib/projects/exportConfig";
 import { normalizeProjectRegion, normalizeUnitOrigin } from "@/lib/projects/region";
 import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import { normalizeCanvasRotationDegrees } from "@/lib/editor/canvasRotation";
+import { areWallsEqual, cloneWalls } from "@/lib/editor/walls";
 import type { Floor, Room, RoomInteriorAsset, RoomOpening, InteriorAssetType, RulerMeasurement } from "@/lib/editor/types";
 
 function areFloorsEqual(a: Floor[], b: Floor[]): boolean {
@@ -105,6 +106,7 @@ export function areDocumentsEqual(a: EditorDocumentState, b: EditorDocumentState
       return false;
     }
     if (!arePointListsEqual(roomA.points, roomB.points)) return false;
+    if (!areWallsEqual(roomA.walls, roomB.walls)) return false;
     if (!areRoomOpeningsEqual(roomA.openings ?? [], roomB.openings ?? [])) return false;
     if (!areRoomInteriorAssetsEqual(roomA.interiorAssets ?? [], roomB.interiorAssets ?? [])) return false;
   }
@@ -136,6 +138,7 @@ export function cloneDocumentState(document: EditorDocumentState): EditorDocumen
       roomType: room.roomType,
       roomColor: room.roomColor,
       points: room.points.map((point) => ({ ...point })),
+      walls: cloneWalls(room.walls),
       openings: cloneRoomOpenings(room.openings ?? []),
       interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
     })),

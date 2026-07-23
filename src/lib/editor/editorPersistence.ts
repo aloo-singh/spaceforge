@@ -26,6 +26,7 @@ import {
   DEFAULT_NORTH_BEARING_DEGREES,
   normalizeNorthBearingDegrees,
 } from "@/lib/editor/north";
+import { cloneWalls, migrateDocumentRoomsToWalls } from "@/lib/editor/walls";
 import {
   cloneEditorExportPreferences,
   DEFAULT_EDITOR_EXPORT_PREFERENCES,
@@ -40,6 +41,7 @@ import {
   normalizeUnitOrigin,
   type ProjectRegion,
 } from "@/lib/projects/region";
+import type { Wall } from "@/lib/editor/types";
 
 // Browser persistence schema for the editor.
 // Compatibility rules:
@@ -62,9 +64,22 @@ import {
 export const EDITOR_PERSISTENCE_STORAGE_KEY = "spaceforge.editor.state";
 export const EDITOR_PERSISTENCE_VERSION = 14;
 export const PERSISTED_HISTORY_STATE_LIMIT = 50;
+const WALL_OBJECTS_MIGRATION_STORAGE_KEY = "spaceforge.editor.wallObjectsMigrationDone";
 
 function warnEditorPersistence(message: string, details?: unknown) {
   console.warn(`[spaceforge] ${message}`, details);
+}
+
+function markWallObjectsMigrationDone(storage: Storage | null): boolean {
+  if (!storage) return false;
+
+  try {
+    storage.setItem(WALL_OBJECTS_MIGRATION_STORAGE_KEY, "true");
+    return true;
+  } catch (error) {
+    warnEditorPersistence("Failed to mark wall objects migration as complete.", error);
+    return false;
+  }
 }
 
 type PersistedPoint = Point;
@@ -77,6 +92,7 @@ type PersistedRoom = {
   roomType?: Room["roomType"];
   roomColor?: Room["roomColor"];
   points: PersistedPoint[];
+  walls?: Wall[];
   openings?: Room["openings"];
   interiorAssets?: Room["interiorAssets"];
 };
@@ -108,6 +124,7 @@ export type PersistedEditorHydrationSnapshot = {
   exportPreferences: EditorExportPreferences;
   historyStack: EditorDocumentState[] | null;
   historyIndex: number | null;
+  didRunWallObjectsMigration?: boolean;
 };
 
 export type PersistedEditorPayloadV1 = {
@@ -333,6 +350,35 @@ function isRoomInteriorAsset(value: unknown): value is Room["interiorAssets"][nu
   );
 }
 
+function isWall(value: unknown): value is Wall {
+  if (!isObject(value)) return false;
+  if (typeof value.id !== "string") return false;
+  if (value.unitOrigin !== undefined && !isUnitOrigin(value.unitOrigin)) return false;
+  if (!isPoint(value.a) || !isPoint(value.b)) return false;
+  if (
+    value.type !== "external" &&
+    value.type !== "internal" &&
+    value.type !== "user"
+  ) {
+    return false;
+  }
+  if (
+    !Array.isArray(value.sides) ||
+    value.sides.length !== 2 ||
+    (value.sides[0] !== "side-a" && value.sides[0] !== "side-b") ||
+    (value.sides[1] !== "side-a" && value.sides[1] !== "side-b")
+  ) {
+    return false;
+  }
+
+  return (
+    isFiniteNumber(value.thicknessMm) &&
+    value.thicknessMm > 0 &&
+    isFiniteNumber(value.floorHeightMm) &&
+    isFiniteNumber(value.ceilingHeightMm)
+  );
+}
+
 function isRoom(value: unknown): value is PersistedRoom {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -343,6 +389,9 @@ function isRoom(value: unknown): value is PersistedRoom {
   if (value.roomColor !== undefined && typeof value.roomColor !== "string") return false;
   if (!Array.isArray(value.points)) return false;
   if (value.points.length < 3) return false;
+  if (value.walls !== undefined && (!Array.isArray(value.walls) || !value.walls.every(isWall))) {
+    return false;
+  }
   if (value.openings !== undefined && (!Array.isArray(value.openings) || !value.openings.every(isRoomOpening))) {
     return false;
   }
@@ -416,6 +465,10 @@ function isPersistedHistory(
   return value.stack.every((snapshot) => isPersistedDocument(snapshot));
 }
 
+function hasPersistedRoomBoundaryWalls(room: PersistedRoom | Room): boolean {
+  return Array.isArray(room.walls) && room.walls.length > 0;
+}
+
 function clonePoint(point: Point): Point {
   return {
     x: point.x,
@@ -432,6 +485,7 @@ function cloneRoom(room: PersistedRoom | Room): Room {
     roomType: room.roomType,
     roomColor: room.roomColor,
     points: room.points.map(clonePoint),
+    walls: cloneWalls(room.walls),
     openings: cloneRoomOpenings(room.openings ?? []),
     interiorAssets: cloneRoomInteriorAssets(room.interiorAssets ?? []),
   };
@@ -486,13 +540,16 @@ function createHistorylessHydrationSnapshot(
   document: PersistedDocument | EditorDocumentState,
   camera: CameraState | null
 ): PersistedEditorHydrationSnapshot {
+  const wallMigration = migrateDocumentRoomsToWalls(cloneDocument(document));
+
   return {
-    document: cloneDocument(document),
+    document: wallMigration.document,
     camera: camera ? cloneCamera(camera) : null,
     settings: cloneEditorSettings(DEFAULT_EDITOR_SETTINGS),
     exportPreferences: cloneEditorExportPreferences(DEFAULT_EDITOR_EXPORT_PREFERENCES),
     historyStack: null,
     historyIndex: null,
+    didRunWallObjectsMigration: wallMigration.didMigrate,
   };
 }
 
@@ -507,7 +564,7 @@ function normalizeDocumentForSegmentAnchoring(
     activeFloorId: document.activeFloorId ?? null,
   });
 
-  return {
+  const wallMigration = migrateDocumentRoomsToWalls({
     region: normalizeProjectRegion(document.region),
     floors,
     activeFloorId,
@@ -537,7 +594,9 @@ function normalizeDocumentForSegmentAnchoring(
       };
     }),
     rulerMeasurements: (document.rulerMeasurements ?? []).map(cloneRulerMeasurement),
-  };
+  });
+
+  return wallMigration.document;
 }
 
 function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload {
@@ -587,23 +646,35 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
     }
 
     const shouldMigrateNumericSegmentOffsets = parsed.version < 12;
+    const didMigrateDocumentWalls = parsed.document.rooms.some(
+      (room) => !hasPersistedRoomBoundaryWalls(room)
+    );
     const normalizedDocument = normalizeDocumentForSegmentAnchoring(parsed.document, {
       migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
     });
+    let didRunWallObjectsMigration = didMigrateDocumentWalls;
 
     const normalizedHistory = isPersistedHistory(parsed.history)
-      ? normalizePersistedHistorySnapshot(
-          {
-            historyStack: parsed.history.stack.map((document) =>
-              normalizeDocumentForSegmentAnchoring(document, {
+      ? (() => {
+          const historyStack = parsed.history.stack.map((document) => {
+            if (document.rooms.some((room) => !hasPersistedRoomBoundaryWalls(room))) {
+              didRunWallObjectsMigration = true;
+            }
+
+            return normalizeDocumentForSegmentAnchoring(document, {
                 migrateNumericSegmentOffsets: shouldMigrateNumericSegmentOffsets,
-              })
-            ),
-            historyIndex: parsed.history.index,
-          },
-          PERSISTED_HISTORY_STATE_LIMIT,
-          normalizedDocument
-        )
+              });
+          });
+
+          return normalizePersistedHistorySnapshot(
+            {
+              historyStack,
+              historyIndex: parsed.history.index,
+            },
+            PERSISTED_HISTORY_STATE_LIMIT,
+            normalizedDocument
+          );
+        })()
       : null;
 
     return {
@@ -623,6 +694,7 @@ function parsePersistedEditorPayload(raw: string): PersistedEditorParsedPayload 
         ),
         historyStack: normalizedHistory?.historyStack ?? null,
         historyIndex: normalizedHistory?.historyIndex ?? null,
+        didRunWallObjectsMigration,
       },
     };
   } catch {
@@ -730,6 +802,22 @@ export function loadEditorSnapshotForHydration(
     const snapshot = deserializeEditorSnapshotForHydration(raw);
     if (!snapshot) {
       warnEditorPersistence("Ignoring invalid persisted editor hydration snapshot.");
+    }
+    if (snapshot?.didRunWallObjectsMigration && snapshot.camera) {
+      const didSave = saveEditorSnapshot(
+        {
+          document: snapshot.document,
+          camera: snapshot.camera,
+          settings: snapshot.settings,
+          exportPreferences: snapshot.exportPreferences,
+          historyStack: snapshot.historyStack ?? [snapshot.document],
+          historyIndex: snapshot.historyIndex ?? 0,
+        },
+        storage
+      );
+      if (didSave) {
+        markWallObjectsMigrationDone(storage);
+      }
     }
     return snapshot;
   } catch (error) {
