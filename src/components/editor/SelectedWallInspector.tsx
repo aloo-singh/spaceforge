@@ -3,7 +3,7 @@
 import { EditorInspectorSection } from "@/components/editor/EditorInspectorSection";
 import { UnitOriginTag } from "@/components/editor/UnitOriginTag";
 import { formatWallDimension } from "@/lib/editor/measurements";
-import type { Room, RoomWall } from "@/lib/editor/types";
+import type { Room, RoomWall, Wall } from "@/lib/editor/types";
 import { getRoomWallSegment } from "@/lib/editor/openings";
 import { getWallLabel } from "@/lib/editor/breadcrumbs";
 import { useEditorStore } from "@/stores/editorStore";
@@ -13,6 +13,17 @@ type SelectedWallInspectorProps = {
   wall: RoomWall;
   className?: string;
 };
+
+function formatWallType(type: Wall["type"]) {
+  switch (type) {
+    case "external":
+      return "External";
+    case "internal":
+      return "Internal";
+    case "user":
+      return "User";
+  }
+}
 
 export function SelectedWallInspector({
   room,
@@ -27,6 +38,7 @@ export function SelectedWallInspector({
   }
 
   const wallName = getWallLabel(room, wall);
+  const selectedWallObject = room.walls?.[wallSegment.segmentIndex] ?? null;
   
   // Count doors and windows on this wall
   const doorsAndWindows = room.openings.filter((opening) => opening.wall === wall);
@@ -56,6 +68,41 @@ export function SelectedWallInspector({
             {formatWallDimension(wallSegment.lengthMm, displayUnitOrigin)}
           </div>
         </div>
+
+        {selectedWallObject ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Wall object</p>
+              <UnitOriginTag unitOrigin={selectedWallObject.unitOrigin} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Type</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {formatWallType(selectedWallObject.type)}
+                </p>
+              </div>
+              <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Thickness</p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {formatWallDimension(selectedWallObject.thicknessMm, displayUnitOrigin)}
+                </p>
+              </div>
+              <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Floor height</p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {formatWallDimension(selectedWallObject.floorHeightMm, displayUnitOrigin)}
+                </p>
+              </div>
+              <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Ceiling height</p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {formatWallDimension(selectedWallObject.ceilingHeightMm, displayUnitOrigin)}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div>
           <label className="text-xs font-semibold uppercase tracking-wide text-foreground/70">

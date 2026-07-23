@@ -7,6 +7,17 @@ type ReleaseNote = {
 
 const latestHighlights: ReleaseNote[] = [
   {
+    version: "v0.82.0",
+    date: "2026-07-21",
+    title: "Wall objects foundation",
+    items: [
+      "Rooms now have first-class wall data, including wall type, thickness, floor height, and ceiling height.",
+      "New and existing rooms automatically receive wall objects for each boundary edge.",
+      "Walls are now rendered with their stored thickness and a simple distinction between external and internal walls.",
+      "The wall inspector now shows region-aware wall dimensions and type details.",
+    ],
+  },
+  {
     version: "v0.81.2",
     date: "2026-06-15",
     title: "Cleaner coloured exports",
