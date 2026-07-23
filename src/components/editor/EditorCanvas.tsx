@@ -76,6 +76,7 @@ import { getAutoFitExportFraming } from "@/lib/editor/exportAutoFitFraming";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import {
   buildEditorExportFilename,
+  drawExtrudedWallsForExport,
   EDITOR_EXPORT_ROOM_COLOR_FILL_ALPHA,
   type EditorExportRoomColorOverride,
   type EditorExportScope,
@@ -1819,6 +1820,7 @@ export default function EditorCanvas({
       themeMode,
       exportResolution,
       exportScope,
+      exportMode = "2d",
       roomColorOverride,
     }: {
       includeSignature: boolean;
@@ -1837,6 +1839,7 @@ export default function EditorCanvas({
       themeMode: "light" | "dark";
       exportResolution?: "normal" | "hi-res";
       exportScope?: EditorExportScope;
+      exportMode?: ExportPngRequest["exportMode"];
       roomColorOverride?: EditorExportRoomColorOverride;
     }) => {
       const app = appRef.current;
@@ -1885,79 +1888,88 @@ export default function EditorCanvas({
       exportStage.addChild(exportRoomLabels);
       exportStage.addChild(exportDraftGraphics);
 
-      drawRooms(
-        exportRoomGraphics,
-        exportRooms,
-        null,
-        [],
-        EMPTY_ROOM_RESIZE_UI,
-        state.roomDraft.points.length > 0,
-        exportCamera,
-        exportViewport,
-        null,
-        exportTheme,
-        roomColorOverride?.mode === "none" ? false : state.settings.showRoomColors,
-        null,
-        {
-          roomColors: pngRoomColors,
-          roomColorFillAlpha: 1,
-          roomDefaultFillAlpha: roomColorOverride?.mode === "none" ? 0 : undefined,
-        }
-      );
-      drawOpenings(
-        exportOpeningGraphics,
-        exportRooms,
-        null,
-        [],
-        exportCamera,
-        exportViewport,
-        exportTheme,
-        true,
-        { includeStairDirectionVisuals: false }
-      );
-      drawWallInteractionOverlay(
-        exportWallOverlayGraphics,
-        exportRooms,
-        null,
-        [],
-        null,
-        EMPTY_ROOM_RESIZE_UI,
-        state.roomDraft.points.length > 0,
-        exportCamera,
-        exportViewport,
-        null,
-        exportTheme
-      );
-      drawRoomLabels(
-        exportRoomLabels,
-        exportRooms,
-        null,
-        null,
-        exportCamera,
-        exportViewport,
-        state.settings,
-        showDimensions,
-        null,
-        exportTheme,
-        [],
-        state.settings.showRoomNames,
-        exportAssetMode !== "none",
-        state.settings.showAssetLabels,
-        { includeStairDirectionLabels: false, displayUnitOrigin: state.document.region }
-      );
-      drawDraft(
-        exportDraftGraphics,
-        state.roomDraft.points,
-        null,
-        exportCamera,
-        exportViewport,
-        getActiveSnapStepMm(exportCamera),
-        getActiveSnapStepMm(exportCamera),
-        "orthogonal",
-        null,
-        exportTheme,
-        false
-      );
+      if (exportMode === "2.5d") {
+        drawExtrudedWallsForExport(
+          exportRoomGraphics,
+          exportRooms,
+          exportCamera,
+          exportViewport
+        );
+      } else {
+        drawRooms(
+          exportRoomGraphics,
+          exportRooms,
+          null,
+          [],
+          EMPTY_ROOM_RESIZE_UI,
+          state.roomDraft.points.length > 0,
+          exportCamera,
+          exportViewport,
+          null,
+          exportTheme,
+          roomColorOverride?.mode === "none" ? false : state.settings.showRoomColors,
+          null,
+          {
+            roomColors: pngRoomColors,
+            roomColorFillAlpha: 1,
+            roomDefaultFillAlpha: roomColorOverride?.mode === "none" ? 0 : undefined,
+          }
+        );
+        drawOpenings(
+          exportOpeningGraphics,
+          exportRooms,
+          null,
+          [],
+          exportCamera,
+          exportViewport,
+          exportTheme,
+          true,
+          { includeStairDirectionVisuals: false }
+        );
+        drawWallInteractionOverlay(
+          exportWallOverlayGraphics,
+          exportRooms,
+          null,
+          [],
+          null,
+          EMPTY_ROOM_RESIZE_UI,
+          state.roomDraft.points.length > 0,
+          exportCamera,
+          exportViewport,
+          null,
+          exportTheme
+        );
+        drawRoomLabels(
+          exportRoomLabels,
+          exportRooms,
+          null,
+          null,
+          exportCamera,
+          exportViewport,
+          state.settings,
+          showDimensions,
+          null,
+          exportTheme,
+          [],
+          state.settings.showRoomNames,
+          exportAssetMode !== "none",
+          state.settings.showAssetLabels,
+          { includeStairDirectionLabels: false, displayUnitOrigin: state.document.region }
+        );
+        drawDraft(
+          exportDraftGraphics,
+          state.roomDraft.points,
+          null,
+          exportCamera,
+          exportViewport,
+          getActiveSnapStepMm(exportCamera),
+          getActiveSnapStepMm(exportCamera),
+          "orthogonal",
+          null,
+          exportTheme,
+          false
+        );
+      }
 
       return {
         renderer: app.renderer,
@@ -2080,6 +2092,7 @@ export default function EditorCanvas({
       themeMode: resolvedThemeMode,
       exportResolution: request.exportResolution,
       exportScope: request.exportScope,
+      exportMode: request.exportMode,
       roomColorOverride,
     });
   }, [createCanvasExportSnapshot, editorThemeMode]);
@@ -2131,6 +2144,7 @@ export default function EditorCanvas({
           floors: state.document.floors,
           activeFloorId: state.document.activeFloorId,
           exportScope: request.exportScope,
+          exportMode: request.exportMode,
           title: exportTitle || undefined,
           description: exportDescription || undefined,
           exportAssetMode: request.exportAssetMode,

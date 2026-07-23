@@ -1,4 +1,5 @@
-import type { Container, ICanvas, Renderer } from "pixi.js";
+import { Graphics, type Container, type ICanvas, type Renderer } from "pixi.js";
+import { worldToScreen } from "@/lib/editor/camera";
 import { MEASUREMENT_TEXT_FONT_FAMILY } from "@/lib/fonts";
 import {
   normalizeCanvasRotationDegrees,
@@ -16,13 +17,22 @@ import { normalizeNorthBearingDegrees } from "@/lib/editor/north";
 import type {
   EditorExportAssetMode,
   EditorExportFormat,
+  EditorExportMode,
   EditorExportResolution,
 } from "@/lib/editor/exportPreferences";
 import { getLayoutBoundsFromRooms } from "@/lib/editor/exportLayoutBounds";
 import { formatWallDimension } from "@/lib/editor/measurements";
 import { getResolvedRoomOpeningLayout } from "@/lib/editor/openings";
 import { getPolygonLabelAnchor } from "@/lib/editor/roomGeometry";
-import type { Floor, Point, Room, RoomInteriorAsset } from "@/lib/editor/types";
+import type {
+  CameraState,
+  Floor,
+  Point,
+  Room,
+  RoomInteriorAsset,
+  ViewportSize,
+  Wall,
+} from "@/lib/editor/types";
 import type { UnitOrigin } from "@/lib/projects/region";
 
 export type EditorExportScope = {
@@ -130,6 +140,15 @@ const SVG_RIGHT_LEGEND_WIDTH_PX = 190;
 const SVG_BOTTOM_LEGEND_GAP_PX = 16;
 const SVG_SIGNATURE_BASELINE_INSET_PX = 16;
 const PDF_EXPORT_FLOAT_PRECISION = 3;
+const EXTRUDED_WALL_TOP_FILL = 0xe8edf2;
+const EXTRUDED_WALL_TOP_STROKE = 0xc3cbd4;
+const EXTRUDED_WALL_TOP_HIGHLIGHT = 0xffffff;
+const EXTRUDED_WALL_SIDE_FILL = 0xa8b2bd;
+const EXTRUDED_WALL_SIDE_DARK_FILL = 0x8e99a5;
+const EXTRUDED_WALL_MIN_DEPTH_PX = 8;
+const EXTRUDED_WALL_MAX_DEPTH_PX = 72;
+const EXTRUDED_WALL_HEIGHT_PROJECTION = 0.12;
+const EXTRUDED_WALL_X_SKEW = 0.42;
 
 type ExportTextLine = {
   text: string;
@@ -176,6 +195,7 @@ export type SvgExportOptions = {
   floors?: Floor[];
   activeFloorId?: string | null;
   exportScope?: EditorExportScope;
+  exportMode?: EditorExportMode;
   title?: string;
   description?: string;
   exportAssetMode?: EditorExportAssetMode;
@@ -186,6 +206,17 @@ export type SvgExportOptions = {
   signatureText?: string;
   signatureLines?: string[];
   displayUnitOrigin?: UnitOrigin;
+};
+
+type ProjectExportPoint = (point: Point) => Point;
+
+type ExtrudedWallPrism = {
+  top: Point[];
+  visibleSides: {
+    points: Point[];
+    isDark: boolean;
+  }[];
+  depthOrder: number;
 };
 
 export type SvgPdfExportMetadata = {
@@ -286,11 +317,51 @@ export function getEditorExportScopeFilenameParts(
   };
 }
 
+export function drawExtrudedWallsForExport(
+  graphics: Graphics,
+  rooms: Room[],
+  camera: CameraState,
+  viewport: ViewportSize
+) {
+  graphics.clear();
+
+  const prisms = getExtrudedWallPrisms(
+    rooms,
+    (point) => worldToScreen(point, camera, viewport),
+    camera.pixelsPerMm
+  );
+
+  for (const prism of prisms) {
+    for (const side of prism.visibleSides) {
+      graphics
+        .poly(flattenPoints(side.points))
+        .fill({
+          color: side.isDark ? EXTRUDED_WALL_SIDE_DARK_FILL : EXTRUDED_WALL_SIDE_FILL,
+          alpha: 1,
+        });
+    }
+
+    graphics
+      .poly(flattenPoints(prism.top))
+      .fill({ color: EXTRUDED_WALL_TOP_FILL, alpha: 1 })
+      .stroke({ color: EXTRUDED_WALL_TOP_STROKE, width: 1.25, alpha: 0.95, join: "round" });
+
+    const highlightedEdges = getHighlightedTopEdges(prism.top);
+    for (const [start, end] of highlightedEdges) {
+      graphics
+        .moveTo(start.x, start.y)
+        .lineTo(end.x, end.y)
+        .stroke({ color: EXTRUDED_WALL_TOP_HIGHLIGHT, width: 1.1, alpha: 0.72, cap: "round" });
+    }
+  }
+}
+
 export function exportToSVG({
   rooms,
   floors = [],
   activeFloorId = null,
   exportScope,
+  exportMode = "2d",
   title,
   description,
   exportAssetMode = "all",
@@ -328,7 +399,8 @@ export function exportToSVG({
     header ? header.height : 0,
     includeNorthIndicator ? SVG_NORTH_INDICATOR_HEIGHT_PX : 0
   );
-  const maxDoorSwingMm = getMaxSvgDoorSwingClearanceMm(exportRooms);
+  const maxDoorSwingMm =
+    exportMode === "2.5d" ? 0 : getMaxSvgDoorSwingClearanceMm(exportRooms);
   const leftPaddingPx = SVG_EXPORT_PADDING_PX;
   const rightOverlayWidth = Math.max(
     includeNorthIndicator ? SVG_NORTH_INDICATOR_WIDTH_PX : 0,
@@ -381,100 +453,107 @@ export function exportToSVG({
   const openingElements: string[] = [];
   const labelElements: string[] = [];
 
-  for (const room of exportRooms) {
-    if (room.points.length < 3) continue;
-
-    const polygonPoints = room.points.map(pointToString).join(" ");
-    const roomFill = getSvgRoomFill(room, roomColorOverride);
-    const roomFillOpacityAttribute =
-      roomFill.opacity === undefined ? "" : ` fill-opacity="${formatNumber(roomFill.opacity)}"`;
+  if (exportMode === "2.5d") {
     roomElements.push(
-      `<polygon points="${polygonPoints}" fill="${roomFill.color}"${roomFillOpacityAttribute} stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
+      ...buildSvgExtrudedWallElements(exportRooms, projectPoint, scale, formatNumber)
     );
+  } else {
+    for (const room of exportRooms) {
+      if (room.points.length < 3) continue;
 
-    for (let index = 0; index < room.points.length; index += 1) {
-      const start = projectPoint(room.points[index]);
-      const end = projectPoint(room.points[(index + 1) % room.points.length]);
+      const polygonPoints = room.points.map(pointToString).join(" ");
+      const roomFill = getSvgRoomFill(room, roomColorOverride);
+      const roomFillOpacityAttribute =
+        roomFill.opacity === undefined ? "" : ` fill-opacity="${formatNumber(roomFill.opacity)}"`;
       roomElements.push(
-        `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`
-      );
-    }
-
-    if (exportAssetMode !== "none") {
-      for (const asset of room.interiorAssets) {
-        if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
-        const renderedAsset = buildSvgInteriorAssetElements(asset, projectPoint, formatNumber);
-        assetElements.push(...renderedAsset.elements);
-        labelElements.push(...renderedAsset.labelElements);
-      }
-    }
-
-    for (const opening of room.openings) {
-      const layout = getResolvedRoomOpeningLayout(room, opening);
-      if (!layout) continue;
-
-      const start = projectPoint(layout.start);
-      const end = projectPoint(layout.end);
-      const center = projectPoint(layout.center);
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const length = Math.hypot(dx, dy);
-      const tangent = {
-        x: length > 0 ? dx / length : 1,
-        y: length > 0 ? dy / length : 0,
-      };
-      const interiorNormalTarget = projectPoint({
-        x: layout.center.x + layout.interiorNormal.x * 100,
-        y: layout.center.y + layout.interiorNormal.y * 100,
-      });
-      const interiorNormalLength =
-        Math.hypot(interiorNormalTarget.x - center.x, interiorNormalTarget.y - center.y) || 1;
-      const interiorNormal = {
-        x: (interiorNormalTarget.x - center.x) / interiorNormalLength,
-        y: (interiorNormalTarget.y - center.y) / interiorNormalLength,
-      };
-      const markerOffset = opening.type === "window" ? 4 : 10;
-
-      openingElements.push(
-        `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />`
+        `<polygon points="${polygonPoints}" fill="${roomFill.color}"${roomFillOpacityAttribute} stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linejoin="round" />`
       );
 
-      if (opening.type === "window") {
-        openingElements.push(
-          `<line x1="${formatNumber(start.x + interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y + interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x + interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y + interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
-          `<line x1="${formatNumber(start.x - interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y - interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x - interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y - interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
-        );
-      } else {
-        const hinge = opening.hingeSide === "end" ? end : start;
-        const hingeTangent =
-          opening.hingeSide === "end"
-            ? { x: -tangent.x, y: -tangent.y }
-            : tangent;
-        const swingNormal =
-          opening.openingSide === "exterior"
-            ? { x: -interiorNormal.x, y: -interiorNormal.y }
-            : interiorNormal;
-        const radius = Math.max(length, 1);
-        const closedEnd = {
-          x: hinge.x + hingeTangent.x * radius,
-          y: hinge.y + hingeTangent.y * radius,
-        };
-        const openLeafEnd = {
-          x: hinge.x + swingNormal.x * radius,
-          y: hinge.y + swingNormal.y * radius,
-        };
-        const sweepFlag = hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x > 0 ? 1 : 0;
-        openingElements.push(
-          `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(openLeafEnd.x)}" y2="${formatNumber(openLeafEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
-          `<path d="M ${formatNumber(closedEnd.x)} ${formatNumber(closedEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 ${sweepFlag} ${formatNumber(openLeafEnd.x)} ${formatNumber(openLeafEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
+      for (let index = 0; index < room.points.length; index += 1) {
+        const start = projectPoint(room.points[index]);
+        const end = projectPoint(room.points[(index + 1) % room.points.length]);
+        roomElements.push(
+          `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${SVG_ROOM_STROKE}" stroke-width="2" stroke-linecap="round" />`
         );
       }
-    }
 
-    const labelAnchor = getPolygonLabelAnchor(room.points);
-    if (labelAnchor) {
-      const labelPoint = projectPoint(labelAnchor);
-      labelElements.push(buildSvgRoomLabelElement(room.name || "Room", labelPoint, formatNumber));
+      if (exportAssetMode !== "none") {
+        for (const asset of room.interiorAssets) {
+          if (exportAssetMode === "stairs-only" && asset.type !== "stairs") continue;
+          const renderedAsset = buildSvgInteriorAssetElements(asset, projectPoint, formatNumber);
+          assetElements.push(...renderedAsset.elements);
+          labelElements.push(...renderedAsset.labelElements);
+        }
+      }
+
+      for (const opening of room.openings) {
+        const layout = getResolvedRoomOpeningLayout(room, opening);
+        if (!layout) continue;
+
+        const start = projectPoint(layout.start);
+        const end = projectPoint(layout.end);
+        const center = projectPoint(layout.center);
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        const tangent = {
+          x: length > 0 ? dx / length : 1,
+          y: length > 0 ? dy / length : 0,
+        };
+        const interiorNormalTarget = projectPoint({
+          x: layout.center.x + layout.interiorNormal.x * 100,
+          y: layout.center.y + layout.interiorNormal.y * 100,
+        });
+        const interiorNormalLength =
+          Math.hypot(interiorNormalTarget.x - center.x, interiorNormalTarget.y - center.y) || 1;
+        const interiorNormal = {
+          x: (interiorNormalTarget.x - center.x) / interiorNormalLength,
+          y: (interiorNormalTarget.y - center.y) / interiorNormalLength,
+        };
+        const markerOffset = opening.type === "window" ? 4 : 10;
+
+        openingElements.push(
+          `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />`
+        );
+
+        if (opening.type === "window") {
+          openingElements.push(
+            `<line x1="${formatNumber(start.x + interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y + interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x + interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y + interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+            `<line x1="${formatNumber(start.x - interiorNormal.x * markerOffset)}" y1="${formatNumber(start.y - interiorNormal.y * markerOffset)}" x2="${formatNumber(end.x - interiorNormal.x * markerOffset)}" y2="${formatNumber(end.y - interiorNormal.y * markerOffset)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`
+          );
+        } else {
+          const hinge = opening.hingeSide === "end" ? end : start;
+          const hingeTangent =
+            opening.hingeSide === "end"
+              ? { x: -tangent.x, y: -tangent.y }
+              : tangent;
+          const swingNormal =
+            opening.openingSide === "exterior"
+              ? { x: -interiorNormal.x, y: -interiorNormal.y }
+              : interiorNormal;
+          const radius = Math.max(length, 1);
+          const closedEnd = {
+            x: hinge.x + hingeTangent.x * radius,
+            y: hinge.y + hingeTangent.y * radius,
+          };
+          const openLeafEnd = {
+            x: hinge.x + swingNormal.x * radius,
+            y: hinge.y + swingNormal.y * radius,
+          };
+          const sweepFlag =
+            hingeTangent.x * swingNormal.y - hingeTangent.y * swingNormal.x > 0 ? 1 : 0;
+          openingElements.push(
+            `<line x1="${formatNumber(hinge.x)}" y1="${formatNumber(hinge.y)}" x2="${formatNumber(openLeafEnd.x)}" y2="${formatNumber(openLeafEnd.y)}" stroke="${SVG_MUTED_STROKE}" stroke-width="1.5" stroke-linecap="round" />`,
+            `<path d="M ${formatNumber(closedEnd.x)} ${formatNumber(closedEnd.y)} A ${formatNumber(radius)} ${formatNumber(radius)} 0 0 ${sweepFlag} ${formatNumber(openLeafEnd.x)} ${formatNumber(openLeafEnd.y)}" fill="none" stroke="${SVG_MUTED_STROKE}" stroke-width="1.25" stroke-linecap="round" />`
+          );
+        }
+      }
+
+      const labelAnchor = getPolygonLabelAnchor(room.points);
+      if (labelAnchor) {
+        const labelPoint = projectPoint(labelAnchor);
+        labelElements.push(buildSvgRoomLabelElement(room.name || "Room", labelPoint, formatNumber));
+      }
     }
   }
 
@@ -1083,6 +1162,164 @@ function getMaxSvgDoorSwingClearanceMm(rooms: Room[]): number {
   }
 
   return maxDoorWidthMm;
+}
+
+function getExtrudedWallPrisms(
+  rooms: Room[],
+  projectPoint: ProjectExportPoint,
+  pixelsPerMm: number
+): ExtrudedWallPrism[] {
+  const prisms = rooms.flatMap((room) =>
+    (room.walls ?? []).flatMap((wall) => {
+      const prism = getExtrudedWallPrism(wall, projectPoint, pixelsPerMm);
+      return prism ? [prism] : [];
+    })
+  );
+
+  return prisms.sort((a, b) => a.depthOrder - b.depthOrder);
+}
+
+function getExtrudedWallPrism(
+  wall: Wall,
+  projectPoint: ProjectExportPoint,
+  pixelsPerMm: number
+): ExtrudedWallPrism | null {
+  const deltaX = wall.b.x - wall.a.x;
+  const deltaY = wall.b.y - wall.a.y;
+  const lengthMm = Math.hypot(deltaX, deltaY);
+  const heightMm = Math.max(0, wall.ceilingHeightMm - wall.floorHeightMm);
+  if (lengthMm <= 0 || wall.thicknessMm <= 0 || heightMm <= 0) return null;
+
+  const halfThicknessMm = wall.thicknessMm / 2;
+  const normalX = (-deltaY / lengthMm) * halfThicknessMm;
+  const normalY = (deltaX / lengthMm) * halfThicknessMm;
+  const base = [
+    projectPoint({ x: wall.a.x + normalX, y: wall.a.y + normalY }),
+    projectPoint({ x: wall.b.x + normalX, y: wall.b.y + normalY }),
+    projectPoint({ x: wall.b.x - normalX, y: wall.b.y - normalY }),
+    projectPoint({ x: wall.a.x - normalX, y: wall.a.y - normalY }),
+  ];
+  const depthPx = Math.min(
+    EXTRUDED_WALL_MAX_DEPTH_PX,
+    Math.max(
+      EXTRUDED_WALL_MIN_DEPTH_PX,
+      heightMm * pixelsPerMm * EXTRUDED_WALL_HEIGHT_PROJECTION
+    )
+  );
+  const extrusion = {
+    x: -depthPx * EXTRUDED_WALL_X_SKEW,
+    y: -depthPx,
+  };
+  const top = base.map((point) => ({
+    x: point.x + extrusion.x,
+    y: point.y + extrusion.y,
+  }));
+  const center = getPointListCenter(base);
+  const visibleSides = base.flatMap((start, index) => {
+    const end = base[(index + 1) % base.length];
+    const midpoint = {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2,
+    };
+    const outward = {
+      x: midpoint.x - center.x,
+      y: midpoint.y - center.y,
+    };
+    if (outward.x * extrusion.x + outward.y * extrusion.y >= 0) return [];
+
+    return [
+      {
+        points: [start, end, top[(index + 1) % top.length], top[index]],
+        isDark: Math.abs(outward.x) >= Math.abs(outward.y),
+      },
+    ];
+  });
+
+  return {
+    top,
+    visibleSides,
+    depthOrder: center.y + center.x * 0.001,
+  };
+}
+
+function buildSvgExtrudedWallElements(
+  rooms: Room[],
+  projectPoint: ProjectExportPoint,
+  pixelsPerMm: number,
+  formatNumber: (value: number) => string
+): string[] {
+  const elements: string[] = [];
+  const prisms = getExtrudedWallPrisms(rooms, projectPoint, pixelsPerMm);
+
+  for (const prism of prisms) {
+    for (const side of prism.visibleSides) {
+      elements.push(
+        `<polygon points="${formatSvgPointList(side.points, formatNumber)}" fill="${toSvgHexColor(side.isDark ? EXTRUDED_WALL_SIDE_DARK_FILL : EXTRUDED_WALL_SIDE_FILL)}" />`
+      );
+    }
+
+    elements.push(
+      `<polygon points="${formatSvgPointList(prism.top, formatNumber)}" fill="${toSvgHexColor(EXTRUDED_WALL_TOP_FILL)}" stroke="${toSvgHexColor(EXTRUDED_WALL_TOP_STROKE)}" stroke-width="1.25" stroke-linejoin="round" />`
+    );
+
+    for (const [start, end] of getHighlightedTopEdges(prism.top)) {
+      elements.push(
+        `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${toSvgHexColor(EXTRUDED_WALL_TOP_HIGHLIGHT)}" stroke-width="1.1" stroke-linecap="round" opacity="0.72" />`
+      );
+    }
+  }
+
+  return elements;
+}
+
+function getHighlightedTopEdges(points: Point[]): [Point, Point][] {
+  const center = getPointListCenter(points);
+  const lightDirection = { x: -0.65, y: -1 };
+
+  return points.flatMap((start, index) => {
+    const end = points[(index + 1) % points.length];
+    const midpoint = {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2,
+    };
+    const outward = {
+      x: midpoint.x - center.x,
+      y: midpoint.y - center.y,
+    };
+    return outward.x * lightDirection.x + outward.y * lightDirection.y > 0
+      ? [[start, end] as [Point, Point]]
+      : [];
+  });
+}
+
+function getPointListCenter(points: Point[]): Point {
+  const total = points.reduce(
+    (sum, point) => ({
+      x: sum.x + point.x,
+      y: sum.y + point.y,
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length,
+  };
+}
+
+function flattenPoints(points: Point[]): number[] {
+  return points.flatMap((point) => [point.x, point.y]);
+}
+
+function formatSvgPointList(
+  points: Point[],
+  formatNumber: (value: number) => string
+): string {
+  return points.map((point) => `${formatNumber(point.x)},${formatNumber(point.y)}`).join(" ");
+}
+
+function toSvgHexColor(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
 }
 
 function normalizeSvgText(value: string): string {
